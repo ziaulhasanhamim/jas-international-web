@@ -1,0 +1,174 @@
+﻿@page "/"
+
+<PageTitle>JAS International — Gadgets & Accessories</PageTitle>
+
+<HeroCarousel />
+
+<CategoryGrid Categories="_categories" />
+
+<ProductSection Title="New arrivals"
+                Eyebrow="Just landed"
+                Products="_newArrivals"
+                ViewAllHref="/products?sort=newest" />
+
+<ProductSection Title="Earbuds"
+                Eyebrow="Hear more"
+                Products="_earbuds"
+                ViewAllHref="/products/earbuds" />
+
+<ProductSection Title="Smart watches"
+                Eyebrow="Stay connected"
+                Products="_smartWatches"
+                ViewAllHref="/products/smart-watches" />
+
+<ProductSection Title="Speakers"
+                Eyebrow="Turn it up"
+                Products="_speakers"
+                ViewAllHref="/products/speakers" />
+
+@* <PromoBanners /> *@
+
+<TrustFeatures />
+
+@code {
+
+    private readonly Category[] _categories =
+    [
+        new("Earbuds", "🎧", "/products/earbuds"),
+        new("Smart Watches", "⌚", "/products/smart-watches"),
+        new("Speakers", "🔊", "/products/speakers"),
+        new("Headphones", "🎧", "/products/headphones"),
+        new("Microphones", "🎙️", "/products/microphones"),
+        new("Chargers", "🔌", "/products/chargers"),
+        new("Power Banks", "🔋", "/products/power-banks"),
+        new("Accessories", "⚡", "/products/accessories"),
+    ];
+
+    private readonly Product[] _newArrivals =
+    [
+        new(
+            "OnePlus Nord Buds 4 Pro",
+            "Earbuds",
+            4990,
+            "New",
+            "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Hollyland Lark A1",
+            "Microphones",
+            7990,
+            "New",
+            "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Smart Watch Series 2",
+            "Smart Watches",
+            5490,
+            null,
+            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Portable Bluetooth Speaker",
+            "Speakers",
+            3990,
+            "New",
+            "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=800&q=80"
+        )
+    ];
+
+    private readonly Product[] _earbuds =
+    [
+        new(
+            "Realme Buds Air 7",
+            "Earbuds",
+            3990,
+            "Popular",
+            "https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Realme T500 Pro",
+            "Earbuds",
+            3790,
+            null,
+            "https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "OnePlus Nord Buds 4 Pro1",
+            "Earbuds",
+            4990,
+            "New",
+            "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "QCY ANC Earbuds",
+            "Earbuds",
+            2990,
+            "Deal",
+            "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?auto=format&fit=crop&w=800&q=80"
+        )
+    ];
+
+    private readonly Product[] _smartWatches =
+    [
+        new(
+            "Redmi Watch 5 Active",
+            "Smart Watches",
+            4990,
+            "Popular",
+            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Amazfit Active",
+            "Smart Watches",
+            9990,
+            null,
+            "https://images.unsplash.com/photo-1544117519-31a4b719223d?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Oraimo Watch",
+            "Smart Watches",
+            3490,
+            "Deal",
+            "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Smart Watch Pro",
+            "Smart Watches",
+            5990,
+            "New",
+            "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=800&q=80"
+        )
+    ];
+
+    private readonly Product[] _speakers =
+    [
+        new(
+            "SoundCore Mini",
+            "Speakers",
+            2990,
+            null,
+            "https://images.unsplash.com/photo-1589256469067-ea99122bbdc4?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "JBL Portable Speaker",
+            "Speakers",
+            6990,
+            "Popular",
+            "https://images.unsplash.com/photo-1608156639585-b3a032ef9689?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "Oraimo SoundGo",
+            "Speakers",
+            3990,
+            null,
+            "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=800&q=80"
+        ),
+        new(
+            "BassBox Mini",
+            "Speakers",
+            2490,
+            "Deal",
+            "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=800&q=80"
+        )
+    ];
+}

@@ -1,0 +1,47 @@
+@using JASIntWeb.Client.Models
+<section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+
+    <div class="mb-6 flex items-end justify-between gap-4">
+
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-volt">
+                @Eyebrow
+            </p>
+
+            <h2 class="font-display mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+                @Title
+            </h2>
+        </div>
+
+        <a href="@ViewAllHref"
+           class="text-sm font-medium text-slate-500 transition hover:text-ink">
+            View all →
+        </a>
+
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+
+        @foreach (var product in Products)
+        {
+            <ProductCard Product="product" />
+        }
+
+    </div>
+
+</section>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Eyebrow { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Product> Products { get; set; } = [];
+
+    [Parameter]
+    public string ViewAllHref { get; set; } = "/products";
+}

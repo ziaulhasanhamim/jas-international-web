@@ -1,0 +1,143 @@
+<div class="space-y-1">
+
+    @foreach (var category in Categories)
+    {
+        var isOpen = _openCategory == category.Slug;
+
+        <div>
+
+            <div class="flex items-center">
+
+                <a href="/products/@category.Slug" class="flex-1 rounded-lg px-3 py-2 text-sm
+                    text-slate-600
+                    hover:bg-mist hover:text-ink @(category.Slug == CategorySlug ? "font-bold" : "")">
+
+                    @category.Name
+
+                </a>
+
+                <span class="px-2 text-xs text-slate-400">
+                    @category.Count
+                </span>
+
+                @if (category.Subcategories.Count > 0)
+                {
+                    <button type="button" @onclick="() => ToggleCategory(category.Slug)" class="mr-1 flex h-8 w-8 items-center
+                        justify-center rounded-lg
+                        text-slate-400
+                        hover:bg-mist hover:text-ink"
+                            aria-label="@(isOpen ? "Hide" : "Show") @category.Name subcategories" aria-expanded="@isOpen">
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200
+                            @(isOpen ? "rotate-90" : "")" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                             stroke-width="1.8">
+
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+
+                        </svg>
+
+                    </button>
+                }
+
+            </div>
+
+            @if (isOpen)
+            {
+                <div class="ml-3 space-y-1 border-l
+                    border-slate-200 pl-3">
+
+                    @foreach (var subcategory in category.Subcategories)
+                    {
+                        <a href="/products/@subcategory.Slug" class="block rounded-md px-3 py-1.5
+                            text-sm text-slate-500
+                            hover:bg-mist hover:text-ink">
+
+                            @subcategory.Name
+
+                        </a>
+                    }
+
+                </div>
+            }
+
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter]
+    public string? CategorySlug { get; set; }
+    private string? _openCategory;
+
+    private void ToggleCategory(string slug)
+    {
+        _openCategory = _openCategory == slug
+            ? null
+            : slug;
+    }
+
+    private readonly List<Category> Categories =
+    [
+        new(
+            "Earbuds",
+            "earbuds",
+            30,
+            [
+                new("TWS", "tws"),
+                new("ANC", "anc"),
+                new("Gaming", "gaming")
+            ]),
+
+        new(
+            "Smart Watches",
+            "smart-watches",
+            20,
+            [
+                new("AMOLED", "amoled"),
+                new("Fitness", "fitness"),
+                new("Bluetooth Calling", "calling")
+            ]),
+
+        new(
+            "Speakers",
+            "speakers",
+            15,
+            [
+                new("Portable", "portable"),
+                new("Party", "party"),
+                new("Desktop", "desktop")
+            ]),
+
+        new(
+            "Microphones",
+            "microphones",
+            12,
+            [
+                new("Wireless", "wireless"),
+                new("USB", "usb"),
+                new("Lavalier", "lavalier")
+            ]),
+
+        new(
+            "Accessories",
+            "accessories",
+            40,
+            [
+                new("Chargers", "chargers"),
+                new("Hubs", "hubs"),
+                new("Cables", "cables"),
+                new("Power Banks", "power-banks")
+            ])
+    ];
+
+    private sealed record Category(
+        string Name,
+        string Slug,
+        int Count,
+        IReadOnlyList<Subcategory> Subcategories);
+
+    private sealed record Subcategory(
+        string Name,
+        string Slug);
+}

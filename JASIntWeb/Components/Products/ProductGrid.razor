@@ -1,0 +1,14 @@
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+
+    @foreach (var product in Products)
+    {
+        <ProductCard Product="product" />
+    }
+
+</div>
+
+@code {
+
+    [Parameter]
+    public IReadOnlyList<Product> Products { get; set; } = [];
+}

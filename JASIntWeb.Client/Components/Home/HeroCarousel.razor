@@ -1,0 +1,241 @@
+@rendermode InteractiveAuto
+@implements IAsyncDisposable
+
+<section class="relative overflow-hidden bg-ink text-white"
+         aria-roledescription="carousel"
+         aria-label="Featured gadgets">
+    <div class="relative min-h-[24rem] sm:min-h-[30rem] lg:min-h-[34rem]">
+        @for(var i = 0; i < _slides.Length; i++)
+        {
+            var slide = _slides[i];
+            var active = i == _index;
+
+            <div class="absolute inset-0 transition-opacity duration-700
+                        @(active ? "opacity-100" : "pointer-events-none opacity-0")"
+                 role="group"
+                 aria-roledescription="slide"
+                 aria-hidden="@(!active)">
+
+                <!-- Hero image -->
+                <img src="@slide.Image"
+                     alt="@slide.ImageAlt"
+                     class="absolute inset-0 h-full w-full object-cover" />
+
+                @if (slide.HasText)
+                {
+                    <!-- Subtle gradient so the image remains prominent -->
+                    <div class="absolute inset-0 bg-gradient-to-r
+                                from-ink/80 via-ink/35 to-transparent">
+                    </div>
+
+                    <!-- Optional text -->
+                    <div class="relative z-10 mx-auto flex h-full max-w-7xl
+                                items-center px-4 py-12 sm:px-6 lg:px-8">
+
+                        <div class="max-w-xl">
+
+                            @if (!string.IsNullOrWhiteSpace(slide.Eyebrow))
+                            {
+                                <p class="mb-3 text-xs font-semibold uppercase
+                                          tracking-[0.22em] text-volt">
+                                    @slide.Eyebrow
+                                </p>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(slide.Title))
+                            {
+                                @if (i == 0)
+                                {
+                                    <h1 class="font-display text-4xl font-semibold
+                                               tracking-tight sm:text-5xl lg:text-6xl">
+                                        @slide.Title
+                                    </h1>
+                                }
+                                else
+                                {
+                                    <h2 class="font-display text-4xl font-semibold
+                                               tracking-tight sm:text-5xl lg:text-6xl">
+                                        @slide.Title
+                                    </h2>
+                                }
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(slide.Copy))
+                            {
+                                <p class="mt-4 max-w-md text-base text-white/75 sm:text-lg">
+                                    @slide.Copy
+                                </p>
+                            }
+
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Carousel controls -->
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 z-30
+                mx-auto flex max-w-7xl items-end justify-between
+                px-4 pb-5 sm:px-6 lg:px-8">
+
+        <!-- Indicators -->
+        <div class="pointer-events-auto flex gap-2"
+             role="tablist"
+             aria-label="Slides">
+
+            @for (var idx = 0; idx < _slides.Length; idx++)
+            {
+                var slide = idx;
+                <button type="button"
+                        class="h-1.5 rounded-full transition-all
+                               @(_index == idx
+                                   ? "w-8 bg-volt"
+                                   : "w-4 bg-white/45 hover:bg-white/70")"
+                        aria-label="Go to slide @(idx + 1)"
+                        aria-selected="@(_index == idx)"
+                        @onclick="() => GoTo(slide)">
+                </button>
+            }
+        </div>
+
+        <!-- Previous / Next -->
+        <div class="pointer-events-auto flex gap-2">
+
+            <button type="button"
+                    class="flex h-10 w-10 items-center justify-center
+                           rounded-full border border-white/20 bg-ink/40
+                           text-white backdrop-blur-sm transition
+                           hover:bg-white/15"
+                    aria-label="Previous slide"
+                    @onclick="Prev">
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-4 w-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M15 19 8 12l7-7" />
+                </svg>
+            </button>
+
+            <button type="button"
+                    class="flex h-10 w-10 items-center justify-center
+                           rounded-full border border-white/20 bg-ink/40
+                           text-white backdrop-blur-sm transition
+                           hover:bg-white/15"
+                    aria-label="Next slide"
+                    @onclick="Next">
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-4 w-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="m9 5 7 7-7 7" />
+                </svg>
+            </button>
+
+        </div>
+    </div>
+
+</section>
+
+@code {
+    private int _index;
+    private CancellationTokenSource? _cts;
+
+    private readonly Slide[] _slides =
+    [
+        new(
+            Eyebrow: "New drop",
+            Title: "Pulse X Pro is here",
+            Copy: "Titanium frame, 120Hz OLED, and a camera that holds up after dark.",
+            Image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1800&q=80",
+            ImageAlt: "Smartphone"
+        ),
+
+        new(
+            Eyebrow: "Audio week",
+            Title: "Silence, studio-tuned",
+            Copy: "ANC headphones with 40-hour battery and spatial audio.",
+            Image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1800&q=80",
+            ImageAlt: "Wireless headphones"
+        ),
+
+        // Image-only slide
+        new(
+            Eyebrow: null,
+            Title: null,
+            Copy: null,
+            Image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1800&q=80",
+            ImageAlt: "Laptop"
+        )
+    ];
+
+    protected override void OnInitialized()
+    {
+        _cts = new CancellationTokenSource();
+        _ = AutoPlayAsync(_cts.Token);
+    }
+
+    private async Task AutoPlayAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(5500, token);
+
+                Next();
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void Next()
+    {
+        _index = (_index + 1) % _slides.Length;
+    }
+
+    private void Prev()
+    {
+        _index = (_index - 1 + _slides.Length) % _slides.Length;
+    }
+
+    private void GoTo(int index)
+    {
+        _index = index;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+
+        return ValueTask.CompletedTask;
+    }
+
+    private sealed record Slide(
+        string? Eyebrow,
+        string? Title,
+        string? Copy,
+        string Image,
+        string ImageAlt)
+    {
+        public bool HasText =>
+            !string.IsNullOrWhiteSpace(Eyebrow) ||
+            !string.IsNullOrWhiteSpace(Title) ||
+            !string.IsNullOrWhiteSpace(Copy);
+    }
+}

@@ -1,0 +1,36 @@
+@rendermode InteractiveAuto
+<select @bind="SelectedSort"
+        class="rounded-xl border border-slate-200
+               bg-white px-3 py-2 text-sm outline-none
+               focus:border-volt">
+
+    <option value="featured">
+        Featured
+    </option>
+
+    <option value="newest">
+        Newest
+    </option>
+
+    <option value="price-low">
+        Price: Low → High
+    </option>
+
+    <option value="price-high">
+        Price: High → Low
+    </option>
+
+    <option value="name">
+        Name
+    </option>
+
+</select>
+
+@code {
+
+    [Parameter]
+    public string SelectedSort { get; set; } = "featured";
+
+    [Parameter]
+    public EventCallback<string> SelectedSortChanged { get; set; }
+}
