@@ -1,0 +1,25 @@
+@inject NavigationManager Nav
+
+<nav class="admin-pagination" aria-label="Pagination">
+    <span>@Total records · Page @Page of @Math.Max(1, (int)Math.Ceiling(Total / (double)Size))</span>
+    <div>
+        @if (Page > 1)
+        {
+            <a class="shop-button-secondary" href="@Nav.GetUriWithQueryParameter("page", Page - 1)">Previous</a>
+        }
+        @if (Page * Size < Total)
+        {
+            <a class="shop-button-secondary" href="@Nav.GetUriWithQueryParameter("page", Page + 1)">Next</a>
+        }
+    </div>
+</nav>
+
+@code
+{
+    [Parameter]
+    public int Total { get; set; }
+    [Parameter]
+    public int Page { get; set; } = 1;
+    [Parameter]
+    public int Size { get; set; } = 25;
+}

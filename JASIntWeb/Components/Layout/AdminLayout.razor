@@ -1,0 +1,42 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.WebUtilities
+
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <a href="/admin" class="admin-brand">
+            <span class="admin-brand-mark">JAS</span>
+            <span>
+                Control center
+                <small>JAS International</small>
+            </span>
+        </a>
+        <AdminNavigation />
+        <a href="/" class="admin-store-link">↗ View storefront</a>
+    </aside>
+    <div class="admin-workspace">
+        <header class="admin-topbar">
+            <span class="admin-workspace-label">STORE OPERATIONS</span>
+            <div class="admin-account">
+                <AuthorizeView>
+                    <Authorized Context="state">
+                        <span>@state.User.Identity?.Name</span>
+                    </Authorized>
+                </AuthorizeView>
+                <a href="/account/logout">Sign out</a>
+            </div>
+        </header>
+        <details class="admin-mobile-menu">
+            <summary>☰ Dashboard menu</summary>
+            <AdminNavigation />
+        </details>
+        <main class="admin-main">
+            @if (QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).TryGetValue("saved", out var saved) && saved == "true")
+            {
+                <p class="form-notice" role="status">Changes saved.</p>
+            }
+            @Body
+        </main>
+        <footer class="admin-footer">JAS International · Store management</footer>
+    </div>
+</div>

@@ -1,0 +1,25 @@
+@rendermode InteractiveAuto
+@inject CartService Cart
+
+@if (Cart.Error is not null)
+{
+    <p class="form-notice">
+        Your order is placed. Your browser cart could not be refreshed;
+        reload this page to try again.
+    </p>
+}
+
+@code
+{
+    [Parameter]
+    public Guid CheckoutToken { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            await Cart.CompleteCheckoutAsync(CheckoutToken);
+            StateHasChanged();
+        }
+    }
+}

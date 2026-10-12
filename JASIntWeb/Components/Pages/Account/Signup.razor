@@ -1,0 +1,81 @@
+@page "/account/signup"
+@inject UserManager<User> Users
+@inject SignInManager<User> SignIn
+
+<PageTitle>Create account — JAS International</PageTitle>
+<div class="shop-container">
+    <div class="shop-panel mx-auto max-w-md">
+        <h1 class="text-3xl font-semibold">Create account</h1>
+        @if (completed)
+        {
+            <SessionRedirect Destination="/cart" />
+        }
+        else
+        {
+            @if (error is not null)
+            {
+                <p role="alert" class="form-error">@error</p>
+            }
+            @if (Input is null)
+            {
+                <p class="admin-help">Loading form…</p>
+            }
+            else
+            {
+                <EditForm Model="Input" OnValidSubmit="Submit" FormName="signup" method="post" Enhance class="mt-6">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <label class="shop-label">
+                        Email
+                        <InputText @bind-Value="Input!.Email" type="email" autocomplete="username" class="shop-input" />
+                    </label>
+                    <label class="shop-label">
+                        Password
+                        <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="shop-input" />
+                    </label>
+                    <p class="mb-4 text-xs text-slate-500">At least 8 characters, including a lowercase letter and a number.</p>
+                    <label class="shop-label">
+                        Confirm password
+                        <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="shop-input" />
+                    </label>
+                    <button class="shop-button w-full" type="submit">Create account</button>
+                </EditForm>
+            }
+            <p class="mt-5 text-sm">
+                Have an account?
+                <a href="/account/login" class="text-volt">Sign in</a>
+            </p>
+        }
+    </div>
+</div>
+
+@code
+{
+    [SupplyParameterFromForm(FormName = "signup")]
+    private SignupForm? Input { get; set; }
+    private string? error;
+    private bool completed;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task Submit()
+    {
+        var email = Input!.Email.Trim();
+        var user = new User
+        {
+            UserName = email,
+            Email = email
+        };
+        var result = await Users.CreateAsync(user, Input.Password);
+        if (result.Succeeded)
+        {
+            await SignIn.SignInAsync(user, false);
+            completed = true;
+        }
+        else
+        {
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+        }
+        Input.Password = Input.ConfirmPassword = "";
+    }
+}

@@ -1,0 +1,82 @@
+@page "/admin/products"
+@inject AppDbContext Db
+
+<PageTitle>Products — JAS Admin</PageTitle>
+<AdminPageHeader
+    Title="Products"
+    Description="Manage your catalog, product options and variants."
+    ActionHref="/admin/products/new"
+    ActionText="+ Add product"
+/>
+<form method="get" data-enhance class="admin-toolbar">
+    <input name="q" value="@Query" class="shop-input" placeholder="Search product name or SKU" />
+    <button class="shop-button-secondary">Search</button>
+    <a href="/admin/products">Clear</a>
+</form>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Variants</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in products)
+            {
+                <tr>
+                    <td>
+                        <strong>@p.Name</strong>
+                        <small class="cell-secondary">@p.Slug</small>
+                    </td>
+                    <td>@p.Category</td>
+                    <td>@p.VariantCount</td>
+                    <td>
+                        <span class="status-badge">@(p.Hidden ? "Hidden" : "Visible")</span>
+                    </td>
+                    <td class="row-actions">
+                        <a href="/admin/products/@p.Id/edit">Edit</a>
+                        <a href="/admin/products/@p.Id/variants">Variants & stock</a>
+                        <a href="/product/@p.Slug" target="_blank" rel="noopener">View ↗</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (products.Count == 0)
+    {
+        <p class="admin-empty">No products match your search.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<AdminProductRow> products = [];
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        var q = Db.Products.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            var term = Query.Trim().ToLower();
+            q = q.Where(p => p.Name.ToLower().Contains(term) || p.ProductVariants.Any(v => v.SKU.ToLower().Contains(term)));
+        }
+        total = await q.CountAsync();
+        products = await q.OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .Skip((Page - 1) * 25)
+            .Take(25)
+            .Select(p => new AdminProductRow(p.Id, p.Name, p.Slug, p.Category!.Name, p.ProductVariants.Count(v => !v.IsDeleted), p.IsDeleted))
+            .ToListAsync();
+    }
+}

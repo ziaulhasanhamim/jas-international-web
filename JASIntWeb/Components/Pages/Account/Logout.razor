@@ -1,0 +1,39 @@
+@page "/account/logout"
+@inject SignInManager<User> SignIn
+@inject UserManager<User> Users
+
+<div class="shop-container">
+    <div class="shop-panel mx-auto max-w-md">
+        <h1 class="text-2xl font-semibold">Sign out</h1>
+        @if (completed)
+        {
+            <SessionRedirect Destination="/" />
+        }
+        else
+        {
+            <form method="post" @formname="logout" @onsubmit="Submit" data-enhance>
+                <AntiforgeryToken />
+                <p class="my-5">Sign out of your account on all devices?</p>
+                <button type="submit" class="shop-button">Sign out</button>
+            </form>
+        }
+    </div>
+</div>
+
+@code
+{
+    [CascadingParameter]
+    private HttpContext Http { get; set; } = default!;
+    private bool completed;
+
+    private async Task Submit()
+    {
+        var user = await Users.GetUserAsync(Http.User);
+        if (user is not null)
+        {
+            await Users.UpdateSecurityStampAsync(user);
+        }
+        await SignIn.SignOutAsync();
+        completed = true;
+    }
+}

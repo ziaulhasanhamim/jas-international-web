@@ -1,0 +1,186 @@
+@page "/admin/products/{ProductId:int}/attributes"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="Product attributes & options"
+    Description="Choose which attributes and values customers can select for this product."
+    ActionHref="/admin/products"
+    ActionText="Back to products"
+/>
+<ProductAdminTabs ProductId="ProductId" />
+@if (productName is null)
+{
+    <p class="admin-empty">Product not found.</p>
+}
+else
+{
+    <h2 class="admin-record-title">@productName</h2>
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="product-attributes"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <p class="admin-help">Enable an attribute, then tick its allowed values. Existing variants keep their options. Remove an option from those variants before removing it here.</p>
+            @for (var i = 0; i < Input!.Attributes.Count; i++)
+            {
+                var index = i;
+                var row = Input.Attributes[i];
+                var definition = definitions.FirstOrDefault(a => a.Id == row.AttributeDefinitionId);
+                <fieldset class="attribute-config">
+                    <legend>@(definition?.Name ?? "Unknown attribute")</legend>
+                    <input
+                        type="hidden"
+                        name="@($"Input.Attributes[{index}].AttributeDefinitionId")"
+                        value="@row.AttributeDefinitionId"
+                    />
+                    <div class="attribute-flags">
+                        <label class="check-label">
+                            <input type="checkbox" name="@($"Input.Attributes[{index}].Enabled")" checked="@(row.Enabled)" value="true" />
+                            <input type="hidden" name="@($"Input.Attributes[{index}].Enabled")" value="false" />
+                            Use on this product
+                        </label>
+                        <label class="check-label">
+                            <input type="checkbox" name="@($"Input.Attributes[{index}].Required")" checked="@(row.Required)" value="true" />
+                            <input type="hidden" name="@($"Input.Attributes[{index}].Required")" value="false" />
+                            Every active variant requires a value
+                        </label>
+                    </div>
+                    <div class="option-checkbox-grid">
+                        @for (var j = 0; j < row.Options.Count; j++)
+                        {
+                            var optionIndex = j;
+                            var option = row.Options[j];
+                            <label class="option-checkbox">
+                                <input
+                                    type="hidden"
+                                    name="@($"Input.Attributes[{index}].Options[{optionIndex}].AttributeOptionId")"
+                                    value="@option.AttributeOptionId"
+                                />
+                                <input
+                                    type="checkbox"
+                                    name="@($"Input.Attributes[{index}].Options[{optionIndex}].Enabled")"
+                                    checked="@(option.Enabled)"
+                                    value="true"
+                                />
+                                <input type="hidden" name="@($"Input.Attributes[{index}].Options[{optionIndex}].Enabled")" value="false" />
+                                @(definition?.Options.FirstOrDefault(o => o.Id == option.AttributeOptionId)?.Value ?? "Unknown value")
+                            </label>
+                        }
+                    </div>
+                    @if (row.Options.Count == 0)
+                    {
+                        <p class="admin-help">Add values in the attribute library first.</p>
+                    }
+                </fieldset>
+            }
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save allowed options</button>
+                <a href="/admin/products/@ProductId/variants" class="shop-button-secondary">Manage variants →</a>
+                <a href="/admin/attributes">Attribute library</a>
+            </div>
+        </EditForm>
+    }
+    @if (bindings.Count > 0)
+    {
+        <div class="shop-panel mt-6">
+            <OrderEditor
+                Kind="OrderableKind.ProductAttributes"
+                ScopeId="ProductId"
+                Items="attributeOrder"
+                Title="Attribute display order"
+            />
+        </div>
+        <div class="admin-form-grid mt-6">
+            @foreach (var binding in bindings)
+            {
+                <div class="shop-panel">
+                    <OrderEditor
+                        @key="binding.Id"
+                        Kind="OrderableKind.ProductOptions"
+                        ScopeId="binding.Id"
+                        Items="@binding.Options.OrderBy(o => o.SortOrder).ThenBy(o => o.Id).Select(o => new OrderableItemDto(o.Id, o.AttributeOption!.Value)).ToList()"
+                        Title="@($"{binding.AttributeDefinition!.Name} value order")"
+                    />
+                </div>
+            }
+        </div>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int ProductId { get; set; }
+    [SupplyParameterFromForm(FormName = "product-attributes")]
+    private ProductAttributesForm? Input { get; set; }
+    private string? productName, error;
+    private List<AttributeDefinition> definitions = [];
+    private List<ProductAttributeDefinition> bindings = [];
+    private List<OrderableItemDto> attributeOrder = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        productName = await Db.Products.Where(p => p.Id == ProductId).Select(p => p.Name).SingleOrDefaultAsync();
+        definitions = await Db.AttributeDefinitions.AsNoTracking()
+            .Include(a => a.Options)
+            .OrderBy(a => a.Name)
+            .ToListAsync();
+        bindings = await Db.ProductAttributeDefinitions.AsNoTracking()
+            .Include(a => a.AttributeDefinition)
+            .Include(a => a.Options)
+            .ThenInclude(o => o.AttributeOption)
+            .Where(a => a.ProductId == ProductId)
+            .OrderBy(a => a.SortOrder)
+            .ThenBy(a => a.Id)
+            .ToListAsync();
+        attributeOrder = bindings.Select(a => new OrderableItemDto(a.Id, a.AttributeDefinition!.Name)).ToList();
+        Input ??= new()
+        {
+            ProductId = ProductId,
+            Attributes = definitions.Select(a => new ProductAttributeForm
+                {
+                    AttributeDefinitionId = a.Id,
+                    Enabled = bindings.Any(b => b.AttributeDefinitionId == a.Id),
+                    Required = bindings.FirstOrDefault(b => b.AttributeDefinitionId == a.Id)?.IsRequired ?? true,
+                    Options = a.Options.OrderBy(o => o.Value).Select(o => new ProductOptionForm
+                        {
+                            AttributeOptionId = o.Id,
+                            Enabled = bindings.SelectMany(b => b.Options).Any(p => p.AttributeOptionId == o.Id)
+                        })
+                    .ToList()
+                })
+                .ToList()
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.ProductId = ProductId;
+            await Session.RunAsync(s => s.SaveProductAttributesAsync(Input));
+            Nav.NavigateTo($"/admin/products/{ProductId}/attributes?saved=true");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

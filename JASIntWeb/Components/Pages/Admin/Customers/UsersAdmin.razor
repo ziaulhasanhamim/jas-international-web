@@ -1,0 +1,76 @@
+@page "/admin/users"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="Customers & access"
+    Description="Find customer accounts and manage administrator access."
+    ActionHref="/admin/users/new"
+    ActionText="+ Add customer"
+/>
+<form method="get" data-enhance class="admin-toolbar">
+    <input name="q" value="@Query" class="shop-input" placeholder="Search email" />
+    <button class="shop-button-secondary">Search</button>
+</form>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in users)
+            {
+                <tr>
+                    <td>
+                        <strong>@u.Email</strong>
+                    </td>
+                    <td>@(u.PhoneNumber ?? "—")</td>
+                    <td>
+                        <span class="status-badge">@(admins.Contains(u.Id) ? "Admin" : "Customer")</span>
+                    </td>
+                    <td>
+                        <a href="/admin/users/@u.Id/edit">Manage access</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (users.Count == 0)
+    {
+        <p class="admin-empty">No accounts found.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<User> users = [];
+    private HashSet<int> admins = [];
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        var q = Db.Users.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            q = q.Where(u => u.Email!.ToLower().Contains(Query.ToLower()));
+        }
+        total = await q.CountAsync();
+        users = await q.OrderBy(u => u.Email).ThenBy(u => u.Id).Skip((Page - 1) * 25).Take(25).ToListAsync();
+        var ids = users.Select(u => u.Id).ToList();
+        admins = (await Db.UserRoles.Where(r => ids.Contains(r.UserId)
+                && Db.Roles.Any(role => role.Id == r.RoleId
+                    && role.Name == "Admin"))
+            .Select(r => r.UserId)
+            .ToListAsync()).ToHashSet();
+    }
+}

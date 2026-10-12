@@ -1,0 +1,96 @@
+@page "/admin/inventory"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="Inventory"
+    Description="Track physical stock, reserved orders and units available to sell."
+/>
+<form method="get" data-enhance class="admin-toolbar">
+    <input name="q" value="@Query" class="shop-input" placeholder="Product name or SKU" />
+    <label class="check-label">
+        <input type="checkbox" name="low" value="true" checked="@(Low)" />
+        Low stock (≤ 5)
+    </label>
+    <button class="shop-button-secondary">Filter</button>
+    <a href="/admin/inventory">Clear</a>
+</form>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Product / SKU</th>
+                <th>On hand</th>
+                <th>Reserved</th>
+                <th>Available</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in rows)
+            {
+                <tr>
+                    <td>
+                        <strong>@row.ProductName</strong>
+                        <small class="cell-secondary">@row.Sku</small>
+                    </td>
+                    <td>@row.OnHand</td>
+                    <td>@row.Reserved</td>
+                    <td>
+                        <span class="status-badge @(row.OnHand - row.Reserved <= 5 ? "status-warning" : "")">@(row.OnHand - row.Reserved)</span>
+                    </td>
+                    <td class="row-actions">
+                        <a href="/admin/inventory/@row.Id/edit">Adjust stock & history</a>
+                        <a href="/admin/products/@row.ProductId/variants/@row.Id/edit">Edit variant</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (rows.Count == 0)
+    {
+        <p class="admin-empty">No matching inventory.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "low")]
+    public bool Low { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private int total;
+    private List<AdminVariantRow> rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        var q = Db.InventoryItems.AsNoTracking().Where(i => !i.ProductVariant!.IsDeleted);
+        if (Low)
+        {
+            q = q.Where(i => i.QuantityOnHand - i.QuantityReserved <= 5 && i.ProductVariant!.IsActive);
+        }
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            q = q.Where(i => i.ProductVariant!.SKU.ToLower()
+                .Contains(Query.ToLower())
+                || i.ProductVariant.Product!.Name.ToLower()
+                .Contains(Query.ToLower()));
+        }
+        total = await q.CountAsync();
+        rows = await q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved).ThenBy(i => i.Id).Skip((Page - 1) * 25).Take(25)
+            .Select(i => new AdminVariantRow(i.ProductVariantId,
+                i.ProductVariant!.ProductId,
+                i.ProductVariant.Product!.Name,
+                i.ProductVariant.SKU,
+                "",
+                i.ProductVariant.SellingPrice,
+                i.QuantityOnHand,
+                i.QuantityReserved,
+                i.ProductVariant.IsActive,
+                i.ProductVariant.IsDefault))
+            .ToListAsync();
+    }
+}

@@ -1,0 +1,141 @@
+@page "/admin/categories/new"
+@page "/admin/categories/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add category" : "Edit category")"
+    ActionHref="/admin/categories"
+    ActionText="Back to list"
+/>
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="CategoryEditor"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label class="shop-label">
+                Category name
+                <InputText @bind-Value="Input!.Name" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                URL slug
+                <InputText @bind-Value="Input!.Slug" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Icon / image URL
+                <InputText @bind-Value="Input!.Icon" class="shop-input" />
+                <small>Use an emoji or an HTTPS / site-relative image URL.</small>
+            </label>
+            <label class="shop-label">
+                Parent category
+                <InputSelect @bind-Value="Input!.ParentId" class="shop-input">
+                    <option value="">Top-level category</option>
+                    @foreach (var p in parents)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+                <small>Two levels: parent → subcategory → product.</small>
+            </label>
+            <label class="check-label">
+                <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
+                <input type="hidden" name="Input.Hidden" value="false" />
+                Hide category and its products
+            </label>
+            <label class="check-label">
+                <input type="checkbox" name="Input.Featured" checked="@(Input!.Featured)" value="true" />
+                <input type="hidden" name="Input.Featured" value="false" />
+                Feature on homepage
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save category</button>
+                <a href="/admin/categories" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "CategoryEditor")]
+    private CategoryEditForm? Input { get; set; }
+    private string? error;
+    private bool notFound;
+    private List<Category> parents = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var hasChildren = Id != 0 && await Db.Categories.AnyAsync(c => c.ParentCategoryId == Id);
+        parents = hasChildren ? [] : await Db.Categories.AsNoTracking()
+            .Where(c => c.Id != Id
+            && !c.IsDeleted
+            && c.ParentCategoryId == null)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+        if (Input is not null)
+        {
+            return;
+        }
+        if (Id == 0)
+        {
+            Input = new();
+            return;
+        }
+        var c = await Db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == Id);
+        if (c is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Slug = c.Slug,
+            Icon = c.Icon ?? "",
+            ParentId = c.ParentCategoryId,
+            Hidden = c.IsDeleted,
+            Featured = await Db.CategoryPlacements.AnyAsync(p => p.CategoryId == Id
+                && p.IsActive
+                && p.PlacementType == CategoryPlacementType.HomepageFeatured)
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            await Session.RunAsync(s => s.SaveCategoryAsync(Input));
+            Nav.NavigateTo("/admin/categories");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

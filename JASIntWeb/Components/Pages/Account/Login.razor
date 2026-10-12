@@ -1,0 +1,78 @@
+@page "/account/login"
+@inject UserManager<User> Users
+@inject SignInManager<User> SignIn
+
+<PageTitle>Sign in — JAS International</PageTitle>
+<div class="shop-container">
+    <div class="shop-panel mx-auto max-w-md">
+        <h1 class="text-3xl font-semibold">Sign in</h1>
+        @if (completed)
+        {
+            <SessionRedirect Destination="@AccountNavigation.SafeReturn(ReturnUrl)" />
+        }
+        else
+        {
+            @if (error is not null)
+            {
+                <p role="alert" class="form-error">@error</p>
+            }
+            @if (Input is null)
+            {
+                <p class="admin-help">Loading form…</p>
+            }
+            else
+            {
+                <EditForm Model="Input" OnValidSubmit="Submit" FormName="login" method="post" Enhance class="mt-6">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <label class="shop-label">
+                        Email
+                        <InputText @bind-Value="Input!.Email" type="email" autocomplete="username" class="shop-input" />
+                    </label>
+                    <label class="shop-label">
+                        Password
+                        <InputText @bind-Value="Input!.Password" type="password" autocomplete="current-password" class="shop-input" />
+                    </label>
+                    <label class="my-4 block text-sm">
+                        <input type="checkbox" name="Input.Remember" checked="@(Input!.Remember)" value="true" />
+                        <input type="hidden" name="Input.Remember" value="false" />
+                        Keep me signed in
+                    </label>
+                    <button class="shop-button w-full" type="submit">Sign in</button>
+                </EditForm>
+            }
+            <a href="/account/forgot-password" class="mt-4 inline-block text-sm text-volt">Forgot password?</a>
+            <p class="mt-5 text-sm">
+                New here?
+                <a href="/account/signup" class="text-volt">Create an account</a>
+            </p>
+        }
+    </div>
+</div>
+
+@code
+{
+    [SupplyParameterFromForm(FormName = "login")]
+    private LoginForm? Input { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+    private string? error;
+    private bool completed;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task Submit()
+    {
+        var user = await Users.FindByEmailAsync(Input!.Email.Trim());
+        var result = user is null ? SignInResult.Failed : await SignIn.PasswordSignInAsync(user, Input.Password, Input.Remember, lockoutOnFailure: true);
+        if (result.Succeeded)
+        {
+            completed = true;
+        }
+        else
+        {
+            error = "Email or password is incorrect, or your account is temporarily locked.";
+        }
+        Input.Password = "";
+    }
+}

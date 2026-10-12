@@ -1,0 +1,123 @@
+@rendermode InteractiveServer
+@inject JASIntWeb.Services.AdminSession Session
+
+<section class="order-editor">
+    <div class="admin-section-heading">
+        <div>
+            <h3>@Title</h3>
+            <p>Drag rows to reorder. The arrow buttons also work with keyboard and touch.</p>
+        </div>
+    </div>
+    <ol class="order-list">
+        @for (var i = 0; i < rows.Count; i++)
+        {
+            var index = i;
+            var item = rows[i];
+            <li
+                @key="item.Id"
+                draggable="true"
+                @ondragstart="() => dragged = item.Id"
+                @ondragover:preventDefault
+                @ondrop="() => Drop(item.Id)"
+                @ondragend="() => dragged = null"
+            >
+                <span class="drag-grip" aria-hidden="true">⠿</span>
+                <span class="order-label">@item.Label</span>
+                <button
+                    type="button"
+                    disabled="@(busy || index == 0)"
+                    aria-label="Move @item.Label up"
+                    @onclick="() => Move(index, -1)"
+                >
+                    ↑
+                </button>
+                <button
+                    type="button"
+                    disabled="@(busy || index == rows.Count - 1)"
+                    aria-label="Move @item.Label down"
+                    @onclick="() => Move(index, 1)"
+                >
+                    ↓
+                </button>
+            </li>
+        }
+    </ol>
+    <div class="order-footer">
+        <button type="button" class="shop-button-secondary" disabled="@(!dirty || busy)" @onclick="Save">@(busy ? "Saving…" : "Save order")</button>
+        @if (message is not null)
+        {
+            <span role="status">@message</span>
+        }
+    </div>
+</section>
+
+@code
+{
+    [Parameter]
+    public string Title { get; set; } = "Display order";
+    [Parameter]
+    public OrderableKind Kind { get; set; }
+    [Parameter]
+    public int ScopeId { get; set; }
+    [Parameter]
+    public List<OrderableItemDto> Items { get; set; } = [];
+    private List<OrderableItemDto> rows = [];
+    private int? dragged;
+    private bool busy, dirty;
+    private string? message;
+
+    protected override void OnParametersSet()
+    {
+        if (!dirty)
+        {
+            rows = Items.ToList();
+        }
+    }
+
+    private void Move(int index, int offset)
+    {
+        if (busy || index + offset < 0 || index + offset >= rows.Count)
+        {
+            return;
+        }
+        var item = rows[index];
+        rows.RemoveAt(index);
+        rows.Insert(index + offset, item);
+        dirty = true;
+        message = "Unsaved order";
+    }
+
+    private void Drop(int target)
+    {
+        if (busy || dragged is null || dragged == target)
+        {
+            return;
+        }
+        var from = rows.FindIndex(r => r.Id == dragged);
+        var to = rows.FindIndex(r => r.Id == target);
+        if (from >= 0 && to >= 0)
+        {
+            Move(from, to - from);
+        }
+        dragged = null;
+    }
+
+    private async Task Save()
+    {
+        busy = true;
+        try
+        {
+            await Session.RunAsync(s => s.ReorderAsync(Kind, ScopeId, rows.Select(r => r.Id).ToList()));
+            dirty = false;
+            message = "Order saved.";
+        }
+        catch (JASIntWeb.Services.ShopException ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

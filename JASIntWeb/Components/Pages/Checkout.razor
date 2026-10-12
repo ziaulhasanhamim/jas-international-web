@@ -1,0 +1,142 @@
+@page "/checkout"
+@using JASIntWeb.Services
+@inject ShoppingService Shop
+@inject NavigationManager Nav
+
+<PageTitle>Checkout — JAS International</PageTitle>
+<div class="shop-container">
+    <h1 class="mb-8 text-3xl font-semibold">Checkout</h1>
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Submit"
+            FormName="checkout"
+            method="post"
+            Enhance
+            class="grid gap-8 lg:grid-cols-2"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <section class="shop-panel">
+                <h2 class="mb-5 text-xl font-semibold">Delivery information</h2>
+                <label class="shop-label">
+                    Full name
+                    <InputText class="shop-input" @bind-Value="Input!.Details.CustomerName" autocomplete="name" />
+                </label>
+                <label class="shop-label">
+                    Mobile number
+                    <InputText class="shop-input" @bind-Value="Input!.Details.PhoneNumber" autocomplete="tel" />
+                </label>
+                <label class="shop-label">
+                    Street address
+                    <InputTextArea class="shop-input" @bind-Value="Input!.Details.Address" autocomplete="street-address" />
+                </label>
+                <label class="shop-label">
+                    District
+                    <InputText class="shop-input" @bind-Value="Input!.Details.District" autocomplete="address-level1" />
+                </label>
+                <label class="shop-label">
+                    City / area
+                    <InputText class="shop-input" @bind-Value="Input!.Details.City" autocomplete="address-level2" />
+                </label>
+                <p class="my-5 text-sm text-slate-500">Cash on delivery. Stock is reserved when your order is placed.</p>
+                @if (summary is not null)
+                {
+                    <input
+                        type="hidden"
+                        name="Input.ReviewedTotal"
+                        value="@total.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                    />
+                }
+                <CheckoutCartFields Reviewed="@(summary is not null)" />
+            </section>
+            <aside class="shop-panel">
+                <h2 class="text-xl font-semibold">Order summary</h2>
+                @if (summary is null)
+                {
+                    <p class="my-5">Enter your delivery details and select Review order to see your final total.</p>
+                    <p>Delivery: ৳@Shop.Rates.Khulna in Khulna · ৳@Shop.Rates.OutsideKhulna elsewhere.</p>
+                }
+                else
+                {
+                    @foreach (var item in summary.Items)
+                    {
+                        <div class="border-b border-slate-100 py-4">
+                            <p>@item.Name × @item.Quantity</p>
+                            <p class="text-sm text-slate-500">@item.Variant</p>
+                            <p>৳@item.LineTotal.ToString("N0")</p>
+                        </div>
+                    }
+                    <p class="mt-5">
+                        Subtotal
+                        <strong class="float-right">৳@summary.Subtotal.ToString("N0")</strong>
+                    </p>
+                    <p class="mt-3">
+                        Delivery
+                        <strong class="float-right">৳@delivery.ToString("N0")</strong>
+                    </p>
+                    <p class="mt-5 text-xl">
+                        Total
+                        <strong class="float-right">৳@total.ToString("N0")</strong>
+                    </p>
+                }
+            </aside>
+        </EditForm>
+    }
+</div>
+
+@code
+{
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "checkout")]
+    private CheckoutPageForm? Input { get; set; }
+    private CartDto? summary;
+    private decimal delivery, total;
+    private string? error;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task Submit()
+    {
+        try
+        {
+            var details = Input!.Details;
+            var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+            if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(details, new(details), errors, true))
+            {
+                throw new ShopException(string.Join(" ", errors.Select(e => e.ErrorMessage)));
+            }
+            var userId = ShoppingService.UserId(HttpContext.User);
+            details.Items = Input.Lines.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList();
+            if (Input.Intent == "place" && Input.ReviewedTotal.HasValue)
+            {
+                details.ExpectedTotal = Input.ReviewedTotal;
+                var result = await Shop.CheckoutAsync(userId, details);
+                Nav.NavigateTo($"/order/{result.PublicToken}");
+                return;
+            }
+            summary = userId.HasValue ? await Shop.GetCartAsync(userId.Value) : await Shop.ResolveAsync(details.Items);
+            if (summary.Items.Count == 0 || summary.Items.Any(i => !i.IsAvailable || i.Quantity > i.Stock))
+            {
+                summary = null;
+                throw new ShopException("Review unavailable items in your cart before checking out.");
+            }
+            delivery = string.Equals(details.District.Trim(), "Khulna", StringComparison.OrdinalIgnoreCase) ? Shop.Rates.Khulna : Shop.Rates.OutsideKhulna;
+            total = summary.Subtotal + delivery;
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

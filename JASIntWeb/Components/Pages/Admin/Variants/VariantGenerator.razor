@@ -1,0 +1,191 @@
+@page "/admin/products/{ProductId:int}/variants/generate"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="Generate variants"
+    Description="Choose values, preview the combination count, then create only missing variants."
+    ActionHref="@($"/admin/products/{ProductId}/variants")"
+    ActionText="Back to variants"
+/>
+<ProductAdminTabs ProductId="ProductId" />
+@if (error is not null)
+{
+    <p class="form-error" role="alert">@error</p>
+}
+@if (notFound)
+{
+    <p class="admin-empty">Product not found.</p>
+}
+else if (Input is null)
+{
+    <p class="admin-help">Loading form…</p>
+}
+else
+{
+    <EditForm
+        Model="Input"
+        OnValidSubmit="Submit"
+        FormName="generate-variants"
+        method="post"
+        Enhance
+        class="shop-panel admin-form"
+    >
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <p class="admin-help">Generate up to 100 combinations at a time. Existing combinations are skipped. New variants start with zero stock so they cannot be sold until you enter real stock.</p>
+        @for (var i = 0; i < Input!.Groups.Count; i++)
+        {
+            var index = i;
+            var group = Input.Groups[i];
+            var definition = attributes.FirstOrDefault(a => a.Id == group.ProductAttributeDefinitionId);
+            <fieldset class="attribute-config">
+                <legend>@definition?.AttributeDefinition?.Name</legend>
+                <input
+                    type="hidden"
+                    name="@($"Input.Groups[{index}].ProductAttributeDefinitionId")"
+                    value="@group.ProductAttributeDefinitionId"
+                />
+                <div class="option-checkbox-grid">
+                    @for (var j = 0; j < group.Options.Count; j++)
+                    {
+                        var oi = j;
+                        var option = group.Options[j];
+                        <label class="option-checkbox">
+                            <input
+                                type="hidden"
+                                name="@($"Input.Groups[{index}].Options[{oi}].ProductAttributeOptionId")"
+                                value="@option.ProductAttributeOptionId"
+                            />
+                            <input
+                                type="checkbox"
+                                name="@($"Input.Groups[{index}].Options[{oi}].Selected")"
+                                checked="@(option.Selected)"
+                                value="true"
+                            />
+                            <input type="hidden" name="@($"Input.Groups[{index}].Options[{oi}].Selected")" value="false" />
+                            @definition?.Options.FirstOrDefault(o => o.Id == option.ProductAttributeOptionId)?.AttributeOption?.Value
+                        </label>
+                    }
+                    @if (definition?.IsRequired == false)
+                    {
+                        <label class="option-checkbox">
+                            <input
+                                type="checkbox"
+                                name="@($"Input.Groups[{index}].IncludeNotApplicable")"
+                                checked="@(group.IncludeNotApplicable)"
+                                value="true"
+                            />
+                            <input type="hidden" name="@($"Input.Groups[{index}].IncludeNotApplicable")" value="false" />
+                            Not applicable
+                        </label>
+                    }
+                </div>
+            </fieldset>
+        }
+        <label class="shop-label">
+            SKU prefix
+            <InputText @bind-Value="Input!.SkuPrefix" class="shop-input" />
+            <small>Each combination receives a unique suffix.</small>
+        </label>
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Starting selling price (৳)
+                <InputNumber @bind-Value="Input!.SellingPrice" class="shop-input" min="0" step="0.01" />
+            </label>
+            <label class="shop-label">
+                Starting cost price (৳)
+                <InputNumber @bind-Value="Input!.CostPrice" class="shop-input" min="0" step="0.01" />
+            </label>
+        </div>
+        @if (preview.HasValue)
+        {
+            <p class="form-notice" role="status">@preview combinations selected before skipping existing variants. Review selections before creating them.</p>
+        }
+        <div class="form-actions">
+            <button type="submit" name="Input.Intent" value="preview" class="shop-button-secondary">Preview count</button>
+            @if (preview is > 0 and <= 100)
+            {
+                <button type="submit" name="Input.Intent" value="generate" class="shop-button">Create missing variants</button>
+            }
+        </div>
+    </EditForm>
+}
+
+@code
+{
+    [Parameter]
+    public int ProductId { get; set; }
+    [SupplyParameterFromForm(FormName = "generate-variants")]
+    private VariantGenerateForm? Input { get; set; }
+    private List<ProductAttributeDefinition> attributes = [];
+    private string? error;
+    private int? preview;
+    private bool notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Db.Products.AnyAsync(product => product.Id == ProductId))
+        {
+            notFound = true;
+            return;
+        }
+        attributes = await Db.ProductAttributeDefinitions.AsNoTracking()
+            .Include(a => a.AttributeDefinition)
+            .Include(a => a.Options)
+            .ThenInclude(o => o.AttributeOption)
+            .Where(a => a.ProductId == ProductId)
+            .OrderBy(a => a.SortOrder)
+            .ThenBy(a => a.Id)
+            .ToListAsync();
+        Input ??= new()
+        {
+            ProductId = ProductId,
+            SkuPrefix = $"JAS-{ProductId}",
+            Groups = attributes.Select(a => new VariantGenerationGroup
+                {
+                    ProductAttributeDefinitionId = a.Id,
+                    Options = a.Options.OrderBy(o => o.SortOrder).Select(o => new VariantGenerationOption
+                        {
+                            ProductAttributeOptionId = o.Id,
+                            Selected = true
+                        })
+                    .ToList()
+                })
+                .ToList()
+        };
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            Input!.ProductId = ProductId;
+            var count = 1;
+            foreach (var group in Input.Groups)
+            {
+                var n = group.Options.Count(o => o.Selected) + (group.IncludeNotApplicable ? 1 : 0);
+                if (n == 0)
+                {
+                    throw new ShopException("Choose at least one value per definition.");
+                }
+                if (count > 100 / n)
+                {
+                    throw new ShopException("Select fewer values: maximum 100 combinations per batch.");
+                }
+                count *= n;
+            }
+            preview = count;
+            if (Input.Intent == "generate")
+            {
+                var created = await Session.RunAsync((s, _) => s.GenerateVariantsAsync(Input));
+                Nav.NavigateTo($"/admin/products/{ProductId}/variants?created={created}");
+            }
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

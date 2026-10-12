@@ -1,0 +1,138 @@
+@page "/admin/carousel/new"
+@page "/admin/carousel/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add carousel slide" : "Edit carousel slide")"
+    ActionHref="/admin/carousel"
+    ActionText="Back to list"
+/>
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="SlideEditor"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label class="shop-label">
+                Image URL
+                <InputText @bind-Value="Input!.Image" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Image description (alt text)
+                <InputText @bind-Value="Input!.Alt" class="shop-input" />
+            </label>
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Eyebrow (optional)
+                    <InputText @bind-Value="Input!.Eyebrow" class="shop-input" />
+                </label>
+                <label class="shop-label">
+                    Title (optional)
+                    <InputText @bind-Value="Input!.Title" class="shop-input" />
+                </label>
+            </div>
+            <label class="shop-label">
+                Supporting text (optional)
+                <InputTextArea @bind-Value="Input!.Copy" class="shop-input" rows="4" />
+            </label>
+            <label class="shop-label">
+                Destination URL (optional)
+                <InputText @bind-Value="Input!.Link" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Button label (optional)
+                <InputText @bind-Value="Input!.LinkText" class="shop-input" />
+            </label>
+            <label class="check-label">
+                <input type="checkbox" name="Input.Active" checked="@(Input!.Active)" value="true" />
+                <input type="hidden" name="Input.Active" value="false" />
+                Show on homepage
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save carousel slide</button>
+                <a href="/admin/carousel" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+    @if (Id > 0)
+    {
+        <a href="/admin/carousel/@Id/delete" class="danger-link">Delete this slide</a>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "SlideEditor")]
+    private SlideEditForm? Input { get; set; }
+    private string? error;
+    private bool notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Input is not null)
+        {
+            return;
+        }
+        if (Id == 0)
+        {
+            Input = new();
+            return;
+        }
+        var s = await Db.CarouselSlides.AsNoTracking().SingleOrDefaultAsync(s => s.Id == Id);
+        if (s is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = s.Id,
+            Title = s.Title,
+            Eyebrow = s.Eyebrow,
+            Copy = s.Copy,
+            Image = s.ImageUrl,
+            Alt = s.ImageAlt,
+            Link = s.LinkUrl,
+            LinkText = s.LinkText,
+            Active = s.IsActive
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            await Session.RunAsync(s => s.SaveSlideAsync(Input));
+            Nav.NavigateTo("/admin/carousel");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

@@ -1,94 +1,180 @@
-using JASIntWeb.Client.Models;
-
+using System.Text.Json;
+using JASIntWeb.Client.Contracts;
+using JASIntWeb.Client.Dtos;
+using Microsoft.JSInterop;
 namespace JASIntWeb.Client.Services;
+// State and notifications stay in C#. JS interop only reads/writes browser localStorage.
 
-public sealed class CartService
+public sealed class CartService(IJSRuntime js, ICartBackend backend)
 {
-    private readonly List<CartItem> _items = [];
-
-    public IReadOnlyList<CartItem> Items => _items;
-
-    public int ItemCount => _items.Sum(x => x.Quantity);
-
-    public decimal Total =>
-        _items.Sum(x => x.Product.Price * x.Quantity);
-
+    private const string StorageKey = "jas.cart.v2";
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    private readonly SemaphoreSlim gate = new(1, 1);
+    private bool loaded;
+    public IReadOnlyList<CartItemDto> Items { get; private set; } = [];
+    public bool IsAuthenticated { get; private set; }
+    public string? Error { get; private set; }
+    public int ItemCount => Items.Sum(i => i.Quantity);
+    public decimal Total => Items.Sum(i => i.LineTotal);
     public event Action? OnChange;
 
-    public void Add(Product product)
+    private async Task<LocalCartDto> ReadAsync()
     {
-        var existing = _items.FirstOrDefault(
-            x => x.Product.Name == product.Name);
-
-        if (existing is not null)
+        var json = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+        try
         {
-            existing.Quantity++;
+            var cart = json is null ? null : JsonSerializer.Deserialize<LocalCartDto>(json, Json);
+            if (cart is null || cart.Token == Guid.Empty || cart.Items is null || cart.Items.Count > 100)
+            {
+                return new();
+            }
+            cart.Items = cart.Items.Where(i => i.VariantId > 0 && i.Quantity is > 0 and <= 99).ToList();
+            return cart;
         }
-        else
+        catch (JsonException)
         {
-            _items.Add(new CartItem(product, 1));
+            return new();
         }
-
-        Notify();
     }
 
-    public void Remove(Product product)
+    private ValueTask WriteAsync(LocalCartDto cart) => js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(cart, Json));
+
+    private async Task ClearIfTokenAsync(Guid token)
     {
-        var item = _items.FirstOrDefault(
-            x => x.Product.Name == product.Name);
-
-        if (item is null)
-            return;
-
-        _items.Remove(item);
-
-        Notify();
+        var current = await ReadAsync();
+        if (current.Token == token)
+        {
+            await js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        }
     }
 
-    public void Increase(Product product)
+    private void Apply(CartDto cart)
     {
-        var item = _items.FirstOrDefault(
-            x => x.Product.Name == product.Name);
-
-        if (item is null)
-            return;
-
-        item.Quantity++;
-
-        Notify();
+        Items = cart.Items;
+        IsAuthenticated = cart.IsAuthenticated;
+        Error = null;
+        loaded = true;
     }
 
-    public void Decrease(Product product)
+    private async Task<LocalCartDto> IdentityAndMergeAsync()
     {
-        var item = _items.FirstOrDefault(
-            x => x.Product.Name == product.Name);
-
-        if (item is null)
-            return;
-
-        item.Quantity--;
-
-        if (item.Quantity <= 0)
-            _items.Remove(item);
-
-        Notify();
+        var account = await backend.AccountAsync();
+        if (IsAuthenticated != account.IsAuthenticated)
+        {
+            Items = [];
+            loaded = false;
+        }
+        IsAuthenticated = account.IsAuthenticated;
+        var local = await ReadAsync();
+        if (IsAuthenticated && local.Items.Count > 0)
+        {
+            Apply(await backend.MergeAsync(new(local.Token, local.Items)));
+            await ClearIfTokenAsync(local.Token);
+            local = await ReadAsync();
+        }
+        return local;
     }
 
-    public void Clear()
+    private async Task RunAsync(Func<Task> action)
     {
-        _items.Clear();
-        Notify();
+        await gate.WaitAsync();
+        try
+        {
+            Error = null;
+            await action();
+        }
+        catch (Exception e) when (e is JSException or CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            Error = e is HttpRequestException or TaskCanceledException ? "Connection interrupted. Please try again." : e.Message;
+        }
+        finally
+        {
+            gate.Release();
+            OnChange?.Invoke();
+        }
     }
 
-    private void Notify()
+    public Task InitializeAsync() => RunAsync(async () =>
+        {
+            if (loaded)
+            {
+                return;
+            }
+            var local = await IdentityAndMergeAsync();
+            Apply(IsAuthenticated ? await backend.GetAsync() : await backend.ResolveAsync(local.Items));
+        });
+
+    public Task RefreshAsync() => RunAsync(async () =>
+        {
+            var local = await IdentityAndMergeAsync();
+            Apply(IsAuthenticated ? await backend.GetAsync() : await backend.ResolveAsync(local.Items));
+        });
+
+    public Task AddAsync(int variantId, int quantity = 1) => ChangeAsync(variantId, quantity, true);
+
+    public Task SetQuantityAsync(int variantId, int quantity) => ChangeAsync(variantId, quantity, false);
+
+    private Task ChangeAsync(int variantId, int quantity, bool add) => RunAsync(async () =>
+        {
+            var local = await IdentityAndMergeAsync();
+            if (IsAuthenticated)
+            {
+                Apply(await backend.ChangeAsync(new(variantId, quantity), add));
+            }
+            else
+            {
+                var old = local.Items.Where(i => i.VariantId == variantId).Sum(i => i.Quantity);
+                var next = add ? old + quantity : quantity;
+                if (next < 0 || next > 99 || (add && quantity <= 0))
+                {
+                    throw new CommerceException("Quantity must be between 1 and 99.");
+                }
+                var lines = local.Items.Where(i => i.VariantId != variantId).ToList();
+                if (next > 0)
+                {
+                    lines.Add(new(variantId, next));
+                }
+                var result = await backend.ResolveAsync(lines);
+                var changed = result.Items.FirstOrDefault(i => i.VariantId == variantId);
+                if (changed is not null && (!changed.IsAvailable || changed.Quantity > changed.Stock))
+                {
+                    throw new CommerceException("The requested quantity is unavailable.");
+                }
+                local.Items = lines;
+                local.Token = Guid.NewGuid();
+                local.CheckoutToken = null;
+                await WriteAsync(local);
+                Apply(result);
+                return;
+            }
+            local.CheckoutToken = null;
+            await WriteAsync(local);
+        });
+
+    public async Task<Guid> CheckoutTokenAsync()
     {
-        OnChange?.Invoke();
+        await gate.WaitAsync();
+        try
+        {
+            var local = await ReadAsync();
+            local.CheckoutToken ??= Guid.NewGuid();
+            await WriteAsync(local);
+            return local.CheckoutToken.Value;
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
-}
 
-public sealed class CartItem(Product product, int quantity)
-{
-    public Product Product { get; } = product;
-
-    public int Quantity { get; set; } = quantity;
+    public Task CompleteCheckoutAsync(Guid checkoutToken) => RunAsync(async () =>
+        {
+            var local = await ReadAsync();
+            if (local.CheckoutToken == checkoutToken)
+            {
+                await ClearIfTokenAsync(local.Token);
+            }
+            var remaining = await IdentityAndMergeAsync();
+            Apply(IsAuthenticated ? await backend.GetAsync() : await backend.ResolveAsync(remaining.Items));
+        });
 }

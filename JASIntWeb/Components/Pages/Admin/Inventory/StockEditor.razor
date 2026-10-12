@@ -1,0 +1,139 @@
+@page "/admin/inventory/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="Adjust inventory"
+    Description="Enter the actual on-hand count. Changes are recorded in inventory history."
+    ActionHref="/admin/inventory"
+    ActionText="Back to inventory"
+/>
+@if (variant is null)
+{
+    <p class="admin-empty">Variant not found.</p>
+}
+else
+{
+    <h2 class="admin-record-title">@variant.Product?.Name · @variant.SKU</h2>
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="inventory"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="inventory-summary">
+                <p>
+                    On hand
+                    <strong>@onHand</strong>
+                </p>
+                <p>
+                    Reserved
+                    <strong>@reserved</strong>
+                </p>
+                <p>
+                    Available
+                    <strong>@(onHand - reserved)</strong>
+                </p>
+            </div>
+            <label class="shop-label">
+                New on-hand quantity
+                <InputNumber @bind-Value="Input!.Quantity" min="@reserved" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Reason
+                <InputText
+                    @bind-Value="Input!.Reason"
+                    class="shop-input"
+                    placeholder="For example: supplier delivery or stock count correction"
+                />
+            </label>
+            <button type="submit" class="shop-button">Save stock count</button>
+        </EditForm>
+    }
+    <section class="shop-panel admin-table-wrap mt-6">
+        <h2 class="admin-section-title">Recent inventory history</h2>
+        <table class="shop-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Change</th>
+                    <th>Type</th>
+                    <th>Reason / reference</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in history)
+                {
+                    <tr>
+                        <td>@row.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy HH:mm")</td>
+                        <td>@(row.QuantityChange > 0 ? "+" : "")@row.QuantityChange</td>
+                        <td>@row.Type</td>
+                        <td>
+                            @row.Note
+                            <small>@row.ReferenceType @row.ReferenceId</small>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "inventory")]
+    private StockEditForm? Input { get; set; }
+    private ProductVariant? variant;
+    private int onHand, reserved;
+    private string? error;
+    private List<InventoryTransaction> history = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        variant = await Db.ProductVariants.AsNoTracking().Include(v => v.Product).SingleOrDefaultAsync(v => v.Id == Id);
+        var stock = await Db.InventoryItems.AsNoTracking().SingleOrDefaultAsync(i => i.ProductVariantId == Id);
+        onHand = stock?.QuantityOnHand ?? 0;
+        reserved = stock?.QuantityReserved ?? 0;
+        Input ??= new()
+        {
+            VariantId = Id,
+            Quantity = onHand
+        };
+        history = await Db.InventoryTransactions.AsNoTracking()
+            .Where(t => t.ProductVariantId == Id)
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(50)
+            .ToListAsync();
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.VariantId = Id;
+            await Session.RunAsync(s => s.SaveStockAsync(Input));
+            Nav.NavigateTo($"/admin/inventory/{Id}/edit?saved=true");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

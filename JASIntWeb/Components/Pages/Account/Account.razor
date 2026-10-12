@@ -1,0 +1,39 @@
+@page "/account"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject AppDbContext Db
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider Auth
+
+<div class="shop-container">
+    <h1 class="text-3xl font-semibold">Your account</h1>
+    <div class="shop-panel mt-6">
+        <p>@email</p>
+        <a href="/account/logout" class="shop-button-secondary mt-5">Sign out</a>
+    </div>
+    <h2 class="mb-4 mt-8 text-xl font-semibold">Your orders</h2>
+    @foreach (var order in orders)
+    {
+        <a class="shop-panel mb-3 block" href="/order/@order.PublicToken">#@order.Id · @order.CreatedAt.ToString("dd MMM yyyy") · @order.Status · ৳@order.Total.ToString("N0")</a>
+    }
+    @if (orders.Count == 0)
+    {
+        <p>No orders yet.</p>
+    }
+</div>
+
+@code
+{
+    private string? email;
+    private List<Order> orders = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await Auth.GetAuthenticationStateAsync()).User;
+        email = user.Identity?.Name;
+        var id = JASIntWeb.Services.ShoppingService.UserId(user);
+        orders = await Db.Orders.AsNoTracking()
+            .Where(o => o.UserId == id)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(100)
+            .ToListAsync();
+    }
+}

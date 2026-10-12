@@ -1,0 +1,6 @@
+@using Microsoft.AspNetCore.Authorization
+@using JASIntWeb.Client.Dtos
+@using JASIntWeb.Services
+@using JASIntWeb.Components.Admin
+@attribute [Authorize(Policy = "AdminOnly")]
+@layout JASIntWeb.Components.Layout.AdminLayout

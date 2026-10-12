@@ -1,0 +1,133 @@
+@page "/admin"
+@inject AppDbContext Db
+
+<PageTitle>Dashboard — JAS Admin</PageTitle>
+<AdminPageHeader
+    Title="Store dashboard"
+    Description="Orders, catalog health and inventory at a glance."
+    ActionHref="/admin/products/new"
+    ActionText="+ Add product"
+/>
+<div class="dashboard-metrics">
+    <a href="/admin/products" class="metric-card">
+        <span>Visible products</span>
+        <strong>@productCount</strong>
+        <small>Current catalog</small>
+    </a>
+    <a href="/admin/orders?status=Pending" class="metric-card">
+        <span>Orders to review</span>
+        <strong>@pending</strong>
+        <small>Pending fulfillment</small>
+    </a>
+    <div class="metric-card metric-highlight">
+        <span>Delivered revenue</span>
+        <strong>৳@revenue.ToString("N0")</strong>
+        <small>This month · Bangladesh time</small>
+    </div>
+    <a href="/admin/inventory?low=true" class="metric-card">
+        <span>Low-stock variants</span>
+        <strong>@lowStock</strong>
+        <small>5 or fewer available</small>
+    </a>
+</div>
+<div class="dashboard-grid">
+    <section class="shop-panel admin-table-wrap">
+        <div class="admin-section-heading">
+            <h2>Recent orders</h2>
+            <a href="/admin/orders">All orders →</a>
+        </div>
+        <table class="shop-table">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in orders)
+                {
+                    <tr>
+                        <td>
+                            <a href="/admin/orders/@o.Id">#@o.Id</a>
+                        </td>
+                        <td>@o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM")</td>
+                        <td>
+                            <span class="status-badge">@o.Status</span>
+                        </td>
+                        <td>৳@o.Total.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (orders.Count == 0)
+        {
+            <p class="admin-empty">New orders will appear here.</p>
+        }
+    </section>
+    <section class="shop-panel">
+        <div class="admin-section-heading">
+            <h2>Needs attention</h2>
+        </div>
+        <div class="attention-list">
+            @foreach (var item in lowItems)
+            {
+                <a href="/admin/inventory/@item.ProductVariantId/edit">
+                    <span>
+                        <strong>@item.ProductVariant?.Product?.Name</strong>
+                        <small>@item.ProductVariant?.SKU</small>
+                    </span>
+                    <span class="status-badge status-warning">@(item.QuantityOnHand - item.QuantityReserved) left</span>
+                </a>
+            }
+            @if (lowItems.Count == 0)
+            {
+                <p class="admin-empty">No low-stock alerts.</p>
+            }
+        </div>
+    </section>
+</div>
+<section class="dashboard-shortcuts">
+    <a href="/admin/orders?status=Pending">
+        <strong>Process orders</strong>
+        <span>Review customer delivery details and fulfillment.</span>
+    </a>
+    <a href="/admin/carousel">
+        <strong>Plan a campaign</strong>
+        <span>Update homepage slides and their order.</span>
+    </a>
+    <a href="/admin/attributes">
+        <strong>Manage product options</strong>
+        <span>Maintain reusable color, storage and warranty values.</span>
+    </a>
+</section>
+
+@code
+{
+    private int productCount, pending, lowStock;
+    private decimal revenue;
+    private List<Order> orders = [];
+    private List<InventoryItem> lowItems = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var local = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(6));
+        var start = new DateTimeOffset(local.Year, local.Month, 1, 0, 0, 0, local.Offset).ToUniversalTime();
+        productCount = await Db.Products.CountAsync(p => !p.IsDeleted);
+        pending = await Db.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
+        revenue = await Db.Orders.Where(o => o.Status == OrderStatus.Delivered && o.UpdatedAt >= start)
+            .SumAsync(o => (decimal?)o.Total) ?? 0;
+        var low = Db.InventoryItems.AsNoTracking()
+            .Where(i => i.QuantityOnHand - i.QuantityReserved <= 5
+            && i.ProductVariant!.IsActive
+            && !i.ProductVariant.IsDeleted);
+        lowStock = await low.CountAsync();
+        lowItems = await low.Include(i => i.ProductVariant)
+            .ThenInclude(v => v!.Product)
+            .OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
+            .Take(6)
+            .ToListAsync();
+        orders = await Db.Orders.AsNoTracking().OrderByDescending(o => o.CreatedAt).Take(8).ToListAsync();
+    }
+}

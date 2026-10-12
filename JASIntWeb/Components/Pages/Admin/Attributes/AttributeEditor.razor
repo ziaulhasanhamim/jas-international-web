@@ -1,0 +1,107 @@
+@page "/admin/attributes/new"
+@page "/admin/attributes/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add attribute" : "Edit attribute")"
+    ActionHref="/admin/attributes"
+    ActionText="Back to list"
+/>
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="AttributeEditor"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label class="shop-label">
+                Attribute name
+                <InputText @bind-Value="Input!.Name" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Code
+                <InputText @bind-Value="Input!.Code" class="shop-input" />
+                <small>For example: color, storage, ram or warranty.</small>
+            </label>
+            <label class="shop-label">
+                Unit (optional)
+                <InputText @bind-Value="Input!.Unit" class="shop-input" />
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save attribute</button>
+                <a href="/admin/attributes" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "AttributeEditor")]
+    private AttributeEditForm? Input { get; set; }
+    private string? error;
+    private bool notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Input is not null)
+        {
+            return;
+        }
+        if (Id == 0)
+        {
+            Input = new();
+            return;
+        }
+        var a = await Db.AttributeDefinitions.AsNoTracking().SingleOrDefaultAsync(a => a.Id == Id);
+        if (a is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = a.Id,
+            Name = a.Name,
+            Code = a.Code,
+            Unit = a.Unit
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            var id = await Session.RunAsync((s, _) => s.SaveAttributeAsync(Input));
+            Nav.NavigateTo($"/admin/attributes/{id}/options");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

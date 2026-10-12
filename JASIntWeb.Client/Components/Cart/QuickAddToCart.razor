@@ -1,0 +1,50 @@
+@rendermode InteractiveAuto
+@inject CartService Cart
+
+<div class="quick-add">
+    <button
+        type="button"
+        class="shop-button"
+        aria-label="Add @ProductName to cart"
+        disabled="@(VariantId is null || Stock <= 0 || busy)"
+        @onclick="Add"
+    >
+        @(busy ? "Adding…" : VariantId is null ? "Unavailable" : Stock <= 0 ? "Out of stock" : "Add to cart")
+    </button>
+    @if (message is not null)
+    {
+        <p role="status" class="mt-2 text-xs text-slate-600">@message</p>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public int? VariantId { get; set; }
+    [Parameter]
+    public int Stock { get; set; }
+    [Parameter]
+    public string ProductName { get; set; } = "product";
+    private bool busy;
+    private string? message;
+
+    protected override void OnParametersSet() => message = null;
+
+    private async Task Add()
+    {
+        if (VariantId is null || Stock <= 0 || busy)
+        {
+            return;
+        }
+        busy = true;
+        try
+        {
+            await Cart.AddAsync(VariantId.Value);
+            message = Cart.Error ?? "Added to cart.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

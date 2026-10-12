@@ -1,0 +1,182 @@
+using System.ComponentModel.DataAnnotations;
+namespace JASIntWeb.Client.Dtos;
+
+public sealed class ProductEditForm
+{
+    public int Id { get; set; }
+    [Required, StringLength(200)]
+    public string Name { get; set; } = "";
+    [Required, StringLength(120)]
+    public string Slug { get; set; } = "";
+    [Range(1, int.MaxValue)]
+    public int CategoryId { get; set; }
+    [StringLength(2000)]
+    public string Description { get; set; } = "";
+    [Required, StringLength(20000)]
+    public string Details { get; set; } = "";
+    [Required, StringLength(2000)]
+    public string Image { get; set; } = "";
+    [StringLength(20000)]
+    public string Images { get; set; } = "";
+    public bool Hidden { get; set; }
+}
+
+public sealed class VariantEditForm
+{
+    public int Id { get; set; }
+    public int ProductId { get; set; }
+    [Required, StringLength(100)]
+    public string Sku { get; set; } = "";
+    [Range(0, 10000000)]
+    public decimal SellingPrice { get; set; }
+    [Range(0, 10000000)]
+    public decimal CostPrice { get; set; }
+    [Range(0, int.MaxValue)]
+    public int Stock { get; set; }
+    public bool Active { get; set; } = true;
+    public bool Default { get; set; }
+    public List<VariantChoiceForm> Choices { get; set; } = [];
+}
+
+public sealed class VariantChoiceForm
+{
+    public int ProductAttributeDefinitionId { get; set; }
+    public int ProductAttributeOptionId { get; set; }
+}
+
+public sealed class CategoryEditForm
+{
+    public int Id { get; set; }
+    [Required, StringLength(200)]
+    public string Name { get; set; } = "";
+    [Required, StringLength(120)]
+    public string Slug { get; set; } = "";
+    [StringLength(2000)]
+    public string Icon { get; set; } = "";
+    public int? ParentId { get; set; }
+    public bool Hidden { get; set; }
+    public bool Featured { get; set; }
+}
+
+public sealed class AttributeEditForm
+{
+    public int Id { get; set; }
+    [Required, StringLength(100)]
+    public string Name { get; set; } = "";
+    [Required, StringLength(120)]
+    public string Code { get; set; } = "";
+    [StringLength(30)]
+    public string? Unit { get; set; }
+}
+
+public sealed class OptionEditForm
+{
+    public int Id { get; set; }
+    public int AttributeDefinitionId { get; set; }
+    [Required, StringLength(100)]
+    public string Value { get; set; } = "";
+    [Required, StringLength(120)]
+    public string Code { get; set; } = "";
+}
+
+public sealed class SlideEditForm
+{
+    public int Id { get; set; }
+    [StringLength(200)]
+    public string? Title { get; set; }
+    [StringLength(100)]
+    public string? Eyebrow { get; set; }
+    [StringLength(600)]
+    public string? Copy { get; set; }
+    [Required, StringLength(2000)]
+    public string Image { get; set; } = "";
+    [Required, StringLength(200)]
+    public string Alt { get; set; } = "";
+    [StringLength(2000)]
+    public string? Link { get; set; }
+    [StringLength(100)]
+    public string? LinkText { get; set; }
+    public bool Active { get; set; } = true;
+}
+
+public sealed class OrderEditForm
+{
+    public int Id { get; set; }
+    [Required]
+    public string Status { get; set; } = "Pending";
+}
+
+public sealed class RoleEditForm
+{
+    public int Id { get; set; }
+    public bool Admin { get; set; }
+}
+
+public sealed class StockEditForm
+{
+    public int VariantId { get; set; }
+    [Range(0, int.MaxValue)]
+    public int Quantity { get; set; }
+    [Required, StringLength(200)]
+    public string Reason { get; set; } = "Stock count";
+}
+
+public sealed class ProductAttributesForm
+{
+    public int ProductId { get; set; }
+    public List<ProductAttributeForm> Attributes { get; set; } = [];
+}
+
+public sealed class ProductAttributeForm
+{
+    public int AttributeDefinitionId { get; set; }
+    public bool Enabled { get; set; }
+    public bool Required { get; set; } = true;
+    public List<ProductOptionForm> Options { get; set; } = [];
+}
+
+public sealed class ProductOptionForm
+{
+    public int AttributeOptionId { get; set; }
+    public bool Enabled { get; set; }
+}
+
+public sealed class VariantGenerateForm
+{
+    public string Intent { get; set; } = "preview";
+    public int ProductId { get; set; }
+    [Required, StringLength(60)]
+    public string SkuPrefix { get; set; } = "";
+    [Range(0, 10000000)]
+    public decimal SellingPrice { get; set; }
+    [Range(0, 10000000)]
+    public decimal CostPrice { get; set; }
+    public List<VariantGenerationGroup> Groups { get; set; } = [];
+}
+
+public sealed class VariantGenerationGroup
+{
+    public int ProductAttributeDefinitionId { get; set; }
+    public bool IncludeNotApplicable { get; set; }
+    public List<VariantGenerationOption> Options { get; set; } = [];
+}
+
+public sealed class VariantGenerationOption
+{
+    public int ProductAttributeOptionId { get; set; }
+    public bool Selected { get; set; }
+}
+
+public sealed record OrderableItemDto(int Id, string Label);
+
+public enum OrderableKind
+{
+    ProductAttributes,
+    ProductOptions,
+    Carousel,
+    FeaturedCategories
+}
+
+public sealed record AdminProductRow(int Id, string Name, string Slug, string Category, int VariantCount, bool Hidden);
+
+public sealed record AdminVariantRow(int Id, int ProductId, string ProductName, string Sku, string Label, decimal Price, int OnHand, int Reserved, bool Active, bool Default);

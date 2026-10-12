@@ -1,0 +1,26 @@
+<div class="admin-page-heading">
+    <div>
+        <p class="admin-eyebrow">JAS / MANAGEMENT</p>
+        <h1>@Title</h1>
+        @if (Description is not null)
+        {
+            <p class="admin-description">@Description</p>
+        }
+    </div>
+    @if (ActionHref is not null)
+    {
+        <a href="@ActionHref" class="shop-button">@ActionText</a>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public string Title { get; set; } = "";
+    [Parameter]
+    public string? Description { get; set; }
+    [Parameter]
+    public string? ActionHref { get; set; }
+    [Parameter]
+    public string ActionText { get; set; } = "Add record";
+}

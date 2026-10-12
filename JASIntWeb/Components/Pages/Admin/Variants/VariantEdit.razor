@@ -1,0 +1,196 @@
+@page "/admin/products/{ProductId:int}/variants/new"
+@page "/admin/products/{ProductId:int}/variants/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add variant" : "Edit variant")"
+    Description="Choose an allowed combination and set its price and stock."
+    ActionHref="@($"/admin/products/{ProductId}/variants")"
+    ActionText="Back to variants"
+/>
+<ProductAdminTabs ProductId="ProductId" />
+@if (notFound)
+{
+    <p class="admin-empty">Product or variant not found.</p>
+}
+else
+{
+    <h2 class="admin-record-title">@name</h2>
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="variant"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="admin-form-grid">
+                @for (var i = 0; i < Input!.Choices.Count; i++)
+                {
+                    var index = i;
+                    var choice = Input.Choices[i];
+                    var definition = attributes.FirstOrDefault(a => a.Id == choice.ProductAttributeDefinitionId);
+                    <label class="shop-label">
+                        @(definition?.AttributeDefinition?.Name ?? "Attribute")
+                        <input
+                            type="hidden"
+                            name="@($"Input.Choices[{index}].ProductAttributeDefinitionId")"
+                            value="@choice.ProductAttributeDefinitionId"
+                        />
+                        <InputSelect
+                            @bind-Value="choice.ProductAttributeOptionId"
+                            name="@($"Input.Choices[{index}].ProductAttributeOptionId")"
+                            class="shop-input"
+                        >
+                            <option value="0">@(definition?.IsRequired == true ? "Choose a value" : "Not applicable")</option>
+                            @if (definition is not null)
+                            {
+                                @foreach (var option in definition.Options.OrderBy(o => o.SortOrder).ThenBy(o => o.Id))
+                                {
+                                    <option value="@option.Id">@option.AttributeOption?.Value</option>
+                                }
+                            }
+                        </InputSelect>
+                    </label>
+                }
+            </div>
+            @if (attributes.Count == 0)
+            {
+                <p class="form-notice">This product has no attributes. It will have one standard variant.</p>
+            }
+            <label class="shop-label">
+                SKU
+                <InputText @bind-Value="Input!.Sku" class="shop-input" />
+                <small>A unique internal code for this exact combination.</small>
+            </label>
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Selling price (৳)
+                    <InputNumber @bind-Value="Input!.SellingPrice" class="shop-input" min="0" step="0.01" />
+                </label>
+                <label class="shop-label">
+                    Cost price (৳)
+                    <InputNumber @bind-Value="Input!.CostPrice" class="shop-input" min="0" step="0.01" />
+                </label>
+            </div>
+            <label class="shop-label">
+                Total stock on hand
+                <InputNumber @bind-Value="Input!.Stock" class="shop-input" min="@reserved" />
+                <small>@reserved units reserved for orders. Available stock = on hand minus reserved.</small>
+            </label>
+            <div class="attribute-flags">
+                <label class="check-label">
+                    <input type="checkbox" name="Input.Active" checked="@(Input!.Active)" value="true" />
+                    <input type="hidden" name="Input.Active" value="false" />
+                    Active
+                </label>
+                <label class="check-label">
+                    <input type="checkbox" name="Input.Default" checked="@(Input!.Default)" value="true" />
+                    <input type="hidden" name="Input.Default" value="false" />
+                    Default variant for quick add
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="shop-button" type="submit">Save variant</button>
+                <a href="/admin/products/@ProductId/variants" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int ProductId { get; set; }
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "variant")]
+    private VariantEditForm? Input { get; set; }
+    private List<ProductAttributeDefinition> attributes = [];
+    private bool notFound;
+    private int reserved;
+    private string? name, error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        name = await Db.Products.Where(p => p.Id == ProductId).Select(p => p.Name).SingleOrDefaultAsync();
+        if (name is null)
+        {
+            notFound = true;
+            return;
+        }
+        attributes = await Db.ProductAttributeDefinitions.AsNoTracking()
+            .Include(a => a.AttributeDefinition)
+            .Include(a => a.Options)
+            .ThenInclude(o => o.AttributeOption)
+            .Where(a => a.ProductId == ProductId)
+            .OrderBy(a => a.SortOrder)
+            .ThenBy(a => a.Id)
+            .ToListAsync();
+        var inventory = Id == 0 ? null : await Db.InventoryItems.AsNoTracking()
+            .SingleOrDefaultAsync(i => i.ProductVariantId == Id);
+        reserved = inventory?.QuantityReserved ?? 0;
+        if (Input is not null)
+        {
+            return;
+        }
+        var variant = Id == 0 ? null : await Db.ProductVariants.AsNoTracking()
+            .Include(v => v.Options)
+            .SingleOrDefaultAsync(v => v.Id == Id
+            && v.ProductId == ProductId);
+        if (Id != 0 && variant is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = Id,
+            ProductId = ProductId,
+            Sku = variant?.SKU ?? $"JAS-{ProductId}-",
+            SellingPrice = variant?.SellingPrice ?? 0,
+            CostPrice = variant?.CostPrice ?? 0,
+            Stock = inventory?.QuantityOnHand ?? 0,
+            Active = variant?.IsActive ?? true,
+            Default = variant?.IsDefault ?? !await Db.ProductVariants.AnyAsync(v => v.ProductId == ProductId
+                && v.IsDefault
+                && v.IsActive
+                && !v.IsDeleted),
+            Choices = attributes.Select(a => new VariantChoiceForm
+                {
+                    ProductAttributeDefinitionId = a.Id,
+                    ProductAttributeOptionId = variant?.Options.FirstOrDefault(o => o.ProductAttributeDefinitionId == a.Id)?.ProductAttributeOptionId ?? 0
+                })
+                .ToList()
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            Input.ProductId = ProductId;
+            await Session.RunAsync((s, _) => s.SaveVariantAsync(Input));
+            Nav.NavigateTo($"/admin/products/{ProductId}/variants");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

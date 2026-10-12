@@ -1,0 +1,73 @@
+@rendermode InteractiveAuto
+@inject CartService Cart
+
+@if (!ready)
+{
+    <p>Loading your cart…</p>
+}
+else if (Cart.Error is not null || error is not null)
+{
+    <p role="alert" class="form-error">@(error ?? Cart.Error)</p>
+    <a href="/cart">Return to cart</a>
+}
+else if (Cart.Items.Count == 0)
+{
+    <p>
+        Your cart is empty.
+        <a href="/products">Continue shopping</a>
+        .
+    </p>
+}
+else
+{
+    <input type="hidden" name="Input.Details.RequestId" value="@token" />
+    @for (var i = 0; i < lines.Count; i++)
+    {
+        <input type="hidden" name="@($"Input.Lines[{i}].VariantId")" value="@lines[i].VariantId" />
+        <input type="hidden" name="@($"Input.Lines[{i}].Quantity")" value="@lines[i].Quantity" />
+    }
+    <p class="my-5">@Cart.ItemCount items · Subtotal ৳@Cart.Total.ToString("N0")</p>
+    <button
+        type="submit"
+        name="Input.Intent"
+        value="@(Reviewed ? "place" : "review")"
+        class="shop-button"
+        disabled="@Cart.Items.Any(i => !i.IsAvailable || i.Quantity > i.Stock)"
+    >
+        @(Reviewed ? "Place order · Cash on delivery" : "Review order & delivery charge")
+    </button>
+    <a class="ml-4 text-volt" href="/cart">Edit cart</a>
+}
+
+@code
+{
+    [Parameter]
+    public bool Reviewed { get; set; }
+    private bool ready;
+    private Guid token;
+    private string? error;
+    private List<CartLineRequest> lines = [];
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first)
+        {
+            return;
+        }
+        await Cart.RefreshAsync();
+        if (Cart.Error is null)
+        {
+            try
+            {
+                token = await Cart.CheckoutTokenAsync();
+                lines = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList();
+            }
+            catch (JSException)
+            {
+                error = "Browser storage is unavailable. Enable it to check out.";
+            }
+        }
+        ready = true;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,53 @@
+@page "/admin/carousel/{Id:int}/delete"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader Title="Delete carousel slide" ActionHref="/admin/carousel" ActionText="Back to slides" />
+<div class="shop-panel">
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (name is null)
+    {
+        <p class="admin-empty">Carousel slide not found.</p>
+    }
+    else
+    {
+        <p>
+            Delete
+            <strong>@name</strong>
+            from the homepage carousel?
+        </p>
+        <form method="post" @formname="delete-slide" @onsubmit="Delete" data-enhance class="form-actions">
+            <AntiforgeryToken />
+            <button type="submit" class="danger-button">Delete slide</button>
+            <a href="/admin/carousel" class="shop-button-secondary">Cancel</a>
+        </form>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    private string? name, error;
+
+    protected override async Task OnInitializedAsync() => name = await Db.CarouselSlides.Where(s => s.Id == Id)
+        .Select(s => s.Title ?? s.ImageAlt)
+        .SingleOrDefaultAsync();
+
+    private async Task Delete()
+    {
+        try
+        {
+            await Session.RunAsync(s => s.DeleteSlideAsync(Id));
+            Nav.NavigateTo("/admin/carousel");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

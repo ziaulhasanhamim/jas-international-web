@@ -1,8 +1,12 @@
 using JASIntWeb.Client.Services;
+using JASIntWeb.Client.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
-
 builder.Services.AddScoped<CartService>();
-
+builder.Services.AddHttpClient("Shop", c => c.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
+builder.Services.AddScoped<ICartBackend, HttpCartBackend>();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthenticationStateDeserialization();
 await builder.Build().RunAsync();

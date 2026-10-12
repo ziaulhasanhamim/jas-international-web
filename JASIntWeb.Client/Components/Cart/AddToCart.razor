@@ -1,0 +1,52 @@
+@rendermode InteractiveAuto
+@inject CartService Cart
+@inject NavigationManager Nav
+
+<div class="mt-6 space-y-3">
+    <div class="flex gap-3">
+        <label class="sr-only" for="quantity-@VariantId">Quantity</label>
+        <input
+            id="quantity-@VariantId"
+            type="number"
+            min="1"
+            max="@Math.Min(Stock, 99)"
+            @bind="quantity"
+            class="w-24 rounded-xl border border-slate-200 px-3 py-3"
+            disabled="@(VariantId <= 0 || Stock <= 0 || busy)"
+        />
+        <button class="shop-button flex-1" disabled="@(VariantId <= 0 || Stock <= 0 || busy)" @onclick="Add">@(busy ? "Adding…" : "Add to cart")</button>
+    </div>
+    <button class="shop-button-secondary w-full" disabled="@(VariantId <= 0 || Stock <= 0 || busy)" @onclick="Buy">Buy now</button>
+    @if (message is not null)
+    {
+        <p role="status" class="text-sm text-slate-600">@message</p>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public int VariantId { get; set; }
+    [Parameter]
+    public int Stock { get; set; }
+    private int quantity = 1;
+    private bool busy;
+    private string? message;
+
+    private async Task Add()
+    {
+        busy = true;
+        await Cart.AddAsync(VariantId, quantity);
+        message = Cart.Error ?? "Added to cart.";
+        busy = false;
+    }
+
+    private async Task Buy()
+    {
+        await Add();
+        if (Cart.Error is null)
+        {
+            Nav.NavigateTo("/checkout");
+        }
+    }
+}

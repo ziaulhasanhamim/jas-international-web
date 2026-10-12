@@ -1,0 +1,60 @@
+@page "/admin/attributes/{AttributeId:int}/options"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="@($"{name} values")"
+    Description="Values are reusable across products. Product pages control which values are allowed and their order."
+    ActionHref="@($"/admin/attributes/{AttributeId}/options/new")"
+    ActionText="+ Add value"
+/>
+<a href="/admin/attributes" class="admin-back-link">← Attribute library</a>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Display value</th>
+                <th>Code</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in options)
+            {
+                <tr>
+                    <td>
+                        <strong>@o.Value</strong>
+                    </td>
+                    <td>@o.Code</td>
+                    <td>
+                        <a href="/admin/attributes/@AttributeId/options/@o.Id/edit">Edit value</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (options.Count == 0)
+    {
+        <p class="admin-empty">No values yet. Add one to make this attribute available to products.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [Parameter]
+    public int AttributeId { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<AttributeOption> options = [];
+    private string? name;
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        name = await Db.AttributeDefinitions.Where(a => a.Id == AttributeId).Select(a => a.Name).SingleOrDefaultAsync();
+        var q = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId);
+        total = await q.CountAsync();
+        options = await q.OrderBy(o => o.Value).ThenBy(o => o.Id).Skip((Page - 1) * 25).Take(25).ToListAsync();
+    }
+}

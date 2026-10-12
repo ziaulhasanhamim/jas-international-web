@@ -1,0 +1,62 @@
+@page "/admin/attributes"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="Attribute library"
+    Description="Reusable attribute names and values. Assign allowed values and display order separately for each product."
+    ActionHref="/admin/attributes/new"
+    ActionText="+ Add attribute"
+/>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Attribute</th>
+                <th>Code</th>
+                <th>Unit</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var a in attributes)
+            {
+                <tr>
+                    <td>
+                        <strong>@a.Name</strong>
+                    </td>
+                    <td>@a.Code</td>
+                    <td>@(a.Unit ?? "—")</td>
+                    <td class="row-actions">
+                        <a href="/admin/attributes/@a.Id/edit">Edit</a>
+                        <a href="/admin/attributes/@a.Id/options">Manage values</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (attributes.Count == 0)
+    {
+        <p class="admin-empty">Add your first attribute, such as Color or Storage.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<AttributeDefinition> attributes = [];
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        total = await Db.AttributeDefinitions.CountAsync();
+        attributes = await Db.AttributeDefinitions.AsNoTracking()
+            .OrderBy(a => a.Name)
+            .ThenBy(a => a.Id)
+            .Skip((Page - 1) * 25)
+            .Take(25)
+            .ToListAsync();
+    }
+}

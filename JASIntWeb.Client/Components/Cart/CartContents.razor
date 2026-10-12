@@ -1,0 +1,104 @@
+@rendermode InteractiveAuto
+@implements IDisposable
+@inject CartService Cart
+
+<div class="space-y-5">
+    @if (!ready)
+    {
+        <p>Loading your cart…</p>
+    }
+    else if (Cart.Items.Count == 0)
+    {
+        <p>
+            Your cart is empty.
+            <a href="/products" class="text-volt">Explore products</a>
+            .
+        </p>
+    }
+    else
+    {
+        @if (!Cart.IsAuthenticated)
+        {
+            <p class="text-sm text-slate-500">
+                Saved on this browser.
+                <a href="/account/login" class="text-volt">Sign in</a>
+                to keep your cart across devices.
+            </p>
+        }
+        @foreach (var item in Cart.Items)
+        {
+            <article
+                @key="item.VariantId"
+                class="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5"
+            >
+                <img src="@item.Image" alt="@item.Name" class="h-20 w-20 rounded-xl object-contain" />
+                <div class="min-w-0 flex-1">
+                    <a class="font-semibold" href="/product/@item.Slug">@item.Name</a>
+                    <p class="text-sm text-slate-500">@item.Variant</p>
+                    <p class="mt-2">৳@item.Price.ToString("N0")</p>
+                    @if (!item.IsAvailable || item.Stock < item.Quantity)
+                    {
+                        <p class="text-sm text-red-600">Unavailable quantity. Available: @item.Stock</p>
+                    }
+                </div>
+                <div class="flex items-center gap-3">
+                    <button
+                        disabled="@busy"
+                        class="shop-button-secondary"
+                        aria-label="Decrease quantity"
+                        @onclick="() => Change(item, item.Quantity - 1)"
+                    >
+                        −
+                    </button>
+                    <span>@item.Quantity</span>
+                    <button
+                        disabled="@(busy || item.Quantity >= item.Stock || item.Quantity >= 99)"
+                        class="shop-button-secondary"
+                        aria-label="Increase quantity"
+                        @onclick="() => Change(item, item.Quantity + 1)"
+                    >
+                        +
+                    </button>
+                    <button disabled="@busy" class="text-sm text-red-600" @onclick="() => Change(item, 0)">Remove</button>
+                </div>
+                <strong>৳@item.LineTotal.ToString("N0")</strong>
+            </article>
+        }
+        <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white p-6">
+            <p class="text-xl font-semibold">Subtotal: ৳@Cart.Total.ToString("N0")</p>
+            <a href="/checkout" class="shop-button">Checkout</a>
+        </div>
+    }
+    @if (Cart.Error is not null)
+    {
+        <p role="alert" class="text-red-600">@Cart.Error</p>
+    }
+</div>
+
+@code
+{
+    private bool ready, busy;
+
+    protected override void OnInitialized() => Cart.OnChange += Changed;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            await Cart.InitializeAsync();
+            ready = true;
+            StateHasChanged();
+        }
+    }
+
+    private void Changed() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task Change(CartItemDto item, int quantity)
+    {
+        busy = true;
+        await Cart.SetQuantityAsync(item.VariantId, quantity);
+        busy = false;
+    }
+
+    public void Dispose() => Cart.OnChange -= Changed;
+}

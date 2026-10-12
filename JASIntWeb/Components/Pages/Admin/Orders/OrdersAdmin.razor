@@ -1,0 +1,92 @@
+@page "/admin/orders"
+@inject AppDbContext Db
+
+<AdminPageHeader Title="Orders" Description="Review customer orders and manage fulfillment." />
+<form method="get" data-enhance class="admin-toolbar">
+    <input name="q" value="@Query" placeholder="Order ID, customer or phone" class="shop-input" />
+    <select name="status" class="shop-input">
+        <option value="">All statuses</option>
+        @foreach (var s in Enum.GetValues<OrderStatus>())
+        {
+            <option value="@s" selected="@(Status == s.ToString())">@s</option>
+        }
+    </select>
+    <button class="shop-button-secondary">Filter</button>
+    <a href="/admin/orders">Clear</a>
+</form>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th>Date</th>
+                <th>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in orders)
+            {
+                <tr>
+                    <td>
+                        <strong>#@o.Id</strong>
+                    </td>
+                    <td>@o.DeliveryAddress?.CustomerName</td>
+                    <td>@o.DeliveryAddress?.PhoneNumber</td>
+                    <td>
+                        <span class="status-badge">@o.Status</span>
+                    </td>
+                    <td>৳@o.Total.ToString("N0")</td>
+                    <td>@o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy")</td>
+                    <td>
+                        <a href="/admin/orders/@o.Id">Manage order</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (orders.Count == 0)
+    {
+        <p class="admin-empty">No matching orders.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<Order> orders = [];
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        var q = Db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
+        if (Enum.TryParse<OrderStatus>(Status, out var status))
+        {
+            q = q.Where(o => o.Status == status);
+        }
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            q = q.Where(o => o.Id.ToString() == Query
+                || o.DeliveryAddress!.CustomerName.ToLower()
+                .Contains(Query.ToLower())
+                || o.DeliveryAddress.PhoneNumber.Contains(Query));
+        }
+        total = await q.CountAsync();
+        orders = await q.OrderByDescending(o => o.CreatedAt)
+            .ThenByDescending(o => o.Id)
+            .Skip((Page - 1) * 25)
+            .Take(25)
+            .ToListAsync();
+    }
+}

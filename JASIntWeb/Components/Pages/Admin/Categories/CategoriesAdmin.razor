@@ -1,0 +1,85 @@
+@page "/admin/categories"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="Categories"
+    Description="Organize the catalog into parent categories and subcategories."
+    ActionHref="/admin/categories/new"
+    ActionText="+ Add category"
+/>
+<form method="get" data-enhance class="admin-toolbar">
+    <input name="q" value="@Query" class="shop-input" placeholder="Search categories" />
+    <button class="shop-button-secondary">Search</button>
+</form>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Parent</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in categories)
+            {
+                <tr>
+                    <td>
+                        <strong>@c.Name</strong>
+                        <small class="cell-secondary">@c.Slug</small>
+                    </td>
+                    <td>@(c.ParentCategory?.Name ?? "Top level")</td>
+                    <td>
+                        <span class="status-badge">@(c.IsDeleted ? "Hidden" : "Visible")</span>
+                    </td>
+                    <td>
+                        <a href="/admin/categories/@c.Id/edit">Edit category</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (categories.Count == 0)
+    {
+        <p class="admin-empty">No categories found.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+@if (featured.Count > 0)
+{
+    <div class="shop-panel mt-6">
+        <OrderEditor Kind="OrderableKind.FeaturedCategories" Items="featured" Title="Homepage category order" />
+    </div>
+}
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<Category> categories = [];
+    private List<OrderableItemDto> featured = [];
+    private int total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        var q = Db.Categories.AsNoTracking().Include(c => c.ParentCategory).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            q = q.Where(c => c.Name.ToLower().Contains(Query.ToLower()));
+        }
+        total = await q.CountAsync();
+        categories = await q.OrderBy(c => c.Name).ThenBy(c => c.Id).Skip((Page - 1) * 25).Take(25).ToListAsync();
+        featured = await Db.CategoryPlacements.AsNoTracking()
+            .Where(p => p.IsActive
+            && p.PlacementType == CategoryPlacementType.HomepageFeatured
+            && !p.Category!.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Id)
+            .Select(p => new OrderableItemDto(p.Id, p.Category!.Name))
+            .ToListAsync();
+    }
+}

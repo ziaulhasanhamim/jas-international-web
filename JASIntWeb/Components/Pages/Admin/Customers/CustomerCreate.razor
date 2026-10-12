@@ -1,0 +1,68 @@
+@page "/admin/users/new"
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="Add customer account"
+    Description="Create a customer account. Administrator access is managed separately after creation."
+    ActionHref="/admin/users"
+    ActionText="Back to accounts"
+/>
+@if (error is not null)
+{
+    <p role="alert" class="form-error">@error</p>
+}
+@if (Input is null)
+{
+    <p class="admin-help">Loading form…</p>
+}
+else
+{
+    <EditForm
+        Model="Input"
+        OnValidSubmit="Save"
+        FormName="create-customer"
+        method="post"
+        Enhance
+        class="shop-panel admin-form"
+    >
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <label class="shop-label">
+            Email
+            <InputText @bind-Value="Input!.Email" type="email" class="shop-input" />
+        </label>
+        <label class="shop-label">
+            Initial password
+            <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="shop-input" />
+        </label>
+        <label class="shop-label">
+            Confirm password
+            <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="shop-input" />
+        </label>
+        <button type="submit" class="shop-button">Create customer</button>
+    </EditForm>
+}
+
+@code
+{
+    [SupplyParameterFromForm(FormName = "create-customer")]
+    private SignupForm? Input { get; set; }
+    private string? error;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task Save()
+    {
+        try
+        {
+            var id = await Session.RunAsync((s, _) => s.CreateCustomerAsync(Input!));
+            Nav.NavigateTo($"/admin/users/{id}/edit");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+            Input!.Password = Input.ConfirmPassword = "";
+        }
+    }
+}

@@ -1,0 +1,41 @@
+@page "/order/{Token:guid}"
+@inject AppDbContext Db
+
+<PageTitle>Order confirmation — JAS International</PageTitle>
+<div class="shop-container">
+    @if (order is null)
+    {
+        <h1 class="text-3xl font-semibold">Order not found</h1>
+    }
+    else
+    {
+        <CheckoutCompleted CheckoutToken="order.CheckoutToken" />
+        <div class="shop-panel">
+            <p class="text-sm uppercase text-volt">Order placed</p>
+            <h1 class="mt-2 text-3xl font-semibold">Thank you for your order</h1>
+            <p class="mt-4">Order #@order.Id · @order.Status</p>
+            @foreach (var item in order.Items)
+            {
+                <p class="mt-4">
+                    @item.ProductName · @item.VariantName × @item.Quantity
+                    <strong class="float-right">৳@item.LineTotal.ToString("N0")</strong>
+                </p>
+            }
+            <p class="mt-5">Delivery: ৳@order.DeliveryCharge.ToString("N0")</p>
+            <p class="mt-4 text-xl font-semibold">Total: ৳@order.Total.ToString("N0")</p>
+            <p class="mt-4 text-sm text-slate-500">Cash on delivery. Save this private link to check your order status.</p>
+            <a href="/products" class="shop-button mt-6">Continue shopping</a>
+        </div>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public Guid Token { get; set; }
+    private Order? order;
+
+    protected override async Task OnInitializedAsync() => order = await Db.Orders.AsNoTracking()
+        .Include(o => o.Items)
+        .SingleOrDefaultAsync(o => o.PublicToken == Token);
+}

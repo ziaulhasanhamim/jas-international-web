@@ -1,0 +1,159 @@
+@page "/admin/products/new"
+@page "/admin/products/{Id:int}/edit"
+@page "/admin/products/{Id:int}"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<PageTitle>@(Id == 0 ? "Add product" : "Edit product") — JAS Admin</PageTitle>
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add product" : "Edit product")"
+    Description="Start with product information, then configure options, variants and stock."
+    ActionHref="/admin/products"
+    ActionText="Back to products"
+/>
+<ProductAdminTabs ProductId="Id" />
+@if (notFound)
+{
+    <p class="admin-empty">Product not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="product"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Product name
+                    <InputText @bind-Value="Input!.Name" class="shop-input" />
+                </label>
+                <label class="shop-label">
+                    URL slug
+                    <InputText @bind-Value="Input!.Slug" class="shop-input" />
+                    <small>For example: samsung-galaxy-a56</small>
+                </label>
+            </div>
+            <label class="shop-label">
+                Category
+                <InputSelect @bind-Value="Input!.CategoryId" class="shop-input">
+                    <option value="0">Select category</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c.Id">@CategoryName(c)</option>
+                    }
+                </InputSelect>
+            </label>
+            <label class="shop-label">
+                Short description
+                <InputTextArea @bind-Value="Input!.Description" class="shop-input" rows="2" />
+            </label>
+            <label class="shop-label">
+                Full product details
+                <InputTextArea @bind-Value="Input!.Details" class="shop-input" rows="6" />
+            </label>
+            <label class="shop-label">
+                Main image URL
+                <InputText @bind-Value="Input!.Image" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                Gallery image URLs
+                <InputTextArea @bind-Value="Input!.Images" class="shop-input" rows="4" />
+                <small>One HTTPS or site-relative image URL per line. Maximum 20 images.</small>
+            </label>
+            <label class="check-label">
+                <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
+                <input type="hidden" name="Input.Hidden" value="false" />
+                Keep product hidden from customers
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save product</button>
+                <a href="/admin/products" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "product")]
+    private ProductEditForm? Input { get; set; }
+    private List<CategoryLinkDto> categories = [];
+    private bool notFound;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await Db.Categories.AsNoTracking()
+            .Where(c => !c.IsDeleted
+            && (c.ParentCategory == null
+                || !c.ParentCategory.IsDeleted))
+            .OrderBy(c => c.Name)
+            .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId))
+            .ToListAsync();
+        if (Input is not null)
+        {
+            return;
+        }
+        if (Id == 0)
+        {
+            Input = new()
+            {
+                Hidden = true
+            };
+            return;
+        }
+        var p = await Db.Products.AsNoTracking().Include(p => p.ProductImages).SingleOrDefaultAsync(p => p.Id == Id);
+        if (p is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Slug = p.Slug,
+            CategoryId = p.CategoryId,
+            Description = p.Description ?? "",
+            Details = p.Details,
+            Image = p.MainImageUrl,
+            Images = string.Join("\n", p.ProductImages.OrderBy(i => i.SortOrder).Select(i => i.ImageUrl)),
+            Hidden = p.IsDeleted
+        };
+    }
+
+    private string CategoryName(CategoryLinkDto c) => c.ParentId is int parent ? (categories.FirstOrDefault(p => p.Id == parent)?.Name + " / " + c.Name) : c.Name;
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            var id = await Session.RunAsync((s, _) => s.SaveProductAsync(Input));
+            Nav.NavigateTo($"/admin/products/{id}/attributes");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

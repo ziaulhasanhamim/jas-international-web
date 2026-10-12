@@ -1,0 +1,116 @@
+@page "/admin/attributes/{AttributeId:int}/options/new"
+@page "/admin/attributes/{AttributeId:int}/options/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add option" : "Edit option")"
+    ActionHref="@($"/admin/attributes/{AttributeId}/options")"
+    ActionText="Back to list"
+/>
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="OptionEditor"
+            method="post"
+            Enhance
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label class="shop-label">
+                Display value
+                <InputText @bind-Value="Input!.Value" class="shop-input" />
+                <small>For example: Blue, 256 GB, or 1 year official warranty.</small>
+            </label>
+            <label class="shop-label">
+                Code
+                <InputText @bind-Value="Input!.Code" class="shop-input" />
+                <small>For example: blue or 256-gb. Display order is configured per product.</small>
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="shop-button">Save option</button>
+                <a href="@($"/admin/attributes/{AttributeId}/options")" class="shop-button-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    }
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [Parameter]
+    public int AttributeId { get; set; }
+    [SupplyParameterFromForm(FormName = "OptionEditor")]
+    private OptionEditForm? Input { get; set; }
+    private string? error;
+    private bool notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Db.AttributeDefinitions.AnyAsync(definition => definition.Id == AttributeId))
+        {
+            notFound = true;
+            return;
+        }
+        if (Input is not null)
+        {
+            return;
+        }
+        if (Id == 0)
+        {
+            Input = new()
+            {
+                AttributeDefinitionId = AttributeId
+            };
+            return;
+        }
+        var o = await Db.AttributeOptions.AsNoTracking()
+            .SingleOrDefaultAsync(o => o.Id == Id && o.AttributeDefinitionId == AttributeId);
+        if (o is null)
+        {
+            notFound = true;
+            return;
+        }
+        Input = new()
+        {
+            Id = o.Id,
+            AttributeDefinitionId = AttributeId,
+            Value = o.Value,
+            Code = o.Code
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            Input.AttributeDefinitionId = AttributeId;
+            await Session.RunAsync(s => s.SaveOptionAsync(Input));
+            Nav.NavigateTo($"/admin/attributes/{AttributeId}/options");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

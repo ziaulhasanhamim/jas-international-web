@@ -1,0 +1,130 @@
+@page "/admin/products/{ProductId:int}/variants"
+@inject AppDbContext Db
+
+<AdminPageHeader
+    Title="Variants & stock"
+    Description="Each combination has its own SKU, price and inventory."
+    ActionHref="@($"/admin/products/{ProductId}/variants/new")"
+    ActionText="+ Add variant"
+/>
+<ProductAdminTabs ProductId="ProductId" />
+<h2 class="admin-record-title">@name</h2>
+@if (Created > 0)
+{
+    <p class="form-notice" role="status">Created @Created variants with zero stock. Set actual stock before selling.</p>
+}
+<div class="admin-toolbar">
+    <form method="get" data-enhance>
+        <input name="q" value="@Query" class="shop-input" placeholder="Search SKU" />
+        <button class="shop-button-secondary">Search</button>
+    </form>
+    <a href="/admin/products/@ProductId/variants/generate" class="shop-button-secondary">Generate combinations</a>
+</div>
+<div class="shop-panel admin-table-wrap">
+    <table class="shop-table">
+        <thead>
+            <tr>
+                <th>Variant / SKU</th>
+                <th>Price</th>
+                <th>On hand</th>
+                <th>Reserved</th>
+                <th>Available</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in rows)
+            {
+                <tr>
+                    <td>
+                        <strong>@row.Label</strong>
+                        <small class="cell-secondary">@row.Sku</small>
+                    </td>
+                    <td>৳@row.Price.ToString("N0")</td>
+                    <td>@row.OnHand</td>
+                    <td>@row.Reserved</td>
+                    <td>
+                        <span class="status-badge @(row.OnHand - row.Reserved <= 5 ? "status-warning" : "")">@(row.OnHand - row.Reserved)</span>
+                    </td>
+                    <td>
+                        @(row.Active ? "Active" : "Inactive")
+                        @if (row.Default)
+                        {
+                            <span class="status-badge">Default</span>
+                        }
+                    </td>
+                    <td class="row-actions">
+                        <a href="/admin/products/@ProductId/variants/@row.Id/edit">Edit</a>
+                        <a href="/admin/inventory/@row.Id/edit">Adjust stock</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (rows.Count == 0)
+    {
+        <p class="admin-empty">No variants yet. Configure product attributes, then add a variant or generate combinations.</p>
+    }
+</div>
+<AdminPagination Total="total" Page="Page" />
+
+@code
+{
+    [Parameter]
+    public int ProductId { get; set; }
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    [SupplyParameterFromQuery(Name = "created")]
+    public int Created { get; set; }
+    private string? name;
+    private int total;
+    private List<AdminVariantRow> rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Page = Math.Clamp(Page, 1, 10000);
+        name = await Db.Products.Where(p => p.Id == ProductId).Select(p => p.Name).SingleOrDefaultAsync();
+        var q = Db.ProductVariants.AsNoTracking().Where(v => v.ProductId == ProductId && !v.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            q = q.Where(v => v.SKU.ToLower().Contains(Query.ToLower()));
+        }
+        total = await q.CountAsync();
+        var data = await q.OrderByDescending(v => v.IsDefault)
+            .ThenBy(v => v.Id)
+            .Skip((Page - 1) * 25)
+            .Take(25)
+            .Select(v => new
+            {
+                v.Id,
+                v.SKU,
+                v.SellingPrice,
+                v.IsActive,
+                v.IsDefault,
+                OnHand = Db.InventoryItems.Where(i => i.ProductVariantId == v.Id)
+                .Select(i => i.QuantityOnHand)
+                .FirstOrDefault(),
+                Reserved = Db.InventoryItems.Where(i => i.ProductVariantId == v.Id)
+                .Select(i => i.QuantityReserved)
+                .FirstOrDefault(),
+                Options = v.Options.OrderBy(o => o.ProductAttributeOption!.ProductAttributeDefinition!.SortOrder)
+                .Select(o => o.ProductAttributeOption!.AttributeOption!.Value)
+                .ToList()
+            })
+            .ToListAsync();
+        rows = data.Select(v => new AdminVariantRow(v.Id,
+                ProductId,
+                name ?? "",
+                v.SKU,
+                v.Options.Count == 0 ? "Standard" : string.Join(" / ", v.Options),
+                v.SellingPrice,
+                v.OnHand,
+                v.Reserved,
+                v.IsActive,
+                v.IsDefault))
+            .ToList();
+    }
+}

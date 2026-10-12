@@ -1,0 +1,83 @@
+@page "/admin/users/{Id:int}/edit"
+@inject Microsoft.AspNetCore.Identity.UserManager<User> Users
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="Manage account access"
+    Description="Role changes invalidate existing sessions. An administrator cannot change their own role."
+    ActionHref="/admin/users"
+    ActionText="Back to accounts"
+/>
+@if (user is null)
+{
+    <p class="admin-empty">Account not found.</p>
+}
+else
+{
+    <div class="shop-panel admin-form">
+        <h2 class="admin-record-title">@user.Email</h2>
+        <p>@user.PhoneNumber</p>
+        @if (error is not null)
+        {
+            <p class="form-error" role="alert">@error</p>
+        }
+        @if (Input is null)
+        {
+            <p class="admin-help">Loading form…</p>
+        }
+        else
+        {
+            <EditForm Model="Input" OnValidSubmit="Save" FormName="account-access" method="post" Enhance>
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <label class="check-label">
+                    <input type="checkbox" name="Input.Admin" checked="@(Input!.Admin)" value="true" />
+                    <input type="hidden" name="Input.Admin" value="false" />
+                    Administrator access
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="shop-button">Save access</button>
+                </div>
+            </EditForm>
+        }
+    </div>
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    [SupplyParameterFromForm(FormName = "account-access")]
+    private RoleEditForm? Input { get; set; }
+    private User? user;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await Users.FindByIdAsync(Id.ToString());
+        Input ??= new()
+        {
+            Id = Id,
+            Admin = user is not null && await Users.IsInRoleAsync(user, "Admin")
+        };
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            Input!.Id = Id;
+            await Session.RunAsync(async (s, actor) =>
+                {
+                    await s.ChangeRoleAsync(Input, actor);
+                    return true;
+                });
+            Nav.NavigateTo("/admin/users");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

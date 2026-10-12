@@ -7,9 +7,9 @@
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --color-ink: #0b1020;
-  --color-mist: #f3f5f9;
-  --color-volt: #ff5a1f;
-  --color-volt-dark: #e24a14;
+  --color-mist: #f4f7fd;
+  --color-volt: #2563eb;
+  --color-volt-dark: #1d4ed8;
 }
 
 html {

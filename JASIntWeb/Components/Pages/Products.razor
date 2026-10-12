@@ -1,122 +1,139 @@
-@page "/products/{categorySlug?}"
+@page "/products"
+@page "/products/{CategorySlug}"
+@page "/category/{CategorySlug?}"
+@inject JASIntWeb.Services.CatalogService Catalog
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>Products — JAS International</PageTitle>
-
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-
-    <div class="mb-8">
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-volt">
-            JAS International
-        </p>
-
-        <h1 class="font-display mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Products
-        </h1>
-
-        <p class="mt-2 text-sm text-slate-500">
-            Explore our latest gadgets and accessories.
-        </p>
-    </div>
-
-    <div class="grid gap-8 lg:grid-cols-[240px_1fr]">
-
-        <!-- Desktop sidebar -->
-        <CategorySidebar CategorySlug="@CategorySlug" />
-
-        <!-- Main catalog -->
+<div class="shop-container">
+    <p class="text-xs font-semibold uppercase tracking-widest text-volt">JAS International</p>
+    <h1 class="font-display mt-2 text-3xl font-semibold">@(string.IsNullOrWhiteSpace(Query) ? "Products" : $"Results for “{Query}”")</h1>
+    <div class="mt-8 grid gap-8 lg:grid-cols-[220px_1fr]">
+        <aside class="space-y-5">
+            <details open class="shop-panel category-navigation">
+                <summary class="font-semibold">Categories</summary>
+                <a href="@CategoryUrl(null)" aria-current="@(CategorySlug == null ? "page" : null)" class="category-link mt-3">All products</a>
+                @foreach (var parent in categories.Where(c => !c.ParentId.HasValue))
+                {
+                    <details class="category-group">
+                        <summary class="category-toggle">
+                            <a href="@CategoryUrl(parent.Slug)" aria-current="@(parent.Slug == CategorySlug ? "page" : null)">@parent.Name</a>
+                            <span class="category-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <a
+                            class="category-link category-parent"
+                            aria-current="@(parent.Slug == CategorySlug ? "page" : null)"
+                            href="@CategoryUrl(parent.Slug)"
+                        >
+                            All @parent.Name
+                        </a>
+                        @if (children.TryGetValue(parent.Id, out var subcategories))
+                        {
+                            <ul class="category-children">
+                                @foreach (var child in subcategories)
+                                {
+                                    <li>
+                                        <a
+                                            class="category-link"
+                                            aria-current="@(child.Slug == CategorySlug ? "page" : null)"
+                                            href="@CategoryUrl(child.Slug)"
+                                        >
+                                            @child.Name
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </details>
+                }
+            </details>
+        </aside>
         <section>
-
-            <!-- Mobile filters -->
-            <MobileCategorySidebar CategorySlug="@CategorySlug" />
-
-            <div class="mb-5 flex items-center justify-between gap-4">
-
-                <p class="text-sm text-slate-500">
-                    <span class="font-medium text-ink">
-                        @_products.Count
-                    </span>
-                    products
-                </p>
-
-                <SortDropdown />
-
-            </div>
-
-            <ProductGrid Products="_products" />
-
+            <form method="get" class="shop-panel mb-5 flex flex-wrap items-end gap-3">
+                <label class="flex-1 text-xs">
+                    Search
+                    <input name="q" value="@Query" class="shop-input" placeholder="Product name or model" />
+                </label>
+                <label class="text-xs">
+                    Min ৳
+                    <input name="min-price" type="number" min="0" value="@MinPrice" class="shop-input w-24" />
+                </label>
+                <label class="text-xs">
+                    Max ৳
+                    <input name="max-price" type="number" min="0" value="@MaxPrice" class="shop-input w-24" />
+                </label>
+                <label class="text-xs">
+                    Sort
+                    <select name="sort" class="shop-input">
+                        <option value="relevance" selected="@(Sort == null || Sort == "relevance")">Relevance</option>
+                        <option value="newest" selected="@(Sort == "newest")">Newest</option>
+                        <option value="price-low" selected="@(Sort == "price-low")">Price: low to high</option>
+                        <option value="price-high" selected="@(Sort == "price-high")">Price: high to low</option>
+                        <option value="name" selected="@(Sort == "name")">Name</option>
+                    </select>
+                </label>
+                <button class="shop-button">Apply</button>
+            </form>
+            <p class="mb-5 text-sm text-slate-500">@total products</p>
+            @if (products.Count == 0)
+            {
+                <p>No products found. Try a shorter name, model number, or broader category.</p>
+            }
+            else
+            {
+                <ProductGrid Products="products" />
+            }
+            <nav class="mt-8 flex items-center gap-5" aria-label="Pagination">
+                @if (Page > 1)
+                {
+                    <a href="@Nav.GetUriWithQueryParameter("page", Page - 1)" class="shop-button-secondary">Previous</a>
+                }
+                <span>Page @Page of @Math.Max(1, (int)Math.Ceiling(total / 18.0))</span>
+                @if (Page * 18 < total)
+                {
+                    <a href="@Nav.GetUriWithQueryParameter("page", Page + 1)" class="shop-button-secondary">Next</a>
+                }
+            </nav>
         </section>
-
     </div>
-
 </div>
 
-@code {
-
-    private List<Product> _products = [];
-
+@code
+{
     [Parameter]
     public string? CategorySlug { get; set; }
-
-    
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")]
+    public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "min-price")]
+    public decimal? MinPrice { get; set; }
+    [SupplyParameterFromQuery(Name = "max-price")]
+    public decimal? MaxPrice { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+    private List<ProductSummaryDto> products = [];
+    private List<CategoryLinkDto> categories = [];
+    private Dictionary<int, List<CategoryLinkDto>> children = [];
+    private int total;
 
     protected override async Task OnInitializedAsync()
     {
-        _products = await LoadProductsAsync();
+        Page = Math.Clamp(Page, 1, 10000);
+        (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page);
+        categories = await Catalog.CategoriesAsync();
+        children = categories.Where(c => c.ParentId.HasValue)
+            .GroupBy(c => c.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
     }
 
-    private Task<List<Product>> LoadProductsAsync()
-    {
-        var products = new List<Product>
+    private string CategoryUrl(string? slug) => QueryHelpers.AddQueryString(slug is null ? "/products" : "/category/" + Uri.EscapeDataString(slug),
+        new Dictionary<string, string?>
         {
-            new(
-                "Realme Buds Air 7",
-                "Earbuds",
-                3990,
-                "Popular",
-                "https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?auto=format&fit=crop&w=800&q=80"
-            ),
-
-            new(
-                "OnePlus Nord Buds 4 Pro",
-                "Earbuds",
-                4990,
-                "New",
-                "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80"
-            ),
-
-            new(
-                "Redmi Watch 5 Active",
-                "Smart Watches",
-                4990,
-                "Popular",
-                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80"
-            ),
-
-            new(
-                "Amazfit Active",
-                "Smart Watches",
-                9990,
-                null,
-                "https://images.unsplash.com/photo-1544117519-31a4b719223d?auto=format&fit=crop&w=800&q=80"
-            ),
-
-            new(
-                "JBL Portable Speaker",
-                "Speakers",
-                6990,
-                "Popular",
-                "https://images.unsplash.com/photo-1608156639585-b3a032ef9689?auto=format&fit=crop&w=800&q=80"
-            ),
-
-            new(
-                "Hollyland Lark A1",
-                "Microphones",
-                7990,
-                "Wireless",
-                "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80"
-            )
-        };
-
-        return Task.FromResult(products);
-    }
+            ["q"] = Query,
+            ["sort"] = Sort,
+            ["min-price"] = MinPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["max-price"] = MaxPrice?.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        });
 }
