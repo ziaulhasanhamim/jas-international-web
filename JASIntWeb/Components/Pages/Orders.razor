@@ -1,0 +1,149 @@
+@page "/orders"
+@inject AppDbContext Db
+@inject AuthenticationStateProvider AuthState
+@using Microsoft.AspNetCore.Components.Authorization
+@using JASIntWeb.Client.Components.Orders
+@using JASIntWeb.Services
+
+<PageTitle>Your Orders · JAS International</PageTitle>
+
+<div class="shop-container py-8 max-w-4xl mx-auto">
+    <div class="mb-8">
+        <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-1">
+            ORDER HISTORY
+        </span>
+        <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">
+            Previous Orders &amp; States
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Check the fulfillment status of your previous orders and view detailed receipts.
+        </p>
+    </div>
+
+    <AuthorizeView>
+        <Authorized Context="user">
+            @if (accountOrders.Count == 0)
+            {
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-10 text-center shadow-xs mb-8">
+                    <span class="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mx-auto mb-4">
+                        <Icon Name="receipt" Class="size-7" />
+                    </span>
+                    <h2 class="text-lg font-bold text-slate-900 mb-1">No Orders Found In Account</h2>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mb-6">
+                        You have not placed any orders with this customer account yet.
+                    </p>
+                    <a href="/products" class="btn-primary text-xs">
+                        Start Shopping
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-4 mb-10">
+                    @foreach (var o in accountOrders)
+                    {
+                        <div class="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:border-slate-300 transition">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                                <div>
+                                    <div class="flex items-center gap-2.5">
+                                        <h3 class="font-bold text-slate-900 text-base">Order #@o.Id</h3>
+                                        @switch (o.Status)
+                                        {
+                                            case OrderStatus.Pending:
+                                                <span class="badge badge-amber">Placed &amp; Reserved</span>
+                                                break;
+                                            case OrderStatus.Processing:
+                                                <span class="badge badge-blue">Confirmed &amp; Preparing</span>
+                                                break;
+                                            case OrderStatus.InTransit:
+                                                <span class="badge badge-purple">Ready for Pickup / In Transit</span>
+                                                break;
+                                            case OrderStatus.Delivered:
+                                                <span class="badge badge-emerald">Fulfilled / Delivered</span>
+                                                break;
+                                            case OrderStatus.Cancelled:
+                                                <span class="badge badge-rose">Cancelled</span>
+                                                break;
+                                            default:
+                                                <span class="badge badge-slate">@o.Status</span>
+                                                break;
+                                        }
+                                    </div>
+                                    <span class="text-xs text-slate-400 block mt-1">
+                                        Placed on @o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
+                                    </span>
+                                </div>
+
+                                <div class="text-left sm:text-right">
+                                    <span class="text-xs text-slate-400 block">Total Payable</span>
+                                    <strong class="text-lg font-extrabold text-blue-600 tabular-nums">৳@o.Total.ToString("N0")</strong>
+                                </div>
+                            </div>
+
+                            <div class="py-3">
+                                <p class="text-xs font-semibold text-slate-700 mb-1.5">Items (@o.Items.Count):</p>
+                                <ul class="text-xs text-slate-600 space-y-1">
+                                    @foreach (var item in o.Items)
+                                    {
+                                        <li class="flex items-center gap-2">
+                                            <span class="size-1 rounded-full bg-slate-400"></span>
+                                            <span>@item.ProductName @(string.IsNullOrEmpty(item.VariantName) ? "" : $"({item.VariantName})") · Qty: @item.Quantity</span>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <span class="text-[11px] text-slate-400">Cash on Delivery</span>
+                                <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                    View Order Receipt
+                                </a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Also check for device orders placed before login -->
+            <div class="border-t border-slate-200/80 pt-8">
+                <h3 class="text-sm font-bold text-slate-800 mb-3">Other Orders Placed From This Browser</h3>
+                <DeviceOrdersList />
+            </div>
+        </Authorized>
+
+        <NotAuthorized>
+            <div class="mb-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                    <Icon Name="receipt" Class="size-4 shrink-0 text-blue-600" />
+                    <span>Showing orders placed from this browser device.</span>
+                </div>
+                <a href="/account/login" class="text-blue-700 font-bold hover:underline shrink-0">
+                    Sign in to account →
+                </a>
+            </div>
+
+            <DeviceOrdersList />
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private List<Order> accountOrders = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            var userId = ShoppingService.UserId(auth.User);
+            if (userId.HasValue)
+            {
+                accountOrders = await Db.Orders.AsNoTracking()
+                    .Where(o => o.UserId == userId.Value)
+                    .Include(o => o.Items)
+                    .OrderByDescending(o => o.CreatedAt)
+                    .ToListAsync();
+            }
+        }
+    }
+}

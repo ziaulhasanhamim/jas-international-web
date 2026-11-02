@@ -19,9 +19,12 @@
         <HeadOutlet />
     </head>
     <body>
+        <div id="navigation-progress" class="navigation-progress" hidden>
+            <div class="navigation-progress-bar"></div>
+        </div>
         <Routes />
         <ReconnectModal />
-        <script src="@Assets["_framework/blazor.web.js"]">
-        </script>
+        <script src="@Assets["_framework/blazor.web.js"]"></script>
+        <script src="@Assets["js/jas-app.js"]"></script>
     </body>
 </html>

@@ -6,24 +6,28 @@
 <HeroCarousel Slides="slides" />
 
 <!-- Popular Brands Strip -->
-<section class="border-y border-slate-200/80 bg-white py-6">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-wrap items-center justify-between gap-6 sm:gap-8 opacity-75 grayscale hover:grayscale-0 transition-all duration-300">
-            <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Featured Brands</span>
-            <div class="flex flex-wrap items-center gap-6 sm:gap-10 text-sm font-bold text-slate-700">
-                <span class="hover:text-blue-600 transition cursor-default">Apple</span>
-                <span class="hover:text-blue-600 transition cursor-default">Samsung</span>
-                <span class="hover:text-blue-600 transition cursor-default">Google Pixel</span>
-                <span class="hover:text-blue-600 transition cursor-default">Xiaomi</span>
-                <span class="hover:text-blue-600 transition cursor-default">Anker</span>
-                <span class="hover:text-blue-600 transition cursor-default">Sony</span>
-                <span class="hover:text-blue-600 transition cursor-default">OnePlus</span>
-                <span class="hover:text-blue-600 transition cursor-default">Baseus</span>
-                <span class="hover:text-blue-600 transition cursor-default">JBL</span>
+@if (featuredBrands.Count > 0)
+{
+    <section class="border-y border-slate-200/80 bg-white py-5">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-4 sm:gap-8">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 shrink-0">Featured Brands</span>
+                <div class="flex flex-wrap items-center gap-3 sm:gap-6 text-sm font-bold text-slate-700">
+                    @foreach (var b in featuredBrands)
+                    {
+                        <a href="/products?brand=@b.Slug" class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-slate-50 transition">
+                            @if (!string.IsNullOrEmpty(b.LogoUrl))
+                            {
+                                <img src="@b.LogoUrl" alt="@b.Name" class="size-5 object-contain" />
+                            }
+                            <span>@b.Name</span>
+                        </a>
+                    }
+                </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+}
 
 <CategoryGrid Categories="categories" />
 
@@ -76,12 +80,14 @@
 @code
 {
     private List<CarouselSlideDto> slides = [];
+    private List<BrandLinkDto> featuredBrands = [];
     private ICollection<CategoryDto> categories = [];
     private ICollection<ProductSummaryDto> newArrivals = [], audio = [], watches = [], speakers = [];
 
     protected override async Task OnInitializedAsync()
     {
         slides = await Catalog.SlidesAsync();
+        featuredBrands = await Catalog.FeaturedBrandsAsync();
         categories = await Catalog.HomeCategoriesAsync();
         newArrivals = await Catalog.LatestAsync(null);
         audio = await Catalog.LatestAsync("headphones");

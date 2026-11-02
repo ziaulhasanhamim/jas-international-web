@@ -35,6 +35,7 @@ else
             FormName="product"
             method="post"
             Enhance
+            data-submit-indication="true"
             class="shop-panel admin-form"
         >
             <DataAnnotationsValidator />
@@ -50,16 +51,28 @@ else
                     <small>For example: samsung-galaxy-a56</small>
                 </label>
             </div>
-            <label class="shop-label">
-                Category
-                <InputSelect @bind-Value="Input!.CategoryId" class="shop-input">
-                    <option value="0">Select category</option>
-                    @foreach (var c in categories)
-                    {
-                        <option value="@c.Id">@CategoryName(c)</option>
-                    }
-                </InputSelect>
-            </label>
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Category
+                    <InputSelect @bind-Value="Input!.CategoryId" class="shop-input">
+                        <option value="0">Select category</option>
+                        @foreach (var c in categories)
+                        {
+                            <option value="@c.Id">@CategoryName(c)</option>
+                        }
+                    </InputSelect>
+                </label>
+                <label class="shop-label">
+                    Brand (optional)
+                    <InputSelect @bind-Value="Input!.BrandId" class="shop-input">
+                        <option value="">No brand / generic</option>
+                        @foreach (var b in brands)
+                        {
+                            <option value="@b.Id">@b.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
             <label class="shop-label">
                 Short description
                 <InputTextArea @bind-Value="Input!.Description" class="shop-input" rows="2" />
@@ -83,7 +96,10 @@ else
                 Keep product hidden from customers
             </label>
             <div class="form-actions">
-                <button type="submit" class="shop-button">Save product</button>
+                <button type="submit" class="shop-button" data-pending-text="Saving product...">
+                    <span class="form-submit-spinner" hidden></span>
+                    <span>Save product</span>
+                </button>
                 <a href="/admin/products" class="shop-button-secondary">Cancel</a>
             </div>
         </EditForm>
@@ -97,6 +113,7 @@ else
     [SupplyParameterFromForm(FormName = "product")]
     private ProductEditForm? Input { get; set; }
     private List<CategoryLinkDto> categories = [];
+    private List<BrandLinkDto> brands = [];
     private bool notFound;
     private string? error;
 
@@ -109,6 +126,14 @@ else
             .OrderBy(c => c.Name)
             .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId))
             .ToListAsync();
+
+        brands = await Db.Brands.AsNoTracking()
+            .Where(b => !b.IsDeleted)
+            .OrderBy(b => b.SortOrder)
+            .ThenBy(b => b.Name)
+            .Select(b => new BrandLinkDto(b.Id, b.Name, b.Slug, b.LogoUrl, b.IsFeatured, b.SortOrder))
+            .ToListAsync();
+
         if (Input is not null)
         {
             return;
@@ -133,6 +158,7 @@ else
             Name = p.Name,
             Slug = p.Slug,
             CategoryId = p.CategoryId,
+            BrandId = p.BrandId,
             Description = p.Description ?? "",
             Details = p.Details,
             Image = p.MainImageUrl,

@@ -1,8 +1,8 @@
 @inherits LayoutComponentBase
 
-<div class="min-h-screen">
+<div class="min-h-screen flex flex-col">
     <SiteHeader />
-    <main>@Body</main>
+    <main class="flex-1 pb-16 md:pb-0">@Body</main>
     <SiteFooter />
 </div>
 <div id="blazor-error-ui" data-nosnippet>

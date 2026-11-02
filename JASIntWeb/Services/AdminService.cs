@@ -72,6 +72,18 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         p.Details = input.Details.Trim();
         p.MainImageUrl = Url(input.Image);
         p.CategoryId = input.CategoryId;
+        if (input.BrandId.HasValue && input.BrandId.Value > 0)
+        {
+            if (!await db.Brands.AnyAsync(b => b.Id == input.BrandId.Value && !b.IsDeleted))
+            {
+                throw new ShopException("Select a valid brand.");
+            }
+            p.BrandId = input.BrandId.Value;
+        }
+        else
+        {
+            p.BrandId = null;
+        }
         p.IsDeleted = input.Hidden;
         p.UpdatedAt = DateTimeOffset.UtcNow;
         if (!await db.Categories.AnyAsync(c => c.Id == p.CategoryId && !c.IsDeleted && (c.ParentCategory == null || !c.ParentCategory.IsDeleted)))
@@ -582,6 +594,59 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         await tx.CommitAsync();
         cache.Remove(CatalogService.CategoriesCacheKey);
         cache.Remove(CatalogService.HomeCategoriesCacheKey);
+    }
+
+    public async Task SaveBrandAsync(BrandEditForm input)
+    {
+        Validate(input);
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlRawAsync("LOCK TABLE \"Brands\" IN SHARE ROW EXCLUSIVE MODE");
+        var b = input.Id == 0 ? new Brand
+        {
+            Name = "",
+            Slug = ""
+        }
+        : (await db.Brands.SingleOrDefaultAsync(x => x.Id == input.Id)) ?? throw new ShopException("Brand not found.");
+        b.Name = input.Name.Trim();
+        b.Slug = Code(input.Slug);
+        b.Description = input.Description?.Trim();
+        b.LogoUrl = string.IsNullOrWhiteSpace(input.LogoUrl) ? null : Url(input.LogoUrl);
+        b.IsFeatured = input.IsFeatured;
+        b.SortOrder = input.SortOrder;
+        b.IsDeleted = input.Hidden;
+        b.UpdatedAt = DateTimeOffset.UtcNow;
+        if (await db.Brands.AnyAsync(x => x.Slug == b.Slug && x.Id != b.Id))
+        {
+            throw new ShopException("This brand slug already exists.");
+        }
+        if (b.Id == 0)
+        {
+            db.Brands.Add(b);
+        }
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        cache.Remove(CatalogService.BrandsCacheKey);
+        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
+    }
+
+    public async Task ToggleBrandFeaturedAsync(int id)
+    {
+        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        b.IsFeatured = !b.IsFeatured;
+        b.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        cache.Remove(CatalogService.BrandsCacheKey);
+        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
+    }
+
+    public async Task DeleteBrandAsync(int id)
+    {
+        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        b.IsDeleted = true;
+        b.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        cache.Remove(CatalogService.BrandsCacheKey);
+        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
     }
 
     public async Task<int> SaveAttributeAsync(AttributeEditForm input)

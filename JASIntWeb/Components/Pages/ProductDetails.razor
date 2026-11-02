@@ -83,7 +83,16 @@ else
 
             <!-- Right: Product Information & Purchase -->
             <div>
-                <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-2">@product.Category</span>
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs font-bold uppercase tracking-widest text-blue-600">@product.Category</span>
+                    @if (!string.IsNullOrEmpty(product.BrandName))
+                    {
+                        <span class="text-slate-300">•</span>
+                        <a href="/products?brand=@product.BrandSlug" class="text-xs font-semibold text-slate-500 hover:text-blue-600 transition">
+                            @product.BrandName
+                        </a>
+                    }
+                </div>
                 <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 leading-snug">@product.Name</h1>
 
                 <!-- Price and SKU -->
@@ -190,6 +199,20 @@ else
                 </div>
             </div>
         </section>
+
+        <!-- Mobile Sticky Bottom Buy Bar (visible only on mobile md:hidden, above the 5-tab mobile bottom nav) -->
+        @if (selected is { Stock: > 0 })
+        {
+            <div class="md:hidden fixed bottom-14 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                    <span class="text-[11px] text-slate-500 truncate block font-medium">@product.Name</span>
+                    <strong class="text-sm font-extrabold text-blue-600 tabular-nums block">৳@selected.Price.ToString("N0")</strong>
+                </div>
+                <div class="shrink-0">
+                    <AddToCart @key="@($"sticky-{selected.Id}")" VariantId="selected.Id" Stock="selected.Stock" />
+                </div>
+            </div>
+        }
     </div>
 }
 

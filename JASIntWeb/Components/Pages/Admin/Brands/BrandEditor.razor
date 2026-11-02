@@ -1,0 +1,187 @@
+@page "/admin/brands/new"
+@page "/admin/brands/{Id:int}/edit"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add Brand" : "Edit Brand")"
+    ActionHref="/admin/brands"
+    ActionText="Back to list"
+/>
+
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center gap-2" role="alert">
+            <Icon Name="alert" Class="size-4 shrink-0" />
+            <span>@error</span>
+        </div>
+    }
+
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm
+            Model="Input"
+            OnValidSubmit="Save"
+            FormName="BrandEditor"
+            method="post"
+            Enhance
+            data-submit-indication="true"
+            class="shop-panel admin-form"
+        >
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-xs text-rose-600 mb-3" />
+
+            <label class="shop-label">
+                Brand name
+                <InputText @bind-Value="Input!.Name" class="shop-input" placeholder="e.g. Apple, Samsung, Anker" />
+            </label>
+
+            <label class="shop-label">
+                URL slug
+                <InputText @bind-Value="Input!.Slug" class="shop-input" placeholder="e.g. apple, samsung, anker" />
+                <small>Used for URLs and storefront filtering, e.g. /products?brand=apple</small>
+            </label>
+
+            <label class="shop-label">
+                Logo URL (optional)
+                <InputText @bind-Value="Input!.LogoUrl" class="shop-input" placeholder="https://... or /brands/logo.svg" />
+                <small>SVG or high-res transparent PNG recommended.</small>
+            </label>
+
+            <label class="shop-label">
+                Brief description (optional)
+                <InputTextArea @bind-Value="Input!.Description" class="shop-input min-h-[70px]" placeholder="Brief background about brand products" />
+            </label>
+
+            <label class="shop-label">
+                Sort Order
+                <InputNumber @bind-Value="Input!.SortOrder" class="shop-input" />
+                <small>Lower numbers appear first on featured brand strips.</small>
+            </label>
+
+            <div class="space-y-2 pt-2">
+                <label class="check-label">
+                    <input type="checkbox" name="Input.IsFeatured" checked="@(Input!.IsFeatured)" value="true" />
+                    <input type="hidden" name="Input.IsFeatured" value="false" />
+                    Feature this brand on the storefront homepage strip
+                </label>
+
+                <label class="check-label">
+                    <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
+                    <input type="hidden" name="Input.Hidden" value="false" />
+                    Hide brand from storefront filters
+                </label>
+            </div>
+
+            <div class="form-actions mt-6 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="shop-button" data-pending-text="Saving brand...">
+                        <span class="form-submit-spinner" hidden></span>
+                        <span>@(Id == 0 ? "Create Brand" : "Save Changes")</span>
+                    </button>
+                    <a href="/admin/brands" class="shop-button-secondary">Cancel</a>
+                </div>
+
+                @if (Id != 0 && productCount == 0)
+                {
+                    <button type="button" class="btn-danger !px-3 !py-2 text-xs" @onclick="Delete">
+                        Delete Brand
+                    </button>
+                }
+            </div>
+        </EditForm>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [SupplyParameterFromForm(FormName = "BrandEditor")]
+    private BrandEditForm? Input { get; set; }
+
+    private string? error;
+    private bool notFound;
+    private int productCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id != 0)
+        {
+            productCount = await Db.Products.CountAsync(p => p.BrandId == Id && !p.IsDeleted);
+        }
+
+        if (Input is not null)
+        {
+            return;
+        }
+
+        if (Id == 0)
+        {
+            Input = new BrandEditForm
+            {
+                SortOrder = (await Db.Brands.MaxAsync(b => (int?)b.SortOrder) ?? 0) + 1
+            };
+        }
+        else
+        {
+            var b = await Db.Brands.SingleOrDefaultAsync(x => x.Id == Id);
+            if (b is null)
+            {
+                notFound = true;
+                return;
+            }
+            Input = new BrandEditForm
+            {
+                Id = b.Id,
+                Name = b.Name,
+                Slug = b.Slug,
+                Description = b.Description,
+                LogoUrl = b.LogoUrl,
+                IsFeatured = b.IsFeatured,
+                SortOrder = b.SortOrder,
+                Hidden = b.IsDeleted
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        error = null;
+        try
+        {
+            await Session.RunAsync(s => s.SaveBrandAsync(Input!));
+            Nav.NavigateTo("/admin/brands");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (Id == 0 || productCount > 0) return;
+        error = null;
+        try
+        {
+            await Session.RunAsync(s => s.DeleteBrandAsync(Id));
+            Nav.NavigateTo("/admin/brands");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

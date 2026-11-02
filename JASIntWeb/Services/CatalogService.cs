@@ -7,7 +7,31 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     public const string CategoriesCacheKey = "catalog:categories";
     public const string HomeCategoriesCacheKey = "catalog:home-categories";
     public const string SlidesCacheKey = "catalog:slides";
+    public const string BrandsCacheKey = "catalog:brands";
+    public const string FeaturedBrandsCacheKey = "catalog:featured-brands";
     private static readonly TimeSpan NavigationLifetime = TimeSpan.FromSeconds(60);
+
+    public async Task<List<BrandLinkDto>> BrandsAsync() =>
+    (await cache.GetOrCreateAsync(BrandsCacheKey, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                return await db.Brands.AsNoTracking().Where(b => !b.IsDeleted)
+                .OrderBy(b => b.SortOrder)
+                .ThenBy(b => b.Name)
+                .Select(b => new BrandLinkDto(b.Id, b.Name, b.Slug, b.LogoUrl, b.IsFeatured, b.SortOrder))
+                .ToListAsync();
+            }))!;
+
+    public async Task<List<BrandLinkDto>> FeaturedBrandsAsync() =>
+    (await cache.GetOrCreateAsync(FeaturedBrandsCacheKey, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                return await db.Brands.AsNoTracking().Where(b => !b.IsDeleted && b.IsFeatured)
+                .OrderBy(b => b.SortOrder)
+                .ThenBy(b => b.Name)
+                .Select(b => new BrandLinkDto(b.Id, b.Name, b.Slug, b.LogoUrl, b.IsFeatured, b.SortOrder))
+                .ToListAsync();
+            }))!;
 
     public async Task<List<CategoryLinkDto>> CategoriesAsync() =>
     (await cache.GetOrCreateAsync(CategoriesCacheKey, async entry =>
@@ -65,6 +89,8 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                 x.Description,
                 x.Details,
                 x.MainImageUrl,
+                BrandName = x.Brand != null ? x.Brand.Name : null,
+                BrandSlug = x.Brand != null ? x.Brand.Slug : null,
                 Category = new CategoryLinkDto(x.CategoryId, x.Category!.Name, x.Category.Slug, x.Category.ParentCategoryId),
                 Parent = x.Category.ParentCategoryId == null ? null : new CategoryLinkDto(x.Category.ParentCategory!.Id,
                     x.Category.ParentCategory.Name, x.Category.ParentCategory.Slug, x.Category.ParentCategory.ParentCategoryId),
@@ -120,7 +146,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
             .ToList(), bindings,
             variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
                     v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))
-            .ToList(), breadcrumbs);
+            .ToList(), breadcrumbs, p.BrandName, p.BrandSlug);
     }
 
     private IQueryable<Product> VisibleProducts() => db.Products.AsNoTracking().Where(p => !p.IsDeleted
@@ -170,15 +196,21 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                     i.ProductVariant.IsActive
                     && !i.ProductVariant.IsDeleted)
                 .Select(i => i.QuantityOnHand - i.QuantityReserved)
-                .FirstOrDefault()))
+                .FirstOrDefault(),
+                p.Brand != null ? p.Brand.Name : null,
+                p.Brand != null ? p.Brand.Slug : null))
             .ToListAsync();
     }
 
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
-        string? sort, decimal? min, decimal? max, int page, int pageSize = 18)
+        string? sort, decimal? min, decimal? max, int page, int pageSize = 18, string? brand = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 48);
         var q = await InCategoryAsync(VisibleProducts(), category);
+        if (!string.IsNullOrWhiteSpace(brand))
+        {
+            q = q.Where(p => p.Brand != null && p.Brand.Slug == brand);
+        }
         term = term?.Trim();
         if (!string.IsNullOrEmpty(term))
         {
@@ -232,7 +264,9 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                         i.ProductVariant.IsActive
                         && !i.ProductVariant.IsDeleted)
                     .Select(i => i.QuantityOnHand - i.QuantityReserved)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                    p.Product.Brand != null ? p.Product.Brand.Name : null,
+                    p.Product.Brand != null ? p.Product.Brand.Slug : null))
             .ToListAsync(), count);
     }
 }

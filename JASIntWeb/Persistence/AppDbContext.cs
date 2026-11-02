@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
+    public DbSet<Brand> Brands { get; set; } = null!;
     public DbSet<Product> Products { get; set; } = null!;
     public DbSet<ProductVariant> ProductVariants { get; set; } = null!;
     public DbSet<ProductVariantOption> ProductVariantOptions { get; set; } = null!;
@@ -123,10 +124,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                         x.SortOrder
                     });
             });
+        builder.Entity<Brand>(e =>
+            {
+                e.HasIndex(x => x.Slug)
+                .IsUnique();
+                e.HasIndex(x => new
+                    {
+                        x.IsFeatured,
+                        x.SortOrder
+                    });
+            });
         builder.Entity<Product>(e =>
             {
                 e.HasIndex(x => x.Slug)
                 .IsUnique();
+                e.HasOne(p => p.Brand)
+                    .WithMany(b => b.Products)
+                    .HasForeignKey(p => p.BrandId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         builder.Entity<ProductImage>(e =>
             {

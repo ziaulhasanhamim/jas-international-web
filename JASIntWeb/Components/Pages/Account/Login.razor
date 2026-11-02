@@ -43,7 +43,7 @@
                 }
                 else
                 {
-                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="login" method="post" Enhance class="space-y-4">
+                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="login" method="post" Enhance data-submit-indication="true" class="space-y-4">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
@@ -68,8 +68,9 @@
                             </label>
                         </div>
 
-                        <button class="btn-primary w-full shadow-xs mt-2" type="submit">
-                            Sign In to Account
+                        <button class="btn-primary w-full shadow-xs mt-2" type="submit" data-pending-text="Signing in...">
+                            <span class="form-submit-spinner" hidden></span>
+                            <span>Sign In to Account</span>
                         </button>
                     </EditForm>
                 }

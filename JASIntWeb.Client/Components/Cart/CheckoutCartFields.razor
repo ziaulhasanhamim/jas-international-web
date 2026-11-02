@@ -32,9 +32,11 @@ else
         name="Input.Intent"
         value="@(Reviewed ? "place" : "review")"
         class="shop-button"
+        data-pending-text="@(Reviewed ? "Placing order..." : "Calculating total...")"
         disabled="@Cart.Items.Any(i => !i.IsAvailable || i.Quantity > i.Stock)"
     >
-        @(Reviewed ? "Place order · Cash on delivery" : "Review order & delivery charge")
+        <span class="form-submit-spinner" hidden></span>
+        <span>@(Reviewed ? "Place order · Cash on delivery" : "Review order & delivery charge")</span>
     </button>
     <a class="ml-4 text-volt" href="/cart">Edit cart</a>
 }

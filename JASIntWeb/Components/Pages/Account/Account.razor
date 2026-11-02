@@ -113,9 +113,9 @@
 
                             <div class="flex items-center gap-3">
                                 <span class="font-bold text-slate-900 text-lg tabular-nums">৳@o.Total.ToString("N0")</span>
-                                <a href="/track?orderId=@o.Id&phone=@(o.DeliveryAddress?.PhoneNumber ?? phoneNumber ?? "")" class="btn-secondary !px-3 !py-1.5 text-xs">
-                                    <Icon Name="truck" Class="size-3.5 text-blue-600" />
-                                    Track
+                                <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                    <Icon Name="receipt" Class="size-3.5 text-blue-600" />
+                                    Receipt
                                 </a>
                             </div>
                         </div>

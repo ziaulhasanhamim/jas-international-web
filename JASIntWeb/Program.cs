@@ -92,6 +92,7 @@ if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("See
     await app.Services.SeedTestDataAsync<AppDbContext>(Path.Combine(app.Environment.ContentRootPath, "data", "JasTestSeedData.json"));
 }
 await app.Services.SeedAdminAsync(builder.Configuration);
+await app.Services.SeedBrandsAsync();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.Use(async (context, next) =>
     {

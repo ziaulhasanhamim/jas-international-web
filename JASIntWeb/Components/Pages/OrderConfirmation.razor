@@ -15,7 +15,7 @@
     }
     else
     {
-        <CheckoutCompleted CheckoutToken="order.CheckoutToken" />
+        <CheckoutCompleted CheckoutToken="order.CheckoutToken" OrderId="order.Id" OrderPublicToken="order.PublicToken" Total="order.Total" />
 
         <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
@@ -83,9 +83,9 @@
 
                 <!-- Action Buttons -->
                 <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <a href="/track?orderId=@order.Id&phone=@(order.DeliveryAddress?.PhoneNumber ?? "")" class="btn-primary w-full sm:w-auto text-xs">
-                        <Icon Name="truck" Class="size-4" />
-                        Track This Order Live
+                    <a href="/orders" class="btn-primary w-full sm:w-auto text-xs">
+                        <Icon Name="receipt" Class="size-4" />
+                        View Your Orders
                     </a>
                     <a href="/products" class="btn-secondary w-full sm:w-auto text-xs">
                         Continue Shopping

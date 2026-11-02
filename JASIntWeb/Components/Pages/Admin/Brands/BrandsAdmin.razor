@@ -1,0 +1,170 @@
+@page "/admin/brands"
+@inject AppDbContext Db
+@inject AdminSession Session
+@inject NavigationManager Nav
+
+<PageTitle>Brands · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">CATALOG BRANDS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Brands</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage gadget manufacturers, featured brand strip on the homepage, and brand filters.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/brands/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Brand
+        </a>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+            <input name="q" value="@Query" class="field pr-9" placeholder="Search brands..." />
+            <span class="absolute right-3 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+        </div>
+        <button type="submit" class="btn-primary">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Query))
+        {
+            <a href="/admin/brands" class="btn-secondary">Clear</a>
+        }
+    </form>
+</div>
+
+<!-- Brands Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Brand Name</th>
+                    <th>Slug</th>
+                    <th>Featured</th>
+                    <th>Sort Order</th>
+                    <th>Products</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in brands)
+                {
+                    <tr>
+                        <td>
+                            <div class="flex items-center gap-3">
+                                @if (!string.IsNullOrEmpty(b.LogoUrl))
+                                {
+                                    <img src="@b.LogoUrl" alt="@b.Name" class="size-8 object-contain rounded-lg border border-slate-100 p-1" />
+                                }
+                                else
+                                {
+                                    <span class="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
+                                        @b.Name[..Math.Min(2, b.Name.Length)].ToUpperInvariant()
+                                    </span>
+                                }
+                                <div>
+                                    <strong class="text-slate-900 block font-semibold">@b.Name</strong>
+                                    @if (!string.IsNullOrEmpty(b.Description))
+                                    {
+                                        <span class="text-xs text-slate-400 truncate max-w-xs block">@b.Description</span>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td class="font-mono text-xs text-slate-600">
+                            /@b.Slug
+                        </td>
+                        <td>
+                            @if (b.IsFeatured)
+                            {
+                                <span class="badge badge-indigo">Featured</span>
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">Standard</span>
+                            }
+                        </td>
+                        <td class="text-xs font-medium text-slate-700">
+                            @b.SortOrder
+                        </td>
+                        <td>
+                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                @b.ProductCount items
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(b.Hidden ? "badge-rose" : "badge-emerald")">
+                                @(b.Hidden ? "Hidden" : "Active")
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <a href="/admin/brands/@b.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit Brand
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (brands.Count == 0)
+    {
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No brands found.</p>
+        </div>
+    }
+</div>
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    private int Page { get; set; } = 1;
+
+    private List<AdminBrandRow> brands = [];
+    private int total;
+    private const int PageSize = 25;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var q = Db.Brands.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            var term = Query.Trim().ToLower();
+            q = q.Where(b => b.Name.ToLower().Contains(term) || b.Slug.ToLower().Contains(term));
+        }
+
+        total = await q.CountAsync();
+        var currentPage = Math.Max(1, Page);
+
+        brands = await q
+            .OrderBy(b => b.SortOrder)
+            .ThenBy(b => b.Name)
+            .Skip((currentPage - 1) * PageSize)
+            .Take(PageSize)
+            .Select(b => new AdminBrandRow(
+                b.Id,
+                b.Name,
+                b.Slug,
+                b.Description,
+                b.LogoUrl,
+                b.IsFeatured,
+                b.SortOrder,
+                b.Products.Count(p => !p.IsDeleted),
+                b.IsDeleted
+            ))
+            .ToListAsync();
+    }
+}

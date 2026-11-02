@@ -193,6 +193,66 @@ public static class JsonTestDataSeeder
         }
     }
 
+    public static async Task SeedBrandsAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (!await db.Brands.AnyAsync(ct))
+        {
+            var initialBrands = new List<Brand>
+            {
+                new() { Name = "Apple", Slug = "apple", IsFeatured = true, SortOrder = 1 },
+                new() { Name = "Samsung", Slug = "samsung", IsFeatured = true, SortOrder = 2 },
+                new() { Name = "Google Pixel", Slug = "google", IsFeatured = true, SortOrder = 3 },
+                new() { Name = "Xiaomi", Slug = "xiaomi", IsFeatured = true, SortOrder = 4 },
+                new() { Name = "Anker", Slug = "anker", IsFeatured = true, SortOrder = 5 },
+                new() { Name = "Sony", Slug = "sony", IsFeatured = true, SortOrder = 6 },
+                new() { Name = "OnePlus", Slug = "oneplus", IsFeatured = true, SortOrder = 7 },
+                new() { Name = "Baseus", Slug = "baseus", IsFeatured = true, SortOrder = 8 },
+                new() { Name = "JBL", Slug = "jbl", IsFeatured = true, SortOrder = 9 }
+            };
+            db.Brands.AddRange(initialBrands);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Link any unassigned products to matching brands
+        var brands = await db.Brands.Where(b => !b.IsDeleted).ToListAsync(ct);
+        var unlinkedProducts = await db.Products.Where(p => p.BrandId == null && !p.IsDeleted).ToListAsync(ct);
+        if (unlinkedProducts.Count > 0 && brands.Count > 0)
+        {
+            foreach (var p in unlinkedProducts)
+            {
+                var lower = p.Name.ToLowerInvariant();
+                Brand? matched = null;
+                if (lower.Contains("iphone") || lower.Contains("macbook") || lower.Contains("airpods") || lower.Contains("apple"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "apple");
+                else if (lower.Contains("galaxy") || lower.Contains("samsung"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "samsung");
+                else if (lower.Contains("pixel") || lower.Contains("google"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "google");
+                else if (lower.Contains("xiaomi") || lower.Contains("redmi") || lower.Contains("poco"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "xiaomi");
+                else if (lower.Contains("anker") || lower.Contains("soundcore"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "anker");
+                else if (lower.Contains("sony") || lower.Contains("wh-1000") || lower.Contains("wf-1000"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "sony");
+                else if (lower.Contains("oneplus") || lower.Contains("nord"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "oneplus");
+                else if (lower.Contains("baseus"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "baseus");
+                else if (lower.Contains("jbl"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "jbl");
+
+                if (matched is not null)
+                {
+                    p.BrandId = matched.Id;
+                }
+            }
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     private sealed class SeedData
     {
         public List<AttributeDefinition> AttributeDefinitions { get; set; } = [];

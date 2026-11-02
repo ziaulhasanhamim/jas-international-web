@@ -31,6 +31,7 @@ else
             FormName="CategoryEditor"
             method="post"
             Enhance
+            data-submit-indication="true"
             class="shop-panel admin-form"
         >
             <DataAnnotationsValidator />
@@ -70,7 +71,10 @@ else
                 Feature on homepage
             </label>
             <div class="form-actions">
-                <button type="submit" class="shop-button">Save category</button>
+                <button type="submit" class="shop-button" data-pending-text="Saving category...">
+                    <span class="form-submit-spinner" hidden></span>
+                    <span>Save category</span>
+                </button>
                 <a href="/admin/categories" class="shop-button-secondary">Cancel</a>
             </div>
         </EditForm>

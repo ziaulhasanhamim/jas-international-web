@@ -9,6 +9,8 @@ public sealed class Product : SoftDeletableEntity
     public required string MainImageUrl { get; set; }
     public required int CategoryId { get; set; }
     public Category? Category { get; set; }
+    public int? BrandId { get; set; }
+    public Brand? Brand { get; set; }
     public ICollection<ProductAttributeDefinition> Attributes { get; set; } = [];
     public ICollection<ProductImage> ProductImages { get; init; } = [];
     public ICollection<ProductVariant> ProductVariants { get; init; } = [];

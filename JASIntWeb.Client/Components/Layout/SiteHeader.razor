@@ -18,9 +18,9 @@
             </a>
         </div>
         <div class="flex items-center gap-4 text-[11px] shrink-0">
-            <a href="/track" class="inline-flex items-center gap-1 text-slate-300 hover:text-white transition">
-                <Icon Name="truck" Class="size-3.5 text-blue-400" />
-                <span>Track Order</span>
+            <a href="/orders" class="inline-flex items-center gap-1 text-slate-300 hover:text-white transition">
+                <Icon Name="receipt" Class="size-3.5 text-blue-400" />
+                <span>Orders</span>
             </a>
             <span class="text-slate-700">•</span>
             <a href="/faq" class="hover:text-white transition">Help &amp; FAQ</a>
@@ -109,7 +109,23 @@
         </div>
     </div>
 
-    <!-- Category Strip & Mobile Search -->
+    <!-- Mobile Quick Search Bar -->
+    <div class="md:hidden px-4 pb-2.5 pt-0.5">
+        <form action="/products" method="get" class="relative">
+            <input
+                id="site-search-mobile"
+                name="q"
+                type="search"
+                placeholder="Search gadgets, smartphones, laptops..."
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 pl-9 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <span class="absolute left-3 top-2.5 text-slate-400">
+                <Icon Name="search" Class="size-3.5" />
+            </span>
+        </form>
+    </div>
+
+    <!-- Category Strip -->
     <div class="border-t border-slate-100 bg-white px-4 py-2 sm:px-6">
         <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 overflow-x-auto text-xs font-medium text-slate-600 scrollbar-none">
             <div class="flex items-center gap-6 whitespace-nowrap">
@@ -127,6 +143,43 @@
         </div>
     </div>
 </header>
+
+<!-- 5-Tab Mobile Bottom Navigation Bar -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 py-1.5 flex items-center justify-around text-[10px] font-semibold text-slate-500">
+    <NavLink href="/" Match="NavLinkMatch.All" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition hover:text-blue-600 [&.active]:text-blue-600 [&.active]:font-bold">
+        <Icon Name="dashboard" Class="size-5" />
+        <span>Home</span>
+    </NavLink>
+    
+    <NavLink href="/products" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition hover:text-blue-600 [&.active]:text-blue-600 [&.active]:font-bold">
+        <Icon Name="box" Class="size-5" />
+        <span>Shop</span>
+    </NavLink>
+
+    <!-- Cart Button with live Badge -->
+    <button type="button" @onclick="() => open = true" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition hover:text-blue-600 relative">
+        <div class="relative">
+            <Icon Name="cart" Class="size-5 text-slate-700" />
+            @if (Cart.ItemCount > 0)
+            {
+                <span class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white shadow-xs">
+                    @Cart.ItemCount
+                </span>
+            }
+        </div>
+        <span>Cart</span>
+    </button>
+
+    <NavLink href="/orders" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition hover:text-blue-600 [&.active]:text-blue-600 [&.active]:font-bold">
+        <Icon Name="receipt" Class="size-5" />
+        <span>Orders</span>
+    </NavLink>
+
+    <NavLink href="/account" class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition hover:text-blue-600 [&.active]:text-blue-600 [&.active]:font-bold">
+        <Icon Name="user" Class="size-5" />
+        <span>Account</span>
+    </NavLink>
+</nav>
 
 <CartDrawer Open="open" OpenChanged="value => open = value" />
 

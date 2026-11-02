@@ -73,6 +73,31 @@
                     }
                 </div>
             </div>
+
+            <!-- Brand Filter -->
+            <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                    <h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <Icon Name="box" Class="size-4 text-blue-600" />
+                        Brands
+                    </h2>
+                    @if (BrandSlug != null)
+                    {
+                        <a href="@FilterUrl(CategorySlug, null)" class="text-[11px] text-blue-600 font-semibold hover:underline">Clear</a>
+                    }
+                </div>
+                <div class="space-y-1 text-xs max-h-56 overflow-y-auto pr-1 scrollbar-none">
+                    <a href="@FilterUrl(CategorySlug, null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(BrandSlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                        <span>All Brands</span>
+                    </a>
+                    @foreach (var b in brands)
+                    {
+                        <a href="@FilterUrl(CategorySlug, b.Slug)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(b.Slug == BrandSlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                            <span>@b.Name</span>
+                        </a>
+                    }
+                </div>
+            </div>
         </aside>
 
         <!-- Product Grid & Search Toolbar -->
@@ -80,6 +105,10 @@
             <!-- Filter & Sort Toolbar -->
             <div class="mb-6 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs">
                 <form method="get" class="flex flex-wrap items-center gap-3">
+                    @if (!string.IsNullOrWhiteSpace(BrandSlug))
+                    {
+                        <input type="hidden" name="brand" value="@BrandSlug" />
+                    }
                     <div class="relative flex-1 min-w-[200px]">
                         <input name="q" value="@Query" class="field pr-9" placeholder="Search by model or name..." />
                         <span class="absolute right-3 top-3 text-slate-400">
@@ -169,6 +198,8 @@
     public string? CategorySlug { get; set; }
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "brand")]
+    public string? BrandSlug { get; set; }
     [SupplyParameterFromQuery(Name = "sort")]
     public string? Sort { get; set; }
     [SupplyParameterFromQuery(Name = "min-price")]
@@ -180,6 +211,7 @@
 
     private List<ProductSummaryDto> products = [];
     private List<CategoryLinkDto> categories = [];
+    private List<BrandLinkDto> brands = [];
     private Dictionary<int, List<CategoryLinkDto>> children = [];
     private string? activeCategoryName;
     private int total;
@@ -187,9 +219,10 @@
     protected override async Task OnInitializedAsync()
     {
         Page = Math.Clamp(Page, 1, 10000);
-        (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page);
+        (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page, pageSize: 18, brand: BrandSlug);
 
         categories = await Catalog.CategoriesAsync();
+        brands = await Catalog.BrandsAsync();
         children = categories.Where(c => c.ParentId.HasValue)
             .GroupBy(c => c.ParentId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -200,11 +233,14 @@
         }
     }
 
-    private string CategoryUrl(string? slug)
+    private string CategoryUrl(string? slug) => FilterUrl(slug, BrandSlug);
+
+    private string FilterUrl(string? catSlug, string? brand)
     {
-        var baseUri = slug is null ? "/products" : $"/category/{slug}";
+        var baseUri = catSlug is null ? "/products" : $"/category/{catSlug}";
         var query = new Dictionary<string, string?>();
         if (!string.IsNullOrWhiteSpace(Query)) query["q"] = Query;
+        if (!string.IsNullOrWhiteSpace(brand)) query["brand"] = brand;
         if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
         if (MinPrice.HasValue) query["min-price"] = MinPrice.Value.ToString();
         if (MaxPrice.HasValue) query["max-price"] = MaxPrice.Value.ToString();

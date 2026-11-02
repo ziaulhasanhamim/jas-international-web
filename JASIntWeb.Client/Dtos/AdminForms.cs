@@ -10,6 +10,7 @@ public sealed class ProductEditForm
     public string Slug { get; set; } = "";
     [Range(1, int.MaxValue)]
     public int CategoryId { get; set; }
+    public int? BrandId { get; set; }
     [StringLength(2000)]
     public string Description { get; set; } = "";
     [Required, StringLength(20000)]
@@ -178,5 +179,23 @@ public enum OrderableKind
 }
 
 public sealed record AdminProductRow(int Id, string Name, string Slug, string Category, int VariantCount, bool Hidden);
+
+public sealed record AdminBrandRow(int Id, string Name, string Slug, string? Description, string? LogoUrl, bool IsFeatured, int SortOrder, int ProductCount, bool Hidden);
+
+public sealed class BrandEditForm
+{
+    public int Id { get; set; }
+    [Required, StringLength(100)]
+    public string Name { get; set; } = "";
+    [Required, StringLength(120)]
+    public string Slug { get; set; } = "";
+    [StringLength(2000)]
+    public string? Description { get; set; }
+    [StringLength(2000)]
+    public string? LogoUrl { get; set; }
+    public bool IsFeatured { get; set; }
+    public int SortOrder { get; set; }
+    public bool Hidden { get; set; }
+}
 
 public sealed record AdminVariantRow(int Id, int ProductId, string ProductName, string Sku, string Label, decimal Price, int OnHand, int Reserved, bool Active, bool Default);

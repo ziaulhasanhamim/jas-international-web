@@ -1,5 +1,6 @@
 @rendermode InteractiveAuto
 @inject CartService Cart
+@inject IJSRuntime JS
 
 @if (Cart.Error is not null)
 {
@@ -13,12 +14,29 @@
 {
     [Parameter]
     public Guid CheckoutToken { get; set; }
+    [Parameter]
+    public int OrderId { get; set; }
+    [Parameter]
+    public Guid OrderPublicToken { get; set; }
+    [Parameter]
+    public decimal Total { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool first)
     {
         if (first)
         {
             await Cart.CompleteCheckoutAsync(CheckoutToken);
+            if (OrderId > 0 && OrderPublicToken != Guid.Empty)
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("jasRecordGuestOrder", OrderId, OrderPublicToken.ToString(), (double)Total);
+                }
+                catch
+                {
+                    // Ignore storage errors in restricted private mode
+                }
+            }
             StateHasChanged();
         }
     }
