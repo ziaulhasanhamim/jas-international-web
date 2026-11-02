@@ -1,5 +1,8 @@
 @page "/order/{Token:guid}"
-@inject AppDbContext Db
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Order Confirmation · JAS International</PageTitle>
 
@@ -19,14 +22,16 @@
 
         <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-8 text-white text-center">
-                <span class="flex size-14 items-center justify-center rounded-full bg-white text-emerald-600 mx-auto mb-4 shadow-md">
+            <div class="bg-gradient-to-r @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-700") p-8 text-white text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-white @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "text-emerald-600" : "text-blue-600") mx-auto mb-4 shadow-md">
                     <Icon Name="check" Class="size-8" />
                 </span>
-                <span class="text-xs font-bold uppercase tracking-widest text-emerald-100 block mb-1">ORDER CONFIRMED</span>
+                <span class="text-xs font-bold uppercase tracking-widest text-emerald-100 block mb-1">
+                    @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "ORDER CONFIRMED & PAID" : "ORDER PLACED · PAYMENT PENDING")
+                </span>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Thank You For Your Order!</h1>
                 <p class="text-xs text-emerald-100 mt-2">
-                    Order <strong>#@order.Id</strong> has been placed and stock is reserved for fulfillment.
+                    Order <strong>#@order.Id</strong> has been registered and inventory is reserved for fulfillment.
                 </p>
             </div>
 
@@ -37,13 +42,14 @@
                     <div>
                         <span class="text-slate-400 block font-medium">Deliver To:</span>
                         <strong class="text-slate-900 text-sm">@order.DeliveryAddress?.CustomerName</strong>
-                        <p class="text-slate-600 mt-0.5">@order.DeliveryAddress?.PhoneNumber</p>
-                        <p class="text-slate-600">@order.DeliveryAddress?.FullAddress (@order.DeliveryAddress?.City)</p>
+                        <p class="text-slate-600 mt-0.5 font-mono">@order.DeliveryAddress?.PhoneNumber</p>
+                        <p class="text-slate-600">@order.DeliveryAddress?.FullAddress</p>
+                        <p class="text-slate-500 text-[11px]">@order.DeliveryAddress?.Thana, @order.DeliveryAddress?.District (@order.DeliveryAddress?.Division)</p>
                     </div>
 
                     <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
                         <span class="text-slate-400 block font-medium">Payment Mode:</span>
-                        <strong class="text-slate-900 text-sm">@(order.PaidAmount > 0 ? "Advance Paid (bKash/Nagad)" : "Cash on Delivery (COD)")</strong>
+                        <strong class="text-slate-900 text-sm">@(order.PaidAmount > 0 ? "Advance Paid (bKash)" : "Payment Pending / COD")</strong>
                         @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
                         {
                             <span class="block text-[11px] font-mono text-blue-600 mt-0.5">Ref: @order.PaymentReferenceCode</span>
@@ -67,7 +73,9 @@
                             }
                             else
                             {
-                                <span class="badge badge-emerald">Stock Reserved</span>
+                                <a href="/checkout/payment/@order.PublicToken" class="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition">
+                                    <span>Complete bKash Payment →</span>
+                                </a>
                             }
                         </div>
                     </div>
@@ -106,9 +114,30 @@
                                 <span class="tabular-nums">-৳@order.DiscountAmount.ToString("N0")</span>
                             </div>
                         }
-                        <div class="border-t border-slate-200 pt-3 flex justify-between text-sm">
-                            <span class="font-bold text-slate-900">Total Payable</span>
+                        <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base">
+                            <span class="font-bold text-slate-900">Total Order Amount</span>
                             <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@order.Total.ToString("N0")</span>
+                        </div>
+
+                        <div class="rounded-xl bg-slate-50 border p-3 mt-2 text-[11px] space-y-1">
+                            @if (order.PaidAmount > 0)
+                            {
+                                <div class="flex justify-between text-slate-700">
+                                    <span>Amount Paid via bKash:</span>
+                                    <strong class="text-emerald-600">৳@order.PaidAmount.ToString("N0")</strong>
+                                </div>
+                                <div class="flex justify-between text-slate-700">
+                                    <span>Due on Delivery:</span>
+                                    <strong class="text-slate-900">৳@Math.Max(0, order.Total - order.PaidAmount).ToString("N0")</strong>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="flex justify-between text-slate-700">
+                                    <span>Payment Status:</span>
+                                    <strong class="text-amber-600">Pending bKash Confirmation</strong>
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -134,8 +163,13 @@
     public Guid Token { get; set; }
     private Order? order;
 
-    protected override async Task OnInitializedAsync() => order = await Db.Orders.AsNoTracking()
-        .Include(o => o.Items)
-        .Include(o => o.DeliveryAddress)
-        .SingleOrDefaultAsync(o => o.PublicToken == Token);
+    protected override async Task OnInitializedAsync()
+    {
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        order = await db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .Include(o => o.DeliveryAddress)
+            .SingleOrDefaultAsync(o => o.PublicToken == Token);
+    }
 }

@@ -1,8 +1,11 @@
 @page "/orders"
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 @inject AuthenticationStateProvider AuthState
 @using Microsoft.AspNetCore.Components.Authorization
 @using JASIntWeb.Client.Components.Orders
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Services
 
 <PageTitle>Your Orders · JAS International</PageTitle>
@@ -94,10 +97,18 @@
                             </div>
 
                             <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-                                <span class="text-[11px] text-slate-400">Cash on Delivery</span>
-                                <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
-                                    View Order Receipt
-                                </a>
+                                <span class="text-[11px] text-slate-400">@(o.PaidAmount > 0 ? $"bKash Paid (৳{o.PaidAmount:N0})" : "Payment Pending")</span>
+                                <div class="flex items-center gap-2">
+                                    @if (o.Status == OrderStatus.Pending && o.PaidAmount == 0)
+                                    {
+                                        <a href="/checkout/payment/@o.PublicToken" class="btn-primary !px-3 !py-1.5 text-xs">
+                                            Pay Now
+                                        </a>
+                                    }
+                                    <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                        View Order Receipt
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     }
@@ -138,7 +149,9 @@
             var userId = ShoppingService.UserId(auth.User);
             if (userId.HasValue)
             {
-                accountOrders = await Db.Orders.AsNoTracking()
+                await using var scope = ScopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                accountOrders = await db.Orders.AsNoTracking()
                     .Where(o => o.UserId == userId.Value)
                     .Include(o => o.Items)
                     .OrderByDescending(o => o.CreatedAt)

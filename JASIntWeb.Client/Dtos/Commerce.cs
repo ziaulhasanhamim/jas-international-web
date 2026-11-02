@@ -41,6 +41,8 @@ public sealed class CheckoutRequest
 
 public sealed record CheckoutResult(int OrderId, Guid PublicToken, decimal Total, string? PaymentReferenceCode = null, decimal DeliveryCharge = 0, decimal DiscountAmount = 0);
 
+public sealed record ConfirmPaymentRequest(string PaymentMethod, string? SenderPhoneNumber, string? TransactionId, string? ReferenceCode);
+
 public sealed record DeliveryRatesDto(decimal Khulna, decimal OutsideKhulna);
 
 public sealed record AccountDto(bool IsAuthenticated, string? Email);

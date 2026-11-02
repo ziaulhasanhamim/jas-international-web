@@ -6,7 +6,7 @@ public class DeliverySettings : Entity
     public string? HubCity { get; set; } = "Khulna Sadar";
     public decimal HubCityFee { get; set; } = 50m;
     public decimal OutsideFee { get; set; } = 150m;
-    public decimal? FreeDeliveryThreshold { get; set; } = 5000m;
+    public decimal? FreeDeliveryThreshold { get; set; }
     public bool RequireAdvanceForCOD { get; set; } = true;
     public decimal AdvanceAmount { get; set; } = 150m;
     public string BkashNumber { get; set; } = "01711465078";

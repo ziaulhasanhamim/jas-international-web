@@ -362,9 +362,9 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         order.Payments.Add(new Payment
             {
                 OrderId = 0,
-                Method = request.PaymentMethod == "BkashAdvance" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
+                Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" || request.PaymentMethod == "Pending" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
                 Status = isAdvanceOrPaid ? PaymentStatus.Completed : PaymentStatus.Pending,
-                Amount = order.Total,
+                Amount = isAdvanceOrPaid ? order.PaidAmount : order.Total,
                 ExternalReference = request.TransactionId
             });
         db.Orders.Add(order);
@@ -376,5 +376,79 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         await db.SaveChangesAsync();
         await tx.CommitAsync();
         return new(order.Id, order.PublicToken, order.Total, order.PaymentReferenceCode, order.DeliveryCharge, order.DiscountAmount);
+    }
+
+    public async Task<Order> ConfirmPaymentAsync(Guid publicToken, ConfirmPaymentRequest request)
+    {
+        var order = await db.Orders
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.PublicToken == publicToken);
+        if (order is null)
+        {
+            throw new ShopException("Order not found.");
+        }
+        if (order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)
+        {
+            throw new ShopException($"This order cannot be updated because its status is {order.Status}.");
+        }
+
+        var dSettings = await deliverySettings.GetSettingsAsync();
+
+        if (request.PaymentMethod is "BkashAdvance" or "FullPayment")
+        {
+            if (string.IsNullOrWhiteSpace(request.SenderPhoneNumber) || !System.Text.RegularExpressions.Regex.IsMatch(request.SenderPhoneNumber.Trim(), @"^(?:\+?88)?01[3-9]\d{8}$"))
+            {
+                throw new ShopException("A valid 11-digit bKash sender phone number is required (01xxxxxxxxx).");
+            }
+            if (string.IsNullOrWhiteSpace(request.TransactionId) || request.TransactionId.Trim().Length < 6)
+            {
+                throw new ShopException("A valid bKash Transaction ID (TrxID) is required.");
+            }
+
+            var isFull = request.PaymentMethod == "FullPayment";
+            var paidAmt = isFull ? order.Total : dSettings.AdvanceAmount;
+
+            if (!string.IsNullOrWhiteSpace(request.ReferenceCode))
+            {
+                order.PaymentReferenceCode = request.ReferenceCode.Trim();
+            }
+            order.SenderPhoneNumber = request.SenderPhoneNumber.Trim();
+            order.TransactionId = request.TransactionId.Trim().ToUpperInvariant();
+            order.PaidAmount = paidAmt;
+            order.Status = OrderStatus.Processing;
+
+            var existingPayment = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash);
+            if (existingPayment != null)
+            {
+                existingPayment.Amount = paidAmt;
+                existingPayment.Status = PaymentStatus.Completed;
+                existingPayment.ExternalReference = order.TransactionId;
+            }
+            else
+            {
+                order.Payments.Add(new Payment
+                {
+                    OrderId = order.Id,
+                    Method = PaymentMethod.Bkash,
+                    Status = PaymentStatus.Completed,
+                    Amount = paidAmt,
+                    ExternalReference = order.TransactionId
+                });
+            }
+        }
+        else if (request.PaymentMethod == "COD")
+        {
+            if (dSettings.RequireAdvanceForCOD)
+            {
+                throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
+            }
+            order.PaidAmount = 0m;
+            order.Status = OrderStatus.Pending;
+        }
+
+        await db.SaveChangesAsync();
+        return order;
     }
 }

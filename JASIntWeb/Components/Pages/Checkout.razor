@@ -18,22 +18,21 @@
 <PageTitle>Secure Checkout · JAS International</PageTitle>
 
 <div class="shop-container py-8 max-w-6xl mx-auto">
+    <!-- Breadcrumb / Step Indicator -->
     <div class="mb-8">
-        <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-1">SECURE CHECKOUT</span>
-        <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">Delivery &amp; Payment</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">bKash &amp; Cash on Delivery across Bangladesh. Genuine tech gadgets with official warranty.</p>
-    </div>
-
-    @if (error is not null)
-    {
-        <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
-            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
-            <div>
-                <strong class="font-semibold block text-rose-900">Please review the form:</strong>
-                <span>@error</span>
-            </div>
+        <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-2">
+            <a href="/cart" class="hover:text-blue-600">Cart</a>
+            <span>/</span>
+            <span class="text-blue-600 font-bold">1. Delivery Location</span>
+            <span>/</span>
+            <span class="text-slate-400">2. Payment</span>
+            <span>/</span>
+            <span class="text-slate-400">3. Confirmation</span>
         </div>
-    }
+        <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-1">STEP 1 OF 2 · DELIVERY DETAILS</span>
+        <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">Where Should We Deliver?</h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">Direct shipping across all 64 districts of Bangladesh. Genuine gadgets with official warranty.</p>
+    </div>
 
     @if (!cartReady || deliverySettings is null)
     {
@@ -58,16 +57,166 @@
     else
     {
         <div class="grid gap-8 lg:grid-cols-12 items-start">
-            <!-- Left Column: Order Summary (Items, Subtotal, Delivery Fee, Coupon, Total) -->
-            <aside class="lg:col-span-5 space-y-6">
+            <!-- Left Column: Delivery Information Form (lg:col-span-7) -->
+            <section class="lg:col-span-7 space-y-6">
                 <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
+                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-slate-100">
+                        <span class="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                            <Icon Name="map-pin" Class="size-5" />
+                        </span>
+                        <div>
+                            <h2 class="font-bold text-slate-900 text-lg">Delivery Information</h2>
+                            <span class="text-xs text-slate-500">Provide your shipping address details</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="field-label">Recipient Full Name *</label>
+                                <input
+                                    type="text"
+                                    class="field @(hasValidated && !IsCustomerNameValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                    @bind="customerName"
+                                    @bind:event="oninput"
+                                    placeholder="e.g. Tanvir Ahmed"
+                                />
+                                @if (hasValidated && !IsCustomerNameValid)
+                                {
+                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Full recipient name is required (min 2 characters).</span>
+                                }
+                            </div>
+                            <div>
+                                <label class="field-label">Contact Mobile Number *</label>
+                                <input
+                                    type="tel"
+                                    class="field @(hasValidated && !IsPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                    @bind="phoneNumber"
+                                    @bind:event="oninput"
+                                    placeholder="017xxxxxxxx (11 digits)"
+                                />
+                                @if (hasValidated && !IsPhoneValid)
+                                {
+                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit mobile number required (01xxxxxxxxx).</span>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- 3-Tier Bangladesh Location Cascading Selects -->
+                        <div class="grid gap-4 sm:grid-cols-3">
+                            <div>
+                                <label class="field-label">Division *</label>
+                                <select
+                                    class="field @(hasValidated && !IsDivisionValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedDivision"
+                                    @bind:after="OnDivisionChanged"
+                                >
+                                    @foreach (var div in BangladeshLocationService.Divisions)
+                                    {
+                                        <option value="@div">@div</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">District *</label>
+                                <select
+                                    class="field @(hasValidated && !IsDistrictValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedDistrict"
+                                    @bind:after="OnDistrictChanged"
+                                >
+                                    @foreach (var dist in availableDistricts)
+                                    {
+                                        <option value="@dist">@dist</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">Thana / Upazila *</label>
+                                <select
+                                    class="field @(hasValidated && !IsThanaValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedThana"
+                                    @bind:after="OnThanaChanged"
+                                >
+                                    @foreach (var thana in availableThanas)
+                                    {
+                                        <option value="@thana">@thana</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="field-label">Detailed Street Address / House / Flat / Landmark *</label>
+                            <textarea
+                                class="field min-h-[85px] @(hasValidated && !IsAddressValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                @bind="streetAddress"
+                                @bind:event="oninput"
+                                placeholder="e.g. House 14, Road 3, Sector 9, or local landmark / market name"
+                            ></textarea>
+                            @if (hasValidated && !IsAddressValid)
+                            {
+                                <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Detailed delivery address is required (min 5 characters).</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Payment Step Explainer Box -->
+                    <div class="mt-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-xs text-slate-600 flex items-start gap-3">
+                        <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-bold text-xs mt-0.5">
+                            2
+                        </span>
+                        <div>
+                            <strong class="font-bold text-slate-900 block mb-0.5">Next: Payment Details</strong>
+                            <p class="text-slate-600 text-[11px]">
+                                On the next page, you will choose between <strong>Advance Delivery Fee (৳@deliverySettings.AdvanceAmount:N0)</strong> or <strong>Full Payment</strong> via bKash, and enter your bKash Transaction ID.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Submission Error Alert (Above Button) -->
+                    @if (!string.IsNullOrEmpty(error))
+                    {
+                        <div class="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
+                            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
+                            <div>
+                                <strong class="font-bold text-rose-900 block">Please Complete Required Information</strong>
+                                <span>@error</span>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Proceed to Payment Button -->
+                    <div class="mt-6 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            class="btn-primary w-full py-4 text-sm sm:text-base font-bold shadow-md flex items-center justify-center gap-2"
+                            @onclick="ProceedToPayment"
+                            disabled="@isSubmitting"
+                        >
+                            @if (isSubmitting)
+                            {
+                                <span class="inline-block size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                <span>Saving Delivery Address...</span>
+                            }
+                            else
+                            {
+                                <span>Proceed to Payment · ৳@total.ToString("N0") →</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Order Summary (lg:col-span-5) -->
+            <aside class="lg:col-span-5 space-y-6">
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs sticky top-24">
                     <h2 class="font-bold text-slate-900 text-lg mb-4 pb-3 border-b border-slate-100 flex items-center justify-between">
                         <span>Order Summary</span>
                         <span class="text-xs text-slate-400 font-normal">@Cart.ItemCount items</span>
                     </h2>
 
                     <!-- Items List -->
-                    <div class="divide-y divide-slate-100 max-h-80 overflow-y-auto mb-4 scrollbar-none pr-1">
+                    <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto mb-4 scrollbar-none pr-1">
                         @foreach (var item in Cart.Items)
                         {
                             <div @key="item.VariantId" class="py-3 flex items-center justify-between gap-3 text-xs">
@@ -128,7 +277,7 @@
                             <span>
                                 Delivery Fee
                                 <strong class="text-slate-800 font-semibold ml-1">
-                                    (@(deliveryFee == 0 ? "FREE" : (isHubDistrict ? $"{deliverySettings.HubDistrict} Hub" : "Outside Hub")))
+                                    (@(deliveryFee == 0 ? "FREE" : (isHubDistrict ? $"{deliverySettings.HubDistrict} Hub" : "Nationwide")))
                                 </strong>
                             </span>
                             <span class="font-semibold text-slate-900 tabular-nums">
@@ -149,335 +298,26 @@
                             <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@total.ToString("N0")</span>
                         </div>
 
-                        <!-- Payment Breakdown -->
-                        <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 mt-3 text-[11px] space-y-1">
-                            @if (selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee)
-                            {
-                                <div class="flex justify-between font-bold text-slate-800">
-                                    <span>Pay Now via bKash:</span>
-                                    <span class="text-blue-600">৳@deliverySettings.AdvanceAmount.ToString("N0")</span>
-                                </div>
-                                <div class="flex justify-between text-slate-600">
-                                    <span>Cash on Delivery (Courier):</span>
-                                    <span class="font-semibold">৳@Math.Max(0, total - deliverySettings.AdvanceAmount).ToString("N0")</span>
-                                </div>
-                            }
-                            else if (selectedPaymentMode == PaymentModeOption.FullPayment)
-                            {
-                                <div class="flex justify-between font-bold text-slate-800">
-                                    <span>Pay Full Amount Now (bKash):</span>
-                                    <span class="text-emerald-700">৳@total.ToString("N0")</span>
-                                </div>
-                                <div class="flex justify-between text-slate-600">
-                                    <span>Due on Delivery:</span>
-                                    <span class="font-semibold text-emerald-600">৳0 (Prepaid)</span>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="flex justify-between font-bold text-slate-800">
-                                    <span>Pay on Delivery (COD):</span>
-                                    <span class="text-slate-900">৳@total.ToString("N0")</span>
-                                </div>
-                            }
+                        <!-- Hub Fee Explainer Tag -->
+                        <div class="rounded-xl bg-slate-50 border border-slate-200 p-2.5 mt-2 text-[11px] text-slate-500 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span>Khulna City (Hub):</span>
+                                <strong class="text-slate-700">৳@deliverySettings.HubCityFee:N0</strong>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>All Other 63 Districts:</span>
+                                <strong class="text-slate-700">৳@deliverySettings.OutsideFee:N0</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
             </aside>
-
-            <!-- Right Column: Delivery Information & Payment Method -->
-            <section class="lg:col-span-7 space-y-6">
-                <!-- 1. Delivery Details Card -->
-                <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-slate-100">
-                        <span class="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                            <Icon Name="map-pin" Class="size-5" />
-                        </span>
-                        <div>
-                            <h2 class="font-bold text-slate-900 text-lg">1. Delivery Location</h2>
-                            <span class="text-xs text-slate-500">Select Division, District &amp; Thana</span>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="field-label">Recipient Full Name *</label>
-                                <input
-                                    type="text"
-                                    class="field @(hasValidated && !IsCustomerNameValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
-                                    @bind="customerName"
-                                    @bind:event="oninput"
-                                    placeholder="Recipient Name"
-                                />
-                                @if (hasValidated && !IsCustomerNameValid)
-                                {
-                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Full recipient name is required (min 2 characters).</span>
-                                }
-                            </div>
-                            <div>
-                                <label class="field-label">Contact Mobile Number *</label>
-                                <input
-                                    type="tel"
-                                    class="field @(hasValidated && !IsPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
-                                    @bind="phoneNumber"
-                                    @bind:event="oninput"
-                                    placeholder="017xxxxxxxx"
-                                />
-                                @if (hasValidated && !IsPhoneValid)
-                                {
-                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit mobile number required (01xxxxxxxxx).</span>
-                                }
-                            </div>
-                        </div>
-
-                        <!-- 3-Tier Bangladesh Location Cascading Selects -->
-                        <div class="grid gap-4 sm:grid-cols-3">
-                            <div>
-                                <label class="field-label">Division *</label>
-                                <select
-                                    class="field @(hasValidated && !IsDivisionValid ? "!border-rose-500 !ring-rose-200" : "")"
-                                    @bind="selectedDivision"
-                                    @bind:after="OnDivisionChanged"
-                                >
-                                    @foreach (var div in BangladeshLocationService.Divisions)
-                                    {
-                                        <option value="@div">@div</option>
-                                    }
-                                </select>
-                            </div>
-                            <div>
-                                <label class="field-label">District *</label>
-                                <select
-                                    class="field @(hasValidated && !IsDistrictValid ? "!border-rose-500 !ring-rose-200" : "")"
-                                    @bind="selectedDistrict"
-                                    @bind:after="OnDistrictChanged"
-                                >
-                                    @foreach (var dist in availableDistricts)
-                                    {
-                                        <option value="@dist">@dist</option>
-                                    }
-                                </select>
-                            </div>
-                            <div>
-                                <label class="field-label">Thana / Upazila *</label>
-                                <select
-                                    class="field @(hasValidated && !IsThanaValid ? "!border-rose-500 !ring-rose-200" : "")"
-                                    @bind="selectedThana"
-                                    @bind:after="OnThanaChanged"
-                                >
-                                    @foreach (var thana in availableThanas)
-                                    {
-                                        <option value="@thana">@thana</option>
-                                    }
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="field-label">Detailed Street Address / House / Flat *</label>
-                            <textarea
-                                class="field min-h-[75px] @(hasValidated && !IsAddressValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
-                                @bind="streetAddress"
-                                @bind:event="oninput"
-                                placeholder="e.g. House 14, Road 3, Sector 9, or area/market landmark"
-                            ></textarea>
-                            @if (hasValidated && !IsAddressValid)
-                            {
-                                <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Detailed delivery address is required (min 5 characters).</span>
-                            }
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Payment Method Card -->
-                <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-slate-100">
-                        <span class="flex size-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                            <Icon Name="cash" Class="size-5" />
-                        </span>
-                        <div>
-                            <h2 class="font-bold text-slate-900 text-lg">2. Payment Method</h2>
-                            <span class="text-xs text-slate-500">Choose bKash advance or full prepayment</span>
-                        </div>
-                    </div>
-
-                    <!-- Payment Mode Options -->
-                    <div class="space-y-3">
-                        <!-- Option A: Advance Delivery Fee (৳150) -->
-                        <label class="block cursor-pointer">
-                            <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee ? "border-blue-600 bg-blue-50/30" : "border-slate-200 hover:border-slate-300 bg-white")">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <input
-                                            type="radio"
-                                            name="paymentMode"
-                                            checked="@(selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee)"
-                                            @onchange="() => SetPaymentMode(PaymentModeOption.AdvanceDeliveryFee)"
-                                            class="size-4 text-blue-600"
-                                        />
-                                        <div>
-                                            <strong class="text-sm font-bold text-slate-900 block">Pay Advance Delivery Fee (৳@deliverySettings.AdvanceAmount.ToString("N0"))</strong>
-                                            <span class="text-xs text-slate-500">Product price (৳@Math.Max(0, total - deliverySettings.AdvanceAmount).ToString("N0")) will be paid on delivery.</span>
-                                        </div>
-                                    </div>
-                                    <span class="font-extrabold text-blue-600 text-sm">৳@deliverySettings.AdvanceAmount.ToString("N0")</span>
-                                </div>
-                            </div>
-                        </label>
-
-                        <!-- Option B: Pay Full Amount via bKash -->
-                        <label class="block cursor-pointer">
-                            <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.FullPayment ? "border-emerald-600 bg-emerald-50/30" : "border-slate-200 hover:border-slate-300 bg-white")">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <input
-                                            type="radio"
-                                            name="paymentMode"
-                                            checked="@(selectedPaymentMode == PaymentModeOption.FullPayment)"
-                                            @onchange="() => SetPaymentMode(PaymentModeOption.FullPayment)"
-                                            class="size-4 text-emerald-600"
-                                        />
-                                        <div>
-                                            <strong class="text-sm font-bold text-slate-900 block">Pay Full Amount (৳@total.ToString("N0"))</strong>
-                                            <span class="text-xs text-slate-500">100% prepaid order. Receive parcel directly with zero cash collection hassle.</span>
-                                        </div>
-                                    </div>
-                                    <span class="font-extrabold text-emerald-600 text-sm">৳@total.ToString("N0")</span>
-                                </div>
-                            </div>
-                        </label>
-
-                        @if (!deliverySettings.RequireAdvanceForCOD)
-                        {
-                            <!-- Option C: 100% Cash on Delivery -->
-                            <label class="block cursor-pointer">
-                                <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.CashOnDelivery ? "border-slate-800 bg-slate-50" : "border-slate-200 hover:border-slate-300 bg-white")">
-                                    <div class="flex items-center gap-3">
-                                        <input
-                                            type="radio"
-                                            name="paymentMode"
-                                            checked="@(selectedPaymentMode == PaymentModeOption.CashOnDelivery)"
-                                            @onchange="() => SetPaymentMode(PaymentModeOption.CashOnDelivery)"
-                                            class="size-4 text-slate-800"
-                                        />
-                                        <div>
-                                            <strong class="text-sm font-bold text-slate-900 block">Full Cash on Delivery (COD)</strong>
-                                            <span class="text-xs text-slate-500">Pay entire ৳@total.ToString("N0") when courier delivers to your address.</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </label>
-                        }
-                    </div>
-
-                    @if (selectedPaymentMode != PaymentModeOption.CashOnDelivery)
-                    {
-                        <!-- bKash Instructions Box -->
-                        <div class="mt-5 rounded-2xl border border-blue-200 bg-blue-50/50 p-5 space-y-4">
-                            <div class="flex items-center justify-between border-b border-blue-100 pb-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-slate-900 text-sm">bKash Payment Details</span>
-                                </div>
-                                <span class="text-xs font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
-                                    Amount to send: ৳@(selectedPaymentMode == PaymentModeOption.FullPayment ? total.ToString("N0") : deliverySettings.AdvanceAmount.ToString("N0"))
-                                </span>
-                            </div>
-
-                            <div class="space-y-1.5 text-xs text-slate-700">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500">bKash Number:</span>
-                                    <strong class="font-mono text-sm font-bold text-slate-900 bg-white px-2 py-0.5 rounded border">@deliverySettings.BkashNumber</strong>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500">Order Reference:</span>
-                                    <strong class="font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded border">@referenceCode</strong>
-                                </div>
-                                <p class="text-[11px] text-slate-500 pt-1">
-                                    Go to bKash app → Send Money to <strong>@deliverySettings.BkashNumber</strong> → Enter Amount &amp; Reference <strong>@referenceCode</strong> → Paste the Transaction ID below.
-                                </p>
-                            </div>
-
-                            <!-- Customer Input Fields -->
-                            <div class="grid gap-3 sm:grid-cols-2 pt-2">
-                                <div>
-                                    <label class="field-label text-xs">Sender bKash Number *</label>
-                                    <input
-                                        type="tel"
-                                        class="field text-xs @(hasValidated && !IsSenderPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
-                                        @bind="senderPhoneNumber"
-                                        @bind:event="oninput"
-                                        placeholder="01xxxxxxxxx (11 digits)"
-                                    />
-                                    @if (hasValidated && !IsSenderPhoneValid)
-                                    {
-                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit bKash sender number is required (01xxxxxxxxx).</span>
-                                    }
-                                </div>
-                                <div>
-                                    <label class="field-label text-xs">Transaction ID (TrxID) *</label>
-                                    <input
-                                        type="text"
-                                        class="field text-xs font-mono uppercase @(hasValidated && !IsTrxIdValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
-                                        @bind="transactionId"
-                                        @bind:event="oninput"
-                                        placeholder="e.g. 9K48X7Q2"
-                                    />
-                                    @if (hasValidated && !IsTrxIdValid)
-                                    {
-                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid bKash TrxID required (at least 6 alphanumeric characters).</span>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    }
-
-                    <!-- Submission Error Alert (Above Button) -->
-                    @if (!string.IsNullOrEmpty(error))
-                    {
-                        <div class="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
-                            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
-                            <div>
-                                <strong class="font-bold text-rose-900 block">Please Complete Required Information</strong>
-                                <span>@error</span>
-                            </div>
-                        </div>
-                    }
-
-                    <!-- Single Place Order Button -->
-                    <div class="mt-6 pt-4 border-t border-slate-100">
-                        <button
-                            type="button"
-                            class="btn-primary w-full py-3.5 text-sm sm:text-base font-bold shadow-md flex items-center justify-center gap-2"
-                            @onclick="PlaceOrder"
-                            disabled="@isSubmitting"
-                        >
-                            @if (isSubmitting)
-                            {
-                                <span class="inline-block size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                <span>Processing Your Order...</span>
-                            }
-                            else
-                            {
-                                <span>Confirm &amp; Place Order · ৳@total.ToString("N0")</span>
-                            }
-                        </button>
-                    </div>
-                </div>
-            </section>
         </div>
     }
 </div>
 
 @code
 {
-    private enum PaymentModeOption
-    {
-        AdvanceDeliveryFee,
-        FullPayment,
-        CashOnDelivery
-    }
-
     private DeliverySettings? deliverySettings;
     private bool cartReady;
     private bool isSubmitting;
@@ -487,20 +327,14 @@
     // Delivery fields
     private string customerName = "";
     private string phoneNumber = "";
-    private string selectedDivision = "Khulna";
-    private string selectedDistrict = "Khulna";
-    private string selectedThana = "Khulna Sadar";
+    private string selectedDivision = "Dhaka";
+    private string selectedDistrict = "Dhaka";
+    private string selectedThana = "Dhanmondi";
     private string streetAddress = "";
 
     // Lists
     private IReadOnlyList<string> availableDistricts = [];
     private IReadOnlyList<string> availableThanas = [];
-
-    // Payment fields
-    private PaymentModeOption selectedPaymentMode = PaymentModeOption.AdvanceDeliveryFee;
-    private string referenceCode = "";
-    private string senderPhoneNumber = "";
-    private string transactionId = "";
 
     // Coupon fields
     private string couponInput = "";
@@ -514,7 +348,6 @@
     private bool isHubDistrict;
 
     private static readonly System.Text.RegularExpressions.Regex PhoneRegex = new(@"^(?:\+?88)?01[3-9]\d{8}$", System.Text.RegularExpressions.RegexOptions.Compiled);
-    private static readonly System.Text.RegularExpressions.Regex TrxIdRegex = new(@"^[A-Za-z0-9]{6,20}$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private bool IsCustomerNameValid => !string.IsNullOrWhiteSpace(customerName) && customerName.Trim().Length >= 2;
     private bool IsPhoneValid => !string.IsNullOrWhiteSpace(phoneNumber) && PhoneRegex.IsMatch(phoneNumber.Trim());
@@ -522,8 +355,6 @@
     private bool IsDivisionValid => !string.IsNullOrWhiteSpace(selectedDivision);
     private bool IsDistrictValid => !string.IsNullOrWhiteSpace(selectedDistrict);
     private bool IsThanaValid => !string.IsNullOrWhiteSpace(selectedThana);
-    private bool IsSenderPhoneValid => !string.IsNullOrWhiteSpace(senderPhoneNumber) && PhoneRegex.IsMatch(senderPhoneNumber.Trim());
-    private bool IsTrxIdValid => !string.IsNullOrWhiteSpace(transactionId) && TrxIdRegex.IsMatch(transactionId.Trim());
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthStateTask { get; set; }
@@ -531,7 +362,6 @@
     protected override async Task OnInitializedAsync()
     {
         deliverySettings = await DeliverySettingsSvc.GetSettingsAsync();
-        referenceCode = $"JAS{Math.Abs(DateTime.UtcNow.Ticks % 9000 + 1000)}";
 
         availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
@@ -573,7 +403,7 @@
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Checkout] Init error: {ex.Message}");
+                Console.WriteLine($"[Checkout] Load address warning: {ex.Message}");
             }
             finally
             {
@@ -609,12 +439,6 @@
     private void OnThanaChanged()
     {
         // Thana updated
-    }
-
-    private void SetPaymentMode(PaymentModeOption mode)
-    {
-        selectedPaymentMode = mode;
-        StateHasChanged();
     }
 
     private void UpdateDeliveryAndTotal()
@@ -659,7 +483,7 @@
         }
     }
 
-    private async Task PlaceOrder()
+    private async Task ProceedToPayment()
     {
         error = null;
         hasValidated = true;
@@ -683,28 +507,6 @@
         {
             error = "Please enter your detailed street and house address (at least 5 characters).";
             return;
-        }
-
-        if (selectedPaymentMode != PaymentModeOption.CashOnDelivery)
-        {
-            if (!IsSenderPhoneValid)
-            {
-                error = "Please enter a valid 11-digit sender bKash number (01xxxxxxxxx).";
-                return;
-            }
-            if (!IsTrxIdValid)
-            {
-                error = "Please enter a valid bKash Transaction ID (TrxID, at least 6 characters).";
-                return;
-            }
-        }
-        else
-        {
-            if (deliverySettings?.RequireAdvanceForCOD == true)
-            {
-                error = "Advance delivery fee via bKash is required to confirm Cash on Delivery orders.";
-                return;
-            }
         }
 
         isSubmitting = true;
@@ -734,9 +536,7 @@
                 City = selectedThana,
                 Address = streetAddress.Trim(),
                 CouponCode = appliedCouponCode,
-                PaymentMethod = selectedPaymentMode == PaymentModeOption.FullPayment ? "FullPayment" : (selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee ? "BkashAdvance" : "COD"),
-                SenderPhoneNumber = senderPhoneNumber?.Trim(),
-                TransactionId = transactionId?.Trim().ToUpperInvariant(),
+                PaymentMethod = "Pending",
                 Items = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList(),
                 ExpectedTotal = total
             };
@@ -753,7 +553,7 @@
                 // ignore
             }
 
-            Nav.NavigateTo($"/order/{result.PublicToken}");
+            Nav.NavigateTo($"/checkout/payment/{result.PublicToken}");
         }
         catch (ShopException ex)
         {

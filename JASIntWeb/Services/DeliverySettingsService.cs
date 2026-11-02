@@ -17,7 +17,7 @@ public sealed class DeliverySettingsService(AppDbContext db)
                 HubCity = "Khulna Sadar",
                 HubCityFee = 50m,
                 OutsideFee = 150m,
-                FreeDeliveryThreshold = 5000m,
+                FreeDeliveryThreshold = null,
                 RequireAdvanceForCOD = true,
                 AdvanceAmount = 150m,
                 BkashNumber = "01711465078",
@@ -28,6 +28,11 @@ public sealed class DeliverySettingsService(AppDbContext db)
                 UpdatedAt = DateTimeOffset.UtcNow
             };
             db.DeliverySettings.Add(settings);
+            await db.SaveChangesAsync();
+        }
+        else if (settings.FreeDeliveryThreshold == 5000m)
+        {
+            settings.FreeDeliveryThreshold = null;
             await db.SaveChangesAsync();
         }
         return settings;

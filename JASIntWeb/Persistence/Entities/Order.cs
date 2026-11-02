@@ -66,8 +66,8 @@ public class Payment : AuditableEntity
 {
     public required int OrderId { get; init; }
     public Order? Order { get; init; }
-    public decimal Amount { get; init; }
-    public required PaymentMethod Method { get; init; }
+    public decimal Amount { get; set; }
+    public PaymentMethod Method { get; set; }
     public required PaymentStatus Status { get; set; }
     public string? ExternalReference { get; set; }
 }

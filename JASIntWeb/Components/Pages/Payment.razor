@@ -1,0 +1,559 @@
+@page "/checkout/payment/{Token:guid}"
+@page "/payment/{Token:guid}"
+@rendermode InteractiveServer
+@using JASIntWeb.Services
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+@inject ShoppingService Shop
+@inject DeliverySettingsService DeliverySettingsSvc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IServiceScopeFactory ScopeFactory
+
+<PageTitle>Complete Payment · JAS International</PageTitle>
+
+<div class="shop-container py-8 max-w-6xl mx-auto">
+    <!-- Breadcrumb / Stepper -->
+    <div class="mb-8">
+        <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-2">
+            <span class="text-emerald-600 font-bold flex items-center gap-1">
+                <svg class="size-3.5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                </svg>
+                1. Delivery Location
+            </span>
+            <span>/</span>
+            <span class="text-blue-600 font-bold">2. Payment</span>
+            <span>/</span>
+            <span class="text-slate-400">3. Confirmation</span>
+        </div>
+        <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-1">STEP 2 OF 2 · PAYMENT VERIFICATION</span>
+        <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">Complete Your Payment</h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">Select your preferred bKash payment option to confirm Order #@order?.Id.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="py-16 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+            <span>Loading order details and payment options…</span>
+        </div>
+    }
+    else if (order is null)
+    {
+        <div class="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+            <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 mb-3">
+                <Icon Name="alert" Class="size-7" />
+            </div>
+            <h2 class="text-xl font-bold text-slate-900">Order Not Found</h2>
+            <p class="text-xs text-slate-500 mt-1 mb-6">The order reference could not be located or may have expired.</p>
+            <a href="/products" class="btn-primary">Browse Catalog</a>
+        </div>
+    }
+    else
+    {
+        <div class="grid gap-8 lg:grid-cols-12 items-start">
+            <!-- Left Column: Payment Options & bKash Form (lg:col-span-7) -->
+            <section class="lg:col-span-7 space-y-6">
+                <!-- Payment Mode Card -->
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
+                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-slate-100">
+                        <span class="flex size-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                            <Icon Name="cash" Class="size-5" />
+                        </span>
+                        <div>
+                            <h2 class="font-bold text-slate-900 text-lg">Choose Payment Option</h2>
+                            <span class="text-xs text-slate-500">Advance delivery fee or 100% full prepayment</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Option A: Advance Delivery Fee (৳150) -->
+                        <label class="block cursor-pointer">
+                            <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee ? "border-blue-600 bg-blue-50/30" : "border-slate-200 hover:border-slate-300 bg-white")">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="paymentMode"
+                                            checked="@(selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee)"
+                                            @onchange="() => SetPaymentMode(PaymentModeOption.AdvanceDeliveryFee)"
+                                            class="size-4 text-blue-600"
+                                        />
+                                        <div>
+                                            <strong class="text-sm font-bold text-slate-900 block">Pay Advance Delivery Fee (৳@deliverySettings?.AdvanceAmount.ToString("N0"))</strong>
+                                            <span class="text-xs text-slate-500">Remaining product price (৳@Math.Max(0, order.Total - (deliverySettings?.AdvanceAmount ?? 150m)).ToString("N0")) will be paid on delivery to courier.</span>
+                                        </div>
+                                    </div>
+                                    <span class="font-extrabold text-blue-600 text-sm">৳@deliverySettings?.AdvanceAmount.ToString("N0")</span>
+                                </div>
+                            </div>
+                        </label>
+
+                        <!-- Option B: Pay Full Amount via bKash -->
+                        <label class="block cursor-pointer">
+                            <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.FullPayment ? "border-emerald-600 bg-emerald-50/30" : "border-slate-200 hover:border-slate-300 bg-white")">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="paymentMode"
+                                            checked="@(selectedPaymentMode == PaymentModeOption.FullPayment)"
+                                            @onchange="() => SetPaymentMode(PaymentModeOption.FullPayment)"
+                                            class="size-4 text-emerald-600"
+                                        />
+                                        <div>
+                                            <strong class="text-sm font-bold text-slate-900 block">Pay Full Amount (৳@order.Total.ToString("N0"))</strong>
+                                            <span class="text-xs text-slate-500">100% prepaid order. Zero cash collection hassle when parcel arrives at your door.</span>
+                                        </div>
+                                    </div>
+                                    <span class="font-extrabold text-emerald-600 text-sm">৳@order.Total.ToString("N0")</span>
+                                </div>
+                            </div>
+                        </label>
+
+                        @if (deliverySettings?.RequireAdvanceForCOD == false)
+                        {
+                            <!-- Option C: 100% Cash on Delivery -->
+                            <label class="block cursor-pointer">
+                                <div class="rounded-2xl border-2 p-4 transition @(selectedPaymentMode == PaymentModeOption.CashOnDelivery ? "border-slate-800 bg-slate-50" : "border-slate-200 hover:border-slate-300 bg-white")">
+                                    <div class="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="paymentMode"
+                                            checked="@(selectedPaymentMode == PaymentModeOption.CashOnDelivery)"
+                                            @onchange="() => SetPaymentMode(PaymentModeOption.CashOnDelivery)"
+                                            class="size-4 text-slate-800"
+                                        />
+                                        <div>
+                                            <strong class="text-sm font-bold text-slate-900 block">Full Cash on Delivery (COD)</strong>
+                                            <span class="text-xs text-slate-500">Pay entire ৳@order.Total.ToString("N0") when courier delivers to your address.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        }
+                    </div>
+
+                    @if (selectedPaymentMode != PaymentModeOption.CashOnDelivery)
+                    {
+                        <!-- bKash Instructions & Credentials Card -->
+                        <div class="mt-6 rounded-2xl border border-pink-200 bg-gradient-to-br from-pink-50/50 to-rose-50/30 p-5 space-y-4">
+                            <div class="flex items-center justify-between border-b border-pink-100 pb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center justify-center size-6 rounded bg-[#E2136E] text-white font-bold text-xs">
+                                        ৳
+                                    </span>
+                                    <span class="font-bold text-slate-900 text-sm">bKash Send Money Details</span>
+                                </div>
+                                <span class="text-xs font-mono font-bold text-[#E2136E] bg-white px-2.5 py-1 rounded-lg border border-pink-200 shadow-2xs">
+                                    Amount to send: ৳@PayableAmount.ToString("N0")
+                                </span>
+                            </div>
+
+                            <!-- Copyable Number & Reference -->
+                            <div class="grid gap-3 sm:grid-cols-2 text-xs">
+                                <div class="rounded-xl bg-white border border-pink-200/80 p-3 shadow-2xs">
+                                    <span class="text-slate-400 block text-[11px] mb-1">bKash Number (Personal/Merchant):</span>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <strong class="font-mono text-sm font-bold text-slate-900">@deliverySettings?.BkashNumber</strong>
+                                        <button
+                                            type="button"
+                                            class="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition"
+                                            @onclick="CopyBkashNumber"
+                                        >
+                                            @(copiedNumber ? "✓ Copied!" : "Copy")
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="rounded-xl bg-white border border-pink-200/80 p-3 shadow-2xs">
+                                    <span class="text-slate-400 block text-[11px] mb-1">Order Reference (Must enter in bKash):</span>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <strong class="font-mono text-sm font-bold text-blue-700">@order.PaymentReferenceCode</strong>
+                                        <button
+                                            type="button"
+                                            class="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition"
+                                            @onclick="CopyReferenceCode"
+                                        >
+                                            @(copiedRef ? "✓ Copied!" : "Copy")
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step-by-step Guide -->
+                            <div class="rounded-xl bg-white/80 border border-pink-100 p-3.5 space-y-1.5 text-xs text-slate-700">
+                                <div class="font-semibold text-slate-900 mb-1 flex items-center gap-1.5">
+                                    <span class="size-1.5 rounded-full bg-[#E2136E]"></span>
+                                    <span>How to pay via bKash App:</span>
+                                </div>
+                                <ol class="list-decimal list-inside space-y-1 text-[11px] text-slate-600 leading-relaxed">
+                                    <li>Open your bKash app and tap <strong>Send Money</strong>.</li>
+                                    <li>Enter receiver number: <strong class="font-mono text-slate-900">@deliverySettings?.BkashNumber</strong>.</li>
+                                    <li>Enter amount: <strong class="font-bold text-[#E2136E]">৳@PayableAmount.ToString("N0")</strong>.</li>
+                                    <li>In the <strong>Reference</strong> field, enter: <strong class="font-mono text-blue-700">@order.PaymentReferenceCode</strong>.</li>
+                                    <li>Enter your bKash PIN to complete the transaction.</li>
+                                    <li>Copy the <strong>Transaction ID (TrxID)</strong> and paste it below.</li>
+                                </ol>
+                            </div>
+
+                            <!-- Customer Input Fields -->
+                            <div class="grid gap-3 sm:grid-cols-2 pt-2 border-t border-pink-100">
+                                <div>
+                                    <label class="field-label text-xs font-semibold">Sender bKash Mobile Number *</label>
+                                    <input
+                                        type="tel"
+                                        class="field text-xs @(hasValidated && !IsSenderPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                        @bind="senderPhoneNumber"
+                                        @bind:event="oninput"
+                                        placeholder="01xxxxxxxxx (11 digits)"
+                                    />
+                                    @if (hasValidated && !IsSenderPhoneValid)
+                                    {
+                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit sender bKash number is required.</span>
+                                    }
+                                </div>
+                                <div>
+                                    <label class="field-label text-xs font-semibold">bKash Transaction ID (TrxID) *</label>
+                                    <input
+                                        type="text"
+                                        class="field text-xs font-mono uppercase @(hasValidated && !IsTrxIdValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                        @bind="transactionId"
+                                        @bind:event="oninput"
+                                        placeholder="e.g. 9K48X7Q2"
+                                    />
+                                    @if (hasValidated && !IsTrxIdValid)
+                                    {
+                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid bKash TrxID required (at least 6 characters).</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Error Alert -->
+                    @if (!string.IsNullOrEmpty(error))
+                    {
+                        <div class="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
+                            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
+                            <div>
+                                <strong class="font-bold text-rose-900 block">Please Check Payment Information</strong>
+                                <span>@error</span>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Confirm Payment Button -->
+                    <div class="mt-6 pt-4 border-t border-slate-100">
+                        <button
+                            type="button"
+                            class="btn-primary w-full py-4 text-sm sm:text-base font-bold shadow-md flex items-center justify-center gap-2"
+                            @onclick="ConfirmPayment"
+                            disabled="@isSubmitting"
+                        >
+                            @if (isSubmitting)
+                            {
+                                <span class="inline-block size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                <span>Verifying Payment &amp; Confirming Order...</span>
+                            }
+                            else
+                            {
+                                <span>Confirm Payment · ৳@PayableAmount.ToString("N0")</span>
+                            }
+                        </button>
+                    </div>
+
+                    <div class="mt-3 text-center">
+                        <a href="/checkout" class="text-xs text-slate-500 hover:text-slate-800 transition">
+                            ← Need to edit delivery address? Return to Checkout
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Order Summary & Delivery Address Details (lg:col-span-5) -->
+            <aside class="lg:col-span-5 space-y-6">
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs sticky top-24">
+                    <!-- Delivery Info Card -->
+                    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4 mb-4 text-xs">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Deliver To:</span>
+                            <span class="text-[10px] font-mono text-blue-600 font-bold">Order #@order.Id</span>
+                        </div>
+                        <strong class="text-slate-900 text-sm block">@order.DeliveryAddress?.CustomerName</strong>
+                        <p class="text-slate-600 mt-0.5 font-mono">@order.DeliveryAddress?.PhoneNumber</p>
+                        <p class="text-slate-700 mt-1">@order.DeliveryAddress?.FullAddress</p>
+                        <p class="text-slate-500 text-[11px]">@order.DeliveryAddress?.Thana, @order.DeliveryAddress?.District (@order.DeliveryAddress?.Division)</p>
+                    </div>
+
+                    <h2 class="font-bold text-slate-900 text-sm mb-3 pb-2 border-b border-slate-100 flex items-center justify-between">
+                        <span>Items in Order</span>
+                        <span class="text-xs text-slate-400 font-normal">@order.Items.Count items</span>
+                    </h2>
+
+                    <!-- Items List -->
+                    <div class="divide-y divide-slate-100 max-h-56 overflow-y-auto mb-4 scrollbar-none pr-1">
+                        @foreach (var item in order.Items)
+                        {
+                            <div @key="item.Id" class="py-2.5 flex items-center justify-between gap-3 text-xs">
+                                <div class="min-w-0">
+                                    <strong class="text-slate-900 block font-semibold truncate">@item.ProductName</strong>
+                                    <span class="text-slate-400 block mt-0.5">@item.VariantName · Qty: @item.Quantity</span>
+                                </div>
+                                <span class="font-bold text-slate-900 tabular-nums shrink-0">৳@item.LineTotal.ToString("N0")</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Totals Breakdown -->
+                    <div class="border-t border-slate-200 pt-4 space-y-2 text-xs">
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span>Subtotal</span>
+                            <span class="font-semibold text-slate-900 tabular-nums">৳@order.Subtotal.ToString("N0")</span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-slate-600">
+                            <span>
+                                Delivery Fee
+                                <strong class="text-slate-800 font-semibold ml-1">
+                                    (@(order.DeliveryCharge == 0 ? "FREE" : (string.Equals(order.DeliveryAddress?.District, deliverySettings?.HubDistrict, StringComparison.OrdinalIgnoreCase) ? $"{deliverySettings?.HubDistrict} Hub" : "Nationwide")))
+                                </strong>
+                            </span>
+                            <span class="font-semibold text-slate-900 tabular-nums">
+                                @(order.DeliveryCharge == 0 ? "FREE" : $"৳{order.DeliveryCharge:N0}")
+                            </span>
+                        </div>
+
+                        @if (order.DiscountAmount > 0)
+                        {
+                            <div class="flex items-center justify-between text-emerald-600 font-semibold">
+                                <span>Coupon Discount (@order.CouponCode)</span>
+                                <span class="tabular-nums">-৳@order.DiscountAmount.ToString("N0")</span>
+                            </div>
+                        }
+
+                        <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-sm">
+                            <span class="font-bold text-slate-900">Total Order Amount</span>
+                            <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@order.Total.ToString("N0")</span>
+                        </div>
+
+                        <!-- Live Payment Breakdown Box -->
+                        <div class="rounded-xl bg-blue-50/60 border border-blue-200 p-3 mt-3 text-[11px] space-y-1">
+                            @if (selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee)
+                            {
+                                <div class="flex justify-between font-bold text-slate-900">
+                                    <span>Pay Now via bKash:</span>
+                                    <span class="text-blue-600 text-xs">৳@PayableAmount.ToString("N0")</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Due on Delivery (Courier COD):</span>
+                                    <span class="font-semibold">৳@Math.Max(0, order.Total - PayableAmount).ToString("N0")</span>
+                                </div>
+                            }
+                            else if (selectedPaymentMode == PaymentModeOption.FullPayment)
+                            {
+                                <div class="flex justify-between font-bold text-slate-900">
+                                    <span>Pay Full Amount via bKash:</span>
+                                    <span class="text-emerald-700 text-xs">৳@order.Total.ToString("N0")</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Due on Delivery:</span>
+                                    <span class="font-semibold text-emerald-600">৳0 (100% Prepaid)</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="flex justify-between font-bold text-slate-900">
+                                    <span>Pay on Delivery (COD):</span>
+                                    <span class="text-slate-900 text-xs">৳@order.Total.ToString("N0")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    }
+</div>
+
+@code
+{
+    [Parameter]
+    public Guid Token { get; set; }
+
+    private enum PaymentModeOption
+    {
+        AdvanceDeliveryFee,
+        FullPayment,
+        CashOnDelivery
+    }
+
+    private Order? order;
+    private DeliverySettings? deliverySettings;
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private string? error;
+    private bool hasValidated;
+
+    private PaymentModeOption selectedPaymentMode = PaymentModeOption.AdvanceDeliveryFee;
+    private string senderPhoneNumber = "";
+    private string transactionId = "";
+
+    private bool copiedNumber;
+    private bool copiedRef;
+
+    private static readonly System.Text.RegularExpressions.Regex PhoneRegex = new(@"^(?:\+?88)?01[3-9]\d{8}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex TrxIdRegex = new(@"^[A-Za-z0-9]{6,20}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private bool IsSenderPhoneValid => !string.IsNullOrWhiteSpace(senderPhoneNumber) && PhoneRegex.IsMatch(senderPhoneNumber.Trim());
+    private bool IsTrxIdValid => !string.IsNullOrWhiteSpace(transactionId) && TrxIdRegex.IsMatch(transactionId.Trim());
+
+    private decimal PayableAmount
+    {
+        get
+        {
+            if (order == null) return 0;
+            if (selectedPaymentMode == PaymentModeOption.FullPayment) return order.Total;
+            if (selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee) return deliverySettings?.AdvanceAmount ?? 150m;
+            return 0m;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            deliverySettings = await DeliverySettingsSvc.GetSettingsAsync();
+
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            order = await db.Orders
+                .Include(o => o.DeliveryAddress)
+                .Include(o => o.Items)
+                .Include(o => o.Payments)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.PublicToken == Token);
+
+            if (order != null)
+            {
+                // If order is already paid, redirect straight to confirmation page
+                if (order.PaidAmount > 0 || order.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered)
+                {
+                    Nav.NavigateTo($"/order/{order.PublicToken}");
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SetPaymentMode(PaymentModeOption mode)
+    {
+        selectedPaymentMode = mode;
+        StateHasChanged();
+    }
+
+    private async Task CopyBkashNumber()
+    {
+        if (deliverySettings?.BkashNumber is not null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("navigator.clipboard.writeText", deliverySettings.BkashNumber);
+                copiedNumber = true;
+                StateHasChanged();
+                await Task.Delay(2000);
+                copiedNumber = false;
+                StateHasChanged();
+            }
+            catch
+            {
+                // Clipboard write fallback
+            }
+        }
+    }
+
+    private async Task CopyReferenceCode()
+    {
+        if (order?.PaymentReferenceCode is not null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("navigator.clipboard.writeText", order.PaymentReferenceCode);
+                copiedRef = true;
+                StateHasChanged();
+                await Task.Delay(2000);
+                copiedRef = false;
+                StateHasChanged();
+            }
+            catch
+            {
+                // Clipboard write fallback
+            }
+        }
+    }
+
+    private async Task ConfirmPayment()
+    {
+        error = null;
+        hasValidated = true;
+
+        if (order is null) return;
+
+        if (selectedPaymentMode != PaymentModeOption.CashOnDelivery)
+        {
+            if (!IsSenderPhoneValid)
+            {
+                error = "Please enter a valid 11-digit sender bKash number (01xxxxxxxxx).";
+                return;
+            }
+            if (!IsTrxIdValid)
+            {
+                error = "Please enter the valid bKash Transaction ID (TrxID, at least 6 alphanumeric characters).";
+                return;
+            }
+        }
+        else
+        {
+            if (deliverySettings?.RequireAdvanceForCOD == true)
+            {
+                error = "Advance delivery fee via bKash is required to confirm Cash on Delivery orders.";
+                return;
+            }
+        }
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var pMode = selectedPaymentMode == PaymentModeOption.FullPayment ? "FullPayment"
+                      : selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee ? "BkashAdvance" : "COD";
+
+            var req = new ConfirmPaymentRequest(pMode, senderPhoneNumber?.Trim(), transactionId?.Trim().ToUpperInvariant(), order.PaymentReferenceCode);
+            await Shop.ConfirmPaymentAsync(order.PublicToken, req);
+
+            Nav.NavigateTo($"/order/{order.PublicToken}");
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+            isSubmitting = false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            isSubmitting = false;
+        }
+    }
+}
