@@ -1,6 +1,6 @@
 using JASIntWeb.Client.Contracts;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
+
 namespace JASIntWeb.Services;
 
 public sealed class ServerCartBackend(IServiceScopeFactory scopes, AuthenticationStateProvider auth) : ICartBackend
@@ -9,17 +9,7 @@ public sealed class ServerCartBackend(IServiceScopeFactory scopes, Authenticatio
     {
         await using var scope = scopes.CreateAsyncScope();
         var principal = (await auth.GetAuthenticationStateAsync()).User;
-        int? id = null;
-        if (principal.Identity?.IsAuthenticated == true)
-        {
-            var signIn = scope.ServiceProvider.GetRequiredService<SignInManager<User>>();
-            var user = await signIn.ValidateSecurityStampAsync(principal);
-            if (user is null)
-            {
-                throw new CommerceException("Your session expired. Reload the page and sign in again.");
-            }
-            id = user.Id;
-        }
+        int? id = ShoppingService.UserId(principal);
         try
         {
             return await action(scope.ServiceProvider.GetRequiredService<ShoppingService>(), id);

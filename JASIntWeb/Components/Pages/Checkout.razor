@@ -3,7 +3,9 @@
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Services
 @using JASIntWeb.Client.Contracts
+@using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
 @implements IDisposable
 @inject ShoppingService Shop
 @inject DeliverySettingsService DeliverySettingsSvc
@@ -11,7 +13,7 @@
 @inject CartService Cart
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 
 <PageTitle>Secure Checkout · JAS International</PageTitle>
 
@@ -25,9 +27,9 @@
     @if (error is not null)
     {
         <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
-            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
             <div>
-                <strong class="font-semibold block">Notice</strong>
+                <strong class="font-semibold block text-rose-900">Please review the form:</strong>
                 <span>@error</span>
             </div>
         </div>
@@ -201,11 +203,31 @@
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="field-label">Recipient Full Name *</label>
-                                <input type="text" class="field" @bind="customerName" placeholder="Recipient Name" />
+                                <input
+                                    type="text"
+                                    class="field @(hasValidated && !IsCustomerNameValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                    @bind="customerName"
+                                    @bind:event="oninput"
+                                    placeholder="Recipient Name"
+                                />
+                                @if (hasValidated && !IsCustomerNameValid)
+                                {
+                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Full recipient name is required (min 2 characters).</span>
+                                }
                             </div>
                             <div>
                                 <label class="field-label">Contact Mobile Number *</label>
-                                <input type="tel" class="field" @bind="phoneNumber" placeholder="017xxxxxxxx" />
+                                <input
+                                    type="tel"
+                                    class="field @(hasValidated && !IsPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                    @bind="phoneNumber"
+                                    @bind:event="oninput"
+                                    placeholder="017xxxxxxxx"
+                                />
+                                @if (hasValidated && !IsPhoneValid)
+                                {
+                                    <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit mobile number required (01xxxxxxxxx).</span>
+                                }
                             </div>
                         </div>
 
@@ -213,7 +235,11 @@
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <label class="field-label">Division *</label>
-                                <select class="field" value="@selectedDivision" @onchange="OnDivisionChanged">
+                                <select
+                                    class="field @(hasValidated && !IsDivisionValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedDivision"
+                                    @bind:after="OnDivisionChanged"
+                                >
                                     @foreach (var div in BangladeshLocationService.Divisions)
                                     {
                                         <option value="@div">@div</option>
@@ -222,7 +248,11 @@
                             </div>
                             <div>
                                 <label class="field-label">District *</label>
-                                <select class="field" value="@selectedDistrict" @onchange="OnDistrictChanged">
+                                <select
+                                    class="field @(hasValidated && !IsDistrictValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedDistrict"
+                                    @bind:after="OnDistrictChanged"
+                                >
                                     @foreach (var dist in availableDistricts)
                                     {
                                         <option value="@dist">@dist</option>
@@ -231,7 +261,11 @@
                             </div>
                             <div>
                                 <label class="field-label">Thana / Upazila *</label>
-                                <select class="field" value="@selectedThana" @onchange="OnThanaChanged">
+                                <select
+                                    class="field @(hasValidated && !IsThanaValid ? "!border-rose-500 !ring-rose-200" : "")"
+                                    @bind="selectedThana"
+                                    @bind:after="OnThanaChanged"
+                                >
                                     @foreach (var thana in availableThanas)
                                     {
                                         <option value="@thana">@thana</option>
@@ -242,7 +276,16 @@
 
                         <div>
                             <label class="field-label">Detailed Street Address / House / Flat *</label>
-                            <textarea class="field min-h-[75px]" @bind="streetAddress" placeholder="e.g. House 14, Road 3, Sector 9, or area/market landmark"></textarea>
+                            <textarea
+                                class="field min-h-[75px] @(hasValidated && !IsAddressValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                @bind="streetAddress"
+                                @bind:event="oninput"
+                                placeholder="e.g. House 14, Road 3, Sector 9, or area/market landmark"
+                            ></textarea>
+                            @if (hasValidated && !IsAddressValid)
+                            {
+                                <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Detailed delivery address is required (min 5 characters).</span>
+                            }
                         </div>
                     </div>
                 </div>
@@ -359,12 +402,44 @@
                             <div class="grid gap-3 sm:grid-cols-2 pt-2">
                                 <div>
                                     <label class="field-label text-xs">Sender bKash Number *</label>
-                                    <input type="tel" class="field text-xs" @bind="senderPhoneNumber" placeholder="01xxxxxxxxx" />
+                                    <input
+                                        type="tel"
+                                        class="field text-xs @(hasValidated && !IsSenderPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                        @bind="senderPhoneNumber"
+                                        @bind:event="oninput"
+                                        placeholder="01xxxxxxxxx (11 digits)"
+                                    />
+                                    @if (hasValidated && !IsSenderPhoneValid)
+                                    {
+                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid 11-digit bKash sender number is required (01xxxxxxxxx).</span>
+                                    }
                                 </div>
                                 <div>
                                     <label class="field-label text-xs">Transaction ID (TrxID) *</label>
-                                    <input type="text" class="field text-xs font-mono uppercase" @bind="transactionId" placeholder="e.g. 9K48X7Q2" />
+                                    <input
+                                        type="text"
+                                        class="field text-xs font-mono uppercase @(hasValidated && !IsTrxIdValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                        @bind="transactionId"
+                                        @bind:event="oninput"
+                                        placeholder="e.g. 9K48X7Q2"
+                                    />
+                                    @if (hasValidated && !IsTrxIdValid)
+                                    {
+                                        <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Valid bKash TrxID required (at least 6 alphanumeric characters).</span>
+                                    }
                                 </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Submission Error Alert (Above Button) -->
+                    @if (!string.IsNullOrEmpty(error))
+                    {
+                        <div class="mt-5 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5 shadow-xs" role="alert">
+                            <Icon Name="alert" Class="size-4 shrink-0 mt-0.5 text-rose-600" />
+                            <div>
+                                <strong class="font-bold text-rose-900 block">Please Complete Required Information</strong>
+                                <span>@error</span>
                             </div>
                         </div>
                     }
@@ -407,6 +482,7 @@
     private bool cartReady;
     private bool isSubmitting;
     private string? error;
+    private bool hasValidated;
 
     // Delivery fields
     private string customerName = "";
@@ -437,6 +513,18 @@
     private decimal total;
     private bool isHubDistrict;
 
+    private static readonly System.Text.RegularExpressions.Regex PhoneRegex = new(@"^(?:\+?88)?01[3-9]\d{8}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex TrxIdRegex = new(@"^[A-Za-z0-9]{6,20}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private bool IsCustomerNameValid => !string.IsNullOrWhiteSpace(customerName) && customerName.Trim().Length >= 2;
+    private bool IsPhoneValid => !string.IsNullOrWhiteSpace(phoneNumber) && PhoneRegex.IsMatch(phoneNumber.Trim());
+    private bool IsAddressValid => !string.IsNullOrWhiteSpace(streetAddress) && streetAddress.Trim().Length >= 5;
+    private bool IsDivisionValid => !string.IsNullOrWhiteSpace(selectedDivision);
+    private bool IsDistrictValid => !string.IsNullOrWhiteSpace(selectedDistrict);
+    private bool IsThanaValid => !string.IsNullOrWhiteSpace(selectedThana);
+    private bool IsSenderPhoneValid => !string.IsNullOrWhiteSpace(senderPhoneNumber) && PhoneRegex.IsMatch(senderPhoneNumber.Trim());
+    private bool IsTrxIdValid => !string.IsNullOrWhiteSpace(transactionId) && TrxIdRegex.IsMatch(transactionId.Trim());
+
     [CascadingParameter]
     private Task<AuthenticationState>? AuthStateTask { get; set; }
 
@@ -455,33 +543,44 @@
     {
         if (firstRender)
         {
-            await Cart.InitializeAsync();
-
-            // Try pre-filling user address if authenticated
-            if (AuthStateTask != null)
+            try
             {
-                var auth = await AuthStateTask;
-                var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
-                if (userId.HasValue)
+                await Cart.InitializeAsync();
+
+                // Try pre-filling user address if authenticated
+                if (AuthStateTask != null)
                 {
-                    var addr = await Db.DeliveryAddresses.FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
-                    if (addr != null)
+                    var auth = await AuthStateTask;
+                    var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
+                    if (userId.HasValue)
                     {
-                        customerName = addr.CustomerName;
-                        phoneNumber = addr.PhoneNumber;
-                        streetAddress = addr.FullAddress;
-                        if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
-                        availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
-                        if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
-                        availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
-                        if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
+                        await using var scope = ScopeFactory.CreateAsyncScope();
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var addr = await db.DeliveryAddresses.AsNoTracking().FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
+                        if (addr != null)
+                        {
+                            customerName = addr.CustomerName;
+                            phoneNumber = addr.PhoneNumber;
+                            streetAddress = addr.FullAddress;
+                            if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
+                            availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
+                            if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
+                            availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
+                            if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
+                        }
                     }
                 }
             }
-
-            cartReady = true;
-            UpdateDeliveryAndTotal();
-            StateHasChanged();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Checkout] Init error: {ex.Message}");
+            }
+            finally
+            {
+                cartReady = true;
+                UpdateDeliveryAndTotal();
+                StateHasChanged();
+            }
         }
     }
 
@@ -491,9 +590,8 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private void OnDivisionChanged(ChangeEventArgs e)
+    private void OnDivisionChanged()
     {
-        selectedDivision = e.Value?.ToString() ?? "Khulna";
         availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
         selectedDistrict = availableDistricts.FirstOrDefault() ?? "";
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
@@ -501,17 +599,16 @@
         UpdateDeliveryAndTotal();
     }
 
-    private void OnDistrictChanged(ChangeEventArgs e)
+    private void OnDistrictChanged()
     {
-        selectedDistrict = e.Value?.ToString() ?? "";
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
         selectedThana = availableThanas.FirstOrDefault() ?? "";
         UpdateDeliveryAndTotal();
     }
 
-    private void OnThanaChanged(ChangeEventArgs e)
+    private void OnThanaChanged()
     {
-        selectedThana = e.Value?.ToString() ?? "";
+        // Thana updated
     }
 
     private void SetPaymentMode(PaymentModeOption mode)
@@ -565,33 +662,47 @@
     private async Task PlaceOrder()
     {
         error = null;
+        hasValidated = true;
 
-        if (string.IsNullOrWhiteSpace(customerName))
+        if (!IsCustomerNameValid)
         {
-            error = "Please enter the recipient full name.";
+            error = "Please enter the recipient full name (at least 2 characters).";
             return;
         }
-        if (string.IsNullOrWhiteSpace(phoneNumber) || !System.Text.RegularExpressions.Regex.IsMatch(phoneNumber.Trim(), @"^(?:\+?88)?01[3-9]\d{8}$"))
+        if (!IsPhoneValid)
         {
             error = "Please enter a valid 11-digit Bangladesh phone number (01xxxxxxxxx).";
             return;
         }
-        if (string.IsNullOrWhiteSpace(streetAddress))
+        if (!IsDivisionValid || !IsDistrictValid || !IsThanaValid)
         {
-            error = "Please enter your detailed street/house address.";
+            error = "Please select your delivery Division, District, and Thana.";
+            return;
+        }
+        if (!IsAddressValid)
+        {
+            error = "Please enter your detailed street and house address (at least 5 characters).";
             return;
         }
 
         if (selectedPaymentMode != PaymentModeOption.CashOnDelivery)
         {
-            if (string.IsNullOrWhiteSpace(senderPhoneNumber))
+            if (!IsSenderPhoneValid)
             {
-                error = "Please enter the sender bKash number.";
+                error = "Please enter a valid 11-digit sender bKash number (01xxxxxxxxx).";
                 return;
             }
-            if (string.IsNullOrWhiteSpace(transactionId))
+            if (!IsTrxIdValid)
             {
-                error = "Please enter the bKash Transaction ID (TrxID).";
+                error = "Please enter a valid bKash Transaction ID (TrxID, at least 6 characters).";
+                return;
+            }
+        }
+        else
+        {
+            if (deliverySettings?.RequireAdvanceForCOD == true)
+            {
+                error = "Advance delivery fee via bKash is required to confirm Cash on Delivery orders.";
                 return;
             }
         }

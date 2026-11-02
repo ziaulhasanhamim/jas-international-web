@@ -228,11 +228,42 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         {
             await LockUserAsync(userId.Value);
             cart = await ActiveCartAsync(userId.Value);
-            request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+            if (cart.Items.Count == 0 && request.Items.Count > 0)
+            {
+                foreach (var line in request.Items)
+                {
+                    cart.Items.Add(new CartItem { ProductVariantId = line.VariantId, Quantity = line.Quantity });
+                }
+            }
+            else
+            {
+                request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+            }
         }
         if (request.Items.Count == 0)
         {
             throw new ShopException("Your cart is empty.");
+        }
+
+        // Strict payment validation
+        if (request.PaymentMethod is "BkashAdvance" or "FullPayment")
+        {
+            if (string.IsNullOrWhiteSpace(request.SenderPhoneNumber) || !System.Text.RegularExpressions.Regex.IsMatch(request.SenderPhoneNumber.Trim(), @"^(?:\+?88)?01[3-9]\d{8}$"))
+            {
+                throw new ShopException("A valid 11-digit bKash sender phone number is required to confirm payment.");
+            }
+            if (string.IsNullOrWhiteSpace(request.TransactionId) || request.TransactionId.Trim().Length < 6)
+            {
+                throw new ShopException("A valid bKash Transaction ID (TrxID) is required to place your order.");
+            }
+        }
+        else if (request.PaymentMethod == "COD")
+        {
+            var dSettings = await deliverySettings.GetSettingsAsync();
+            if (dSettings.RequireAdvanceForCOD)
+            {
+                throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
+            }
         }
         var summary = await ResolveAsync(request.Items, userId.HasValue);
         if (summary.Items.Any(i => !i.IsAvailable))
@@ -314,8 +345,8 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             Total = calculatedTotal,
             PaymentReferenceCode = refCode,
             SenderPhoneNumber = request.SenderPhoneNumber?.Trim(),
-            TransactionId = request.TransactionId?.Trim(),
-            PaidAmount = isAdvanceOrPaid ? (request.PaymentMethod == "FullPayment" ? calculatedTotal : 150m) : 0m,
+            TransactionId = request.TransactionId?.Trim().ToUpperInvariant(),
+            PaidAmount = isAdvanceOrPaid ? (request.PaymentMethod == "FullPayment" ? calculatedTotal : (await deliverySettings.GetSettingsAsync()).AdvanceAmount) : 0m,
             Items = summary.Items.Select(i => new OrderItem
                 {
                     ProductVariantId = i.VariantId,
