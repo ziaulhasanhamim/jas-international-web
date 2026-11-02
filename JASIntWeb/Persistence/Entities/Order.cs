@@ -21,7 +21,13 @@ public class Order : AuditableEntity
     public DeliveryAddress? DeliveryAddress { get; set; }
     public required decimal Subtotal { get; init; }
     public required decimal DeliveryCharge { get; init; }
+    public decimal DiscountAmount { get; set; }
+    public string? CouponCode { get; set; }
     public required decimal Total { get; set; }
+    public string? PaymentReferenceCode { get; set; }
+    public string? SenderPhoneNumber { get; set; }
+    public string? TransactionId { get; set; }
+    public decimal PaidAmount { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
 }

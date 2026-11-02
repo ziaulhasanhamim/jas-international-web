@@ -29,6 +29,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DeliveryAddress> DeliveryAddresses { get; set; } = null!;
     public DbSet<CarouselSlide> CarouselSlides => Set<CarouselSlide>();
     public DbSet<CartMergeReceipt> CartMergeReceipts => Set<CartMergeReceipt>();
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -2,82 +2,146 @@
 @implements IDisposable
 @inject CartService Cart
 
-<div class="space-y-5">
+<div class="space-y-6">
     @if (!ready)
     {
-        <p>Loading your cart…</p>
+        <div class="p-8 text-center text-slate-500 flex items-center justify-center gap-2">
+            <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+            <span>Loading your cart…</span>
+        </div>
     }
     else if (Cart.Items.Count == 0)
     {
-        <p>
-            Your cart is empty.
-            <a href="/products" class="text-volt">Explore products</a>
-            .
-        </p>
+        <div class="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+            <div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-4">
+                <svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-slate-900">Your cart is empty</h2>
+            <p class="text-sm text-slate-500 mt-2 mb-6">Looks like you haven't added any authentic gadgets to your cart yet.</p>
+            <a href="/products" class="btn-primary">Explore Products</a>
+        </div>
     }
     else
     {
-        @if (!Cart.IsAuthenticated)
-        {
-            <p class="text-sm text-slate-500">
-                Saved on this browser.
-                <a href="/account/login" class="text-volt">Sign in</a>
-                to keep your cart across devices.
-            </p>
-        }
-        @foreach (var item in Cart.Items)
-        {
-            <article
-                @key="item.VariantId"
-                class="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5"
-            >
-                <img src="@item.Image" alt="@item.Name" class="h-20 w-20 rounded-xl object-contain" />
-                <div class="min-w-0 flex-1">
-                    <a class="font-semibold" href="/product/@item.Slug">@item.Name</a>
-                    <p class="text-sm text-slate-500">@item.Variant</p>
-                    <p class="mt-2">৳@item.Price.ToString("N0")</p>
-                    @if (!item.IsAvailable || item.Stock < item.Quantity)
-                    {
-                        <p class="text-sm text-red-600">Unavailable quantity. Available: @item.Stock</p>
-                    }
-                </div>
-                <div class="flex items-center gap-3">
-                    <button
-                        disabled="@busy"
-                        class="shop-button-secondary"
-                        aria-label="Decrease quantity"
-                        @onclick="() => Change(item, item.Quantity - 1)"
-                    >
-                        −
-                    </button>
-                    <span>@item.Quantity</span>
-                    <button
-                        disabled="@(busy || item.Quantity >= item.Stock || item.Quantity >= 99)"
-                        class="shop-button-secondary"
-                        aria-label="Increase quantity"
-                        @onclick="() => Change(item, item.Quantity + 1)"
-                    >
-                        +
-                    </button>
-                    <button disabled="@busy" class="text-sm text-red-600" @onclick="() => Change(item, 0)">Remove</button>
-                </div>
-                <strong>৳@item.LineTotal.ToString("N0")</strong>
-            </article>
-        }
-        <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white p-6">
-            <p class="text-xl font-semibold">Subtotal: ৳@Cart.Total.ToString("N0")</p>
-            <a href="/checkout" class="shop-button">Checkout</a>
+        <!-- Free Shipping Progress Bar -->
+        var target = 5000m;
+        var progress = Math.Min(100, (int)(Cart.Total / target * 100));
+        var remaining = Math.Max(0, target - Cart.Total);
+
+        <div class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50/50 p-4 shadow-xs">
+            <div class="flex items-center justify-between text-xs mb-2">
+                @if (remaining > 0)
+                {
+                    <span class="font-medium text-slate-700">Add <strong class="text-blue-700 font-bold">৳@remaining.ToString("N0")</strong> more to unlock <strong class="text-blue-700 font-bold">FREE Nationwide Delivery!</strong></span>
+                }
+                else
+                {
+                    <span class="font-bold text-emerald-700 flex items-center gap-1.5">
+                        <span class="size-2 rounded-full bg-emerald-500"></span>
+                        🎉 You qualified for FREE Nationwide Delivery!
+                    </span>
+                }
+                <span class="font-bold text-slate-500">@progress%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-blue-200/60">
+                <div class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300" style="width: @(progress)%"></div>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            @foreach (var item in Cart.Items)
+            {
+                var isPending = pendingVariantId == item.VariantId;
+                <article
+                    @key="item.VariantId"
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs transition hover:border-slate-300"
+                >
+                    <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                        <img src="@item.Image" alt="@item.Name" class="size-16 sm:size-20 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" />
+                        <div class="min-w-0 flex-1">
+                            <a class="font-semibold text-slate-900 text-sm hover:text-blue-600 transition line-clamp-1" href="/product/@item.Slug">@item.Name</a>
+                            <p class="text-xs text-slate-500 mt-0.5">@item.Variant</p>
+                            <p class="text-xs font-semibold text-blue-600 mt-1.5 tabular-nums">৳@item.Price.ToString("N0") each</p>
+                            @if (!item.IsAvailable || item.Stock < item.Quantity)
+                            {
+                                <p class="text-[11px] font-semibold text-red-600 mt-1">Limited stock. Available: @item.Stock</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        <!-- Stepper Buttons -->
+                        <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
+                            <button
+                                class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40"
+                                aria-label="Decrease quantity"
+                                @onclick="() => Change(item, item.Quantity - 1)"
+                            >
+                                −
+                            </button>
+                            <span class="w-8 text-center text-xs font-bold text-slate-800 tabular-nums">
+                                @if (isPending)
+                                {
+                                    <span class="inline-block size-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                                }
+                                else
+                                {
+                                    @item.Quantity
+                                }
+                            </span>
+                            <button
+                                disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)"
+                                class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40"
+                                aria-label="Increase quantity"
+                                @onclick="() => Change(item, item.Quantity + 1)"
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        <!-- Line Total & Delete -->
+                        <div class="flex items-center gap-4 text-right">
+                            <strong class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums min-w-[70px]">৳@item.LineTotal.ToString("N0")</strong>
+                            <button
+                                class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition"
+                                title="Remove item"
+                                @onclick="() => Change(item, 0)"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block">Total Payable</span>
+                <p class="text-2xl font-black text-slate-900 tabular-nums mt-0.5">৳@Cart.Total.ToString("N0")</p>
+                <span class="text-xs text-slate-500">Excluding delivery fee (calculated at checkout)</span>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <a href="/products" class="btn-secondary flex-1 sm:flex-none text-center">Continue Shopping</a>
+                <a href="/checkout" class="btn-primary flex-1 sm:flex-none text-center shadow-md">Proceed to Checkout →</a>
+            </div>
         </div>
     }
+
     @if (Cart.Error is not null)
     {
-        <p role="alert" class="text-red-600">@Cart.Error</p>
+        <div role="alert" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700 shadow-xs">
+            @Cart.Error
+        </div>
     }
 </div>
 
 @code
 {
-    private bool ready, busy;
+    private bool ready;
+    private int? pendingVariantId;
 
     protected override void OnInitialized() => Cart.OnChange += Changed;
 
@@ -95,9 +159,17 @@
 
     private async Task Change(CartItemDto item, int quantity)
     {
-        busy = true;
-        await Cart.SetQuantityAsync(item.VariantId, quantity);
-        busy = false;
+        pendingVariantId = item.VariantId;
+        StateHasChanged();
+        try
+        {
+            await Cart.SetQuantityAsync(item.VariantId, quantity);
+        }
+        finally
+        {
+            pendingVariantId = null;
+            StateHasChanged();
+        }
     }
 
     public void Dispose() => Cart.OnChange -= Changed;

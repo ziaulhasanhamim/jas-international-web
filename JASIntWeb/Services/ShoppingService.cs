@@ -4,10 +4,10 @@ namespace JASIntWeb.Services;
 
 public sealed class ShopException(string message) : Exception(message);
 
-public sealed class ShoppingService(AppDbContext db, IConfiguration config)
+public sealed class ShoppingService(AppDbContext db, IConfiguration config, DeliverySettingsService deliverySettings, CouponService couponService)
 {
     public static int? UserId(ClaimsPrincipal user) => int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
-    public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 80), config.GetValue<decimal>("Delivery:OutsideKhulna", 130));
+    public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 50), config.GetValue<decimal>("Delivery:OutsideKhulna", 150));
 
     public async Task LockUserAsync(int userId) => await db.Database.ExecuteSqlInterpolatedAsync(
         $"SELECT \"Id\" FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE");
@@ -267,30 +267,55 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
                 Price = variant.SellingPrice
             };
         }
-        var delivery = string.Equals(request.District.Trim(), "Khulna", StringComparison.OrdinalIgnoreCase) ? Rates.Khulna : Rates.OutsideKhulna;
-        if (request.ExpectedTotal.HasValue && request.ExpectedTotal.Value != summary.Subtotal + delivery)
+        var delivery = await deliverySettings.CalculateDeliveryChargeAsync(request.District, summary.Subtotal);
+
+        decimal discount = 0;
+        string? appliedCoupon = null;
+        if (!string.IsNullOrWhiteSpace(request.CouponCode))
         {
-            throw new ShopException("Your cart or delivery charge changed. Review your order again before placing it.");
+            var couponVal = await couponService.ValidateCouponAsync(request.CouponCode, summary.Subtotal, delivery);
+            if (couponVal.IsValid && !string.IsNullOrEmpty(couponVal.Code))
+            {
+                discount = couponVal.DiscountAmount;
+                appliedCoupon = couponVal.Code;
+                await couponService.RecordCouponUseAsync(appliedCoupon);
+            }
+        }
+
+        var calculatedTotal = Math.Max(0, summary.Subtotal + delivery - discount);
+        if (request.ExpectedTotal.HasValue && request.ExpectedTotal.Value != calculatedTotal)
+        {
+            throw new ShopException("Your cart, delivery charge, or coupon changed. Review your order again before placing it.");
         }
         var address = new DeliveryAddress
         {
             CustomerName = request.CustomerName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
             FullAddress = request.Address.Trim(),
+            Division = request.Division?.Trim() ?? "Khulna",
             District = request.District.Trim(),
+            Thana = request.Thana?.Trim() ?? request.City.Trim(),
             City = request.City.Trim(),
             CustomerId = userId
         };
+        var refCode = $"JAS{Random.Shared.Next(1000, 9999)}";
+        var isAdvanceOrPaid = !string.IsNullOrWhiteSpace(request.TransactionId);
         var order = new Order
         {
             UserId = userId,
             CheckoutToken = request.RequestId,
-            Status = OrderStatus.Pending,
+            Status = isAdvanceOrPaid ? OrderStatus.Processing : OrderStatus.Pending,
             DeliveryAddressId = 0,
             DeliveryAddress = address,
             Subtotal = summary.Subtotal,
             DeliveryCharge = delivery,
-            Total = summary.Subtotal + delivery,
+            DiscountAmount = discount,
+            CouponCode = appliedCoupon,
+            Total = calculatedTotal,
+            PaymentReferenceCode = refCode,
+            SenderPhoneNumber = request.SenderPhoneNumber?.Trim(),
+            TransactionId = request.TransactionId?.Trim(),
+            PaidAmount = isAdvanceOrPaid ? (request.PaymentMethod == "FullPayment" ? calculatedTotal : 150m) : 0m,
             Items = summary.Items.Select(i => new OrderItem
                 {
                     ProductVariantId = i.VariantId,
@@ -306,9 +331,10 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
         order.Payments.Add(new Payment
             {
                 OrderId = 0,
-                Method = PaymentMethod.CashOnDelivery,
-                Status = PaymentStatus.Pending,
-                Amount = order.Total
+                Method = request.PaymentMethod == "BkashAdvance" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
+                Status = isAdvanceOrPaid ? PaymentStatus.Completed : PaymentStatus.Pending,
+                Amount = order.Total,
+                ExternalReference = request.TransactionId
             });
         db.Orders.Add(order);
         if (cart is not null)
@@ -318,6 +344,6 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        return new(order.Id, order.PublicToken, order.Total);
+        return new(order.Id, order.PublicToken, order.Total, order.PaymentReferenceCode, order.DeliveryCharge, order.DiscountAmount);
     }
 }

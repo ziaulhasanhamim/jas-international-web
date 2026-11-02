@@ -74,22 +74,68 @@ else
                 </label>
             </div>
             <label class="shop-label">
-                Short description
-                <InputTextArea @bind-Value="Input!.Description" class="shop-input" rows="2" />
+                Short overview / summary
+                <InputTextArea @bind-Value="Input!.Description" class="shop-input" rows="2" placeholder="Brief one or two sentence summary shown on product card and search snippets" />
             </label>
-            <label class="shop-label">
-                Full product details
-                <InputTextArea @bind-Value="Input!.Details" class="shop-input" rows="6" />
-            </label>
-            <label class="shop-label">
-                Main image URL
-                <InputText @bind-Value="Input!.Image" class="shop-input" />
-            </label>
-            <label class="shop-label">
-                Gallery image URLs
-                <InputTextArea @bind-Value="Input!.Images" class="shop-input" rows="4" />
-                <small>One HTTPS or site-relative image URL per line. Maximum 20 images.</small>
-            </label>
+
+            <!-- Product Media & Image Gallery -->
+            <div class="mt-6 border-t border-slate-200/80 pt-6">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Product Pictures &amp; Gallery</h3>
+                        <p class="text-xs text-slate-500">Upload multiple images. The first image marked as Cover will be the primary storefront image.</p>
+                    </div>
+                </div>
+
+                <div id="product-media-manager" class="space-y-4">
+                    <input type="hidden" name="Input.Image" id="input-main-image" value="@Input!.Image" />
+                    <input type="hidden" name="Input.Images" id="input-gallery-images" value="@Input!.Images" />
+
+                    <!-- Drag & Drop Zone -->
+                    <div id="media-dropzone" class="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-blue-500 hover:bg-blue-50/30 transition-all cursor-pointer bg-slate-50/50">
+                        <div class="mx-auto flex size-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 mb-3">
+                            <Icon Name="camera" Class="size-6" />
+                        </div>
+                        <p class="text-sm font-semibold text-slate-800">Drag &amp; drop product pictures here</p>
+                        <p class="text-xs text-slate-500 mt-1">Supports PNG, JPG, WEBP, AVIF up to 10MB each</p>
+                        <div class="mt-4 flex items-center justify-center gap-3">
+                            <label class="btn-primary cursor-pointer text-xs py-2 px-4 shadow-sm">
+                                <span>Browse from Device</span>
+                                <input type="file" multiple accept="image/*" class="hidden" id="file-uploader-input" />
+                            </label>
+                            <button type="button" id="btn-add-url" class="btn-secondary text-xs py-2 px-4">
+                                Add from URL
+                            </button>
+                        </div>
+                        <div id="media-upload-progress" class="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-blue-600" hidden>
+                            <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+                            Uploading images...
+                        </div>
+                    </div>
+
+                    <!-- Images Cards Grid -->
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Arrange Photos (First photo is Main Cover)</h4>
+                        <div id="media-cards-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rich Description & Specification Tables -->
+            <div class="mt-8 border-t border-slate-200/80 pt-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Rich Description &amp; Specifications</h3>
+                        <p class="text-xs text-slate-500">Add rich text, headings, bullet lists, and specification tables. You can also paste formatted specs from official brand pages or toggle code mode.</p>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-xs p-1">
+                    <textarea name="Input.Details" id="input-details-html" class="w-full min-h-[380px] p-4 text-sm font-sans focus:outline-none border-0 text-slate-800 leading-relaxed">@Input!.Details</textarea>
+                </div>
+            </div>
             <label class="check-label">
                 <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
                 <input type="hidden" name="Input.Hidden" value="false" />

@@ -16,6 +16,41 @@
 else
 {
     <PageTitle>@product.Name — JAS International</PageTitle>
+    <HeadContent>
+        <meta name="description" content="@(string.IsNullOrWhiteSpace(product.Description) ? $"{product.Name} available at JAS International. Authentic tech gadgets with official warranty and nationwide delivery." : product.Description)" />
+        <meta property="og:title" content="@product.Name | JAS International" />
+        <meta property="og:description" content="@product.Description" />
+        <meta property="og:image" content="@product.MainImage" />
+        <meta property="og:type" content="product" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="@product.Name | JAS International" />
+        <meta name="twitter:description" content="@product.Description" />
+        <meta name="twitter:image" content="@product.MainImage" />
+        <link rel="canonical" href="@Nav.Uri" />
+        <script type="application/ld+json">
+        {
+            "@@context": "https://schema.org",
+            "@@type": "Product",
+            "name": "@product.Name",
+            "image": "@product.MainImage",
+            "description": "@(product.Description ?? product.Name)",
+            "brand": {
+                "@@type": "Brand",
+                "name": "@(product.BrandName ?? "JAS International")"
+            },
+            "offers": {
+                "@@type": "Offer",
+                "priceCurrency": "BDT",
+                "price": "@(selected?.Price ?? 0)",
+                "availability": "@(selected is { Stock: > 0 } ? "https://schema.org/InStock" : "https://schema.org/OutOfStock")",
+                "seller": {
+                    "@@type": "Organization",
+                    "name": "JAS International"
+                }
+            }
+        }
+        </script>
+    </HeadContent>
     <div class="shop-container py-6">
         <!-- Breadcrumb Navigation -->
         <nav aria-label="Breadcrumb" class="mb-6 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -190,12 +225,14 @@ else
             </div>
         </div>
 
-        <!-- Specifications & Details Tabs -->
+        <!-- Specifications & Details -->
         <section class="mt-16 border-t border-slate-200 pt-10">
-            <div class="max-w-3xl">
-                <h2 class="text-xl font-bold text-slate-900 mb-4">Detailed Specifications</h2>
+            <div class="max-w-4xl">
+                <h2 class="text-xl font-bold text-slate-900 mb-4">Detailed Specifications &amp; Features</h2>
                 <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-                    <p class="whitespace-pre-line leading-relaxed text-sm text-slate-700">@product.Details</p>
+                    <div class="product-rich-specs text-slate-700">
+                        @((MarkupString)product.Details)
+                    </div>
                 </div>
             </div>
         </section>

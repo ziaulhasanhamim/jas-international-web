@@ -116,6 +116,23 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
 
     private Task ChangeAsync(int variantId, int quantity, bool add) => RunAsync(async () =>
         {
+            // Optimistic in-memory update for 0ms instantaneous UI response
+            var existingItem = Items.FirstOrDefault(i => i.VariantId == variantId);
+            if (existingItem != null)
+            {
+                var optimisticQty = add ? existingItem.Quantity + quantity : quantity;
+                if (optimisticQty <= 0)
+                {
+                    Items = Items.Where(i => i.VariantId != variantId).ToList();
+                }
+                else
+                {
+                    var updatedItem = existingItem with { Quantity = optimisticQty };
+                    Items = Items.Select(i => i.VariantId == variantId ? updatedItem : i).ToList();
+                }
+                OnChange?.Invoke();
+            }
+
             var local = await IdentityAndMergeAsync();
             if (IsAuthenticated)
             {

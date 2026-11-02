@@ -59,5 +59,11 @@ internal static class CommerceModel
                 "\"QuantityOnHand\" >= 0 AND \"QuantityReserved\" >= 0 AND \"QuantityReserved\" <= \"QuantityOnHand\""));
         b.Entity<ProductVariant>()
             .ToTable(t => t.HasCheckConstraint("CK_Variant_Price", "\"SellingPrice\" >= 0 AND \"CostPrice\" >= 0"));
+        b.Entity<Product>().HasIndex(x => new { x.IsDeleted, x.CategoryId, x.CreatedAt });
+        b.Entity<Product>().HasIndex(x => new { x.IsDeleted, x.BrandId, x.CreatedAt });
+        b.Entity<Coupon>().HasIndex(x => x.Code).IsUnique();
+        b.Entity<Coupon>().HasIndex(x => new { x.IsActive, x.ExpiryDate });
+        b.Entity<Order>().HasIndex(x => x.PaymentReferenceCode);
+        b.Entity<Order>().HasIndex(x => x.TransactionId);
     }
 }

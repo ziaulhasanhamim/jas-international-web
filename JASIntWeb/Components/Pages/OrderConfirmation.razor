@@ -43,8 +43,33 @@
 
                     <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
                         <span class="text-slate-400 block font-medium">Payment Mode:</span>
-                        <strong class="text-slate-900 text-sm">Cash on Delivery (COD)</strong>
-                        <span class="badge badge-emerald mt-1.5 block sm:inline-block">Stock Reserved</span>
+                        <strong class="text-slate-900 text-sm">@(order.PaidAmount > 0 ? "Advance Paid (bKash/Nagad)" : "Cash on Delivery (COD)")</strong>
+                        @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
+                        {
+                            <span class="block text-[11px] font-mono text-blue-600 mt-0.5">Ref: @order.PaymentReferenceCode</span>
+                        }
+                        @if (!string.IsNullOrEmpty(order.TransactionId))
+                        {
+                            <span class="block text-[11px] font-mono text-slate-500">TrxID: @order.TransactionId</span>
+                        }
+                        <div class="mt-2">
+                            @if (order.PaidAmount > 0 || order.Status == OrderStatus.Processing)
+                            {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
+                                    <span class="size-1.5 rounded-full bg-emerald-500"></span> Payment Verified (৳@order.PaidAmount.ToString("N0"))
+                                </span>
+                            }
+                            else if (!string.IsNullOrEmpty(order.TransactionId))
+                            {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-600/20">
+                                    <span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span> Verifying via SMS Webhook...
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-emerald">Stock Reserved</span>
+                            }
+                        </div>
                     </div>
                 </div>
 
@@ -74,6 +99,13 @@
                             <span>Delivery Fee</span>
                             <span class="font-semibold text-slate-900 tabular-nums">৳@order.DeliveryCharge.ToString("N0")</span>
                         </div>
+                        @if (order.DiscountAmount > 0)
+                        {
+                            <div class="flex justify-between text-emerald-600 font-semibold">
+                                <span>Coupon Discount (@order.CouponCode)</span>
+                                <span class="tabular-nums">-৳@order.DiscountAmount.ToString("N0")</span>
+                            </div>
+                        }
                         <div class="border-t border-slate-200 pt-3 flex justify-between text-sm">
                             <span class="font-bold text-slate-900">Total Payable</span>
                             <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@order.Total.ToString("N0")</span>

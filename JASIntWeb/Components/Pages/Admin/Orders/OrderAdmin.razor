@@ -154,15 +154,33 @@ else
 
             <!-- Payment details summary -->
             <div class="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
-                <div class="flex items-center gap-2">
-                    <Icon Name="cash" Class="size-4 text-slate-400" />
-                    <span>Payment Method: <strong>Cash on Delivery (COD)</strong></span>
-                </div>
-                <div>
-                    @foreach (var p in order.Payments)
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <Icon Name="cash" Class="size-4 text-emerald-600" />
+                        <span>Payment: <strong>@(order.PaidAmount > 0 ? "Advance Paid" : "Pending Payment")</strong></span>
+                        @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
+                        {
+                            <span class="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold">Ref: @order.PaymentReferenceCode</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(order.SenderPhoneNumber) || !string.IsNullOrEmpty(order.TransactionId))
                     {
-                        <span class="badge @(p.Status == PaymentStatus.Completed ? "badge-emerald" : "badge-amber")">
-                            @p.Method: @p.Status (৳@p.Amount.ToString("N0"))
+                        <div class="text-[11px] text-slate-500 font-mono">
+                            Sender: @(order.SenderPhoneNumber ?? "N/A") | TrxID: @(order.TransactionId ?? "N/A")
+                        </div>
+                    }
+                </div>
+                <div class="flex items-center gap-2">
+                    @if (order.PaidAmount == 0 && (!string.IsNullOrEmpty(order.TransactionId) || order.Status == OrderStatus.Pending))
+                    {
+                        <button type="button" @onclick="VerifyPayment" class="btn-secondary !text-emerald-700 !bg-emerald-50 !border-emerald-200 text-xs font-bold py-1 px-3">
+                            ✓ Mark Advance Paid (৳150)
+                        </button>
+                    }
+                    else if (order.PaidAmount > 0)
+                    {
+                        <span class="badge badge-emerald">
+                            ✓ Paid ৳@order.PaidAmount.ToString("N0")
                         </span>
                     }
                 </div>
@@ -294,6 +312,18 @@ else
         catch (ShopException ex)
         {
             error = ex.Message;
+        }
+    }
+
+    private async Task VerifyPayment()
+    {
+        var existing = await Db.Orders.FirstOrDefaultAsync(o => o.Id == Id);
+        if (existing != null)
+        {
+            existing.PaidAmount = 150m;
+            existing.Status = OrderStatus.Processing;
+            await Db.SaveChangesAsync();
+            Nav.NavigateTo($"/admin/orders/{Id}?saved=true", forceLoad: true);
         }
     }
 }

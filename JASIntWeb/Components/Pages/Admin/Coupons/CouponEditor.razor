@@ -1,0 +1,127 @@
+@page "/admin/coupons/new"
+@page "/admin/coupons/{Id:int}/edit"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>@(Id == 0 ? "Create Coupon" : "Edit Coupon") · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Create Coupon" : "Edit Coupon")"
+    Description="Set coupon code, discount percentage or flat amount, minimum order spend, and expiration."
+    ActionHref="/admin/coupons"
+    ActionText="Back to coupons"
+/>
+
+@if (coupon is null)
+{
+    <p class="admin-help">Loading coupon…</p>
+}
+else
+{
+    <EditForm Model="coupon" OnValidSubmit="Save" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-4">
+        <DataAnnotationsValidator />
+
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Coupon Code
+                <InputText @bind-Value="coupon.Code" class="shop-input uppercase font-mono" placeholder="e.g. WELCOME200" />
+                <small>Unique code entered by customers at checkout.</small>
+            </label>
+            <label class="shop-label">
+                Discount Type
+                <InputSelect @bind-Value="coupon.DiscountType" class="shop-input">
+                    <option value="@CouponDiscountType.Percentage">Percentage Off (%)</option>
+                    <option value="@CouponDiscountType.FixedAmount">Fixed Amount Off (৳)</option>
+                    <option value="@CouponDiscountType.FreeDelivery">Free Delivery</option>
+                </InputSelect>
+            </label>
+        </div>
+
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Discount Value
+                <InputNumber @bind-Value="coupon.DiscountValue" class="shop-input" />
+                <small>Percentage (e.g. 10 for 10%) or Flat Amount in BDT (e.g. 200).</small>
+            </label>
+            <label class="shop-label">
+                Maximum Discount Cap (৳, optional)
+                <InputNumber @bind-Value="coupon.MaxDiscountAmount" class="shop-input" />
+                <small>Max discount for percentage coupons (e.g. 20% off up to ৳500).</small>
+            </label>
+        </div>
+
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Minimum Order Spend (৳, optional)
+                <InputNumber @bind-Value="coupon.MinOrderAmount" class="shop-input" />
+                <small>Minimum cart subtotal required to use this coupon.</small>
+            </label>
+            <label class="shop-label">
+                Total Usage Limit (optional)
+                <InputNumber @bind-Value="coupon.UsageLimit" class="shop-input" />
+                <small>Maximum times this coupon can be redeemed across all customers.</small>
+            </label>
+        </div>
+
+        <label class="shop-label">
+            Internal Note / Description
+            <InputText @bind-Value="coupon.Description" class="shop-input" placeholder="e.g. Eid Campaign 2026 promotion for new users" />
+        </label>
+
+        <label class="check-label">
+            <input type="checkbox" @bind="coupon.IsActive" />
+            <span class="font-bold text-slate-800">Coupon is Active</span>
+        </label>
+
+        <div class="form-actions">
+            <button type="submit" class="shop-button" data-pending-text="Saving coupon...">
+                <span class="form-submit-spinner" hidden></span>
+                <span>@(Id == 0 ? "Create Coupon" : "Save Changes")</span>
+            </button>
+            <a href="/admin/coupons" class="shop-button-secondary">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code
+{
+    [Parameter]
+    public int Id { get; set; }
+    private Coupon? coupon;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id == 0)
+        {
+            coupon = new Coupon
+            {
+                Code = "",
+                DiscountType = CouponDiscountType.Percentage,
+                DiscountValue = 10,
+                IsActive = true
+            };
+        }
+        else
+        {
+            coupon = await Db.Coupons.FindAsync(Id);
+            if (coupon == null)
+            {
+                Nav.NavigateTo("/admin/coupons");
+            }
+        }
+    }
+
+    private async Task Save()
+    {
+        if (coupon == null) return;
+        coupon.Code = coupon.Code.Trim().ToUpperInvariant();
+
+        if (Id == 0)
+        {
+            Db.Coupons.Add(coupon);
+        }
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/admin/coupons?saved=true");
+    }
+}

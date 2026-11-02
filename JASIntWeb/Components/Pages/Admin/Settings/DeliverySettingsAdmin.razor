@@ -1,0 +1,157 @@
+@page "/admin/settings/delivery"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Delivery &amp; MFS Payment Settings · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="Delivery &amp; Payment Settings"
+    Description="Configure central hub delivery rates, nationwide shipping, free delivery threshold, and bKash / Bangla QR automation."
+/>
+
+@if (saved)
+{
+    <div class="mb-6 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-xs" role="status">
+        <Icon Name="check" Class="size-5 text-emerald-600 shrink-0" />
+        <span class="font-medium">Settings Updated!</span> Delivery fees and payment automation settings have been saved.
+    </div>
+}
+
+@if (settings is null)
+{
+    <p class="admin-help">Loading settings…</p>
+}
+else
+{
+    <EditForm Model="settings" OnValidSubmit="SaveSettings" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-6">
+        <DataAnnotationsValidator />
+
+        <!-- 1. Delivery Rates Section -->
+        <div>
+            <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4">1. Delivery Zones &amp; Rates (BDT)</h3>
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Central Hub District
+                    <InputText @bind-Value="settings.HubDistrict" class="shop-input" />
+                    <small>Default: Khulna. Orders to this district will receive the Hub City rate.</small>
+                </label>
+                <label class="shop-label">
+                    Hub City Delivery Fee (৳)
+                    <InputNumber @bind-Value="settings.HubCityFee" class="shop-input" />
+                    <small>E.g. ৳50 for Khulna City delivery within 24 hours.</small>
+                </label>
+            </div>
+            <div class="admin-form-grid mt-4">
+                <label class="shop-label">
+                    Outside Hub / Nationwide Delivery Fee (৳)
+                    <InputNumber @bind-Value="settings.OutsideFee" class="shop-input" />
+                    <small>E.g. ৳150 for all other 63 districts nationwide via courier.</small>
+                </label>
+                <label class="shop-label">
+                    Free Delivery Threshold (৳)
+                    <InputNumber @bind-Value="settings.FreeDeliveryThreshold" class="shop-input" />
+                    <small>Orders at or above this subtotal qualify for 100% Free Delivery (e.g. ৳5,000).</small>
+                </label>
+            </div>
+        </div>
+
+        <!-- 2. Bangla QR & bKash Automation Section -->
+        <div class="pt-4 border-t border-slate-200">
+            <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4">2. Bangla QR &amp; MFS Payment Configuration</h3>
+            
+            <label class="check-label mb-4">
+                <input type="checkbox" @bind="settings.RequireAdvanceForCOD" />
+                <span class="font-bold text-slate-800">Require Advance Delivery Fee for Cash on Delivery (Recommended in BD)</span>
+            </label>
+            <p class="text-xs text-slate-500 mb-4 -mt-2">
+                Prevents fraudulent orders and courier return loss by requiring customers to pay the delivery fee (e.g. ৳150) in advance via bKash/Nagad/Bangla QR. The gadget price remains Cash on Delivery upon parcel arrival.
+            </p>
+
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Required Advance Amount (৳)
+                    <InputNumber @bind-Value="settings.AdvanceAmount" class="shop-input" />
+                    <small>Amount customer must send (usually ৳150).</small>
+                </label>
+                <label class="shop-label">
+                    bKash Number
+                    <InputText @bind-Value="settings.BkashNumber" class="shop-input" />
+                    <small>Customer will send money / payment to this number.</small>
+                </label>
+            </div>
+
+            <div class="admin-form-grid mt-4">
+                <label class="shop-label">
+                    Nagad Number
+                    <InputText @bind-Value="settings.NagadNumber" class="shop-input" />
+                    <small>Alternative MFS number.</small>
+                </label>
+                <label class="shop-label">
+                    Bangla QR Image URL
+                    <InputText @bind-Value="settings.BanglaQrImageUrl" class="shop-input" />
+                    <small>Relative path (e.g. /jas-logo.png) or uploaded QR image.</small>
+                </label>
+            </div>
+        </div>
+
+        <!-- 3. Automated SMS Webhook Setup Guide -->
+        <div class="pt-4 border-t border-slate-200">
+            <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 mb-3">3. Automated SMS Webhook Verification</h3>
+            <div class="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-xs text-slate-700 space-y-2">
+                <p class="font-bold text-blue-900">How 100% Automated bKash Verification Works:</p>
+                <p>1. Install any free SMS Forwarder app on the Android phone with your bKash SIM.</p>
+                <p>2. Set target Webhook URL: <code class="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 font-bold text-blue-800">https://your-domain.com/api/webhooks/mfs-sms</code></p>
+                <p>3. Method: <strong>POST</strong> with JSON containing <code class="font-mono bg-white px-1">"message"</code> and <code class="font-mono bg-white px-1">"sender"</code>.</p>
+                <p>4. When an SMS arrives from bKash (16247) containing the Reference or TrxID, our server parses it and confirms the order in 3 seconds!</p>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="shop-button" data-pending-text="Saving settings...">
+                <span class="form-submit-spinner" hidden></span>
+                <span>Save All Settings</span>
+            </button>
+        </div>
+    </EditForm>
+}
+
+@code
+{
+    private DeliverySettings? settings;
+    private bool saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await Db.DeliverySettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new DeliverySettings
+            {
+                HubDistrict = "Khulna",
+                HubCity = "Khulna Sadar",
+                HubCityFee = 50m,
+                OutsideFee = 150m,
+                FreeDeliveryThreshold = 5000m,
+                RequireAdvanceForCOD = true,
+                AdvanceAmount = 150m,
+                BkashNumber = "01711465078",
+                NagadNumber = "01711465078",
+                BanglaQrImageUrl = "/jas-logo.png",
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            Db.DeliverySettings.Add(settings);
+            await Db.SaveChangesAsync();
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (settings != null)
+        {
+            settings.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            saved = true;
+        }
+    }
+}

@@ -27,13 +27,19 @@ public sealed class CheckoutRequest
     public string PhoneNumber { get; set; } = "";
     [Required, StringLength(300)]
     public string Address { get; set; } = "";
+    public string Division { get; set; } = "Khulna";
     [Required, StringLength(80)]
-    public string District { get; set; } = "";
+    public string District { get; set; } = "Khulna";
+    public string Thana { get; set; } = "Khulna Sadar";
     [Required, StringLength(80)]
-    public string City { get; set; } = "";
+    public string City { get; set; } = "Khulna";
+    public string? CouponCode { get; set; }
+    public string PaymentMethod { get; set; } = "COD";
+    public string? SenderPhoneNumber { get; set; }
+    public string? TransactionId { get; set; }
 }
 
-public sealed record CheckoutResult(int OrderId, Guid PublicToken, decimal Total);
+public sealed record CheckoutResult(int OrderId, Guid PublicToken, decimal Total, string? PaymentReferenceCode = null, decimal DeliveryCharge = 0, decimal DiscountAmount = 0);
 
 public sealed record DeliveryRatesDto(decimal Khulna, decimal OutsideKhulna);
 

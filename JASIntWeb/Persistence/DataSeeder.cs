@@ -253,6 +253,68 @@ public static class JsonTestDataSeeder
         }
     }
 
+    public static async Task SeedCommerceEnhancementsAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (!await db.DeliverySettings.AnyAsync(ct))
+        {
+            db.DeliverySettings.Add(new DeliverySettings
+            {
+                HubDistrict = "Khulna",
+                HubCity = "Khulna Sadar",
+                HubCityFee = 50m,
+                OutsideFee = 150m,
+                FreeDeliveryThreshold = 5000m,
+                RequireAdvanceForCOD = true,
+                AdvanceAmount = 150m,
+                BkashNumber = "01711465078",
+                NagadNumber = "01711465078",
+                BanglaQrImageUrl = "/jas-logo.png",
+                PaymentInstructions = "Send ৳150 Advance Delivery Fee to our bKash/Nagad number or scan Bangla QR with the Order Reference code to instantly confirm your order.",
+                SmsWebhookSecret = "jas_secret_sms_2026",
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (!await db.Coupons.AnyAsync(ct))
+        {
+            db.Coupons.AddRange(
+                new Coupon
+                {
+                    Code = "WELCOME200",
+                    DiscountType = CouponDiscountType.FixedAmount,
+                    DiscountValue = 200m,
+                    MinOrderAmount = 1000m,
+                    IsActive = true,
+                    Description = "৳200 flat discount on orders over ৳1,000"
+                },
+                new Coupon
+                {
+                    Code = "SAVE10",
+                    DiscountType = CouponDiscountType.Percentage,
+                    DiscountValue = 10m,
+                    MaxDiscountAmount = 500m,
+                    MinOrderAmount = 500m,
+                    IsActive = true,
+                    Description = "10% off up to ৳500"
+                },
+                new Coupon
+                {
+                    Code = "FREESHIP",
+                    DiscountType = CouponDiscountType.FreeDelivery,
+                    DiscountValue = 0m,
+                    MinOrderAmount = 2000m,
+                    IsActive = true,
+                    Description = "Free delivery on orders over ৳2,000"
+                }
+            );
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     private sealed class SeedData
     {
         public List<AttributeDefinition> AttributeDefinitions { get; set; } = [];

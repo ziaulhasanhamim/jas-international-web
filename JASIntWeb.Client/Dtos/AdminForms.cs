@@ -13,11 +13,11 @@ public sealed class ProductEditForm
     public int? BrandId { get; set; }
     [StringLength(2000)]
     public string Description { get; set; } = "";
-    [Required, StringLength(20000)]
+    [Required, StringLength(100000)]
     public string Details { get; set; } = "";
-    [Required, StringLength(2000)]
+    [Required, StringLength(5000)]
     public string Image { get; set; } = "";
-    [StringLength(20000)]
+    [StringLength(50000)]
     public string Images { get; set; } = "";
     public bool Hidden { get; set; }
 }

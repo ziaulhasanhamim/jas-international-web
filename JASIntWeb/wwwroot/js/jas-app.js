@@ -172,4 +172,283 @@
             return "[]";
         }
     };
+
+    // Product Media Manager (Upload, Arrange, Set Cover)
+    function initProductEditorMedia() {
+        const container = document.getElementById("product-media-manager");
+        if (!container) return;
+
+        const mainInput = document.getElementById("input-main-image");
+        const galleryInput = document.getElementById("input-gallery-images");
+        const cardsContainer = document.getElementById("media-cards-container");
+        const fileInput = document.getElementById("file-uploader-input");
+        const dropzone = document.getElementById("media-dropzone");
+        const btnAddUrl = document.getElementById("btn-add-url");
+        const uploadProgress = document.getElementById("media-upload-progress");
+
+        if (!mainInput || !galleryInput || !cardsContainer) return;
+
+        let images = [];
+        const mainVal = (mainInput.value || "").trim();
+        const galleryVals = (galleryInput.value || "")
+            .split("\n")
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        if (mainVal) {
+            images.push(mainVal);
+        }
+        for (const g of galleryVals) {
+            if (!images.includes(g)) images.push(g);
+        }
+
+        function syncInputs() {
+            if (images.length > 0) {
+                mainInput.value = images[0];
+                galleryInput.value = images.slice(1).join("\n");
+            } else {
+                mainInput.value = "";
+                galleryInput.value = "";
+            }
+        }
+
+        function renderCards() {
+            cardsContainer.innerHTML = "";
+            if (images.length === 0) {
+                cardsContainer.innerHTML = '<p class="text-xs text-slate-400 col-span-full py-4 text-center">No images added yet. Upload files or add an image URL above.</p>';
+                return;
+            }
+
+            images.forEach((url, idx) => {
+                const card = document.createElement("div");
+                const isCover = idx === 0;
+                card.className = `relative group rounded-2xl border p-2 bg-white flex flex-col gap-2 transition-all ${
+                    isCover ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "border-slate-200 hover:border-slate-300"
+                }`;
+
+                card.innerHTML = `
+                    <div class="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center">
+                        <img src="${url}" alt="Product image ${idx + 1}" class="w-full h-full object-contain" onerror="this.src='/jas-logo.png'" />
+                        ${isCover ? '<span class="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">⭐ Cover</span>' : ''}
+                        <span class="absolute bottom-1 right-2 bg-black/60 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">#${idx + 1}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-1 pt-1">
+                        <button type="button" class="btn-move-left size-7 rounded-lg border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-xs text-slate-700 disabled:opacity-30" ${idx === 0 ? "disabled" : ""} title="Move left">◀</button>
+                        ${!isCover ? '<button type="button" class="btn-set-cover flex-1 text-[11px] font-semibold py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition">Set Cover</button>' : '<span class="flex-1 text-center text-[11px] font-bold text-blue-600">Main</span>'}
+                        <button type="button" class="btn-move-right size-7 rounded-lg border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-xs text-slate-700 disabled:opacity-30" ${idx === images.length - 1 ? "disabled" : ""} title="Move right">▶</button>
+                        <button type="button" class="btn-delete-img size-7 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 flex items-center justify-center text-xs" title="Delete image">✕</button>
+                    </div>
+                `;
+
+                card.querySelector(".btn-move-left")?.addEventListener("click", () => {
+                    if (idx > 0) {
+                        const tmp = images[idx];
+                        images[idx] = images[idx - 1];
+                        images[idx - 1] = tmp;
+                        syncInputs();
+                        renderCards();
+                    }
+                });
+
+                card.querySelector(".btn-move-right")?.addEventListener("click", () => {
+                    if (idx < images.length - 1) {
+                        const tmp = images[idx];
+                        images[idx] = images[idx + 1];
+                        images[idx + 1] = tmp;
+                        syncInputs();
+                        renderCards();
+                    }
+                });
+
+                card.querySelector(".btn-set-cover")?.addEventListener("click", () => {
+                    const chosen = images.splice(idx, 1)[0];
+                    images.unshift(chosen);
+                    syncInputs();
+                    renderCards();
+                });
+
+                card.querySelector(".btn-delete-img")?.addEventListener("click", () => {
+                    images.splice(idx, 1);
+                    syncInputs();
+                    renderCards();
+                });
+
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        async function handleUploadFiles(files) {
+            if (!files || files.length === 0) return;
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append("files", file);
+            }
+
+            if (uploadProgress) {
+                uploadProgress.hidden = false;
+            }
+
+            try {
+                const res = await fetch("/api/admin/uploads/product-images", {
+                    method: "POST",
+                    body: formData
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.urls && Array.isArray(data.urls)) {
+                        for (const u of data.urls) {
+                            if (!images.includes(u)) images.push(u);
+                        }
+                        syncInputs();
+                        renderCards();
+                    }
+                } else {
+                    alert("Upload failed. Make sure files are images under 10MB.");
+                }
+            } catch (err) {
+                console.error("Upload error", err);
+                alert("Upload failed due to network error.");
+            } finally {
+                if (uploadProgress) {
+                    uploadProgress.hidden = true;
+                }
+                if (fileInput) fileInput.value = "";
+            }
+        }
+
+        fileInput?.addEventListener("change", e => {
+            handleUploadFiles(e.target.files);
+        });
+
+        if (dropzone) {
+            ["dragenter", "dragover"].forEach(evt => {
+                dropzone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add("border-blue-500", "bg-blue-50/50");
+                });
+            });
+
+            ["dragleave", "drop"].forEach(evt => {
+                dropzone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove("border-blue-500", "bg-blue-50/50");
+                });
+            });
+
+            dropzone.addEventListener("drop", e => {
+                const dt = e.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    handleUploadFiles(dt.files);
+                }
+            });
+        }
+
+        btnAddUrl?.addEventListener("click", () => {
+            const url = prompt("Enter image HTTPS or site-relative URL (e.g. /jas-logo.png):");
+            if (url && url.trim()) {
+                const trimmed = url.trim();
+                if (!images.includes(trimmed)) {
+                    images.push(trimmed);
+                    syncInputs();
+                    renderCards();
+                }
+            }
+        });
+
+        renderCards();
+    }
+
+    // WYSIWYG Editor using TinyMCE Library with Table Tools & Specs Template
+    function initProductEditorWysiwyg() {
+        const textarea = document.getElementById("input-details-html");
+        if (!textarea) return;
+
+        if (window.tinymce) {
+            try {
+                if (tinymce.get("input-details-html")) {
+                    tinymce.get("input-details-html").remove();
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            tinymce.init({
+                selector: "#input-details-html",
+                height: 480,
+                plugins: "table lists link code image",
+                toolbar: "undo redo | blocks | bold italic underline | bullist numlist | table techspecs | code",
+                menubar: false,
+                statusbar: true,
+                branding: false,
+                content_style: `
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                        font-size: 14px;
+                        line-height: 1.65;
+                        color: #334155;
+                        padding: 16px;
+                    }
+                    h2 { font-size: 18px; font-weight: bold; color: #0f172a; margin-top: 20px; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+                    h3 { font-size: 15px; font-weight: 600; color: #1e293b; margin-top: 16px; margin-bottom: 6px; }
+                    ul, ol { padding-left: 20px; margin-bottom: 16px; }
+                    li { margin-bottom: 4px; }
+                    table { width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+                    table td, table th { border: 1px solid #e2e8f0; padding: 10px 14px; }
+                    table tr:nth-child(even) { background-color: #f8fafc; }
+                    table tr td:first-child { font-weight: 600; color: #1e293b; width: 30%; background-color: #f1f5f9; }
+                `,
+                setup: function (editor) {
+                    editor.ui.registry.addButton("techspecs", {
+                        text: "⚡ Tech Specs Template",
+                        tooltip: "Insert Standard Electronics Specification Sheet Template",
+                        onAction: function () {
+                            editor.insertContent(`
+<h2>Key Features</h2>
+<ul>
+    <li>High-performance authentic gadget hardware with official warranty</li>
+    <li>Fast charging, low latency and durable premium build quality</li>
+    <li>Intelligent thermal management and certified safety protection</li>
+</ul>
+<h2>Specification Table</h2>
+<table class="spec-table" style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1;">
+    <tbody>
+        <tr><td style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; background: #f8fafc; width: 30%;">Brand</td><td style="border: 1px solid #cbd5e1; padding: 10px 14px;">Anker / Official Brand</td></tr>
+        <tr><td style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; background: #f8fafc;">Model</td><td style="border: 1px solid #cbd5e1; padding: 10px 14px;">Product Model Number</td></tr>
+        <tr><td style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; background: #f8fafc;">Output Power</td><td style="border: 1px solid #cbd5e1; padding: 10px 14px;">30W Fast Charging / PD 3.0</td></tr>
+        <tr><td style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; background: #f8fafc;">Warranty</td><td style="border: 1px solid #cbd5e1; padding: 10px 14px;">7-Day Replacement + 18 Months Official Warranty</td></tr>
+    </tbody>
+</table>
+<p>&nbsp;</p>
+`);
+                        }
+                    });
+
+                    editor.on("change input keyup", function () {
+                        editor.save();
+                    });
+                }
+            });
+
+            const form = textarea.closest("form");
+            form?.addEventListener("submit", function () {
+                try {
+                    tinymce.triggerSave();
+                } catch (e) {
+                    // ignore
+                }
+            });
+        }
+    }
+
+    function initAdminExtensions() {
+        initProductEditorMedia();
+        initProductEditorWysiwyg();
+    }
+
+    if (window.Blazor) {
+        window.Blazor.addEventListener("enhancednavigationend", initAdminExtensions);
+    }
+    document.addEventListener("DOMContentLoaded", initAdminExtensions);
 })();

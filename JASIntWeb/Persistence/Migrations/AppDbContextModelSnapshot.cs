@@ -373,6 +373,67 @@ namespace JASIntWeb.Persistence.Migrations
                     b.ToTable("CategoryPlacements");
                 });
 
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.Coupon", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("ExpiryDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("MaxDiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MinOrderAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("TimesUsed")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UsageLimit")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "ExpiryDate");
+
+                    b.ToTable("Coupons");
+                });
+
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.DeliveryAddress", b =>
                 {
                     b.Property<int>("Id")
@@ -396,6 +457,9 @@ namespace JASIntWeb.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Division")
+                        .HasColumnType("text");
+
                     b.Property<string>("FullAddress")
                         .IsRequired()
                         .HasColumnType("text");
@@ -404,11 +468,69 @@ namespace JASIntWeb.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Thana")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
 
                     b.ToTable("DeliveryAddresses");
+                });
+
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.DeliverySettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AdvanceAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("BanglaQrImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BkashNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("FreeDeliveryThreshold")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("HubCity")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("HubCityFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("HubDistrict")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NagadNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OutsideFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("PaymentInstructions")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("RequireAdvanceForCOD")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SmsWebhookSecret")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliverySettings");
                 });
 
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.InventoryItem", b =>
@@ -497,6 +619,9 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<Guid>("CheckoutToken")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CouponCode")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -512,8 +637,20 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<decimal>("DeliveryCharge")
                         .HasColumnType("numeric");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("PaymentReferenceCode")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("PublicToken")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("SenderPhoneNumber")
+                        .HasColumnType("text");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -523,6 +660,9 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.Property<decimal>("Total")
                         .HasColumnType("numeric");
+
+                    b.Property<string>("TransactionId")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -540,8 +680,12 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.HasIndex("DeliveryAddressId");
 
+                    b.HasIndex("PaymentReferenceCode");
+
                     b.HasIndex("PublicToken")
                         .IsUnique();
+
+                    b.HasIndex("TransactionId");
 
                     b.HasIndex("Status", "CreatedAt");
 
@@ -727,6 +871,10 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("IsDeleted", "BrandId", "CreatedAt");
+
+                    b.HasIndex("IsDeleted", "CategoryId", "CreatedAt");
 
                     b.ToTable("Products");
                 });

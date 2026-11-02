@@ -1,0 +1,122 @@
+@page "/admin/coupons"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Coupons &amp; Promo Codes · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="Coupons &amp; Promotions"
+    Description="Manage customer promotional discount codes, percentage caps, minimum spends, and free delivery vouchers."
+    ActionHref="/admin/coupons/new"
+    ActionText="Create New Coupon"
+/>
+
+<div class="shop-panel">
+    @if (coupons.Count == 0)
+    {
+        <p class="admin-empty">No coupons created yet. Click "Create New Coupon" to offer promotions to your shoppers.</p>
+    }
+    else
+    {
+        <div class="admin-table-wrap">
+            <table class="shop-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Type &amp; Discount</th>
+                        <th>Min. Spend</th>
+                        <th>Max. Cap</th>
+                        <th>Usage</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in coupons)
+                    {
+                        var isExpired = c.ExpiryDate.HasValue && c.ExpiryDate.Value < DateTimeOffset.UtcNow;
+                        <tr>
+                            <td>
+                                <strong class="font-mono text-sm text-blue-600 font-bold">@c.Code</strong>
+                                @if (!string.IsNullOrEmpty(c.Description))
+                                {
+                                    <span class="cell-secondary">@c.Description</span>
+                                }
+                            </td>
+                            <td>
+                                @switch (c.DiscountType)
+                                {
+                                    case CouponDiscountType.Percentage:
+                                        <span>@c.DiscountValue.ToString("N0")% Off</span>
+                                        break;
+                                    case CouponDiscountType.FixedAmount:
+                                        <span>৳@c.DiscountValue.ToString("N0") Flat Off</span>
+                                        break;
+                                    case CouponDiscountType.FreeDelivery:
+                                        <span class="text-emerald-600 font-semibold">Free Delivery</span>
+                                        break;
+                                }
+                            </td>
+                            <td>
+                                @(c.MinOrderAmount.HasValue ? $"৳{c.MinOrderAmount.Value:N0}" : "No minimum")
+                            </td>
+                            <td>
+                                @(c.MaxDiscountAmount.HasValue ? $"৳{c.MaxDiscountAmount.Value:N0}" : "—")
+                            </td>
+                            <td>
+                                <span>@c.TimesUsed @(c.UsageLimit.HasValue ? $"/ {c.UsageLimit.Value}" : "uses")</span>
+                            </td>
+                            <td>
+                                @if (!c.IsActive)
+                                {
+                                    <span class="badge badge-rose">Disabled</span>
+                                }
+                                else if (isExpired)
+                                {
+                                    <span class="badge badge-amber">Expired</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-emerald">Active</span>
+                                }
+                            </td>
+                            <td class="text-right">
+                                <a href="/admin/coupons/@c.Id/edit" class="text-blue-600 font-semibold text-xs hover:underline mr-3">Edit</a>
+                                <button type="button" @onclick="() => ToggleActive(c)" class="text-slate-500 hover:text-slate-900 text-xs">
+                                    @(c.IsActive ? "Disable" : "Enable")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code
+{
+    private List<Coupon> coupons = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoupons();
+    }
+
+    private async Task LoadCoupons()
+    {
+        coupons = await Db.Coupons.AsNoTracking().OrderByDescending(c => c.CreatedAt).ToListAsync();
+    }
+
+    private async Task ToggleActive(Coupon c)
+    {
+        var existing = await Db.Coupons.FindAsync(c.Id);
+        if (existing != null)
+        {
+            existing.IsActive = !existing.IsActive;
+            await Db.SaveChangesAsync();
+            await LoadCoupons();
+        }
+    }
+}
