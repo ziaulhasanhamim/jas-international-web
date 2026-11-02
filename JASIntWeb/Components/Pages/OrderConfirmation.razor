@@ -1,30 +1,97 @@
 @page "/order/{Token:guid}"
 @inject AppDbContext Db
 
-<PageTitle>Order confirmation — JAS International</PageTitle>
-<div class="shop-container">
+<PageTitle>Order Confirmation · JAS International</PageTitle>
+
+<div class="shop-container py-12 max-w-3xl mx-auto">
     @if (order is null)
     {
-        <h1 class="text-3xl font-semibold">Order not found</h1>
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
+            <Icon Name="alert" Class="size-12 text-slate-300 mx-auto mb-3" />
+            <h1 class="text-2xl font-bold text-slate-900">Order Not Found</h1>
+            <p class="text-xs text-slate-500 mt-2 mb-6">The requested order reference could not be located.</p>
+            <a href="/products" class="btn-primary">Return to Catalog</a>
+        </div>
     }
     else
     {
         <CheckoutCompleted CheckoutToken="order.CheckoutToken" />
-        <div class="shop-panel">
-            <p class="text-sm uppercase text-volt">Order placed</p>
-            <h1 class="mt-2 text-3xl font-semibold">Thank you for your order</h1>
-            <p class="mt-4">Order #@order.Id · @order.Status</p>
-            @foreach (var item in order.Items)
-            {
-                <p class="mt-4">
-                    @item.ProductName · @item.VariantName × @item.Quantity
-                    <strong class="float-right">৳@item.LineTotal.ToString("N0")</strong>
+
+        <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+            <!-- Header Banner -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-8 text-white text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-white text-emerald-600 mx-auto mb-4 shadow-md">
+                    <Icon Name="check" Class="size-8" />
+                </span>
+                <span class="text-xs font-bold uppercase tracking-widest text-emerald-100 block mb-1">ORDER CONFIRMED</span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Thank You For Your Order!</h1>
+                <p class="text-xs text-emerald-100 mt-2">
+                    Order <strong>#@order.Id</strong> has been placed and stock is reserved for fulfillment.
                 </p>
-            }
-            <p class="mt-5">Delivery: ৳@order.DeliveryCharge.ToString("N0")</p>
-            <p class="mt-4 text-xl font-semibold">Total: ৳@order.Total.ToString("N0")</p>
-            <p class="mt-4 text-sm text-slate-500">Cash on delivery. Save this private link to check your order status.</p>
-            <a href="/products" class="shop-button mt-6">Continue shopping</a>
+            </div>
+
+            <!-- Receipt Body -->
+            <div class="p-6 sm:p-8 space-y-6">
+                <!-- Delivery Info Card -->
+                <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
+                    <div>
+                        <span class="text-slate-400 block font-medium">Deliver To:</span>
+                        <strong class="text-slate-900 text-sm">@order.DeliveryAddress?.CustomerName</strong>
+                        <p class="text-slate-600 mt-0.5">@order.DeliveryAddress?.PhoneNumber</p>
+                        <p class="text-slate-600">@order.DeliveryAddress?.FullAddress (@order.DeliveryAddress?.City)</p>
+                    </div>
+
+                    <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
+                        <span class="text-slate-400 block font-medium">Payment Mode:</span>
+                        <strong class="text-slate-900 text-sm">Cash on Delivery (COD)</strong>
+                        <span class="badge badge-emerald mt-1.5 block sm:inline-block">Stock Reserved</span>
+                    </div>
+                </div>
+
+                <!-- Line Items Table -->
+                <div class="border-t border-slate-100 pt-5">
+                    <h3 class="font-bold text-slate-900 text-sm mb-3">Order Details</h3>
+                    <div class="divide-y divide-slate-100">
+                        @foreach (var item in order.Items)
+                        {
+                            <div class="py-3 flex items-center justify-between text-xs">
+                                <div>
+                                    <strong class="text-slate-900 block font-semibold">@item.ProductName</strong>
+                                    <span class="text-slate-400">@item.VariantName · Qty: @item.Quantity</span>
+                                </div>
+                                <span class="font-semibold text-slate-900 tabular-nums">৳@item.LineTotal.ToString("N0")</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Totals -->
+                    <div class="border-t border-slate-200 mt-4 pt-4 space-y-2 text-xs">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Subtotal</span>
+                            <span class="font-semibold text-slate-900 tabular-nums">৳@order.Subtotal.ToString("N0")</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Delivery Fee</span>
+                            <span class="font-semibold text-slate-900 tabular-nums">৳@order.DeliveryCharge.ToString("N0")</span>
+                        </div>
+                        <div class="border-t border-slate-200 pt-3 flex justify-between text-sm">
+                            <span class="font-bold text-slate-900">Total Payable</span>
+                            <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@order.Total.ToString("N0")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <a href="/track?orderId=@order.Id&phone=@(order.DeliveryAddress?.PhoneNumber ?? "")" class="btn-primary w-full sm:w-auto text-xs">
+                        <Icon Name="truck" Class="size-4" />
+                        Track This Order Live
+                    </a>
+                    <a href="/products" class="btn-secondary w-full sm:w-auto text-xs">
+                        Continue Shopping
+                    </a>
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -37,5 +104,6 @@
 
     protected override async Task OnInitializedAsync() => order = await Db.Orders.AsNoTracking()
         .Include(o => o.Items)
+        .Include(o => o.DeliveryAddress)
         .SingleOrDefaultAsync(o => o.PublicToken == Token);
 }

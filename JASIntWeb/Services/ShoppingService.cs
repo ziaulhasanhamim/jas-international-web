@@ -239,6 +239,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
         {
             throw new ShopException("One or more cart items are unavailable. Update your cart before checking out.");
         }
+        var unitCosts = new Dictionary<int, decimal>();
         foreach (var item in summary.Items.OrderBy(i => i.VariantId))
         {
             // Lock inventory in a stable order. The available quantity is checked again after acquiring the lock.
@@ -260,6 +261,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
             }
             // Do not trust a client price or the earlier quote.
             inventory.QuantityReserved += item.Quantity;
+            unitCosts[item.VariantId] = variant.CostPrice;
             summary.Items[summary.Items.IndexOf(item)] = item with
             {
                 Price = variant.SellingPrice
@@ -295,6 +297,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config)
                     ProductName = i.Name,
                     VariantName = i.Variant,
                     UnitPrice = i.Price,
+                    UnitCost = unitCosts[i.VariantId],
                     Quantity = i.Quantity,
                     LineTotal = i.LineTotal
                 })

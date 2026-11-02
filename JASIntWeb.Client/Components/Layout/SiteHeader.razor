@@ -1,55 +1,133 @@
 @rendermode InteractiveAuto
 @implements IDisposable
 @inject CartService Cart
+@inject NavigationManager Nav
 
-<header class="brand-header sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-    <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
-        <a href="/" class="flex shrink-0 items-center gap-3">
-            <img src="/jas-logo.png" width="56" height="56" class="w-14 rounded-xl" alt="JAS International" />
-            <span>
-                <strong class="font-display block text-2xl text-volt">JAS</strong>
-                <span class="text-xs uppercase tracking-widest">International</span>
+<!-- Top Utility Announcement Bar -->
+<div class="bg-slate-900 text-slate-300 text-xs py-2 px-4 border-b border-slate-800">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div class="flex items-center gap-4 truncate">
+            <span class="inline-flex items-center gap-1.5 text-slate-300">
+                <Icon Name="map-pin" Class="size-3.5 text-blue-400 shrink-0" />
+                <span class="truncate">Khulna Shopping Complex, 3rd Floor, Khulna</span>
             </span>
+            <span class="hidden md:inline text-slate-600">•</span>
+            <a href="tel:01711465078" class="hidden md:inline-flex items-center gap-1.5 text-slate-300 hover:text-white transition">
+                <Icon Name="phone" Class="size-3.5 text-emerald-400 shrink-0" />
+                <span>01711465078</span>
+            </a>
+        </div>
+        <div class="flex items-center gap-4 text-[11px] shrink-0">
+            <a href="/track" class="inline-flex items-center gap-1 text-slate-300 hover:text-white transition">
+                <Icon Name="truck" Class="size-3.5 text-blue-400" />
+                <span>Track Order</span>
+            </a>
+            <span class="text-slate-700">•</span>
+            <a href="/faq" class="hover:text-white transition">Help &amp; FAQ</a>
+            <span class="text-slate-700">•</span>
+            <a href="/contact" class="hover:text-white transition">Showroom</a>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Brand Header -->
+<header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-6 px-4 py-3 sm:px-6">
+        <!-- Brand Logo -->
+        <a href="/" class="flex shrink-0 items-center gap-3">
+            <img src="/jas-logo.png" width="48" height="48" class="size-11 sm:size-12 rounded-xl shadow-xs" alt="JAS International" />
+            <div class="leading-none">
+                <span class="font-display font-bold text-xl sm:text-2xl text-blue-600 tracking-tight">JAS</span>
+                <span class="block text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-slate-500 mt-0.5">International</span>
+            </div>
         </a>
-        <form
-            action="/products"
-            method="get"
-            class="order-3 flex w-full gap-2 md:order-none md:ml-auto md:w-auto md:flex-1 md:max-w-lg"
-        >
-            <label class="sr-only" for="site-search">Search products</label>
+
+        <!-- Search Bar -->
+        <form action="/products" method="get" class="hidden md:flex flex-1 max-w-md lg:max-w-lg relative">
             <input
                 id="site-search"
                 name="q"
                 type="search"
-                placeholder="Search products or model…"
-                class="min-w-0 flex-1 rounded-full border border-slate-200 bg-mist px-4 py-2.5 text-sm"
+                placeholder="Search gadgets, smartphones, laptops, audio..."
+                class="w-full rounded-full border border-slate-200 bg-slate-50/80 px-4 py-2.5 pl-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
-            <button class="shop-button rounded-full">Search</button>
+            <span class="absolute left-3.5 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+            <button type="submit" class="absolute right-1.5 top-1.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition">
+                Search
+            </button>
         </form>
-        <a href="/products" class="ml-auto text-sm md:ml-0">Shop</a>
-        <AuthorizeView>
-            <Authorized>
-                <a href="/account" class="text-sm">Account</a>
-            </Authorized>
-            <NotAuthorized>
-                <a href="/account/login" class="text-sm">Sign in</a>
-            </NotAuthorized>
-        </AuthorizeView>
-        <AuthorizeView Roles="Admin">
-            <Authorized>
-                <a href="/admin" class="text-sm">Admin</a>
-            </Authorized>
-        </AuthorizeView>
-        <button
-            type="button"
-            @onclick="() => open = true"
-            class="cart-pill rounded-full px-4 py-2 text-sm"
-            aria-label="Open cart"
-        >
-            Cart (@Cart.ItemCount)
-        </button>
+
+        <!-- Right Utility Actions -->
+        <div class="flex items-center gap-2 sm:gap-3">
+            <a href="/products" class="hidden lg:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-blue-600 transition px-2 py-1">
+                Shop
+            </a>
+
+            <!-- Account / Auth -->
+            <AuthorizeView>
+                <Authorized Context="user">
+                    <a href="/account" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition">
+                        <span class="flex size-6 items-center justify-center rounded-full bg-blue-600 text-[10px] text-white font-bold">
+                            @(user.User.Identity?.Name?.FirstOrDefault().ToString().ToUpperInvariant() ?? "U")
+                        </span>
+                        <span class="hidden sm:inline max-w-[100px] truncate">Account</span>
+                    </a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/account/login" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                        <Icon Name="user" Class="size-4 text-slate-500" />
+                        <span>Sign In</span>
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+
+            <!-- Admin Link if Admin -->
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <a href="/admin" class="hidden sm:inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition ring-1 ring-indigo-500/20">
+                        <Icon Name="dashboard" Class="size-3.5" />
+                        <span>Admin</span>
+                    </a>
+                </Authorized>
+            </AuthorizeView>
+
+            <!-- Cart Trigger Button -->
+            <button
+                type="button"
+                @onclick="() => open = true"
+                class="inline-flex items-center gap-2 rounded-full bg-blue-600 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+                aria-label="Open shopping cart"
+            >
+                <Icon Name="cart" Class="size-4" />
+                <span>Cart</span>
+                <span class="flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700">
+                    @Cart.ItemCount
+                </span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Category Strip & Mobile Search -->
+    <div class="border-t border-slate-100 bg-white px-4 py-2 sm:px-6">
+        <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 overflow-x-auto text-xs font-medium text-slate-600 scrollbar-none">
+            <div class="flex items-center gap-6 whitespace-nowrap">
+                <a href="/products" class="hover:text-blue-600 transition font-semibold text-slate-900">All Gadgets</a>
+                <a href="/category/phones" class="hover:text-blue-600 transition">Smartphones</a>
+                <a href="/category/laptops" class="hover:text-blue-600 transition">Laptops</a>
+                <a href="/category/headphones" class="hover:text-blue-600 transition">Audio &amp; Earbuds</a>
+                <a href="/category/wearables" class="hover:text-blue-600 transition">Smart Watches</a>
+                <a href="/category/speakers" class="hover:text-blue-600 transition">Bluetooth Speakers</a>
+                <a href="/products?sort=newest" class="text-blue-600 font-semibold hover:underline">New Arrivals</a>
+            </div>
+            <div class="hidden sm:flex items-center gap-3 shrink-0 text-slate-400">
+                <span class="text-[11px]">Free delivery on select products</span>
+            </div>
+        </div>
     </div>
 </header>
+
 <CartDrawer Open="open" OpenChanged="value => open = value" />
 
 @code

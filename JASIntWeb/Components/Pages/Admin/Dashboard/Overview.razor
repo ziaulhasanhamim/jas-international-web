@@ -1,123 +1,261 @@
 @page "/admin"
 @inject AppDbContext Db
+@inject SalesMetricsService Metrics
 
-<PageTitle>Dashboard — JAS Admin</PageTitle>
-<AdminPageHeader
-    Title="Store dashboard"
-    Description="Orders, catalog health and inventory at a glance."
-    ActionHref="/admin/products/new"
-    ActionText="+ Add product"
-/>
-<div class="dashboard-metrics">
-    <a href="/admin/products" class="metric-card">
-        <span>Visible products</span>
-        <strong>@productCount</strong>
-        <small>Current catalog</small>
-    </a>
-    <a href="/admin/orders?status=Pending" class="metric-card">
-        <span>Orders to review</span>
-        <strong>@pending</strong>
-        <small>Pending fulfillment</small>
-    </a>
-    <div class="metric-card metric-highlight">
-        <span>Delivered revenue</span>
-        <strong>৳@revenue.ToString("N0")</strong>
-        <small>This month · Bangladesh time</small>
+<PageTitle>Command Center · JAS International Admin</PageTitle>
+
+<!-- Executive Command Center Header -->
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">STORE MANAGEMENT HUB</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Executive Command Center</h1>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                <Icon Name="receipt" Class="size-3.5" />
+                @DateTime.UtcNow.AddHours(6).ToString("dddd, dd MMM yyyy")
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                <Icon Name="dashboard" Class="size-3.5 text-slate-500" />
+                Khulna Main Showroom
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full @(pending > 0 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20") px-2.5 py-1 font-medium">
+                <span class="size-1.5 rounded-full @(pending > 0 ? "bg-amber-500 animate-pulse" : "bg-emerald-500")"></span>
+                @(pending > 0 ? $"{pending} Pending Order{(pending == 1 ? "" : "s")}" : "All Orders Processed")
+            </span>
+        </div>
     </div>
-    <a href="/admin/inventory?low=true" class="metric-card">
-        <span>Low-stock variants</span>
-        <strong>@lowStock</strong>
-        <small>5 or fewer available</small>
+
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a href="/admin/products/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Product
+        </a>
+        <a href="/admin/orders" class="btn-secondary">
+            <Icon Name="cart" Class="size-4" />
+            Manage Orders
+        </a>
+    </div>
+</div>
+
+<!-- Hero 4-Card KPI Grid -->
+<div class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 mb-7">
+    <!-- Month Sales Card -->
+    <a href="/admin/analytics" class="metric-sales group">
+        <span class="metric-icon-emerald">
+            <Icon Name="cash" />
+        </span>
+        <p>This Month Revenue</p>
+        <strong class="tabular-nums">৳@(sales?.Select("this-month").Totals.Sales.ToString("N0") ?? "0")</strong>
+        <div class="mt-2.5 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+            <span class="text-slate-500">Delivered store orders</span>
+            <span class="rounded-full bg-emerald-100/90 px-2 py-0.5 font-semibold text-emerald-800 tabular-nums ring-1 ring-emerald-600/20">
+                ৳@((sales?.Select("this-month").Totals.Sales - sales?.Select("this-month").Totals.Cost)?.ToString("N0") ?? "0") profit
+            </span>
+        </div>
+    </a>
+
+    <!-- Pending Fulfillment Card -->
+    <a href="/admin/orders?status=Pending" class="metric-funds group">
+        <span class="metric-icon-blue">
+            <Icon Name="cart" />
+        </span>
+        <p>Pending Orders</p>
+        <strong class="tabular-nums">@pending</strong>
+        <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Awaiting confirmation & dispatch</span>
+            <span class="text-blue-600 font-semibold group-hover:underline">Review →</span>
+        </div>
+    </a>
+
+    <!-- Low Stock Card -->
+    <a href="/admin/inventory" class="metric-stock group">
+        <span class="metric-icon-amber">
+            <Icon Name="alert" />
+        </span>
+        <p>Low Stock Variants</p>
+        <strong class="tabular-nums">@lowStock</strong>
+        <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+            <span>5 or fewer units remaining</span>
+            <span class="text-amber-700 font-semibold group-hover:underline">Restock →</span>
+        </div>
+    </a>
+
+    <!-- Active Catalog Card -->
+    <a href="/admin/products" class="metric-valuation group">
+        <span class="metric-icon-purple">
+            <Icon Name="box" />
+        </span>
+        <p>Active Catalog</p>
+        <strong class="tabular-nums">@productCount</strong>
+        <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Live products published</span>
+            <span class="text-purple-600 font-semibold group-hover:underline">Catalog →</span>
+        </div>
     </a>
 </div>
-<div class="dashboard-grid">
-    <section class="shop-panel admin-table-wrap">
-        <div class="admin-section-heading">
-            <h2>Recent orders</h2>
-            <a href="/admin/orders">All orders →</a>
+
+@if (sales is not null)
+{
+    <div class="mb-7">
+        <SalesPeriodSummary Summary="sales" />
+    </div>
+}
+
+<!-- Quick Operations Hub Cards -->
+<div class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4 mb-7">
+    <HubCard Href="/admin/orders?status=Pending" Title="Fulfill Orders" Hint="Verify COD & dispatch shipments" IconName="truck" Theme="blue" />
+    <HubCard Href="/admin/inventory" Title="Inventory Health" Hint="Track stock quantities & reserved units" IconName="box" Theme="amber" />
+    <HubCard Href="/admin/analytics" Title="Profit Margins" Hint="Period comparisons & best sales days" IconName="history" Theme="emerald" />
+    <HubCard Href="/admin/carousel" Title="Marketing Slides" Hint="Update homepage promotional campaigns" IconName="camera" Theme="purple" />
+</div>
+
+<!-- Main Split: Recent Orders & Stock Alerts -->
+<div class="grid gap-7 lg:grid-cols-3 mb-8">
+    <div class="lg:col-span-2 rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h2 class="font-bold text-slate-900 text-lg">Recent Customer Orders</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Latest transactions from online storefront</p>
+            </div>
+            <a href="/admin/orders" class="text-xs font-semibold text-blue-600 hover:text-blue-800 transition">
+                View all orders →
+            </a>
         </div>
-        <table class="shop-table">
-            <thead>
-                <tr>
-                    <th>Order</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var o in orders)
-                {
+
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>
-                            <a href="/admin/orders/@o.Id">#@o.Id</a>
-                        </td>
-                        <td>@o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM")</td>
-                        <td>
-                            <span class="status-badge">@o.Status</span>
-                        </td>
-                        <td>৳@o.Total.ToString("N0")</td>
+                        <th>Order</th>
+                        <th>Date</th>
+                        <th>Customer / Location</th>
+                        <th>Status</th>
+                        <th class="text-right">Total</th>
+                        <th class="text-right">Action</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var o in orders)
+                    {
+                        <tr>
+                            <td class="font-semibold text-slate-900">
+                                <a href="/admin/orders/@o.Id" class="text-blue-600 hover:underline">#@o.Id</a>
+                            </td>
+                            <td class="text-xs text-slate-500">
+                                @o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM, hh:mm tt")
+                            </td>
+                            <td>
+                                <span class="font-medium text-slate-800 block text-xs">@(o.DeliveryAddress?.CustomerName ?? "Customer")</span>
+                                <span class="text-[11px] text-slate-400">@(o.DeliveryAddress?.City ?? "Khulna")</span>
+                            </td>
+                            <td>
+                                @switch (o.Status)
+                                {
+                                    case OrderStatus.Pending:
+                                        <span class="badge badge-amber">Pending</span>
+                                        break;
+                                    case OrderStatus.Processing:
+                                        <span class="badge badge-blue">Processing</span>
+                                        break;
+                                    case OrderStatus.InTransit:
+                                        <span class="badge badge-purple">In Transit</span>
+                                        break;
+                                    case OrderStatus.Delivered:
+                                        <span class="badge badge-emerald">Delivered</span>
+                                        break;
+                                    case OrderStatus.Cancelled:
+                                        <span class="badge badge-rose">Cancelled</span>
+                                        break;
+                                    default:
+                                        <span class="badge badge-slate">@o.Status</span>
+                                        break;
+                                }
+                            </td>
+                            <td class="text-right font-semibold text-slate-900 tabular-nums">
+                                ৳@o.Total.ToString("N0")
+                            </td>
+                            <td class="text-right">
+                                <a href="/admin/orders/@o.Id" class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                                    Manage <Icon Name="arrow" Class="size-3" />
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
         @if (orders.Count == 0)
         {
-            <p class="admin-empty">New orders will appear here.</p>
+            <div class="empty-state">
+                <Icon Name="receipt" Class="size-10 text-slate-300" />
+                <p>No customer orders yet. They will appear here in real time.</p>
+            </div>
         }
-    </section>
-    <section class="shop-panel">
-        <div class="admin-section-heading">
-            <h2>Needs attention</h2>
-        </div>
-        <div class="attention-list">
-            @foreach (var item in lowItems)
-            {
-                <a href="/admin/inventory/@item.ProductVariantId/edit">
-                    <span>
-                        <strong>@item.ProductVariant?.Product?.Name</strong>
-                        <small>@item.ProductVariant?.SKU</small>
-                    </span>
-                    <span class="status-badge status-warning">@(item.QuantityOnHand - item.QuantityReserved) left</span>
+    </div>
+
+    <!-- Stock Alerts Section -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+        <div>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-bold text-slate-900 text-lg">Inventory Alerts</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Critical stock needing restock</p>
+                </div>
+                <a href="/admin/inventory" class="text-xs font-semibold text-amber-600 hover:text-amber-800">
+                    Inventory →
                 </a>
-            }
+            </div>
+
+            <div class="divide-y divide-slate-100">
+                @foreach (var item in lowItems)
+                {
+                    var available = item.QuantityOnHand - item.QuantityReserved;
+                    <a href="/admin/inventory/@item.ProductVariantId/edit" class="flex items-center justify-between py-3 group hover:bg-slate-50/80 rounded-lg px-2 -mx-2 transition">
+                        <div class="min-w-0 flex-1 pr-3">
+                            <strong class="block text-xs font-semibold text-slate-900 truncate group-hover:text-blue-600 transition">
+                                @item.ProductVariant?.Product?.Name
+                            </strong>
+                            <span class="block text-[11px] text-slate-400 font-mono">
+                                @(item.ProductVariant?.SKU ?? "SKU-N/A")
+                            </span>
+                        </div>
+                        <span class="badge @(available <= 1 ? "badge-rose" : "badge-amber") shrink-0">
+                            @available in stock
+                        </span>
+                    </a>
+                }
+            </div>
+
             @if (lowItems.Count == 0)
             {
-                <p class="admin-empty">No low-stock alerts.</p>
+                <div class="empty-state py-8">
+                    <Icon Name="check" Class="size-8 text-emerald-500" />
+                    <p class="text-emerald-700 font-medium">All products are healthy in stock.</p>
+                </div>
             }
         </div>
-    </section>
+
+        <div class="mt-6 pt-4 border-t border-slate-100">
+            <a href="/admin/inventory" class="btn-secondary w-full text-xs">
+                Open Stock Manager
+            </a>
+        </div>
+    </div>
 </div>
-<section class="dashboard-shortcuts">
-    <a href="/admin/orders?status=Pending">
-        <strong>Process orders</strong>
-        <span>Review customer delivery details and fulfillment.</span>
-    </a>
-    <a href="/admin/carousel">
-        <strong>Plan a campaign</strong>
-        <span>Update homepage slides and their order.</span>
-    </a>
-    <a href="/admin/attributes">
-        <strong>Manage product options</strong>
-        <span>Maintain reusable color, storage and warranty values.</span>
-    </a>
-</section>
 
 @code
 {
     private int productCount, pending, lowStock;
-    private decimal revenue;
+    private SalesSummary? sales;
     private List<Order> orders = [];
     private List<InventoryItem> lowItems = [];
 
     protected override async Task OnInitializedAsync()
     {
-        var local = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(6));
-        var start = new DateTimeOffset(local.Year, local.Month, 1, 0, 0, 0, local.Offset).ToUniversalTime();
+        sales = await Metrics.GetSummaryAsync();
         productCount = await Db.Products.CountAsync(p => !p.IsDeleted);
         pending = await Db.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
-        revenue = await Db.Orders.Where(o => o.Status == OrderStatus.Delivered && o.UpdatedAt >= start)
-            .SumAsync(o => (decimal?)o.Total) ?? 0;
         var low = Db.InventoryItems.AsNoTracking()
             .Where(i => i.QuantityOnHand - i.QuantityReserved <= 5
             && i.ProductVariant!.IsActive
@@ -128,6 +266,10 @@
             .OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
             .Take(6)
             .ToListAsync();
-        orders = await Db.Orders.AsNoTracking().OrderByDescending(o => o.CreatedAt).Take(8).ToListAsync();
+        orders = await Db.Orders.AsNoTracking()
+            .Include(o => o.DeliveryAddress)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(8)
+            .ToListAsync();
     }
 }

@@ -1,55 +1,78 @@
 @page "/admin/carousel"
 @inject AppDbContext Db
 
-<AdminPageHeader
-    Title="Homepage carousel"
-    Description="Manage homepage campaigns and their display order."
-    ActionHref="/admin/carousel/new"
-    ActionText="+ Add slide"
-/>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Preview</th>
-                <th>Slide</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var s in slides)
-            {
+<PageTitle>Homepage Carousel · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">MARKETING & MERCHANDISING</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Homepage Carousel</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage promotional banners, hero slide graphics, target links, and order.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/carousel/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Slide
+        </a>
+    </div>
+</div>
+
+<!-- Slides Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        <img src="@s.ImageUrl" alt="@s.ImageAlt" class="admin-thumbnail" loading="lazy" />
-                    </td>
-                    <td>
-                        <strong>@(s.Title ?? s.ImageAlt)</strong>
-                        <small class="cell-secondary">@s.LinkUrl</small>
-                    </td>
-                    <td>
-                        <span class="status-badge">@(s.IsActive ? "Published" : "Hidden")</span>
-                    </td>
-                    <td>
-                        <a href="/admin/carousel/@s.Id/edit">Edit slide</a>
-                    </td>
+                    <th>Slide Preview</th>
+                    <th>Banner Title &amp; Target</th>
+                    <th>Publish Status</th>
+                    <th class="text-right">Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var s in slides)
+                {
+                    <tr>
+                        <td class="w-32">
+                            <img src="@s.ImageUrl" alt="@s.ImageAlt" class="h-14 w-28 object-cover rounded-lg border border-slate-200" loading="lazy" />
+                        </td>
+                        <td>
+                            <strong class="text-slate-900 block font-semibold">@(s.Title ?? s.ImageAlt)</strong>
+                            <span class="text-xs text-blue-600 hover:underline font-mono">@s.LinkUrl</span>
+                        </td>
+                        <td>
+                            <span class="badge @(s.IsActive ? "badge-emerald" : "badge-slate")">
+                                @(s.IsActive ? "Published Live" : "Hidden")
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <a href="/admin/carousel/@s.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit Slide
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (slides.Count == 0)
     {
-        <p class="admin-empty">No slides yet. Add a homepage campaign.</p>
+        <div class="empty-state py-12">
+            <Icon Name="camera" Class="size-10 text-slate-300" />
+            <p>No homepage slides created yet. Add a campaign banner.</p>
+        </div>
     }
 </div>
+
 @if (slides.Count > 1)
 {
-    <div class="shop-panel mt-6">
+    <div class="mt-8 rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs">
         <OrderEditor
             Kind="OrderableKind.Carousel"
             Items="@slides.Select(s => new OrderableItemDto(s.Id, s.Title ?? s.ImageAlt)).ToList()"
-            Title="Carousel display order"
+            Title="Carousel Slide Display Order"
         />
     </div>
 }

@@ -1,57 +1,103 @@
 @page "/admin/inventory"
 @inject AppDbContext Db
 
-<AdminPageHeader
-    Title="Inventory"
-    Description="Track physical stock, reserved orders and units available to sell."
-/>
-<form method="get" data-enhance class="admin-toolbar">
-    <input name="q" value="@Query" class="shop-input" placeholder="Product name or SKU" />
-    <label class="check-label">
-        <input type="checkbox" name="low" value="true" checked="@(Low)" />
-        Low stock (≤ 5)
-    </label>
-    <button class="shop-button-secondary">Filter</button>
-    <a href="/admin/inventory">Clear</a>
-</form>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Product / SKU</th>
-                <th>On hand</th>
-                <th>Reserved</th>
-                <th>Available</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var row in rows)
-            {
+<PageTitle>Inventory & Stock · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">STOCK & LOGISTICS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Inventory Management</h1>
+        <p class="text-sm text-slate-500 mt-1">Track physical stock on hand, customer reservations, and available units.</p>
+    </div>
+</div>
+
+<!-- Filter Toolbar -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+            <input name="q" value="@Query" class="field pr-9" placeholder="Search by SKU or product name..." />
+            <span class="absolute right-3 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700 font-medium cursor-pointer">
+            <input type="checkbox" name="low" value="true" checked="@(Low)" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <span>Low Stock (≤ 5 units)</span>
+        </label>
+        <button type="submit" class="btn-primary">Filter</button>
+        @if (!string.IsNullOrWhiteSpace(Query) || Low)
+        {
+            <a href="/admin/inventory" class="btn-secondary">Clear</a>
+        }
+    </form>
+</div>
+
+<!-- Inventory Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        <strong>@row.ProductName</strong>
-                        <small class="cell-secondary">@row.Sku</small>
-                    </td>
-                    <td>@row.OnHand</td>
-                    <td>@row.Reserved</td>
-                    <td>
-                        <span class="status-badge @(row.OnHand - row.Reserved <= 5 ? "status-warning" : "")">@(row.OnHand - row.Reserved)</span>
-                    </td>
-                    <td class="row-actions">
-                        <a href="/admin/inventory/@row.Id/edit">Adjust stock & history</a>
-                        <a href="/admin/products/@row.ProductId/variants/@row.Id/edit">Edit variant</a>
-                    </td>
+                    <th>Product / Description</th>
+                    <th>SKU Code</th>
+                    <th class="text-center">On Hand</th>
+                    <th class="text-center">Reserved</th>
+                    <th class="text-center">Available to Sell</th>
+                    <th class="text-right">Selling Price</th>
+                    <th class="text-right">Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    var available = row.OnHand - row.Reserved;
+                    <tr>
+                        <td>
+                            <strong class="text-slate-900 block font-semibold">@row.ProductName</strong>
+                        </td>
+                        <td class="font-mono text-xs text-slate-600">
+                            @row.Sku
+                        </td>
+                        <td class="text-center font-medium text-slate-700">
+                            @row.OnHand
+                        </td>
+                        <td class="text-center text-xs font-semibold text-amber-700">
+                            @(row.Reserved > 0 ? $"{row.Reserved}" : "-")
+                        </td>
+                        <td class="text-center">
+                            <span class="badge @(available <= 2 ? "badge-rose" : available <= 5 ? "badge-amber" : "badge-emerald")">
+                                @available units
+                            </span>
+                        </td>
+                        <td class="text-right font-medium text-slate-900 tabular-nums">
+                            ৳@row.Price.ToString("N0")
+                        </td>
+                        <td class="text-right whitespace-nowrap space-x-2">
+                            <a href="/admin/inventory/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Adjust Stock
+                            </a>
+                            <a href="/admin/products/@row.ProductId/variants/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit Variant
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (rows.Count == 0)
     {
-        <p class="admin-empty">No matching inventory.</p>
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No inventory items match the current filters.</p>
+        </div>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
 
 @code
 {

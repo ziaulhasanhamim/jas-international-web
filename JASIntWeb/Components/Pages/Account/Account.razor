@@ -2,38 +2,363 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject AppDbContext Db
 @inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider Auth
+@inject UserManager<User> Users
+@inject SignInManager<User> SignIn
+@inject NavigationManager Nav
 
-<div class="shop-container">
-    <h1 class="text-3xl font-semibold">Your account</h1>
-    <div class="shop-panel mt-6">
-        <p>@email</p>
-        <a href="/account/logout" class="shop-button-secondary mt-5">Sign out</a>
+<PageTitle>Customer Account Portal · JAS International</PageTitle>
+
+<div class="shop-container py-10 max-w-5xl mx-auto">
+    <!-- Customer Header Profile Bar -->
+    <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <span class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-xl font-bold text-white shadow-xs">
+                    @(customerName?.FirstOrDefault().ToString().ToUpperInvariant() ?? email?.FirstOrDefault().ToString().ToUpperInvariant() ?? "U")
+                </span>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900">
+                        @(customerName ?? "Customer Account")
+                    </h1>
+                    <p class="text-xs text-slate-500 font-mono mt-0.5">@email</p>
+                    @if (!string.IsNullOrWhiteSpace(phoneNumber))
+                    {
+                        <p class="text-xs text-slate-500 mt-0.5">@phoneNumber</p>
+                    }
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <a href="/account/logout" class="btn-secondary !px-4 !py-2 text-xs">
+                    <Icon Name="logout" Class="size-3.5" />
+                    Sign Out
+                </a>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="mt-8 flex items-center gap-2 border-b border-slate-100 pb-px overflow-x-auto text-xs font-semibold scrollbar-none">
+            <a href="/account" class="px-4 py-2.5 rounded-xl transition @(tab == "orders" ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                My Orders (@orders.Count)
+            </a>
+            <a href="/account?tab=profile" class="px-4 py-2.5 rounded-xl transition @(tab == "profile" ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                Profile &amp; Delivery Address
+            </a>
+            <a href="/account?tab=security" class="px-4 py-2.5 rounded-xl transition @(tab == "security" ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                Security &amp; Password
+            </a>
+        </div>
     </div>
-    <h2 class="mb-4 mt-8 text-xl font-semibold">Your orders</h2>
-    @foreach (var order in orders)
+
+    @if (flashMessage != null)
     {
-        <a class="shop-panel mb-3 block" href="/order/@order.PublicToken">#@order.Id · @order.CreatedAt.ToString("dd MMM yyyy") · @order.Status · ৳@order.Total.ToString("N0")</a>
+        <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-medium text-emerald-800 flex items-center gap-2" role="status">
+            <Icon Name="check" Class="size-4 text-emerald-600 shrink-0" />
+            <span>@flashMessage</span>
+        </div>
     }
-    @if (orders.Count == 0)
+
+    @if (tab == "orders")
     {
-        <p>No orders yet.</p>
+        <!-- Orders Tab -->
+        @if (orders.Count == 0)
+        {
+            <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
+                <Icon Name="cart" Class="size-12 text-slate-300 mx-auto mb-3" />
+                <h3 class="font-bold text-slate-900 text-lg mb-1">No Orders Yet</h3>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto mb-6">
+                    You haven't placed any orders with this account yet. Discover our catalog of genuine gadgets and electronics.
+                </p>
+                <a href="/products" class="btn-primary text-xs">
+                    Start Shopping
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="space-y-4">
+                @foreach (var o in orders)
+                {
+                    <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
+                            <div>
+                                <div class="flex items-center gap-2.5">
+                                    <span class="font-bold text-slate-900 text-base">Order #@o.Id</span>
+                                    @switch (o.Status)
+                                    {
+                                        case OrderStatus.Pending:
+                                            <span class="badge badge-amber text-[10px]">Pending Review</span>
+                                            break;
+                                        case OrderStatus.Processing:
+                                            <span class="badge badge-blue text-[10px]">Processing</span>
+                                            break;
+                                        case OrderStatus.InTransit:
+                                            <span class="badge badge-purple text-[10px]">In Delivery</span>
+                                            break;
+                                        case OrderStatus.Delivered:
+                                            <span class="badge badge-emerald text-[10px]">Delivered</span>
+                                            break;
+                                        case OrderStatus.Cancelled:
+                                            <span class="badge badge-rose text-[10px]">Cancelled</span>
+                                            break;
+                                        default:
+                                            <span class="badge badge-slate text-[10px]">@o.Status</span>
+                                            break;
+                                    }
+                                </div>
+                                <span class="text-xs text-slate-400 mt-0.5 block">
+                                    Placed on @o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <span class="font-bold text-slate-900 text-lg tabular-nums">৳@o.Total.ToString("N0")</span>
+                                <a href="/track?orderId=@o.Id&phone=@(o.DeliveryAddress?.PhoneNumber ?? phoneNumber ?? "")" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                    <Icon Name="truck" Class="size-3.5 text-blue-600" />
+                                    Track
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Items list in order -->
+                        <div class="space-y-2 text-xs">
+                            @foreach (var item in o.Items)
+                            {
+                                <div class="flex items-center justify-between py-1 text-slate-700">
+                                    <span>
+                                        <strong>@item.ProductName</strong>
+                                        <span class="text-slate-400 ml-1">(@item.VariantName) × @item.Quantity</span>
+                                    </span>
+                                    <span class="font-semibold text-slate-900 tabular-nums">৳@item.LineTotal.ToString("N0")</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500">
+                            <span>Delivery to: <strong>@(o.DeliveryAddress?.CustomerName ?? customerName ?? "You")</strong>, @(o.DeliveryAddress?.FullAddress ?? "") (@(o.DeliveryAddress?.City ?? ""))</span>
+                            <span>Payment: <strong>Cash on Delivery (COD)</strong></span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else if (tab == "profile")
+    {
+        <!-- Profile & Saved Address Tab -->
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs max-w-2xl">
+            <h2 class="text-lg font-bold text-slate-900 mb-1">Personal Details &amp; Default Delivery Address</h2>
+            <p class="text-xs text-slate-500 mb-6">These details will automatically pre-fill during checkout for quick ordering.</p>
+
+            <EditForm Model="FormProfile" OnValidSubmit="SaveProfile" FormName="customer-profile" method="post" Enhance class="space-y-4">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="field-label">Full Name</label>
+                        <InputText @bind-Value="FormProfile.FullName" class="field" placeholder="e.g. Tanvir Hasan" />
+                    </div>
+                    <div>
+                        <label class="field-label">Contact Phone</label>
+                        <InputText @bind-Value="FormProfile.PhoneNumber" type="tel" class="field" placeholder="017xxxxxxxx" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="field-label">Street / House Address</label>
+                    <InputText @bind-Value="FormProfile.StreetAddress" class="field" placeholder="e.g. House 14, Road 3, Sonadanga R/A" />
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="field-label">City / Thana</label>
+                        <InputText @bind-Value="FormProfile.City" class="field" placeholder="e.g. Khulna" />
+                    </div>
+                    <div>
+                        <label class="field-label">District</label>
+                        <InputText @bind-Value="FormProfile.District" class="field" placeholder="e.g. Khulna" />
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn-primary">
+                        Save Profile Details
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    }
+    else if (tab == "security")
+    {
+        <!-- Security & Password Tab -->
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs max-w-lg">
+            <h2 class="text-lg font-bold text-slate-900 mb-1">Update Security Password</h2>
+            <p class="text-xs text-slate-500 mb-6">Ensure your account uses a secure password of at least 8 characters.</p>
+
+            @if (passwordError != null)
+            {
+                <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700" role="alert">
+                    @passwordError
+                </div>
+            }
+
+            <EditForm Model="FormPassword" OnValidSubmit="ChangePassword" FormName="change-password" method="post" Enhance class="space-y-4">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                <div>
+                    <label class="field-label">Current Password</label>
+                    <InputText @bind-Value="FormPassword.CurrentPassword" type="password" class="field" placeholder="••••••••" />
+                </div>
+
+                <div>
+                    <label class="field-label">New Password</label>
+                    <InputText @bind-Value="FormPassword.NewPassword" type="password" class="field" placeholder="At least 8 characters" />
+                </div>
+
+                <div>
+                    <label class="field-label">Confirm New Password</label>
+                    <InputText @bind-Value="FormPassword.ConfirmNewPassword" type="password" class="field" placeholder="Re-type new password" />
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn-primary">
+                        Update Password
+                    </button>
+                </div>
+            </EditForm>
+        </div>
     }
 </div>
 
 @code
 {
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? TabQuery { get; set; }
+
+    [SupplyParameterFromForm(FormName = "customer-profile")]
+    private ProfileEditForm? profileForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "change-password")]
+    private ChangePasswordForm? passwordForm { get; set; }
+
+    private ProfileEditForm FormProfile => profileForm ??= new();
+    private ChangePasswordForm FormPassword => passwordForm ??= new();
+
+    private string tab => TabQuery ?? "orders";
     private string? email;
+    private string? customerName;
+    private string? phoneNumber;
+    private string? flashMessage;
+    private string? passwordError;
     private List<Order> orders = [];
+    private User? currentUser;
 
     protected override async Task OnInitializedAsync()
     {
-        var user = (await Auth.GetAuthenticationStateAsync()).User;
-        email = user.Identity?.Name;
-        var id = JASIntWeb.Services.ShoppingService.UserId(user);
-        orders = await Db.Orders.AsNoTracking()
-            .Where(o => o.UserId == id)
-            .OrderByDescending(o => o.CreatedAt)
-            .Take(100)
-            .ToListAsync();
+        profileForm ??= new();
+        passwordForm ??= new();
+        var authState = await Auth.GetAuthenticationStateAsync();
+        var userClaims = authState.User;
+        email = userClaims.Identity?.Name;
+        currentUser = await Users.GetUserAsync(userClaims);
+
+        if (currentUser is not null)
+        {
+            phoneNumber = currentUser.PhoneNumber;
+            var claims = await Users.GetClaimsAsync(currentUser);
+            customerName = claims.FirstOrDefault(c => c.Type == "name")?.Value ?? currentUser.UserName;
+
+            var defaultAddress = await Db.DeliveryAddresses.FirstOrDefaultAsync(d => d.CustomerId == currentUser.Id);
+            if (defaultAddress is not null)
+            {
+                customerName ??= defaultAddress.CustomerName;
+                phoneNumber ??= defaultAddress.PhoneNumber;
+                profileForm.FullName = defaultAddress.CustomerName;
+                profileForm.PhoneNumber = defaultAddress.PhoneNumber;
+                profileForm.StreetAddress = defaultAddress.FullAddress;
+                profileForm.District = defaultAddress.District;
+                profileForm.City = defaultAddress.City;
+            }
+            else
+            {
+                profileForm.FullName = customerName ?? "";
+                profileForm.PhoneNumber = phoneNumber ?? "";
+            }
+
+            orders = await Db.Orders.AsNoTracking()
+                .Include(o => o.Items)
+                .Include(o => o.DeliveryAddress)
+                .Where(o => o.UserId == currentUser.Id)
+                .OrderByDescending(o => o.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (currentUser is null) return;
+
+        currentUser.PhoneNumber = FormProfile.PhoneNumber.Trim();
+        await Users.UpdateAsync(currentUser);
+
+        var existingClaims = await Users.GetClaimsAsync(currentUser);
+        var nameClaim = existingClaims.FirstOrDefault(c => c.Type == "name");
+        if (nameClaim is not null)
+        {
+            await Users.ReplaceClaimAsync(currentUser, nameClaim, new System.Security.Claims.Claim("name", FormProfile.FullName.Trim()));
+        }
+        else
+        {
+            await Users.AddClaimAsync(currentUser, new System.Security.Claims.Claim("name", FormProfile.FullName.Trim()));
+        }
+
+        var defaultAddress = await Db.DeliveryAddresses.FirstOrDefaultAsync(d => d.CustomerId == currentUser.Id);
+        if (defaultAddress is null)
+        {
+            defaultAddress = new DeliveryAddress
+            {
+                CustomerId = currentUser.Id,
+                CustomerName = FormProfile.FullName.Trim(),
+                PhoneNumber = FormProfile.PhoneNumber.Trim(),
+                FullAddress = FormProfile.StreetAddress.Trim(),
+                District = FormProfile.District.Trim(),
+                City = FormProfile.City.Trim()
+            };
+            Db.DeliveryAddresses.Add(defaultAddress);
+        }
+        else
+        {
+            defaultAddress.CustomerName = FormProfile.FullName.Trim();
+            defaultAddress.PhoneNumber = FormProfile.PhoneNumber.Trim();
+            defaultAddress.FullAddress = FormProfile.StreetAddress.Trim();
+            defaultAddress.District = FormProfile.District.Trim();
+            defaultAddress.City = FormProfile.City.Trim();
+        }
+
+        await Db.SaveChangesAsync();
+        customerName = FormProfile.FullName;
+        phoneNumber = FormProfile.PhoneNumber;
+        flashMessage = "Your profile and default delivery address have been updated successfully.";
+    }
+
+    private async Task ChangePassword()
+    {
+        if (currentUser is null) return;
+        passwordError = null;
+
+        var result = await Users.ChangePasswordAsync(currentUser, FormPassword.CurrentPassword, FormPassword.NewPassword);
+        if (result.Succeeded)
+        {
+            await SignIn.RefreshSignInAsync(currentUser);
+            flashMessage = "Your password was successfully changed.";
+            passwordForm = new();
+        }
+        else
+        {
+            passwordError = string.Join(" ", result.Errors.Select(e => e.Description));
+        }
     }
 }

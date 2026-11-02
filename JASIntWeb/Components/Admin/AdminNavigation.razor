@@ -1,37 +1,34 @@
-<nav class="admin-navigation" aria-label="Administration">
-    <p>Overview</p>
-    <NavLink href="/admin" Match="NavLinkMatch.All">
-        <span>◈</span>
+<nav aria-label="Main admin navigation" class="flex flex-col gap-1 px-3 py-4">
+    <NavLink href="/admin" Match="NavLinkMatch.All" class="nav-link">
+        <Icon Name="dashboard" Class="size-4" />
         Dashboard
     </NavLink>
-    <p>Commerce</p>
-    <NavLink href="/admin/orders">
-        <span>▤</span>
-        Orders
+    <NavLink href="/admin/analytics" class="nav-link">
+        <Icon Name="history" Class="size-4" />
+        Sales &amp; Analytics
     </NavLink>
-    <NavLink href="/admin/products">
-        <span>▦</span>
-        Products
-    </NavLink>
-    <NavLink href="/admin/inventory">
-        <span>▣</span>
-        Inventory
-    </NavLink>
-    <NavLink href="/admin/users">
-        <span>◎</span>
-        Customers & access
-    </NavLink>
-    <p>Catalog & content</p>
-    <NavLink href="/admin/categories">
-        <span>▧</span>
-        Categories
-    </NavLink>
-    <NavLink href="/admin/attributes">
-        <span>≡</span>
-        Attribute library
-    </NavLink>
-    <NavLink href="/admin/carousel">
-        <span>▱</span>
-        Homepage carousel
-    </NavLink>
+
+    <SidebarGroup Title="Orders & Commerce" IconName="cart" Prefix="/admin/orders">
+        <NavLink href="/admin/orders" Match="NavLinkMatch.All">All Orders</NavLink>
+        <NavLink href="/admin/orders?status=Pending">Pending Review</NavLink>
+        <NavLink href="/admin/orders?status=Confirmed">Confirmed</NavLink>
+        <NavLink href="/admin/orders?status=Shipped">In Delivery</NavLink>
+    </SidebarGroup>
+
+    <SidebarGroup Title="Products & Catalog" IconName="box" Prefix="/admin/products" AlternatePrefix="/admin/inventory">
+        <NavLink href="/admin/products" Match="NavLinkMatch.All">All Products</NavLink>
+        <NavLink href="/admin/products/new">Add Product</NavLink>
+        <NavLink href="/admin/inventory">Stock Inventory</NavLink>
+        <NavLink href="/admin/categories">Categories</NavLink>
+        <NavLink href="/admin/attributes">Attribute Library</NavLink>
+    </SidebarGroup>
+
+    <SidebarGroup Title="Storefront Content" IconName="camera" Prefix="/admin/carousel">
+        <NavLink href="/admin/carousel" Match="NavLinkMatch.All">Hero Carousel</NavLink>
+    </SidebarGroup>
+
+    <SidebarGroup Title="Customers & Access" IconName="users" Prefix="/admin/users">
+        <NavLink href="/admin/users" Match="NavLinkMatch.All">Customer Accounts</NavLink>
+        <NavLink href="/admin/users/create">Add Account</NavLink>
+    </SidebarGroup>
 </nav>

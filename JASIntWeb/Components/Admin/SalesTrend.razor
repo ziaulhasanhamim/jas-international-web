@@ -1,0 +1,45 @@
+@using System.Globalization
+@using JASIntWeb.Services
+
+@if (Rows.Count > 0)
+{
+    <figure class="sales-trend">
+        <figcaption class="admin-section-heading">
+            <div>
+                <h2>@(Monthly ? "Monthly" : "Daily") sales &amp; gross profit</h2>
+                <p>BDT · @Period.DateLabel · Delivered orders</p>
+                @if (Monthly) { <p>Monthly totals within this range; boundary months may be partial.</p> }
+            </div>
+            <div class="sales-legend"><span>Product sales</span><span>Gross profit</span></div>
+        </figcaption>
+        <div class="sales-chart-plot">
+        <div class="sales-chart-scale"><span>৳@Maximum.ToString("N0")</span><span>Amount (BDT)</span><span>৳@Minimum.ToString("N0")</span></div>
+        <svg class="sales-chart" viewBox="0 0 800 220" role="img" aria-label="@($"{(Monthly ? "Monthly" : "Daily")} product sales and gross profit in BDT from {Period.DateLabel}. Exact values are in the trend table below.")">
+            <line x1="15" x2="785" y1="@Y(0)" y2="@Y(0)" class="sales-chart-zero" />
+            <polyline points="@Points(false)" class="sales-chart-sales" />
+            <polyline points="@Points(true)" class="sales-chart-profit" />
+            @foreach (var pair in Rows.Select((row, index) => (row, index)))
+            {
+                <circle cx="@X(pair.index)" cy="@Y(pair.row.Totals.Sales)" r="3" class="sales-chart-sales-dot">
+                    <title>@pair.row.Date.ToString(Monthly ? "MMM yyyy" : "dd MMM yyyy"): Sales ৳@pair.row.Totals.Sales.ToString("N2")</title>
+                </circle>
+                <circle cx="@X(pair.index)" cy="@Y(pair.row.Totals.Profit)" r="3" class="sales-chart-profit-dot">
+                    <title>@pair.row.Date.ToString(Monthly ? "MMM yyyy" : "dd MMM yyyy"): Gross profit ৳@pair.row.Totals.Profit.ToString("N2")</title>
+                </circle>
+            }
+        </svg>
+        </div>
+        <div class="sales-chart-dates"><span>@Rows[0].Date.ToString(Monthly ? "MMM yyyy" : "dd MMM")</span><span>Date · Bangladesh time</span><span>@Rows[^1].Date.ToString(Monthly ? "MMM yyyy" : "dd MMM")</span></div>
+    </figure>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SalesBucket> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public SalesPeriod Period { get; set; } = null!;
+    [Parameter] public bool Monthly { get; set; }
+    private decimal Maximum => Math.Max(1, Rows.Max(r => Math.Max(r.Totals.Sales, r.Totals.Profit)));
+    private decimal Minimum => Math.Min(0, Rows.Min(r => Math.Min(r.Totals.Sales, r.Totals.Profit)));
+    private string X(int index) => (Rows.Count == 1 ? 400m : 15m + 770m * index / (Rows.Count - 1)).ToString("0.##", CultureInfo.InvariantCulture);
+    private string Y(decimal value) => (200m - (value - Minimum) / (Maximum - Minimum) * 180m).ToString("0.##", CultureInfo.InvariantCulture);
+    private string Points(bool profit) => string.Join(" ", Rows.Select((r, i) => $"{X(i)},{Y(profit ? r.Totals.Profit : r.Totals.Sales)}"));
+}

@@ -1,55 +1,101 @@
 @page "/admin/categories"
 @inject AppDbContext Db
 
-<AdminPageHeader
-    Title="Categories"
-    Description="Organize the catalog into parent categories and subcategories."
-    ActionHref="/admin/categories/new"
-    ActionText="+ Add category"
-/>
-<form method="get" data-enhance class="admin-toolbar">
-    <input name="q" value="@Query" class="shop-input" placeholder="Search categories" />
-    <button class="shop-button-secondary">Search</button>
-</form>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Category</th>
-                <th>Parent</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var c in categories)
-            {
+<PageTitle>Categories · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">CATALOG TAXONOMY</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Categories</h1>
+        <p class="text-sm text-slate-500 mt-1">Organize the catalog hierarchy into parent categories and subcategories.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/categories/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Category
+        </a>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+            <input name="q" value="@Query" class="field pr-9" placeholder="Search categories..." />
+            <span class="absolute right-3 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+        </div>
+        <button type="submit" class="btn-primary">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Query))
+        {
+            <a href="/admin/categories" class="btn-secondary">Clear</a>
+        }
+    </form>
+</div>
+
+<!-- Categories Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        <strong>@c.Name</strong>
-                        <small class="cell-secondary">@c.Slug</small>
-                    </td>
-                    <td>@(c.ParentCategory?.Name ?? "Top level")</td>
-                    <td>
-                        <span class="status-badge">@(c.IsDeleted ? "Hidden" : "Visible")</span>
-                    </td>
-                    <td>
-                        <a href="/admin/categories/@c.Id/edit">Edit category</a>
-                    </td>
+                    <th>Category Name</th>
+                    <th>URL Slug</th>
+                    <th>Parent Level</th>
+                    <th>Visibility</th>
+                    <th class="text-right">Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var c in categories)
+                {
+                    <tr>
+                        <td>
+                            <strong class="text-slate-900 block font-semibold">@c.Name</strong>
+                        </td>
+                        <td class="font-mono text-xs text-slate-600">
+                            /@c.Slug
+                        </td>
+                        <td class="text-xs">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                                @(c.ParentCategory?.Name ?? "Top level (Root)")
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(c.IsDeleted ? "badge-rose" : "badge-emerald")">
+                                @(c.IsDeleted ? "Hidden" : "Active")
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <a href="/admin/categories/@c.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit Category
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (categories.Count == 0)
     {
-        <p class="admin-empty">No categories found.</p>
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No categories found.</p>
+        </div>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
+
 @if (featured.Count > 0)
 {
-    <div class="shop-panel mt-6">
-        <OrderEditor Kind="OrderableKind.FeaturedCategories" Items="featured" Title="Homepage category order" />
+    <div class="mt-8 rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs">
+        <OrderEditor Kind="OrderableKind.FeaturedCategories" Items="featured" Title="Homepage Featured Category Order" />
     </div>
 }
 

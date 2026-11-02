@@ -1,45 +1,74 @@
 @page "/admin/attributes"
 @inject AppDbContext Db
 
-<AdminPageHeader
-    Title="Attribute library"
-    Description="Reusable attribute names and values. Assign allowed values and display order separately for each product."
-    ActionHref="/admin/attributes/new"
-    ActionText="+ Add attribute"
-/>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Attribute</th>
-                <th>Code</th>
-                <th>Unit</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var a in attributes)
-            {
+<PageTitle>Attribute Library · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">PRODUCT SPECIFICATIONS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Attribute Library</h1>
+        <p class="text-sm text-slate-500 mt-1">Reusable attributes (e.g. Color, Storage, Warranty) and allowable values across products.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/attributes/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Attribute
+        </a>
+    </div>
+</div>
+
+<!-- Attributes Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        <strong>@a.Name</strong>
-                    </td>
-                    <td>@a.Code</td>
-                    <td>@(a.Unit ?? "—")</td>
-                    <td class="row-actions">
-                        <a href="/admin/attributes/@a.Id/edit">Edit</a>
-                        <a href="/admin/attributes/@a.Id/options">Manage values</a>
-                    </td>
+                    <th>Attribute Name</th>
+                    <th>Identifier Code</th>
+                    <th>Measurement Unit</th>
+                    <th class="text-right">Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var a in attributes)
+                {
+                    <tr>
+                        <td>
+                            <strong class="text-slate-900 block font-semibold">@a.Name</strong>
+                        </td>
+                        <td class="font-mono text-xs text-slate-600">
+                            @a.Code
+                        </td>
+                        <td class="text-slate-600 text-xs">
+                            @(a.Unit ?? "—")
+                        </td>
+                        <td class="text-right whitespace-nowrap space-x-2">
+                            <a href="/admin/attributes/@a.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit
+                            </a>
+                            <a href="/admin/attributes/@a.Id/options" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Manage Options
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (attributes.Count == 0)
     {
-        <p class="admin-empty">Add your first attribute, such as Color or Storage.</p>
+        <div class="empty-state py-12">
+            <Icon Name="tag" Class="size-10 text-slate-300" />
+            <p>No attributes configured yet. Add Color, Storage, or Warranty.</p>
+        </div>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
 
 @code
 {

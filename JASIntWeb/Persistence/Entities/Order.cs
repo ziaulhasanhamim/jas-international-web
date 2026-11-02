@@ -16,6 +16,7 @@ public class Order : AuditableEntity
     public int? UserId { get; set; }
     public User? User { get; set; }
     public required OrderStatus Status { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
     public required int DeliveryAddressId { get; set; }
     public DeliveryAddress? DeliveryAddress { get; set; }
     public required decimal Subtotal { get; init; }
@@ -34,6 +35,8 @@ public class OrderItem : AuditableEntity
     public required string ProductName { get; init; }
     public required string VariantName { get; init; }
     public decimal UnitPrice { get; init; }
+    public decimal UnitCost { get; init; }
+    public bool CostIsEstimated { get; init; }
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }
 }

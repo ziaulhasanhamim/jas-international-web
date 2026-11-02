@@ -1,0 +1,25 @@
+@using JASIntWeb.Services
+
+<div class="sales-record">
+    <span>@Title</span>
+    @if (Record is null)
+    {
+        <strong>No delivered sales yet</strong>
+    }
+    else
+    {
+        <strong>@Record.Label</strong>
+        <p class="@(Profit && Record.Totals.Profit < 0 ? "sales-loss" : null)">৳@((Profit ? Record.Totals.Profit : Record.Totals.Sales).ToString("N2"))</p>
+        <small>@Record.Totals.Orders.ToString("N0") orders · @Record.Totals.Units.ToString("N0") units</small>
+        @if (Profit && Record.Totals.EstimatedUnits > 0)
+        {
+            <small>Includes estimated costs</small>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public SalesRecord? Record { get; set; }
+    [Parameter] public bool Profit { get; set; }
+}

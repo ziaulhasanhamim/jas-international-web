@@ -1,57 +1,103 @@
 @page "/admin/products"
 @inject AppDbContext Db
 
-<PageTitle>Products — JAS Admin</PageTitle>
-<AdminPageHeader
-    Title="Products"
-    Description="Manage your catalog, product options and variants."
-    ActionHref="/admin/products/new"
-    ActionText="+ Add product"
-/>
-<form method="get" data-enhance class="admin-toolbar">
-    <input name="q" value="@Query" class="shop-input" placeholder="Search product name or SKU" />
-    <button class="shop-button-secondary">Search</button>
-    <a href="/admin/products">Clear</a>
-</form>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Variants</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var p in products)
-            {
+<PageTitle>Products Management · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">CATALOG MANAGEMENT</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Products Catalog</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage catalog listings, attributes, pricing, and variants.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/products/new" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Product
+        </a>
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+            <input name="q" value="@Query" placeholder="Search by product name, model, or SKU..." class="field pr-9" />
+            <span class="absolute right-3 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+        </div>
+        <button type="submit" class="btn-primary">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Query))
+        {
+            <a href="/admin/products" class="btn-secondary">Clear</a>
+        }
+    </form>
+</div>
+
+<!-- Products Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        <strong>@p.Name</strong>
-                        <small class="cell-secondary">@p.Slug</small>
-                    </td>
-                    <td>@p.Category</td>
-                    <td>@p.VariantCount</td>
-                    <td>
-                        <span class="status-badge">@(p.Hidden ? "Hidden" : "Visible")</span>
-                    </td>
-                    <td class="row-actions">
-                        <a href="/admin/products/@p.Id/edit">Edit</a>
-                        <a href="/admin/products/@p.Id/variants">Variants & stock</a>
-                        <a href="/product/@p.Slug" target="_blank" rel="noopener">View ↗</a>
-                    </td>
+                    <th>Product Name & Slug</th>
+                    <th>Category</th>
+                    <th class="text-center">Active Variants</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var p in products)
+                {
+                    <tr>
+                        <td>
+                            <strong class="text-slate-900 block font-semibold">@p.Name</strong>
+                            <span class="text-xs text-slate-400 font-mono">/@p.Slug</span>
+                        </td>
+                        <td class="text-slate-700 font-medium">
+                            @p.Category
+                        </td>
+                        <td class="text-center">
+                            <span class="inline-flex size-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                                @p.VariantCount
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(p.Hidden ? "badge-rose" : "badge-emerald")">
+                                @(p.Hidden ? "Archived" : "Published")
+                            </span>
+                        </td>
+                        <td class="text-right whitespace-nowrap space-x-2">
+                            <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit
+                            </a>
+                            <a href="/admin/products/@p.Id/variants" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Variants
+                            </a>
+                            <a href="/product/@p.Slug" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 text-xs font-medium inline-flex items-center gap-1">
+                                Storefront <Icon Name="arrow" Class="size-3 rotate-[-45deg]" />
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (products.Count == 0)
     {
-        <p class="admin-empty">No products match your search.</p>
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No products match your search query.</p>
+        </div>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
 
 @code
 {

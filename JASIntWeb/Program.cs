@@ -1,20 +1,19 @@
 using JASIntWeb.Client.Services;
 using JASIntWeb.Components;
 using JASIntWeb.Client.Contracts;
-using JASIntWeb.Controllers;
+using JASIntWeb.Endpoints;
 using JASIntWeb.Services;
 using Microsoft.AspNetCore.Identity;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
 builder.AddStoreHosting();
-builder.Services.AddControllers().ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = context =>
-    new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(new ApiErrorDto("Review the submitted values and try again.", "validation")));
-builder.Services.AddScoped<CartRequestFilter>();
+builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<SalesMetricsService>();
 builder.Services.AddScoped<AdminSession>();
 builder.Services.AddScoped<AccountMailService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents().AddInteractiveWebAssemblyComponents()
@@ -55,6 +54,7 @@ builder.Services.ConfigureApplicationCookie(o =>
             return Task.CompletedTask;
         };
     });
+
 builder.Services.AddIdentityCore<User>(o =>
     {
         o.User.RequireUniqueEmail = true;
@@ -69,6 +69,7 @@ builder.Services.AddIdentityCore<User>(o =>
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+
 builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.Zero);
 builder.Services.AddAuthorizationBuilder().AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
 builder.Services.AddAntiforgery(o => o.HeaderName = "X-CSRF-TOKEN");
@@ -110,9 +111,10 @@ app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<CartRequestMiddleware>();
 app.UseAntiforgery();
 app.MapStaticAssets();
-app.MapControllers();
+app.MapStoreEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(JASIntWeb.Client._Imports).Assembly);
 app.Run();

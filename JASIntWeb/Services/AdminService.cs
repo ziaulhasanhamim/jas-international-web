@@ -520,6 +520,10 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         order.Status = status;
         order.UpdatedAt = DateTimeOffset.UtcNow;
+        if (status == OrderStatus.Delivered)
+        {
+            order.DeliveredAt = order.UpdatedAt;
+        }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
     }

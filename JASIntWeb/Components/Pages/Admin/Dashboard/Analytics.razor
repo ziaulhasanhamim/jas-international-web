@@ -1,0 +1,145 @@
+@page "/admin/analytics"
+@inject SalesMetricsService Metrics
+
+<PageTitle>Sales &amp; profit — JAS Admin</PageTitle>
+<AdminPageHeader Title="Sales &amp; profit" Description="Delivered sales, product performance and historical records. All dates use Bangladesh time." ActionHref="/admin" ActionText="Back to dashboard" />
+
+@if (summary is not null && selected is not null && soldItems is not null)
+{
+    <nav class="sales-periods" aria-label="Sales reporting period">
+        @foreach (var option in summary.Periods)
+        {
+            <a href="@($"/admin/analytics?period={option.Period.Key}")" aria-current="@(option.Period.Key == selected.Period.Key ? "page" : null)">@option.Period.Label</a>
+        }
+    </nav>
+    <div class="sales-context"><h2>@selected.Period.Label</h2><p>@selected.Period.DateLabel</p></div>
+    <div class="dashboard-metrics sales-metrics">
+        <div class="metric-card metric-highlight"><span>Product sales</span><strong>৳@selected.Totals.Sales.ToString("N2")</strong><small>Delivery fees excluded</small></div>
+        <div class="metric-card"><span>Gross profit</span><strong class="@(selected.Totals.Profit < 0 ? "sales-loss" : null)">৳@selected.Totals.Profit.ToString("N2")</strong><small>@selected.Totals.Margin.ToString("N1")% gross margin</small></div>
+        <div class="metric-card"><span>Delivered orders</span><strong>@selected.Totals.Orders.ToString("N0")</strong><small>৳@selected.Totals.AverageOrder.ToString("N2") average product sale</small></div>
+        <div class="metric-card"><span>Units sold</span><strong>@selected.Totals.Units.ToString("N0")</strong><small>Across all delivered items</small></div>
+    </div>
+    <div class="sales-note">
+        <p>Gross profit = product sales − purchase cost. It excludes delivery fees, delivery costs, taxes and operating expenses.</p>
+        <p>Delivery fees: <strong>৳@selected.Totals.DeliveryFees.ToString("N2")</strong> · Revenue including delivery: <strong>৳@selected.Totals.Revenue.ToString("N2")</strong> · Product cost: <strong>৳@selected.Totals.Cost.ToString("N2")</strong></p>
+        @if (summary.Select("all-time").Totals.EstimatedUnits > 0)
+        {
+            <p class="sales-estimate">Historical costs were unavailable for @summary.Select("all-time").Totals.EstimatedUnits.ToString("N0") sold units. Their costs were estimated from variant prices when reporting was added. Those estimates are fixed; affected profit totals and records are labelled. This period includes @selected.Totals.EstimatedUnits.ToString("N0") estimated units.</p>
+        }
+    </div>
+
+    <SalesPeriodSummary Summary="summary" Selected="selected.Period.Key" />
+
+    <section class="shop-panel sales-section">
+        @if (selected.Totals.Orders == 0)
+        {
+            <h2 class="admin-section-title">Sales trend</h2>
+            <p class="admin-empty">No delivered orders in this period. Choose another period to explore sales.</p>
+        }
+        else
+        {
+            <SalesTrend Rows="trend" Period="selected.Period" Monthly="monthlyTrend" />
+            <details class="sales-trend-details">
+                <summary>View exact @(monthlyTrend ? "monthly" : "daily") totals</summary>
+                <div class="admin-table-wrap">
+                    <table class="shop-table sales-table">
+                        <thead><tr><th>@(monthlyTrend ? "Month" : "Day")</th><th>Orders</th><th>Units</th><th>Product sales</th><th>Gross profit</th></tr></thead>
+                        <tbody>
+                            @foreach (var row in trend.OrderByDescending(r => r.Date))
+                            {
+                                <tr><td>@row.Date.ToString(monthlyTrend ? "MMM yyyy" : "dd MMM yyyy")</td><td>@row.Totals.Orders</td><td>@row.Totals.Units</td><td>৳@row.Totals.Sales.ToString("N2")</td><td class="@(row.Totals.Profit < 0 ? "sales-loss" : null)">৳@row.Totals.Profit.ToString("N2") @if (row.Totals.EstimatedUnits > 0) { <span class="cell-secondary">Includes estimated costs</span> }</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
+    </section>
+
+    <section class="shop-panel admin-table-wrap sales-section">
+        <div class="admin-section-heading"><div><h2>Items sold</h2><p>All sold product variants in @selected.Period.Label.ToLowerInvariant(). Totals above include every item, regardless of search or page.</p></div><span class="admin-help">@soldItems.Total.ToString("N0") matching rows</span></div>
+        <form method="get" action="/admin/analytics" data-enhance class="admin-toolbar">
+            <input type="hidden" name="period" value="@selected.Period.Key" />
+            <label class="sales-filter-label">Search items<input name="q" value="@Query" placeholder="Product, variant or SKU" class="shop-input" /></label>
+            <label class="sales-filter-label">Sort by<select name="sort" class="shop-input">
+                <option value="sales" selected="@(Sort == "sales")">Highest sales</option>
+                <option value="profit" selected="@(Sort == "profit")">Highest profit</option>
+                <option value="units" selected="@(Sort == "units")">Most units sold</option>
+                <option value="name" selected="@(Sort == "name")">Product name</option>
+            </select></label>
+            <button class="shop-button-secondary">Apply</button>
+            <a href="@($"/admin/analytics?period={selected.Period.Key}")">Clear</a>
+        </form>
+        <table class="shop-table sales-table">
+            <thead><tr><th>Product / variant</th><th>Units sold</th><th>Product sales</th><th>Purchase cost</th><th>Gross profit</th><th>Margin</th></tr></thead>
+            <tbody>
+                @foreach (var item in soldItems.Items)
+                {
+                    <tr>
+                        <td><strong>@item.Product</strong><span class="cell-secondary">@(string.IsNullOrWhiteSpace(item.Variant) ? "Base variant" : item.Variant) · Variant #@item.VariantId</span></td>
+                        <td>@item.Units.ToString("N0")</td><td>৳@item.Sales.ToString("N2")</td>
+                        <td>৳@item.Cost.ToString("N2") @if (item.EstimatedUnits > 0) { <span class="cell-secondary">@item.EstimatedUnits units with estimated costs</span> }</td>
+                        <td class="@(item.Profit < 0 ? "sales-loss" : null)">৳@item.Profit.ToString("N2")</td><td>@item.Margin.ToString("N1")%</td>
+                    </tr>
+                }
+            </tbody>
+            @if (string.IsNullOrWhiteSpace(Query))
+            {
+                <tfoot><tr><th>Whole period · all pages</th><td>@selected.Totals.Units.ToString("N0")</td><td>৳@selected.Totals.Sales.ToString("N2")</td><td>৳@selected.Totals.Cost.ToString("N2")</td><td>৳@selected.Totals.Profit.ToString("N2")</td><td>@selected.Totals.Margin.ToString("N1")%</td></tr></tfoot>
+            }
+        </table>
+        @if (soldItems.Items.Count == 0)
+        {
+            <p class="admin-empty">@(string.IsNullOrWhiteSpace(Query) ? "No items sold in this period." : "No sold items match your search.")</p>
+        }
+        <div class="admin-pagination">
+            <span>Page @soldItems.Page of @soldItems.Pages · @SoldItemsPage.PageSize rows per page</span>
+            <div>
+                @if (soldItems.Page > 1) { <a class="shop-button-secondary" href="@ItemPage(soldItems.Page - 1)">← Previous</a> }
+                @if (soldItems.Page < soldItems.Pages) { <a class="shop-button-secondary" href="@ItemPage(soldItems.Page + 1)">Next →</a> }
+            </div>
+        </div>
+    </section>
+
+    <section class="shop-panel sales-section">
+        <div class="admin-section-heading"><div><h2>All-time records</h2><p>Highest product sales and gross profit across all delivered-order history. Earliest period wins ties. Current months and years are included.</p></div></div>
+        <div class="sales-records">
+            <SalesRecordCard Title="Best sales day" Record="summary.History.BestSalesDay" />
+            <SalesRecordCard Title="Best profit day" Record="summary.History.BestProfitDay" Profit="true" />
+            <SalesRecordCard Title="Best sales month" Record="summary.History.BestSalesMonth" />
+            <SalesRecordCard Title="Best profit month" Record="summary.History.BestProfitMonth" Profit="true" />
+            <SalesRecordCard Title="Best sales year" Record="summary.History.BestSalesYear" />
+            <SalesRecordCard Title="Best profit year" Record="summary.History.BestProfitYear" Profit="true" />
+        </div>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "period")] public string? Period { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
+    private SalesSummary? summary;
+    private PeriodSales? selected;
+    private SoldItemsPage? soldItems;
+    private IReadOnlyList<SalesBucket> trend = [];
+    private bool monthlyTrend;
+
+    protected override async Task OnInitializedAsync()
+    {
+        summary = await Metrics.GetSummaryAsync();
+        selected = summary.Select(Period);
+        Sort = Sort is "profit" or "units" or "name" ? Sort : "sales";
+        soldItems = await Metrics.GetItemsAsync(selected.Period, Query, Sort, Page);
+        monthlyTrend = selected.Period.End.DayNumber - selected.Period.Start.DayNumber > 62;
+        var days = summary.Days.Where(d => d.Date >= selected.Period.Start && d.Date <= selected.Period.End).ToDictionary(d => d.Date);
+        var daily = Enumerable.Range(0, selected.Period.End.DayNumber - selected.Period.Start.DayNumber + 1)
+            .Select(offset => selected.Period.Start.AddDays(offset))
+            .Select(date => days.GetValueOrDefault(date) ?? new SalesBucket(date, SalesTotals.Empty));
+        trend = monthlyTrend
+            ? daily.GroupBy(d => new DateOnly(d.Date.Year, d.Date.Month, 1)).Select(g => new SalesBucket(g.Key, SalesTotals.Sum(g.Select(d => d.Totals)))).ToArray()
+            : daily.ToArray();
+    }
+
+    private string ItemPage(int page) => $"/admin/analytics?period={selected!.Period.Key}&q={Uri.EscapeDataString(Query ?? "")}&sort={Sort}&page={page}";
+}

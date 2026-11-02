@@ -447,6 +447,9 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("DeliveryAddressId")
                         .HasColumnType("integer");
 
@@ -486,6 +489,8 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.HasIndex("Status", "CreatedAt");
 
+                    b.HasIndex("Status", "DeliveredAt");
+
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.ToTable("Orders");
@@ -498,6 +503,9 @@ namespace JASIntWeb.Persistence.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("CostIsEstimated")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -520,6 +528,9 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");

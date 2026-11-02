@@ -1,60 +1,128 @@
 @page "/admin/orders"
 @inject AppDbContext Db
 
-<AdminPageHeader Title="Orders" Description="Review customer orders and manage fulfillment." />
-<form method="get" data-enhance class="admin-toolbar">
-    <input name="q" value="@Query" placeholder="Order ID, customer or phone" class="shop-input" />
-    <select name="status" class="shop-input">
-        <option value="">All statuses</option>
-        @foreach (var s in Enum.GetValues<OrderStatus>())
-        {
-            <option value="@s" selected="@(Status == s.ToString())">@s</option>
-        }
-    </select>
-    <button class="shop-button-secondary">Filter</button>
-    <a href="/admin/orders">Clear</a>
-</form>
-<div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th>Date</th>
-                <th>
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var o in orders)
+<PageTitle>Orders Management · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">COMMERCE OPERATIONS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Customer Orders</h1>
+        <p class="text-sm text-slate-500 mt-1">Review, confirm, dispatch, and fulfill online store orders.</p>
+    </div>
+</div>
+
+<!-- Filter Toolbar -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[220px]">
+            <input name="q" value="@Query" placeholder="Search Order #, customer name, or phone..." class="field pr-9" />
+            <span class="absolute right-3 top-3 text-slate-400">
+                <Icon Name="search" Class="size-4" />
+            </span>
+        </div>
+        <select name="status" class="field w-auto min-w-[150px]">
+            <option value="">All Statuses</option>
+            @foreach (var s in Enum.GetValues<OrderStatus>())
             {
-                <tr>
-                    <td>
-                        <strong>#@o.Id</strong>
-                    </td>
-                    <td>@o.DeliveryAddress?.CustomerName</td>
-                    <td>@o.DeliveryAddress?.PhoneNumber</td>
-                    <td>
-                        <span class="status-badge">@o.Status</span>
-                    </td>
-                    <td>৳@o.Total.ToString("N0")</td>
-                    <td>@o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy")</td>
-                    <td>
-                        <a href="/admin/orders/@o.Id">Manage order</a>
-                    </td>
-                </tr>
+                <option value="@s" selected="@(Status == s.ToString())">@s</option>
             }
-        </tbody>
-    </table>
+        </select>
+        <button type="submit" class="btn-primary">
+            Filter
+        </button>
+        @if (!string.IsNullOrWhiteSpace(Query) || !string.IsNullOrWhiteSpace(Status))
+        {
+            <a href="/admin/orders" class="btn-secondary">
+                Reset
+            </a>
+        }
+    </form>
+</div>
+
+<!-- Orders Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Date & Time</th>
+                    <th>Customer Name</th>
+                    <th>Contact Phone</th>
+                    <th>Delivery Area</th>
+                    <th>Status</th>
+                    <th class="text-right">Total Amount</th>
+                    <th class="text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in orders)
+                {
+                    <tr>
+                        <td class="font-bold text-slate-900">
+                            <a href="/admin/orders/@o.Id" class="text-blue-600 hover:underline">#@o.Id</a>
+                        </td>
+                        <td class="text-xs text-slate-500 whitespace-nowrap">
+                            @o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
+                        </td>
+                        <td class="font-semibold text-slate-800">
+                            @(o.DeliveryAddress?.CustomerName ?? "Guest")
+                        </td>
+                        <td class="text-xs font-mono text-slate-600">
+                            @(o.DeliveryAddress?.PhoneNumber ?? "-")
+                        </td>
+                        <td class="text-xs text-slate-600">
+                            @(o.DeliveryAddress?.City ?? "-"), @(o.DeliveryAddress?.District ?? "-")
+                        </td>
+                        <td>
+                            @switch (o.Status)
+                            {
+                                case OrderStatus.Pending:
+                                    <span class="badge badge-amber">Pending</span>
+                                    break;
+                                case OrderStatus.Processing:
+                                    <span class="badge badge-blue">Processing</span>
+                                    break;
+                                case OrderStatus.InTransit:
+                                    <span class="badge badge-purple">In Transit</span>
+                                    break;
+                                case OrderStatus.Delivered:
+                                    <span class="badge badge-emerald">Delivered</span>
+                                    break;
+                                case OrderStatus.Cancelled:
+                                    <span class="badge badge-rose">Cancelled</span>
+                                    break;
+                                default:
+                                    <span class="badge badge-slate">@o.Status</span>
+                                    break;
+                            }
+                        </td>
+                        <td class="text-right font-bold text-slate-900 tabular-nums">
+                            ৳@o.Total.ToString("N0")
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="/admin/orders/@o.Id" class="btn-secondary !px-3 !py-1 text-xs">
+                                View & Fulfill
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     @if (orders.Count == 0)
     {
-        <p class="admin-empty">No matching orders.</p>
+        <div class="empty-state py-12">
+            <Icon Name="cart" Class="size-10 text-slate-300" />
+            <p>No orders match the selected filters.</p>
+        </div>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4">
+    <AdminPagination Total="total" Page="Page" />
+</div>
 
 @code
 {
@@ -78,8 +146,7 @@
         if (!string.IsNullOrWhiteSpace(Query))
         {
             q = q.Where(o => o.Id.ToString() == Query
-                || o.DeliveryAddress!.CustomerName.ToLower()
-                .Contains(Query.ToLower())
+                || o.DeliveryAddress!.CustomerName.ToLower().Contains(Query.ToLower())
                 || o.DeliveryAddress.PhoneNumber.Contains(Query));
         }
         total = await q.CountAsync();

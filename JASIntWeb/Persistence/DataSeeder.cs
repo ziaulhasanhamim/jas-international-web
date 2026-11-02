@@ -98,6 +98,10 @@ public static class JsonTestDataSeeder
         }
         foreach (var o in data.Orders)
         {
+            if (o.Status == OrderStatus.Delivered)
+            {
+                o.DeliveredAt ??= o.UpdatedAt ?? o.CreatedAt;
+            }
             if (o.UserId.HasValue)
             {
                 o.UserId = userIds[o.UserId.Value];
@@ -109,7 +113,25 @@ public static class JsonTestDataSeeder
         db.AddRange(data.CarouselSlides);
         await db.SaveChangesAsync(ct);
         db.AddRange(data.CartItems);
-        db.AddRange(data.OrderItems);
+        var variantCosts = data.ProductVariants.ToDictionary(v => v.Id, v => v.CostPrice);
+        // Fixture order costs were not recorded at sale time; preserve them as explicit estimates.
+        db.AddRange(data.OrderItems.Select(i => new OrderItem
+        {
+            Id = i.Id,
+            OrderId = i.OrderId,
+            ProductVariantId = i.ProductVariantId,
+            ProductName = i.ProductName,
+            VariantName = i.VariantName,
+            UnitPrice = i.UnitPrice,
+            UnitCost = variantCosts[i.ProductVariantId],
+            CostIsEstimated = true,
+            Quantity = i.Quantity,
+            LineTotal = i.LineTotal,
+            CreatedAt = i.CreatedAt,
+            UpdatedAt = i.UpdatedAt,
+            CreatedByUserId = i.CreatedByUserId,
+            UpdatedByUserId = i.UpdatedByUserId
+        }));
         db.AddRange(data.Payments);
         await db.SaveChangesAsync(ct);
         // Explicit fixture IDs do not advance PostgreSQL sequences. Repair EVERY identity sequence.

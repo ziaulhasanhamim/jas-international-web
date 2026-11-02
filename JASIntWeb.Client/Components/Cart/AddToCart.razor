@@ -2,24 +2,61 @@
 @inject CartService Cart
 @inject NavigationManager Nav
 
-<div class="mt-6 space-y-3">
-    <div class="flex gap-3">
-        <label class="sr-only" for="quantity-@VariantId">Quantity</label>
-        <input
-            id="quantity-@VariantId"
-            type="number"
-            min="1"
-            max="@Math.Min(Stock, 99)"
-            @bind="quantity"
-            class="w-24 rounded-xl border border-slate-200 px-3 py-3"
+<div class="space-y-3">
+    <div class="flex items-center gap-3">
+        <!-- Quantity Stepper -->
+        <div class="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-xs">
+            <button
+                type="button"
+                @onclick="Decrement"
+                disabled="@(quantity <= 1 || busy)"
+                class="flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Decrease quantity"
+            >
+                -
+            </button>
+            <span class="w-10 text-center font-bold text-sm text-slate-900 tabular-nums">@quantity</span>
+            <button
+                type="button"
+                @onclick="Increment"
+                disabled="@(quantity >= Math.Min(Stock, 99) || busy)"
+                class="flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Increase quantity"
+            >
+                +
+            </button>
+        </div>
+
+        <!-- Add to Cart Button -->
+        <button
+            type="button"
+            class="flex-1 btn-primary gap-2 shadow-xs"
             disabled="@(VariantId <= 0 || Stock <= 0 || busy)"
-        />
-        <button class="shop-button flex-1" disabled="@(VariantId <= 0 || Stock <= 0 || busy)" @onclick="Add">@(busy ? "Adding…" : "Add to cart")</button>
+            @onclick="Add"
+        >
+            <Icon Name="cart" Class="size-4" />
+            <span>@(busy ? "Adding to Cart…" : "Add to Cart")</span>
+        </button>
     </div>
-    <button class="shop-button-secondary w-full" disabled="@(VariantId <= 0 || Stock <= 0 || busy)" @onclick="Buy">Buy now</button>
+
+    <!-- Buy Now Direct Button -->
+    <button
+        type="button"
+        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 shadow-xs select-none disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled="@(VariantId <= 0 || Stock <= 0 || busy)"
+        @onclick="Buy"
+    >
+        <Icon Name="bag" Class="size-4 text-emerald-400" />
+        <span>Buy Now · Direct Checkout</span>
+    </button>
+
     @if (message is not null)
     {
-        <p role="status" class="text-sm text-slate-600">@message</p>
+        <div class="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 ring-1 ring-blue-600/20" role="status">
+            <Icon Name="check" Class="size-3.5 text-blue-600 shrink-0" />
+            <span>@message</span>
+            <a href="/cart" class="ml-auto underline font-bold">View Cart</a>
+        </div>
     }
 </div>
 
@@ -33,11 +70,27 @@
     private bool busy;
     private string? message;
 
+    private void Increment()
+    {
+        if (quantity < Math.Min(Stock, 99))
+        {
+            quantity++;
+        }
+    }
+
+    private void Decrement()
+    {
+        if (quantity > 1)
+        {
+            quantity--;
+        }
+    }
+
     private async Task Add()
     {
         busy = true;
         await Cart.AddAsync(VariantId, quantity);
-        message = Cart.Error ?? "Added to cart.";
+        message = Cart.Error ?? $"Added {quantity} unit{(quantity == 1 ? "" : "s")} to your cart.";
         busy = false;
     }
 

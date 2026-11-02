@@ -2,50 +2,88 @@
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
 
-<PageTitle>Create account — JAS International</PageTitle>
-<div class="shop-container">
-    <div class="shop-panel mx-auto max-w-md">
-        <h1 class="text-3xl font-semibold">Create account</h1>
-        @if (completed)
-        {
-            <SessionRedirect Destination="/cart" />
-        }
-        else
-        {
-            @if (error is not null)
+<PageTitle>Create Account · JAS International</PageTitle>
+
+<div class="shop-container py-12 min-h-[75vh] flex items-center justify-center">
+    <div class="w-full max-w-md">
+        <!-- Logo and Heading -->
+        <div class="text-center mb-8">
+            <a href="/" class="inline-flex items-center gap-3 mb-4">
+                <img src="/jas-logo.png" alt="JAS International" class="size-12 rounded-xl shadow-xs" />
+                <div class="text-left leading-none">
+                    <span class="font-display font-bold text-2xl text-blue-600 block">JAS</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">International</span>
+                </div>
+            </a>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Create an Account</h1>
+            <p class="text-xs text-slate-500 mt-1">Join JAS International to track orders and save your delivery details.</p>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
+            @if (completed)
             {
-                <p role="alert" class="form-error">@error</p>
-            }
-            @if (Input is null)
-            {
-                <p class="admin-help">Loading form…</p>
+                <SessionRedirect Destination="/account" />
             }
             else
             {
-                <EditForm Model="Input" OnValidSubmit="Submit" FormName="signup" method="post" Enhance class="mt-6">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-                    <label class="shop-label">
-                        Email
-                        <InputText @bind-Value="Input!.Email" type="email" autocomplete="username" class="shop-input" />
-                    </label>
-                    <label class="shop-label">
-                        Password
-                        <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="shop-input" />
-                    </label>
-                    <p class="mb-4 text-xs text-slate-500">At least 8 characters, including a lowercase letter and a number.</p>
-                    <label class="shop-label">
-                        Confirm password
-                        <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="shop-input" />
-                    </label>
-                    <button class="shop-button w-full" type="submit">Create account</button>
-                </EditForm>
+                @if (error is not null)
+                {
+                    <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
+                        <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+                        <div>
+                            <strong class="font-semibold block">Registration Error</strong>
+                            <span>@error</span>
+                        </div>
+                    </div>
+                }
+
+                @if (Input is null)
+                {
+                    <p class="text-xs text-slate-400">Loading form…</p>
+                }
+                else
+                {
+                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="signup" method="post" Enhance class="space-y-4">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                        <div>
+                            <label class="field-label">Full Name</label>
+                            <InputText @bind-Value="Input!.FullName" class="field" placeholder="e.g. Tanvir Ahmed" />
+                        </div>
+
+                        <div>
+                            <label class="field-label">Mobile Phone Number</label>
+                            <InputText @bind-Value="Input!.PhoneNumber" type="tel" class="field" placeholder="017xxxxxxxx" />
+                        </div>
+
+                        <div>
+                            <label class="field-label">Email Address</label>
+                            <InputText @bind-Value="Input!.Email" type="email" autocomplete="username" class="field" placeholder="you@example.com" />
+                        </div>
+
+                        <div>
+                            <label class="field-label">Password</label>
+                            <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="field" placeholder="At least 8 characters" />
+                        </div>
+
+                        <div>
+                            <label class="field-label">Confirm Password</label>
+                            <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="field" placeholder="Re-type password" />
+                        </div>
+
+                        <button class="btn-primary w-full shadow-xs mt-2" type="submit">
+                            Create Customer Account
+                        </button>
+                    </EditForm>
+                }
+
+                <div class="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-500">
+                    Already have an account?
+                    <a href="/account/login" class="text-blue-600 font-semibold hover:underline ml-1">Sign in here</a>
+                </div>
             }
-            <p class="mt-5 text-sm">
-                Have an account?
-                <a href="/account/login" class="text-volt">Sign in</a>
-            </p>
-        }
+        </div>
     </div>
 </div>
 
@@ -64,11 +102,16 @@
         var user = new User
         {
             UserName = email,
-            Email = email
+            Email = email,
+            PhoneNumber = Input.PhoneNumber.Trim()
         };
         var result = await Users.CreateAsync(user, Input.Password);
         if (result.Succeeded)
         {
+            if (!string.IsNullOrWhiteSpace(Input.FullName))
+            {
+                await Users.AddClaimAsync(user, new System.Security.Claims.Claim("name", Input.FullName.Trim()));
+            }
             await SignIn.SignInAsync(user, false);
             completed = true;
         }

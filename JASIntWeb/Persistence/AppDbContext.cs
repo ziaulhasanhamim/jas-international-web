@@ -46,6 +46,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         builder.Entity<Order>(e =>
             {
+                e.HasIndex(x => new { x.Status, x.DeliveredAt });
                 e.HasIndex(x => new
                     {
                         x.UserId,

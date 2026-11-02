@@ -1,0 +1,41 @@
+@using JASIntWeb.Services
+
+<section class="shop-panel admin-table-wrap sales-section" aria-labelledby="sales-period-heading">
+    <div class="admin-section-heading">
+        <div>
+            <h2 id="sales-period-heading">Sales by period</h2>
+            <p>Delivered orders · Bangladesh time · Last week is Monday–Sunday</p>
+        </div>
+        <a href="/admin/analytics">Explore sales &amp; profit →</a>
+    </div>
+    <table class="shop-table sales-table">
+        <thead><tr><th>Period</th><th>Orders</th><th>Units sold</th><th>Product sales</th><th>Gross profit</th><th>Margin</th></tr></thead>
+        <tbody>
+            @foreach (var row in Summary.Periods)
+            {
+                <tr class="@(Selected == row.Period.Key ? "sales-selected" : null)">
+                    <td>
+                        <a href="@($"/admin/analytics?period={row.Period.Key}")">@row.Period.Label</a>
+                        <span class="cell-secondary">@row.Period.DateLabel</span>
+                    </td>
+                    <td>@row.Totals.Orders.ToString("N0")</td>
+                    <td>@row.Totals.Units.ToString("N0")</td>
+                    <td>৳@row.Totals.Sales.ToString("N2")</td>
+                    <td class="@(row.Totals.Profit < 0 ? "sales-loss" : null)">
+                        ৳@row.Totals.Profit.ToString("N2")
+                        @if (row.Totals.EstimatedUnits > 0)
+                        {
+                            <span class="cell-secondary">Includes estimated costs</span>
+                        }
+                    </td>
+                    <td>@row.Totals.Margin.ToString("N1")%</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SalesSummary Summary { get; set; } = null!;
+    [Parameter] public string? Selected { get; set; }
+}
