@@ -6,12 +6,13 @@ namespace JASIntWeb.Services;
 public sealed class EmailVerificationService(
     IMemoryCache cache,
     AccountMailService mailService,
-    ILogger<EmailVerificationService> logger,
-    IWebHostEnvironment env)
+    ILogger<EmailVerificationService> logger)
 {
     private static string CacheKey(string email) => $"email_verify:{email.Trim().ToLowerInvariant()}";
 
-    public async Task<string> GenerateAndSendCodeAsync(string email)
+    public bool IsConfigured => mailService.IsConfigured;
+
+    public async Task<(string Code, bool Sent)> GenerateAndSendCodeAsync(string email)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
         // Generate a 6-digit numeric verification code (100000 - 999999)
@@ -22,12 +23,13 @@ public sealed class EmailVerificationService(
 
         logger.LogInformation("[EmailVerification] Generated verification code for {Email}", normalizedEmail);
 
+        var sent = false;
         try
         {
-            var sent = await mailService.SendVerificationCodeEmailAsync(normalizedEmail, code);
+            sent = await mailService.SendVerificationCodeEmailAsync(normalizedEmail, code);
             if (!sent)
             {
-                logger.LogWarning("[EmailVerification] Email sending returned false (SMTP not configured or failed). Dev code for {Email} is: {Code}", normalizedEmail, code);
+                logger.LogWarning("[EmailVerification] Email sending returned false. IsConfigured={IsConfigured}", mailService.IsConfigured);
             }
         }
         catch (Exception ex)
@@ -35,7 +37,7 @@ public sealed class EmailVerificationService(
             logger.LogError(ex, "[EmailVerification] Error sending verification email to {Email}", normalizedEmail);
         }
 
-        return code;
+        return (code, sent);
     }
 
     public bool ValidateCode(string email, string code)
@@ -58,7 +60,8 @@ public sealed class EmailVerificationService(
 
     public string? GetDevCode(string email)
     {
-        if (env.IsDevelopment() || !mailService.IsConfigured)
+        // Only show dev code on screen if SMTP is not configured
+        if (!mailService.IsConfigured)
         {
             if (cache.TryGetValue(CacheKey(email), out string? code))
             {

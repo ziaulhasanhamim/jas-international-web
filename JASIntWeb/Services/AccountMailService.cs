@@ -56,11 +56,13 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
     {
         if (!IsConfigured)
         {
+            Console.WriteLine($"[Mail] SMTP not configured. Mail:Host='{config["Mail:Host"]}', Mail:From='{config["Mail:From"]}'. Skipping email to {to}.");
             log.LogInformation("SMTP not configured. Skipping HTML email to {To} with subject '{Subject}'.", to, subject);
             return false;
         }
         try
         {
+            Console.WriteLine($"[Mail] Connecting to {config["Mail:Host"]}:{config.GetValue<int>("Mail:Port", 587)} to send '{subject}' to {to}...");
             using var client = CreateClient();
             using var message = new MailMessage(GetFromAddress(), new MailAddress(to))
             {
@@ -70,11 +72,14 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
                 BodyEncoding = Encoding.UTF8
             };
             await client.SendMailAsync(message);
+            Console.WriteLine($"[Mail] SUCCESS: Email successfully sent to {to}!");
             log.LogInformation("Email sent successfully to {To} for '{Subject}'", to, subject);
             return true;
         }
         catch (Exception e)
         {
+            Console.WriteLine($"[Mail] ERROR sending email to {to}: {e.Message}");
+            if (e.InnerException != null) Console.WriteLine($"[Mail] Inner: {e.InnerException.Message}");
             log.LogWarning("HTML email sending failed: {Message}", e.Message);
             return false;
         }
