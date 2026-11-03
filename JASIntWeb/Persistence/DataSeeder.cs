@@ -313,6 +313,77 @@ public static class JsonTestDataSeeder
             );
             await db.SaveChangesAsync(ct);
         }
+
+        // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery
+        var hasPlaceholders = await db.Products.AnyAsync(p => p.MainImageUrl != null && p.MainImageUrl.Contains("placehold.co"), ct);
+        var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday"), ct);
+        if (hasPlaceholders || hasOldSlides)
+        {
+            var seedPath = Path.Combine(AppContext.BaseDirectory, "data", "JasTestSeedData.json");
+            if (!File.Exists(seedPath))
+            {
+                seedPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "JasTestSeedData.json");
+            }
+            if (File.Exists(seedPath))
+            {
+                var settings = new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNameCaseInsensitive = true };
+                settings.Converters.Add(new JsonStringEnumConverter());
+                var seedData = JsonSerializer.Deserialize<SeedData>(await File.ReadAllTextAsync(seedPath, ct), settings);
+                if (seedData != null)
+                {
+                    if (hasPlaceholders)
+                    {
+                        var productMap = seedData.Products.ToDictionary(p => p.Id, p => p.MainImageUrl);
+                        var productsToUpdate = await db.Products.Where(p => p.MainImageUrl.Contains("placehold.co")).ToListAsync(ct);
+                        foreach (var p in productsToUpdate)
+                        {
+                            if (productMap.TryGetValue(p.Id, out var newUrl))
+                            {
+                                p.MainImageUrl = newUrl;
+                            }
+                        }
+
+                        var imagesToUpdate = await db.ProductImages.Where(i => i.ImageUrl.Contains("placehold.co")).ToListAsync(ct);
+                        var imgMap = seedData.ProductImages.ToDictionary(i => i.Id, i => i.ImageUrl);
+                        foreach (var img in imagesToUpdate)
+                        {
+                            if (imgMap.TryGetValue(img.Id, out var newUrl))
+                            {
+                                img.ImageUrl = newUrl;
+                            }
+                            else if (productMap.TryGetValue(img.ProductId, out var fallbackUrl))
+                            {
+                                img.ImageUrl = fallbackUrl;
+                            }
+                        }
+                    }
+
+                    if (hasOldSlides && seedData.CarouselSlides.Count > 0)
+                    {
+                        var oldSlides = await db.CarouselSlides.ToListAsync(ct);
+                        db.CarouselSlides.RemoveRange(oldSlides);
+                        try
+                    {
+                        await db.SaveChangesAsync(ct);
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        // Concurrently updated by another process/test worker
+                    }
+                        db.CarouselSlides.AddRange(seedData.CarouselSlides);
+                    }
+
+                    try
+                    {
+                        await db.SaveChangesAsync(ct);
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        // Concurrently updated by another process/test worker
+                    }
+                }
+            }
+        }
     }
 
     private sealed class SeedData

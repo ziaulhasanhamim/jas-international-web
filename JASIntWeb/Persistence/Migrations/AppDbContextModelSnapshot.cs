@@ -619,10 +619,22 @@ namespace JASIntWeb.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdminNotes")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CheckoutToken")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CouponCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CourierName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CourierTrackingId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CourierTrackingUrl")
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAt")

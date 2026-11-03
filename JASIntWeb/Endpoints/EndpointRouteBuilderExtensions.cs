@@ -7,6 +7,7 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapCartEndpoints();
         endpoints.MapOrderEndpoints();
         endpoints.MapHealthEndpoints();
+        endpoints.MapSeoEndpoints();
         return endpoints;
     }
 }

@@ -22,6 +22,13 @@
                 <span class="size-1.5 rounded-full @(pending > 0 ? "bg-amber-500 animate-pulse" : "bg-emerald-500")"></span>
                 @(pending > 0 ? $"{pending} Pending Order{(pending == 1 ? "" : "s")}" : "All Orders Processed")
             </span>
+            @if (unconfirmedPayments > 0)
+            {
+                <a href="/admin/orders?payment=unconfirmed" class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 text-rose-700 ring-1 ring-rose-600/30 px-2.5 py-1 font-bold animate-pulse hover:bg-rose-100 transition">
+                    <span class="size-1.5 rounded-full bg-rose-600"></span>
+                    <span>@unconfirmedPayments Needs Payment Confirmation</span>
+                </a>
+            }
         </div>
     </div>
 
@@ -246,7 +253,7 @@
 
 @code
 {
-    private int productCount, pending, lowStock;
+    private int productCount, pending, lowStock, unconfirmedPayments;
     private SalesSummary? sales;
     private List<Order> orders = [];
     private List<InventoryItem> lowItems = [];
@@ -256,6 +263,7 @@
         sales = await Metrics.GetSummaryAsync();
         productCount = await Db.Products.CountAsync(p => !p.IsDeleted);
         pending = await Db.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
+        unconfirmedPayments = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && !string.IsNullOrEmpty(o.TransactionId));
         var low = Db.InventoryItems.AsNoTracking()
             .Where(i => i.QuantityOnHand - i.QuantityReserved <= 5
             && i.ProductVariant!.IsActive

@@ -1,6 +1,7 @@
 @page "/admin/orders/{Id:int}"
 @rendermode InteractiveServer
 @inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 @inject AdminSession Session
 @inject ShoppingService Shop
 @inject NavigationManager Nav
@@ -87,6 +88,74 @@ else
             <button type="button" @onclick="() => alertMessage = null" class="text-slate-400 hover:text-slate-600 font-bold ml-2">✕</button>
         </div>
     }
+
+    <!-- Visual Order Progress Stepper -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs mb-6">
+        <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+            <span class="text-xs font-bold uppercase tracking-widest text-slate-500">Order Progress Timeline</span>
+            @if (order.DeliveredAt.HasValue)
+            {
+                <span class="text-xs text-emerald-700 font-semibold">Delivered on @order.DeliveredAt.Value.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</span>
+            }
+            else if (order.Status == OrderStatus.Cancelled)
+            {
+                <span class="text-xs text-rose-600 font-bold">Cancelled &amp; Reserved Stock Released</span>
+            }
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <!-- Step 1: Placed -->
+            <div class="rounded-xl border p-3 @(order.Status != OrderStatus.Cancelled ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : "border-slate-200 bg-slate-50 text-slate-500")">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold">✓</span>
+                    <span class="text-xs font-bold">1. Order Placed</span>
+                </div>
+                <p class="text-[11px] text-slate-500">@(order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM, hh:mm tt"))</p>
+            </div>
+
+            <!-- Step 2: Confirmed / Processing -->
+            @{
+                var isStep2Active = order.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered;
+            }
+            <div class="rounded-xl border p-3 @(isStep2Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Cancelled ? "border-slate-200 bg-slate-50 text-slate-400" : "border-blue-200 bg-blue-50/60 text-blue-950"))">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex size-5 items-center justify-center rounded-full @(isStep2Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
+                        @(isStep2Active ? "✓" : "2")
+                    </span>
+                    <span class="text-xs font-bold">2. Confirmed &amp; Packing</span>
+                </div>
+                <p class="text-[11px] text-slate-500">@(order.PaidAmount > 0 ? "Payment verified" : "Payment confirmation")</p>
+            </div>
+
+            <!-- Step 3: In Transit -->
+            @{
+                var isStep3Active = order.Status is OrderStatus.InTransit or OrderStatus.Delivered;
+            }
+            <div class="rounded-xl border p-3 @(isStep3Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Processing ? "border-blue-200 bg-blue-50/60 text-blue-950" : "border-slate-200 bg-slate-50 text-slate-400"))">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex size-5 items-center justify-center rounded-full @(isStep3Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
+                        @(isStep3Active ? "✓" : "3")
+                    </span>
+                    <span class="text-xs font-bold">3. In Transit / Dispatched</span>
+                </div>
+                <p class="text-[11px] text-slate-500">@(string.IsNullOrEmpty(order.CourierName) ? "Pending dispatch" : order.CourierName)</p>
+            </div>
+
+            <!-- Step 4: Delivered -->
+            @{
+                var isStep4Active = order.Status == OrderStatus.Delivered;
+            }
+            <div class="rounded-xl border p-3 @(isStep4Active ? "border-emerald-300 bg-emerald-100 text-emerald-950 font-bold" : "border-slate-200 bg-slate-50 text-slate-400")">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex size-5 items-center justify-center rounded-full @(isStep4Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
+                        @(isStep4Active ? "✓" : "4")
+                    </span>
+                    <span class="text-xs font-bold">4. Delivered</span>
+                </div>
+                <p class="text-[11px] text-slate-500">@(isStep4Active ? "Completed & collected" : "Pending delivery")</p>
+            </div>
+        </div>
+    </div>
 
     <div class="grid gap-6 lg:grid-cols-3 mb-7">
         <!-- Customer & Delivery Card -->
@@ -273,26 +342,58 @@ else
                 }
                 else
                 {
-                    <EditForm Model="Input" OnValidSubmit="Save" FormName="order-status" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <EditForm Model="Input" OnValidSubmit="Save" class="space-y-4">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
-                        <div class="grid gap-4 sm:grid-cols-2 items-end">
+                        <div class="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <label class="field-label">Update Order Status</label>
-                                <InputSelect @bind-Value="Input!.Status" class="field">
-                                    @foreach (var status in AllowedStatuses())
+                                <label class="field-label font-bold text-slate-800">Order Status</label>
+                                <InputSelect @bind-Value="Input.Status" class="field font-semibold text-slate-900" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                                    @foreach (var status in AllowedStatuses().Distinct())
                                     {
                                         <option value="@status">@status</option>
                                     }
                                 </InputSelect>
                             </div>
+
                             <div>
-                                <button type="submit" class="btn-primary w-full" data-pending-text="Saving status..." disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
-                                    <span class="form-submit-spinner" hidden></span>
-                                    <span>Save Status</span>
-                                </button>
+                                <label class="field-label font-bold text-slate-800">Courier Service</label>
+                                <InputSelect @bind-Value="Input.CourierName" class="field" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                                    <option value="">Select courier provider...</option>
+                                    <option value="Steadfast Courier">Steadfast Courier</option>
+                                    <option value="Pathao Courier">Pathao Courier</option>
+                                    <option value="RedX">RedX Delivery</option>
+                                    <option value="Sundarban Courier">Sundarban Courier</option>
+                                    <option value="Paperfly">Paperfly</option>
+                                    <option value="Showroom Pickup">Showroom Pickup (Khulna)</option>
+                                    <option value="Other">Other / Self-Delivery</option>
+                                </InputSelect>
                             </div>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="field-label">Courier Consignment / Tracking Code</label>
+                                <InputText @bind-Value="Input.CourierTrackingId" placeholder="e.g. STEADFAST-109281" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
+                            </div>
+
+                            <div>
+                                <label class="field-label">Courier Tracking URL</label>
+                                <InputText @bind-Value="Input.CourierTrackingUrl" placeholder="https://steadfast.com.bd/t/..." class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="field-label">Internal Fulfillment &amp; Audit Notes</label>
+                            <InputTextArea @bind-Value="Input.AdminNotes" placeholder="Add packaging notes, customer requests, or special handling instructions..." rows="2" class="field text-xs" />
+                        </div>
+
+                        <div class="pt-2">
+                            <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                                <Icon Name="check" Class="size-4" />
+                                <span>Save Changes &amp; Update Order</span>
+                            </button>
                         </div>
                     </EditForm>
                 }
@@ -373,46 +474,37 @@ else
 {
     [Parameter]
     public int Id { get; set; }
-    [SupplyParameterFromForm(FormName = "order-status")]
     private OrderEditForm? Input { get; set; }
     private Order? order;
     private string? error;
+    private string? alertMessage;
+    private string alertType = "emerald";
 
     protected override async Task OnInitializedAsync()
     {
-        order = await Db.Orders.AsNoTracking()
-            .Include(o => o.DeliveryAddress)
-            .Include(o => o.Items)
-            .Include(o => o.Payments)
-            .AsSplitQuery()
-            .SingleOrDefaultAsync(o => o.Id == Id);
-        Input ??= new()
-        {
-            Id = Id,
-            Status = order?.Status.ToString() ?? "Pending"
-        };
+        await ReloadOrderAsync();
     }
 
     private IEnumerable<OrderStatus> AllowedStatuses()
     {
-        if (order is null)
-        {
-            yield break;
-        }
+        if (order is null) yield break;
         yield return order.Status;
         if (order.Status == OrderStatus.Pending)
         {
             yield return OrderStatus.Processing;
-        }
-        if (order.Status == OrderStatus.Processing)
-        {
             yield return OrderStatus.InTransit;
         }
-        if (order.Status == OrderStatus.InTransit)
+        else if (order.Status == OrderStatus.Processing)
+        {
+            yield return OrderStatus.InTransit;
+            yield return OrderStatus.Delivered;
+        }
+        else if (order.Status == OrderStatus.InTransit)
         {
             yield return OrderStatus.Delivered;
         }
-        if (order.Status is OrderStatus.Pending or OrderStatus.Processing or OrderStatus.InTransit)
+
+        if (order.Status is not (OrderStatus.Delivered or OrderStatus.Cancelled))
         {
             yield return OrderStatus.Cancelled;
         }
@@ -422,18 +514,23 @@ else
     {
         try
         {
-            Input!.Id = Id;
+            error = null;
+            if (Input == null) return;
+            Input.Id = Id;
             await Session.RunAsync(s => s.ChangeOrderAsync(Input));
-            Nav.NavigateTo($"/admin/orders/{Id}?saved=true");
+            await ReloadOrderAsync();
+            alertType = "emerald";
+            alertMessage = $"Order #{Id} details and status ({order?.Status}) updated successfully!";
         }
         catch (ShopException ex)
         {
             error = ex.Message;
         }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
     }
-
-    private string? alertMessage;
-    private string alertType = "emerald";
 
     private async Task VerifyPayment()
     {
@@ -485,16 +582,27 @@ else
 
     private async Task ReloadOrderAsync()
     {
-        order = await Db.Orders
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var freshDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        order = await freshDb.Orders.AsNoTracking()
             .Include(o => o.DeliveryAddress)
             .Include(o => o.Items)
             .Include(o => o.Payments)
             .Include(o => o.User)
-            .FirstOrDefaultAsync(o => o.Id == Id);
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(o => o.Id == Id);
 
-        if (order != null && Input != null)
+        if (order != null)
         {
-            Input.Status = order.Status.ToString();
+            Input = new OrderEditForm
+            {
+                Id = order.Id,
+                Status = order.Status.ToString(),
+                CourierName = order.CourierName,
+                CourierTrackingId = order.CourierTrackingId,
+                CourierTrackingUrl = order.CourierTrackingUrl,
+                AdminNotes = order.AdminNotes
+            };
         }
     }
 }

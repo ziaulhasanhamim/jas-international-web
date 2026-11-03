@@ -28,6 +28,10 @@ public class Order : AuditableEntity
     public string? SenderPhoneNumber { get; set; }
     public string? TransactionId { get; set; }
     public decimal PaidAmount { get; set; }
+    public string? CourierName { get; set; }
+    public string? CourierTrackingId { get; set; }
+    public string? CourierTrackingUrl { get; set; }
+    public string? AdminNotes { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
 }

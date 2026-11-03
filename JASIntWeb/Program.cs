@@ -141,6 +141,29 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseHttpsRedirection();
+
+// Enforce clean canonical URLs: Redirect legacy /products/{slug} to /category/{slug}
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? "";
+    if (string.Equals(path, "/category", StringComparison.OrdinalIgnoreCase) || string.Equals(path, "/category/", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
+        context.Response.Headers.Location = $"/products{context.Request.QueryString}";
+        return;
+    }
+    if (path.StartsWith("/products/", StringComparison.OrdinalIgnoreCase))
+    {
+        var slug = path["/products/".Length..];
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
+            context.Response.Headers.Location = $"/category/{slug}{context.Request.QueryString}";
+            return;
+        }
+    }
+    await next();
+});
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -421,36 +444,6 @@ app.MapGet("/account/external-login-callback", async (
     return Results.Redirect(returnUrl);
 });
 
-app.MapGet("/robots.txt", () => Results.Text("User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /account/\nSitemap: https://jasinternational.com/sitemap.xml\n", "text/plain"));
-
-app.MapGet("/sitemap.xml", async (AppDbContext db, HttpRequest request) =>
-{
-    var baseUrl = $"{request.Scheme}://{request.Host}";
-    var products = await db.Products.AsNoTracking().Where(p => !p.IsDeleted).Select(p => p.Slug).ToListAsync();
-    var categories = await db.Categories.AsNoTracking().Where(c => !c.IsDeleted).Select(c => c.Slug).ToListAsync();
-    var brands = await db.Brands.AsNoTracking().Where(b => !b.IsDeleted).Select(b => b.Slug).ToListAsync();
-
-    var sb = new System.Text.StringBuilder();
-    sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-    sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
-    sb.AppendLine($"  <url><loc>{baseUrl}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>");
-    sb.AppendLine($"  <url><loc>{baseUrl}/products</loc><changefreq>daily</changefreq><priority>0.9</priority></url>");
-    sb.AppendLine($"  <url><loc>{baseUrl}/about</loc><priority>0.5</priority></url>");
-    sb.AppendLine($"  <url><loc>{baseUrl}/contact</loc><priority>0.5</priority></url>");
-    sb.AppendLine($"  <url><loc>{baseUrl}/faq</loc><priority>0.5</priority></url>");
-
-    foreach (var cat in categories)
-        sb.AppendLine($"  <url><loc>{baseUrl}/category/{cat}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>");
-
-    foreach (var brand in brands)
-        sb.AppendLine($"  <url><loc>{baseUrl}/products?brand={brand}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>");
-
-    foreach (var prod in products)
-        sb.AppendLine($"  <url><loc>{baseUrl}/products/{prod}</loc><changefreq>daily</changefreq><priority>0.9</priority></url>");
-
-    sb.AppendLine("</urlset>");
-    return Results.Text(sb.ToString(), "application/xml");
-});
 app.MapStoreEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(JASIntWeb.Client._Imports).Assembly);

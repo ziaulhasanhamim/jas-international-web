@@ -488,69 +488,83 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         {
             throw new ShopException("Invalid order status.");
         }
-        if (status == order.Status)
+
+        order.CourierName = input.CourierName;
+        order.CourierTrackingId = input.CourierTrackingId;
+        order.CourierTrackingUrl = input.CourierTrackingUrl;
+        order.AdminNotes = input.AdminNotes;
+
+        var statusChanged = status != order.Status;
+
+        if (statusChanged)
         {
-            await tx.CommitAsync();
-            return;
-        }
-        var valid = order.Status switch
-        {
-            OrderStatus.Pending => status is OrderStatus.Processing or OrderStatus.Cancelled,
-            OrderStatus.Processing => status is OrderStatus.InTransit or OrderStatus.Cancelled,
-            OrderStatus.InTransit => status is OrderStatus.Delivered or OrderStatus.Cancelled,
-            _ => false
-        };
-        if (!valid)
-        {
-            throw new ShopException("Invalid status transition. Pending → Processing → InTransit → Delivered. Undelivered orders may be cancelled.");
-        }
-        if (status is OrderStatus.Delivered or OrderStatus.Cancelled)
-        {
-            foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
+            var valid = order.Status switch
             {
-                await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
-                var stock = (await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId)) ?? throw new ShopException("Inventory is missing. Review stock before changing this order.");
-                if (stock.QuantityReserved < item.Quantity)
+                OrderStatus.Pending => status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Cancelled,
+                OrderStatus.Processing => status is OrderStatus.InTransit or OrderStatus.Delivered or OrderStatus.Cancelled,
+                OrderStatus.InTransit => status is OrderStatus.Delivered or OrderStatus.Cancelled,
+                _ => false
+            };
+            if (!valid)
+            {
+                throw new ShopException($"Invalid status transition from {order.Status} to {status}. Delivered or cancelled orders cannot be reopened.");
+            }
+            if (status is OrderStatus.Delivered or OrderStatus.Cancelled)
+            {
+                foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
                 {
-                    throw new ShopException("Reserved stock is inconsistent. Review inventory before changing this order.");
+                    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
+                    var stock = (await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId)) ?? throw new ShopException("Inventory is missing. Review stock before changing this order.");
+                    if (stock.QuantityReserved < item.Quantity)
+                    {
+                        throw new ShopException("Reserved stock is inconsistent. Review inventory before changing this order.");
+                    }
+                    stock.QuantityReserved -= item.Quantity;
+                    if (status == OrderStatus.Delivered)
+                    {
+                        stock.QuantityOnHand -= item.Quantity;
+                        db.InventoryTransactions.Add(new()
+                            {
+                                ProductVariantId = item.ProductVariantId,
+                                QuantityChange = -item.Quantity,
+                                Type = InventoryTransactionType.Sale,
+                                ReferenceType = "Order",
+                                ReferenceId = order.Id,
+                                Note = "Order delivered"
+                            });
+                    }
                 }
-                stock.QuantityReserved -= item.Quantity;
-                if (status == OrderStatus.Delivered)
+                foreach (var payment in order.Payments.Where(p => p.Method == PaymentMethod.CashOnDelivery && p.Status == PaymentStatus.Pending))
                 {
-                    stock.QuantityOnHand -= item.Quantity;
-                    db.InventoryTransactions.Add(new()
-                        {
-                            ProductVariantId = item.ProductVariantId,
-                            QuantityChange = -item.Quantity,
-                            Type = InventoryTransactionType.Sale,
-                            ReferenceType = "Order",
-                            ReferenceId = order.Id,
-                            Note = "Order delivered"
-                        });
+                    payment.Status = status == OrderStatus.Delivered ? PaymentStatus.Completed : PaymentStatus.Failed;
                 }
             }
-            foreach (var payment in order.Payments.Where(p => p.Method == PaymentMethod.CashOnDelivery && p.Status == PaymentStatus.Pending))
+            order.Status = status;
+            order.UpdatedAt = DateTimeOffset.UtcNow;
+            if (status == OrderStatus.Delivered)
             {
-                payment.Status = status == OrderStatus.Delivered ? PaymentStatus.Completed : PaymentStatus.Failed;
+                order.DeliveredAt = order.UpdatedAt;
             }
         }
-        order.Status = status;
-        order.UpdatedAt = DateTimeOffset.UtcNow;
-        if (status == OrderStatus.Delivered)
+        else
         {
-            order.DeliveredAt = order.UpdatedAt;
+            order.UpdatedAt = DateTimeOffset.UtcNow;
         }
+
         await db.SaveChangesAsync();
         await tx.CommitAsync();
 
-        // Dispatch order status update email to customer
-        try
+        if (statusChanged)
         {
-            await mailService.SendOrderStatusUpdateEmailAsync(order, status);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email] Failed to send order status update email: {ex.Message}");
+            // Dispatch order status update email to customer
+            try
+            {
+                await mailService.SendOrderStatusUpdateEmailAsync(order, status);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Email] Failed to send order status update email: {ex.Message}");
+            }
         }
     }
 

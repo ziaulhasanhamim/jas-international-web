@@ -152,168 +152,168 @@
       "id": 1,
       "name": "Phones",
       "slug": "phones",
-      "icon": "📱",
+      "icon": "\ud83d\udcf1",
       "parentCategoryId": null
     },
     {
       "id": 2,
       "name": "Tablets",
       "slug": "tablets",
-      "icon": "📲",
+      "icon": "\ud83d\udcf2",
       "parentCategoryId": null
     },
     {
       "id": 3,
       "name": "Audio",
       "slug": "audio",
-      "icon": "🎧",
+      "icon": "\ud83c\udfa7",
       "parentCategoryId": null
     },
     {
       "id": 4,
       "name": "Wearables",
       "slug": "wearables",
-      "icon": "⌚",
+      "icon": "\u231a",
       "parentCategoryId": null
     },
     {
       "id": 5,
       "name": "Power & Charging",
       "slug": "power-charging",
-      "icon": "🔋",
+      "icon": "\ud83d\udd0b",
       "parentCategoryId": null
     },
     {
       "id": 6,
       "name": "Creator Gear",
       "slug": "creator-gear",
-      "icon": "🎙️",
+      "icon": "\ud83c\udf99\ufe0f",
       "parentCategoryId": null
     },
     {
       "id": 7,
       "name": "Computer Accessories",
       "slug": "computer-accessories",
-      "icon": "💻",
+      "icon": "\ud83d\udcbb",
       "parentCategoryId": null
     },
     {
       "id": 8,
       "name": "Cases & Protection",
       "slug": "cases-protection",
-      "icon": "🛡️",
+      "icon": "\ud83d\udee1\ufe0f",
       "parentCategoryId": null
     },
     {
       "id": 9,
       "name": "Android Phones",
       "slug": "android-phones",
-      "icon": "📱",
+      "icon": "\ud83d\udcf1",
       "parentCategoryId": 1
     },
     {
       "id": 10,
       "name": "iPhones",
       "slug": "iphones",
-      "icon": "🍎",
+      "icon": "\ud83c\udf4e",
       "parentCategoryId": 1
     },
     {
       "id": 11,
       "name": "Android Tablets",
       "slug": "android-tablets",
-      "icon": "📲",
+      "icon": "\ud83d\udcf2",
       "parentCategoryId": 2
     },
     {
       "id": 12,
       "name": "iPads",
       "slug": "ipads",
-      "icon": "🍎",
+      "icon": "\ud83c\udf4e",
       "parentCategoryId": 2
     },
     {
       "id": 13,
       "name": "True Wireless Earbuds",
       "slug": "true-wireless-earbuds",
-      "icon": "🎧",
+      "icon": "\ud83c\udfa7",
       "parentCategoryId": 3
     },
     {
       "id": 14,
       "name": "Headphones",
       "slug": "headphones",
-      "icon": "🎵",
+      "icon": "\ud83c\udfb5",
       "parentCategoryId": 3
     },
     {
       "id": 15,
       "name": "Speakers",
       "slug": "speakers",
-      "icon": "🔊",
+      "icon": "\ud83d\udd0a",
       "parentCategoryId": 3
     },
     {
       "id": 16,
       "name": "Smartwatches",
       "slug": "smartwatches",
-      "icon": "⌚",
+      "icon": "\u231a",
       "parentCategoryId": 4
     },
     {
       "id": 17,
       "name": "Fitness Bands",
       "slug": "fitness-bands",
-      "icon": "🏃",
+      "icon": "\ud83c\udfc3",
       "parentCategoryId": 4
     },
     {
       "id": 18,
       "name": "Power Banks",
       "slug": "power-banks",
-      "icon": "🔋",
+      "icon": "\ud83d\udd0b",
       "parentCategoryId": 5
     },
     {
       "id": 19,
       "name": "Wall Chargers",
       "slug": "wall-chargers",
-      "icon": "🔌",
+      "icon": "\ud83d\udd0c",
       "parentCategoryId": 5
     },
     {
       "id": 20,
       "name": "Cables",
       "slug": "cables",
-      "icon": "🧵",
+      "icon": "\ud83e\uddf5",
       "parentCategoryId": 5
     },
     {
       "id": 21,
       "name": "Microphones",
       "slug": "microphones",
-      "icon": "🎙️",
+      "icon": "\ud83c\udf99\ufe0f",
       "parentCategoryId": 6
     },
     {
       "id": 22,
       "name": "Tripods & Gimbals",
       "slug": "tripods-gimbals",
-      "icon": "🎥",
+      "icon": "\ud83c\udfa5",
       "parentCategoryId": 6
     },
     {
       "id": 23,
       "name": "Keyboards & Mice",
       "slug": "keyboards-mice",
-      "icon": "⌨️",
+      "icon": "\u2328\ufe0f",
       "parentCategoryId": 7
     },
     {
       "id": 24,
       "name": "Covers & Screen Protectors",
       "slug": "covers-screen-protectors",
-      "icon": "🛡️",
+      "icon": "\ud83d\udee1\ufe0f",
       "parentCategoryId": 8
     }
   ],
@@ -382,7 +382,7 @@
       "slug": "samsung-galaxy-a56",
       "details": "Samsung Galaxy A56 is a sample item in Android Phones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Samsung Galaxy A56.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Galaxy%20A56",
+      "mainImageUrl": "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=800&q=80",
       "categoryId": 9,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -393,7 +393,7 @@
       "slug": "redmi-note-14-pro",
       "details": "Redmi Note 14 Pro is a sample item in Android Phones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Redmi Note 14 Pro.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Note%2014%20Pro",
+      "mainImageUrl": "https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=800&q=80",
       "categoryId": 9,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -404,7 +404,7 @@
       "slug": "nothing-phone-3a",
       "details": "Nothing Phone 3a is a sample item in Android Phones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Nothing Phone 3a.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Nothing%20Phone%203a",
+      "mainImageUrl": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
       "categoryId": 9,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -415,7 +415,7 @@
       "slug": "motorola-edge-50-fusion",
       "details": "Motorola Edge 50 Fusion is a sample item in Android Phones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Motorola Edge 50 Fusion.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Motorola%20Edge%2050%20Fusion",
+      "mainImageUrl": "https://images.unsplash.com/photo-1580910051074-3eb694886505?auto=format&fit=crop&w=800&q=80",
       "categoryId": 9,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -426,7 +426,7 @@
       "slug": "apple-iphone-16",
       "details": "Apple iPhone 16 is a sample item in iPhones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPhone 16.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2016",
+      "mainImageUrl": "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=800&q=80",
       "categoryId": 10,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -437,7 +437,7 @@
       "slug": "apple-iphone-15",
       "details": "Apple iPhone 15 is a sample item in iPhones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPhone 15.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2015",
+      "mainImageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80",
       "categoryId": 10,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -448,7 +448,7 @@
       "slug": "apple-iphone-16-pro",
       "details": "Apple iPhone 16 Pro is a sample item in iPhones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPhone 16 Pro.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2016%20Pro",
+      "mainImageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80",
       "categoryId": 10,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -459,7 +459,7 @@
       "slug": "redmi-pad-2",
       "details": "Redmi Pad 2 is a sample item in Android Tablets. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Redmi Pad 2.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Pad%202",
+      "mainImageUrl": "https://images.unsplash.com/photo-1561154464-82e9adf32764?auto=format&fit=crop&w=800&q=80",
       "categoryId": 11,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -470,7 +470,7 @@
       "slug": "xiaomi-pad-7",
       "details": "Xiaomi Pad 7 is a sample item in Android Tablets. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Xiaomi Pad 7.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Pad%207",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 11,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -481,7 +481,7 @@
       "slug": "samsung-galaxy-tab-s10-fe",
       "details": "Samsung Galaxy Tab S10 FE is a sample item in Android Tablets. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Samsung Galaxy Tab S10 FE.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Galaxy%20Tab%20S10%20FE",
+      "mainImageUrl": "https://images.unsplash.com/photo-1561154464-82e9adf32764?auto=format&fit=crop&w=800&q=80",
       "categoryId": 11,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -492,7 +492,7 @@
       "slug": "honor-pad-9",
       "details": "Honor Pad 9 is a sample item in Android Tablets. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Honor Pad 9.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Honor%20Pad%209",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 11,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -503,7 +503,7 @@
       "slug": "apple-ipad-a16",
       "details": "Apple iPad A16 is a sample item in iPads. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPad A16.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20A16",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 12,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -514,7 +514,7 @@
       "slug": "apple-ipad-air-11-m3",
       "details": "Apple iPad Air 11 M3 is a sample item in iPads. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPad Air 11 M3.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20Air%2011%20M3",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 12,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -525,7 +525,7 @@
       "slug": "apple-ipad-mini-a17-pro",
       "details": "Apple iPad Mini A17 Pro is a sample item in iPads. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Apple iPad Mini A17 Pro.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20Mini%20A17%20Pro",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 12,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -536,7 +536,7 @@
       "slug": "oneplus-nord-buds-3-pro",
       "details": "OnePlus Nord Buds 3 Pro is a sample item in True Wireless Earbuds. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for OnePlus Nord Buds 3 Pro.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=OnePlus%20Nord%20Buds%203%20Pro",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "categoryId": 13,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -547,7 +547,7 @@
       "slug": "realme-buds-air-6",
       "details": "Realme Buds Air 6 is a sample item in True Wireless Earbuds. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Realme Buds Air 6.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Realme%20Buds%20Air%206",
+      "mainImageUrl": "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&w=800&q=80",
       "categoryId": 13,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -558,7 +558,7 @@
       "slug": "soundpeats-c30",
       "details": "SoundPEATS C30 is a sample item in True Wireless Earbuds. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for SoundPEATS C30.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=SoundPEATS%20C30",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "categoryId": 13,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -569,7 +569,7 @@
       "slug": "cmf-buds-2-pro",
       "details": "CMF Buds 2 Pro is a sample item in True Wireless Earbuds. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for CMF Buds 2 Pro.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=CMF%20Buds%202%20Pro",
+      "mainImageUrl": "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&w=800&q=80",
       "categoryId": 13,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -580,7 +580,7 @@
       "slug": "qcy-melobuds-n20",
       "details": "QCY MeloBuds N20 is a sample item in True Wireless Earbuds. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for QCY MeloBuds N20.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=QCY%20MeloBuds%20N20",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "categoryId": 13,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -591,7 +591,7 @@
       "slug": "qcy-h3-anc-headphones",
       "details": "QCY H3 ANC Headphones is a sample item in Headphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for QCY H3 ANC Headphones.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=QCY%20H3%20ANC%20Headphones",
+      "mainImageUrl": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
       "categoryId": 14,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -602,7 +602,7 @@
       "slug": "edifier-w820nb-plus",
       "details": "Edifier W820NB Plus is a sample item in Headphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Edifier W820NB Plus.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Edifier%20W820NB%20Plus",
+      "mainImageUrl": "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80",
       "categoryId": 14,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -613,7 +613,7 @@
       "slug": "soundcore-q20i",
       "details": "Soundcore Q20i is a sample item in Headphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Soundcore Q20i.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Soundcore%20Q20i",
+      "mainImageUrl": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
       "categoryId": 14,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -624,7 +624,7 @@
       "slug": "jbl-go-4",
       "details": "JBL Go 4 is a sample item in Speakers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for JBL Go 4.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=JBL%20Go%204",
+      "mainImageUrl": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=800&q=80",
       "categoryId": 15,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -635,7 +635,7 @@
       "slug": "anker-soundcore-select-4-go",
       "details": "Anker Soundcore Select 4 Go is a sample item in Speakers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Anker Soundcore Select 4 Go.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Soundcore%20Select%204%20Go",
+      "mainImageUrl": "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=800&q=80",
       "categoryId": 15,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -646,7 +646,7 @@
       "slug": "xiaomi-sound-pocket",
       "details": "Xiaomi Sound Pocket is a sample item in Speakers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Xiaomi Sound Pocket.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Sound%20Pocket",
+      "mainImageUrl": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=800&q=80",
       "categoryId": 15,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -657,7 +657,7 @@
       "slug": "redmi-watch-5-active",
       "details": "Redmi Watch 5 Active is a sample item in Smartwatches. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Redmi Watch 5 Active.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Watch%205%20Active",
+      "mainImageUrl": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
       "categoryId": 16,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -668,7 +668,7 @@
       "slug": "amazfit-bip-5",
       "details": "Amazfit Bip 5 is a sample item in Smartwatches. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Amazfit Bip 5.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Amazfit%20Bip%205",
+      "mainImageUrl": "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80",
       "categoryId": 16,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -679,7 +679,7 @@
       "slug": "cmf-watch-pro-2",
       "details": "CMF Watch Pro 2 is a sample item in Smartwatches. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for CMF Watch Pro 2.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=CMF%20Watch%20Pro%202",
+      "mainImageUrl": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
       "categoryId": 16,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -690,7 +690,7 @@
       "slug": "huawei-watch-fit-3",
       "details": "Huawei Watch Fit 3 is a sample item in Smartwatches. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Huawei Watch Fit 3.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Huawei%20Watch%20Fit%203",
+      "mainImageUrl": "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80",
       "categoryId": 16,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -701,7 +701,7 @@
       "slug": "xiaomi-smart-band-9",
       "details": "Xiaomi Smart Band 9 is a sample item in Fitness Bands. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Xiaomi Smart Band 9.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Smart%20Band%209",
+      "mainImageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "categoryId": 17,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -712,7 +712,7 @@
       "slug": "huawei-band-9",
       "details": "Huawei Band 9 is a sample item in Fitness Bands. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Huawei Band 9.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Huawei%20Band%209",
+      "mainImageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "categoryId": 17,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -723,7 +723,7 @@
       "slug": "amazfit-band-7",
       "details": "Amazfit Band 7 is a sample item in Fitness Bands. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Amazfit Band 7.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Amazfit%20Band%207",
+      "mainImageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "categoryId": 17,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -734,7 +734,7 @@
       "slug": "baseus-adaman-20000mah-22-5w",
       "details": "Baseus Adaman 20000mAh 22.5W is a sample item in Power Banks. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Baseus Adaman 20000mAh 22.5W.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Baseus%20Adaman%2020000mAh%2022.5W",
+      "mainImageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "categoryId": 18,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -745,7 +745,7 @@
       "slug": "anker-zolo-10000mah-30w",
       "details": "Anker Zolo 10000mAh 30W is a sample item in Power Banks. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Anker Zolo 10000mAh 30W.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Zolo%2010000mAh%2030W",
+      "mainImageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "categoryId": 18,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -756,7 +756,7 @@
       "slug": "xiaomi-20000mah-33w",
       "details": "Xiaomi 20000mAh 33W is a sample item in Power Banks. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Xiaomi 20000mAh 33W.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%2020000mAh%2033W",
+      "mainImageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "categoryId": 18,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -767,7 +767,7 @@
       "slug": "ugreen-nexode-20000mah-45w",
       "details": "Ugreen Nexode 20000mAh 45W is a sample item in Power Banks. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Ugreen Nexode 20000mAh 45W.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20Nexode%2020000mAh%2045W",
+      "mainImageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "categoryId": 18,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -778,7 +778,7 @@
       "slug": "anker-zolo-20w-usb-c-charger",
       "details": "Anker Zolo 20W USB-C Charger is a sample item in Wall Chargers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Anker Zolo 20W USB-C Charger.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Zolo%2020W%20USB-C%20Charger",
+      "mainImageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 19,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -789,7 +789,7 @@
       "slug": "samsung-25w-usb-c-adapter",
       "details": "Samsung 25W USB-C Adapter is a sample item in Wall Chargers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Samsung 25W USB-C Adapter.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%2025W%20USB-C%20Adapter",
+      "mainImageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 19,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -800,7 +800,7 @@
       "slug": "ugreen-nexode-65w-charger",
       "details": "Ugreen Nexode 65W Charger is a sample item in Wall Chargers. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Ugreen Nexode 65W Charger.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20Nexode%2065W%20Charger",
+      "mainImageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 19,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -811,7 +811,7 @@
       "slug": "ugreen-usb-c-to-usb-c-100w-cable",
       "details": "Ugreen USB-C to USB-C 100W Cable is a sample item in Cables. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Ugreen USB-C to USB-C 100W Cable.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20USB-C%20to%20USB-C%20100W%20Cable",
+      "mainImageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "categoryId": 20,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -822,7 +822,7 @@
       "slug": "baseus-usb-c-to-usb-c-60w-cable",
       "details": "Baseus USB-C to USB-C 60W Cable is a sample item in Cables. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Baseus USB-C to USB-C 60W Cable.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Baseus%20USB-C%20to%20USB-C%2060W%20Cable",
+      "mainImageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "categoryId": 20,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -833,7 +833,7 @@
       "slug": "anker-usb-c-to-lightning-cable",
       "details": "Anker USB-C to Lightning Cable is a sample item in Cables. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Anker USB-C to Lightning Cable.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20USB-C%20to%20Lightning%20Cable",
+      "mainImageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "categoryId": 20,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -844,7 +844,7 @@
       "slug": "hollyland-lark-a1-duo",
       "details": "Hollyland Lark A1 Duo is a sample item in Microphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Hollyland Lark A1 Duo.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Hollyland%20Lark%20A1%20Duo",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "categoryId": 21,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -855,7 +855,7 @@
       "slug": "dji-mic-mini",
       "details": "DJI Mic Mini is a sample item in Microphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for DJI Mic Mini.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Mic%20Mini",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "categoryId": 21,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -866,7 +866,7 @@
       "slug": "boya-mini-2",
       "details": "Boya Mini 2 is a sample item in Microphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Boya Mini 2.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Boya%20Mini%202",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "categoryId": 21,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -877,7 +877,7 @@
       "slug": "maono-wave-t1-mini",
       "details": "Maono Wave T1 Mini is a sample item in Microphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Maono Wave T1 Mini.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Maono%20Wave%20T1%20Mini",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "categoryId": 21,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -888,7 +888,7 @@
       "slug": "ulanzi-a100-wireless-mic",
       "details": "Ulanzi A100 Wireless Mic is a sample item in Microphones. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Ulanzi A100 Wireless Mic.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ulanzi%20A100%20Wireless%20Mic",
+      "mainImageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "categoryId": 21,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -899,7 +899,7 @@
       "slug": "dji-osmo-mobile-6",
       "details": "DJI Osmo Mobile 6 is a sample item in Tripods & Gimbals. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for DJI Osmo Mobile 6.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Osmo%20Mobile%206",
+      "mainImageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "categoryId": 22,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -910,7 +910,7 @@
       "slug": "dji-osmo-mobile-se",
       "details": "DJI Osmo Mobile SE is a sample item in Tripods & Gimbals. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for DJI Osmo Mobile SE.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Osmo%20Mobile%20SE",
+      "mainImageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "categoryId": 22,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -921,7 +921,7 @@
       "slug": "ulanzi-mt-44-tripod",
       "details": "Ulanzi MT-44 Tripod is a sample item in Tripods & Gimbals. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Ulanzi MT-44 Tripod.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ulanzi%20MT-44%20Tripod",
+      "mainImageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "categoryId": 22,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -932,7 +932,7 @@
       "slug": "logitech-k380-keyboard",
       "details": "Logitech K380 Keyboard is a sample item in Keyboards & Mice. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Logitech K380 Keyboard.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Logitech%20K380%20Keyboard",
+      "mainImageUrl": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
       "categoryId": 23,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -943,7 +943,7 @@
       "slug": "rapoo-m20-wireless-mouse",
       "details": "Rapoo M20 Wireless Mouse is a sample item in Keyboards & Mice. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Rapoo M20 Wireless Mouse.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Rapoo%20M20%20Wireless%20Mouse",
+      "mainImageUrl": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
       "categoryId": 23,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -954,7 +954,7 @@
       "slug": "redragon-k552-keyboard",
       "details": "Redragon K552 Keyboard is a sample item in Keyboards & Mice. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Redragon K552 Keyboard.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redragon%20K552%20Keyboard",
+      "mainImageUrl": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
       "categoryId": 23,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -965,7 +965,7 @@
       "slug": "logitech-m650-mouse",
       "details": "Logitech M650 Mouse is a sample item in Keyboards & Mice. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Logitech M650 Mouse.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Logitech%20M650%20Mouse",
+      "mainImageUrl": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
       "categoryId": 23,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -976,7 +976,7 @@
       "slug": "iphone-16-clear-case",
       "details": "iPhone 16 Clear Case is a sample item in Covers & Screen Protectors. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for iPhone 16 Clear Case.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPhone%2016%20Clear%20Case",
+      "mainImageUrl": "https://images.unsplash.com/photo-1601593346740-925612772716?auto=format&fit=crop&w=800&q=80",
       "categoryId": 24,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -987,7 +987,7 @@
       "slug": "redmi-note-14-pro-silicone-case",
       "details": "Redmi Note 14 Pro Silicone Case is a sample item in Covers & Screen Protectors. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Redmi Note 14 Pro Silicone Case.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Note%2014%20Pro%20Silicone%20Case",
+      "mainImageUrl": "https://images.unsplash.com/photo-1601593346740-925612772716?auto=format&fit=crop&w=800&q=80",
       "categoryId": 24,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -998,7 +998,7 @@
       "slug": "ipad-air-11-folio-case",
       "details": "iPad Air 11 Folio Case is a sample item in Covers & Screen Protectors. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for iPad Air 11 Folio Case.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPad%20Air%2011%20Folio%20Case",
+      "mainImageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "categoryId": 24,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -1009,7 +1009,7 @@
       "slug": "samsung-tab-s10-fe-tempered-glass",
       "details": "Samsung Tab S10 FE Tempered Glass is a sample item in Covers & Screen Protectors. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for Samsung Tab S10 FE Tempered Glass.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Tab%20S10%20FE%20Tempered%20Glass",
+      "mainImageUrl": "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80",
       "categoryId": 24,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -1020,7 +1020,7 @@
       "slug": "iphone-15-privacy-glass",
       "details": "iPhone 15 Privacy Glass is a sample item in Covers & Screen Protectors. Check specifications, availability, and warranty before selling.",
       "description": "Sample listing for iPhone 15 Privacy Glass.",
-      "mainImageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPhone%2015%20Privacy%20Glass",
+      "mainImageUrl": "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80",
       "categoryId": 24,
       "isDeleted": false,
       "createdAt": "2026-09-01T08:00:00Z"
@@ -1029,355 +1029,355 @@
   "productImages": [
     {
       "id": 1,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Galaxy%20A56",
+      "imageUrl": "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=800&q=80",
       "productId": 1,
       "sortOrder": 0
     },
     {
       "id": 2,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Note%2014%20Pro",
+      "imageUrl": "https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=800&q=80",
       "productId": 2,
       "sortOrder": 0
     },
     {
       "id": 3,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Nothing%20Phone%203a",
+      "imageUrl": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
       "productId": 3,
       "sortOrder": 0
     },
     {
       "id": 4,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Motorola%20Edge%2050%20Fusion",
+      "imageUrl": "https://images.unsplash.com/photo-1580910051074-3eb694886505?auto=format&fit=crop&w=800&q=80",
       "productId": 4,
       "sortOrder": 0
     },
     {
       "id": 5,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2016",
+      "imageUrl": "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=800&q=80",
       "productId": 5,
       "sortOrder": 0
     },
     {
       "id": 6,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2015",
+      "imageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80",
       "productId": 6,
       "sortOrder": 0
     },
     {
       "id": 7,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPhone%2016%20Pro",
+      "imageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80",
       "productId": 7,
       "sortOrder": 0
     },
     {
       "id": 8,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Pad%202",
+      "imageUrl": "https://images.unsplash.com/photo-1561154464-82e9adf32764?auto=format&fit=crop&w=800&q=80",
       "productId": 8,
       "sortOrder": 0
     },
     {
       "id": 9,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Pad%207",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 9,
       "sortOrder": 0
     },
     {
       "id": 10,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Galaxy%20Tab%20S10%20FE",
+      "imageUrl": "https://images.unsplash.com/photo-1561154464-82e9adf32764?auto=format&fit=crop&w=800&q=80",
       "productId": 10,
       "sortOrder": 0
     },
     {
       "id": 11,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Honor%20Pad%209",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 11,
       "sortOrder": 0
     },
     {
       "id": 12,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20A16",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 12,
       "sortOrder": 0
     },
     {
       "id": 13,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20Air%2011%20M3",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 13,
       "sortOrder": 0
     },
     {
       "id": 14,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Apple%20iPad%20Mini%20A17%20Pro",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 14,
       "sortOrder": 0
     },
     {
       "id": 15,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=OnePlus%20Nord%20Buds%203%20Pro",
+      "imageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "productId": 15,
       "sortOrder": 0
     },
     {
       "id": 16,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Realme%20Buds%20Air%206",
+      "imageUrl": "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&w=800&q=80",
       "productId": 16,
       "sortOrder": 0
     },
     {
       "id": 17,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=SoundPEATS%20C30",
+      "imageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "productId": 17,
       "sortOrder": 0
     },
     {
       "id": 18,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=CMF%20Buds%202%20Pro",
+      "imageUrl": "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?auto=format&fit=crop&w=800&q=80",
       "productId": 18,
       "sortOrder": 0
     },
     {
       "id": 19,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=QCY%20MeloBuds%20N20",
+      "imageUrl": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
       "productId": 19,
       "sortOrder": 0
     },
     {
       "id": 20,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=QCY%20H3%20ANC%20Headphones",
+      "imageUrl": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
       "productId": 20,
       "sortOrder": 0
     },
     {
       "id": 21,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Edifier%20W820NB%20Plus",
+      "imageUrl": "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80",
       "productId": 21,
       "sortOrder": 0
     },
     {
       "id": 22,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Soundcore%20Q20i",
+      "imageUrl": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80",
       "productId": 22,
       "sortOrder": 0
     },
     {
       "id": 23,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=JBL%20Go%204",
+      "imageUrl": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=800&q=80",
       "productId": 23,
       "sortOrder": 0
     },
     {
       "id": 24,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Soundcore%20Select%204%20Go",
+      "imageUrl": "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=800&q=80",
       "productId": 24,
       "sortOrder": 0
     },
     {
       "id": 25,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Sound%20Pocket",
+      "imageUrl": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=800&q=80",
       "productId": 25,
       "sortOrder": 0
     },
     {
       "id": 26,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Watch%205%20Active",
+      "imageUrl": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
       "productId": 26,
       "sortOrder": 0
     },
     {
       "id": 27,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Amazfit%20Bip%205",
+      "imageUrl": "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80",
       "productId": 27,
       "sortOrder": 0
     },
     {
       "id": 28,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=CMF%20Watch%20Pro%202",
+      "imageUrl": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
       "productId": 28,
       "sortOrder": 0
     },
     {
       "id": 29,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Huawei%20Watch%20Fit%203",
+      "imageUrl": "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80",
       "productId": 29,
       "sortOrder": 0
     },
     {
       "id": 30,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%20Smart%20Band%209",
+      "imageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "productId": 30,
       "sortOrder": 0
     },
     {
       "id": 31,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Huawei%20Band%209",
+      "imageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "productId": 31,
       "sortOrder": 0
     },
     {
       "id": 32,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Amazfit%20Band%207",
+      "imageUrl": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=800&q=80",
       "productId": 32,
       "sortOrder": 0
     },
     {
       "id": 33,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Baseus%20Adaman%2020000mAh%2022.5W",
+      "imageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "productId": 33,
       "sortOrder": 0
     },
     {
       "id": 34,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Zolo%2010000mAh%2030W",
+      "imageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "productId": 34,
       "sortOrder": 0
     },
     {
       "id": 35,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Xiaomi%2020000mAh%2033W",
+      "imageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "productId": 35,
       "sortOrder": 0
     },
     {
       "id": 36,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20Nexode%2020000mAh%2045W",
+      "imageUrl": "https://images.unsplash.com/photo-1609592424361-b4f0f62fe939?auto=format&fit=crop&w=800&q=80",
       "productId": 36,
       "sortOrder": 0
     },
     {
       "id": 37,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20Zolo%2020W%20USB-C%20Charger",
+      "imageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "productId": 37,
       "sortOrder": 0
     },
     {
       "id": 38,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%2025W%20USB-C%20Adapter",
+      "imageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "productId": 38,
       "sortOrder": 0
     },
     {
       "id": 39,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20Nexode%2065W%20Charger",
+      "imageUrl": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80",
       "productId": 39,
       "sortOrder": 0
     },
     {
       "id": 40,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ugreen%20USB-C%20to%20USB-C%20100W%20Cable",
+      "imageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "productId": 40,
       "sortOrder": 0
     },
     {
       "id": 41,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Baseus%20USB-C%20to%20USB-C%2060W%20Cable",
+      "imageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "productId": 41,
       "sortOrder": 0
     },
     {
       "id": 42,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Anker%20USB-C%20to%20Lightning%20Cable",
+      "imageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80",
       "productId": 42,
       "sortOrder": 0
     },
     {
       "id": 43,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Hollyland%20Lark%20A1%20Duo",
+      "imageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "productId": 43,
       "sortOrder": 0
     },
     {
       "id": 44,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Mic%20Mini",
+      "imageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "productId": 44,
       "sortOrder": 0
     },
     {
       "id": 45,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Boya%20Mini%202",
+      "imageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "productId": 45,
       "sortOrder": 0
     },
     {
       "id": 46,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Maono%20Wave%20T1%20Mini",
+      "imageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "productId": 46,
       "sortOrder": 0
     },
     {
       "id": 47,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ulanzi%20A100%20Wireless%20Mic",
+      "imageUrl": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
       "productId": 47,
       "sortOrder": 0
     },
     {
       "id": 48,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Osmo%20Mobile%206",
+      "imageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "productId": 48,
       "sortOrder": 0
     },
     {
       "id": 49,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=DJI%20Osmo%20Mobile%20SE",
+      "imageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "productId": 49,
       "sortOrder": 0
     },
     {
       "id": 50,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Ulanzi%20MT-44%20Tripod",
+      "imageUrl": "https://images.unsplash.com/photo-1589872765306-0370607d727b?auto=format&fit=crop&w=800&q=80",
       "productId": 50,
       "sortOrder": 0
     },
     {
       "id": 51,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Logitech%20K380%20Keyboard",
+      "imageUrl": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
       "productId": 51,
       "sortOrder": 0
     },
     {
       "id": 52,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Rapoo%20M20%20Wireless%20Mouse",
+      "imageUrl": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
       "productId": 52,
       "sortOrder": 0
     },
     {
       "id": 53,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redragon%20K552%20Keyboard",
+      "imageUrl": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
       "productId": 53,
       "sortOrder": 0
     },
     {
       "id": 54,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Logitech%20M650%20Mouse",
+      "imageUrl": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
       "productId": 54,
       "sortOrder": 0
     },
     {
       "id": 55,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPhone%2016%20Clear%20Case",
+      "imageUrl": "https://images.unsplash.com/photo-1601593346740-925612772716?auto=format&fit=crop&w=800&q=80",
       "productId": 55,
       "sortOrder": 0
     },
     {
       "id": 56,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Redmi%20Note%2014%20Pro%20Silicone%20Case",
+      "imageUrl": "https://images.unsplash.com/photo-1601593346740-925612772716?auto=format&fit=crop&w=800&q=80",
       "productId": 56,
       "sortOrder": 0
     },
     {
       "id": 57,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPad%20Air%2011%20Folio%20Case",
+      "imageUrl": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80",
       "productId": 57,
       "sortOrder": 0
     },
     {
       "id": 58,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=Samsung%20Tab%20S10%20FE%20Tempered%20Glass",
+      "imageUrl": "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80",
       "productId": 58,
       "sortOrder": 0
     },
     {
       "id": 59,
-      "imageUrl": "https://placehold.co/800x800/e8eff7/16324f.png?text=iPhone%2015%20Privacy%20Glass",
+      "imageUrl": "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80",
       "productId": 59,
       "sortOrder": 0
     }
@@ -6296,38 +6296,50 @@
   "carouselSlides": [
     {
       "id": 1,
-      "eyebrow": "JAS International",
-      "title": "Your tech. Your next upgrade.",
-      "copy": "Explore phones, tablets and everyday accessories.",
-      "imageUrl": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1800&q=80",
-      "imageAlt": "Smartphone",
-      "linkUrl": "/category/phones",
-      "linkText": "Shop phones",
+      "eyebrow": "APPLE INTELLIGENCE READY",
+      "title": "iPhone 16 Pro Max \u00b7 Titanium Precision",
+      "copy": "Grade 5 Titanium design. Powered by the breakthrough A18 Pro chip with 4K 120 fps Dolby Vision.",
+      "imageUrl": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=1920&q=85",
+      "imageAlt": "Apple iPhone 16 Pro Max Flagship",
+      "linkUrl": "/product/apple-iphone-16-pro",
+      "linkText": "Order Now",
       "sortOrder": 1,
       "isActive": true
     },
     {
       "id": 2,
-      "eyebrow": "Audio",
-      "title": "Find your everyday sound",
-      "copy": "Explore our earbuds, headphones and speakers.",
-      "imageUrl": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1800&q=80",
-      "imageAlt": "Headphones",
-      "linkUrl": "/category/headphones",
-      "linkText": "Explore audio",
+      "eyebrow": "NEXT-GEN GALAXY AI",
+      "title": "Galaxy S25 Ultra \u00b7 Beyond Epic",
+      "copy": "Snapdragon 8 Elite, 200MP Quad Telephoto camera system, and built-in S Pen.",
+      "imageUrl": "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=1920&q=85",
+      "imageAlt": "Samsung Galaxy S25 Ultra Flagship",
+      "linkUrl": "/category/android-phones",
+      "linkText": "Discover Galaxy",
       "sortOrder": 2,
       "isActive": true
     },
     {
       "id": 3,
-      "eyebrow": "Power & accessories",
-      "title": "Keep your essentials ready",
-      "copy": "Chargers, power banks and cables for your daily routine.",
-      "imageUrl": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1800&q=80",
-      "imageAlt": "Computer accessories",
-      "linkUrl": "/category/accessories",
-      "linkText": "Shop accessories",
+      "eyebrow": "STUDIO GRADE SOUND",
+      "title": "Sony WH-1000XM5 & AirPods Pro 2",
+      "copy": "Immerse in pure acoustics with industry-leading Active Noise Cancellation and Spatial Audio.",
+      "imageUrl": "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1920&q=85",
+      "imageAlt": "Premium Wireless ANC Headphones",
+      "linkUrl": "/category/audio",
+      "linkText": "Explore Audio",
       "sortOrder": 3,
+      "isActive": true
+    },
+    {
+      "id": 4,
+      "eyebrow": "FAST CHARGE ECOSYSTEM",
+      "title": "Anker GaNPrime\u2122 140W & Qi2 Wireless",
+      "copy": "Ultra-compact high-speed multi-device charging for your laptop, phone, and wearables.",
+      "imageUrl": "https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=1920&q=85",
+      "imageAlt": "Anker GaN Fast Charging Ecosystem",
+      "linkUrl": "/category/power-charging",
+      "linkText": "Shop Power Gear",
+      "sortOrder": 4,
       "isActive": true
     }
   ],

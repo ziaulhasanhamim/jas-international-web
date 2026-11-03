@@ -105,6 +105,10 @@ public sealed class OrderEditForm
     public int Id { get; set; }
     [Required]
     public string Status { get; set; } = "Pending";
+    public string? CourierName { get; set; }
+    public string? CourierTrackingId { get; set; }
+    public string? CourierTrackingUrl { get; set; }
+    public string? AdminNotes { get; set; }
 }
 
 public sealed class RoleEditForm

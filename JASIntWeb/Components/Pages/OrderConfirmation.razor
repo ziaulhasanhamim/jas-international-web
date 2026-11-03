@@ -1,20 +1,29 @@
 @page "/order/{Id:int}"
 @page "/order/{Token:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
 @inject IServiceScopeFactory ScopeFactory
 @inject NavigationManager Nav
 
-<PageTitle>Order Confirmation · JAS International</PageTitle>
+<PageTitle>@(order is null ? "Order Details" : $"Order #{order.Id} · {order.Status}") · JAS International</PageTitle>
 
 <div class="shop-container py-12 max-w-3xl mx-auto">
-    @if (order is null)
+    @if (isLoading)
+    {
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
+            <span class="inline-block size-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></span>
+            <p class="text-sm font-semibold text-slate-700">Loading order status…</p>
+        </div>
+    }
+    else if (order is null)
     {
         <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
             <Icon Name="alert" Class="size-12 text-slate-300 mx-auto mb-3" />
             <h1 class="text-2xl font-bold text-slate-900">Order Not Found</h1>
-            <p class="text-xs text-slate-500 mt-2 mb-6">The requested order reference could not be located.</p>
+            <p class="text-xs text-slate-500 mt-2 mb-6">The requested order reference could not be located or payment is awaiting initial verification.</p>
             <a href="/products" class="btn-primary">Return to Catalog</a>
         </div>
     }
@@ -24,44 +33,52 @@
 
         var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
         var isCancelled = order.Status == OrderStatus.Cancelled;
-        var hasSubmittedTrx = !string.IsNullOrEmpty(order.TransactionId);
+        var isDelivered = order.Status == OrderStatus.Delivered;
+        var isInTransit = order.Status == OrderStatus.InTransit;
+        var isProcessing = order.Status == OrderStatus.Processing;
 
         <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isPaymentVerified ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-800")) p-8 text-white text-center">
-                <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isPaymentVerified ? "text-emerald-600" : "text-blue-600")) mx-auto mb-4 shadow-md">
+            <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isDelivered ? "from-emerald-600 via-teal-600 to-emerald-700" : (isInTransit ? "from-purple-600 via-indigo-600 to-blue-700" : "from-blue-600 via-indigo-600 to-blue-700"))) p-8 text-white text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isDelivered ? "text-emerald-600" : (isInTransit ? "text-purple-600" : "text-blue-600"))) mx-auto mb-4 shadow-md">
                     @if (isCancelled)
                     {
                         <Icon Name="close" Class="size-8" />
                     }
-                    else if (isPaymentVerified)
+                    else if (isDelivered)
                     {
                         <Icon Name="check" Class="size-8" />
                     }
+                    else if (isInTransit)
+                    {
+                        <Icon Name="truck" Class="size-8" />
+                    }
                     else
                     {
-                        <svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <Icon Name="box" Class="size-8" />
                     }
                 </span>
 
                 <span class="text-xs font-bold uppercase tracking-widest text-white/90 block mb-1">
                     @if (isCancelled)
                     {
-                        <span>ORDER CANCELLED · PAYMENT NOT RECEIVED</span>
+                        <span>ORDER CANCELLED</span>
                     }
-                    else if (isPaymentVerified)
+                    else if (isDelivered)
                     {
-                        <span>PAYMENT VERIFIED · PENDING ADMIN CONFIRMATION</span>
+                        <span>ORDER DELIVERED &amp; COMPLETED</span>
                     }
-                    else if (hasSubmittedTrx)
+                    else if (isInTransit)
                     {
-                        <span>ORDER PLACED · AWAITING PAYMENT VERIFICATION</span>
+                        <span>DISPATCHED · OUT FOR DELIVERY</span>
+                    }
+                    else if (isProcessing)
+                    {
+                        <span>CONFIRMED · PACKAGING IN PROGRESS</span>
                     }
                     else
                     {
-                        <span>ORDER PLACED · PAYMENT REQUIRED</span>
+                        <span>ORDER PLACED · PENDING DISPATCH</span>
                     }
                 </span>
 
@@ -70,9 +87,17 @@
                     {
                         <span>Order #@order.Id Cancelled</span>
                     }
-                    else if (isPaymentVerified)
+                    else if (isDelivered)
                     {
-                        <span>Payment Verified!</span>
+                        <span>Delivered Successfully!</span>
+                    }
+                    else if (isInTransit)
+                    {
+                        <span>Order #@order.Id Is On The Way!</span>
+                    }
+                    else if (isProcessing)
+                    {
+                        <span>Order #@order.Id Confirmed!</span>
                     }
                     else
                     {
@@ -83,25 +108,156 @@
                 <p class="text-xs text-white/90 mt-2 max-w-lg mx-auto">
                     @if (isCancelled)
                     {
-                        <span>This order was cancelled because advance payment was not received or could not be verified. Any reserved stock has been released. If you have questions, please contact our support team.</span>
+                        <span>This order was cancelled. Any reserved stock has been released. If you have questions, please contact our showroom support team.</span>
                     }
-                    else if (isPaymentVerified)
+                    else if (isDelivered)
                     {
-                        <span>Your bKash payment of ৳@order.PaidAmount.ToString("N0") has been verified. Order #@order.Id is reserved and queued for admin dispatch confirmation.</span>
+                        <span>Your order has been delivered and fulfilled. Thank you for choosing JAS International for your authentic tech upgrades!</span>
                     }
-                    else if (hasSubmittedTrx)
+                    else if (isInTransit)
                     {
-                        <span>We have recorded your bKash transaction (TrxID: <strong>@order.TransactionId</strong>). Verification is in progress. <strong>You can safely close this page or browse other products.</strong></span>
+                        <span>Your parcel has been handed over to @(order.CourierName ?? "our delivery courier"). It is currently on the way to your shipping address.</span>
+                    }
+                    else if (isProcessing)
+                    {
+                        <span>Your payment has been verified. Our inventory team is currently packing your items with warranty inspection.</span>
                     }
                     else
                     {
-                        <span>Order #@order.Id has been registered. Please complete your bKash payment to initiate shipping.</span>
+                        <span>Order #@order.Id has been registered in our system and is queued for fulfillment confirmation.</span>
                     }
                 </p>
             </div>
 
-            <!-- Receipt Body -->
+            <!-- Receipt & Tracking Stepper Body -->
             <div class="p-6 sm:p-8 space-y-6">
+
+                <!-- 5-Stage Visual Progress Stepper -->
+                <div class="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-200/80 pb-3">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <span class="relative flex size-2.5">
+                                @if (!isDelivered && !isCancelled)
+                                {
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full size-2.5 bg-blue-600"></span>
+                                }
+                                else if (isDelivered)
+                                {
+                                    <span class="relative inline-flex rounded-full size-2.5 bg-emerald-600"></span>
+                                }
+                                else
+                                {
+                                    <span class="relative inline-flex rounded-full size-2.5 bg-rose-600"></span>
+                                }
+                            </span>
+                            Live Order Tracking
+                        </span>
+
+                        <span class="text-xs text-slate-500 font-medium">
+                            @if (isDelivered && order.DeliveredAt.HasValue)
+                            {
+                                <span>Completed @order.DeliveredAt.Value.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</span>
+                            }
+                            else
+                            {
+                                <span>Placed @order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM, hh:mm tt")</span>
+                            }
+                        </span>
+                    </div>
+
+                    @if (isCancelled)
+                    {
+                        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900 flex items-center gap-3">
+                            <Icon Name="close" Class="size-5 text-rose-600 shrink-0" />
+                            <div>
+                                <strong class="font-bold block">Order Cancelled</strong>
+                                <span class="text-rose-700">This order was cancelled and inventory released.</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <!-- Step 1: Placed -->
+                            <div class="rounded-xl border p-3 bg-white border-emerald-200 shadow-2xs">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold">✓</span>
+                                    <span class="text-xs font-bold text-emerald-950">1. Placed</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500">Order registered</p>
+                            </div>
+
+                            <!-- Step 2: Confirmed / Payment -->
+                            @{
+                                var isStep2Done = isPaymentVerified || isProcessing || isInTransit || isDelivered;
+                            }
+                            <div class="rounded-xl border p-3 bg-white @(isStep2Done ? "border-emerald-200 shadow-2xs" : "border-slate-200 opacity-60")">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="flex size-5 items-center justify-center rounded-full @(isStep2Done ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600") text-[10px] font-bold">
+                                        @(isStep2Done ? "✓" : "2")
+                                    </span>
+                                    <span class="text-xs font-bold @(isStep2Done ? "text-emerald-950" : "text-slate-700")">2. Confirmed</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500">@(isPaymentVerified ? "bKash Verified" : "Order Confirmed")</p>
+                            </div>
+
+                            <!-- Step 3: Dispatched -->
+                            @{
+                                var isStep3Done = isInTransit || isDelivered;
+                            }
+                            <div class="rounded-xl border p-3 bg-white @(isStep3Done ? "border-emerald-200 shadow-2xs" : (isProcessing ? "border-blue-300 ring-2 ring-blue-500/20 shadow-2xs" : "border-slate-200 opacity-60"))">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="flex size-5 items-center justify-center rounded-full @(isStep3Done ? "bg-emerald-600 text-white" : (isProcessing ? "bg-blue-600 text-white animate-pulse" : "bg-slate-200 text-slate-600")) text-[10px] font-bold">
+                                        @(isStep3Done ? "✓" : "3")
+                                    </span>
+                                    <span class="text-xs font-bold @(isStep3Done ? "text-emerald-950" : (isProcessing ? "text-blue-900" : "text-slate-700"))">3. Dispatched</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500">@(string.IsNullOrEmpty(order.CourierName) ? (isInTransit ? "In Delivery" : "Packaging") : order.CourierName)</p>
+                            </div>
+
+                            <!-- Step 4: Delivered -->
+                            <div class="rounded-xl border p-3 bg-white @(isDelivered ? "border-emerald-300 bg-emerald-50/50 shadow-2xs font-bold" : "border-slate-200 opacity-60")">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="flex size-5 items-center justify-center rounded-full @(isDelivered ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600") text-[10px] font-bold">
+                                        @(isDelivered ? "✓" : "4")
+                                    </span>
+                                    <span class="text-xs font-bold @(isDelivered ? "text-emerald-950" : "text-slate-700")">4. Delivered</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500">@(isDelivered ? "Received" : "Pending")</p>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Courier Tracking Banner if Available -->
+                    @if (!string.IsNullOrEmpty(order.CourierTrackingId) || !string.IsNullOrEmpty(order.CourierName))
+                    {
+                        <div class="mt-4 pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                            <div class="flex items-center gap-2">
+                                <Icon Name="truck" Class="size-4 text-blue-600 shrink-0" />
+                                <div>
+                                    <span class="text-slate-500">Courier Provider:</span>
+                                    <strong class="text-slate-900 ml-1">@(order.CourierName ?? "Standard Delivery")</strong>
+                                    @if (!string.IsNullOrEmpty(order.CourierTrackingId))
+                                    {
+                                        <span class="ml-2 font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 font-bold">
+                                            @order.CourierTrackingId
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(order.CourierTrackingUrl))
+                            {
+                                <a href="@order.CourierTrackingUrl" target="_blank" rel="noopener noreferrer" class="btn-secondary !py-1 !px-3 text-xs inline-flex items-center gap-1.5 shrink-0">
+                                    <span>Track Courier Parcel</span>
+                                    <span class="text-[10px]">↗</span>
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+
                 <!-- Delivery Info Card -->
                 <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
                     <div>
@@ -119,7 +275,7 @@
                     <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
                         <span class="text-slate-400 block font-medium">Payment Mode:</span>
                         <strong class="text-slate-900 text-sm">
-                            @(order.PaidAmount > 0 ? "Advance Paid (bKash)" : (hasSubmittedTrx ? "bKash Verification Pending" : "Cash on Delivery / Pending"))
+                            @(order.PaidAmount > 0 ? "Advance Paid (bKash)" : "Cash on Delivery / Showroom")
                         </strong>
                         @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
                         {
@@ -136,120 +292,73 @@
                                     <span class="size-1.5 rounded-full bg-emerald-500"></span> Payment Verified (৳@order.PaidAmount.ToString("N0"))
                                 </span>
                             }
-                            else if (hasSubmittedTrx)
+                            else if (isCancelled)
                             {
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-600/20 animate-pulse">
-                                    <span class="size-1.5 rounded-full bg-amber-500"></span> Awaiting Payment Verification
+                                <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-600/20">
+                                    Order Cancelled
                                 </span>
                             }
                             else
                             {
-                                <a href="/checkout/payment/@order.PublicToken" class="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition">
-                                    <span>Complete bKash Payment →</span>
-                                </a>
+                                <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-600/20">
+                                    Cash on Delivery
+                                </span>
                             }
                         </div>
                     </div>
                 </div>
 
-                @if (!isPaymentVerified && hasSubmittedTrx)
-                {
-                    <!-- Reassuring Information Notice -->
-                    <div class="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 space-y-1.5">
-                        <div class="flex items-center gap-2 font-bold text-blue-950 text-sm">
-                            <span class="flex size-5 items-center justify-center rounded-full bg-blue-200 text-blue-800 text-xs font-bold">i</span>
-                            <span>Payment Verification in Progress</span>
-                        </div>
-                        <p class="text-blue-900 text-xs">
-                            Your transaction ID <strong class="font-mono text-slate-900">@order.TransactionId</strong> from sender <strong class="font-mono text-slate-900">@order.SenderPhoneNumber</strong> is recorded.
-                            Our automated bKash SMS system or admin will verify your payment shortly.
-                        </p>
-                        <p class="text-blue-800 text-[11px] pt-1 border-t border-blue-200/60">
-                            ✓ <strong>You can safely close this tab or browse other pages.</strong> Your item stock is secured.
-                            @if (!string.IsNullOrEmpty(order.DeliveryAddress?.Email))
-                            {
-                                <span> An email confirmation will be sent to <strong>@order.DeliveryAddress?.Email</strong> once payment is verified.</span>
-                            }
-                        </p>
-                        <div class="mt-2 pt-2 border-t border-blue-200/60 flex items-center gap-2 text-[11px] font-semibold text-blue-800">
-                            <span class="relative flex size-2 shrink-0">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full size-2 bg-blue-600"></span>
-                            </span>
-                            <span>Auto-checking live verification… Leaving this page open will automatically update to your final verified receipt upon confirmation.</span>
-                        </div>
+                <!-- Ordered Items Table -->
+                <div class="rounded-2xl border border-slate-200/90 overflow-hidden">
+                    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200/80 font-bold text-xs text-slate-700">
+                        Ordered Items (@order.Items.Count)
                     </div>
-                }
-
-                <!-- Line Items Table -->
-                <div class="border-t border-slate-100 pt-5">
-                    <h3 class="font-bold text-slate-900 text-sm mb-3">Order Details</h3>
                     <div class="divide-y divide-slate-100">
                         @foreach (var item in order.Items)
                         {
-                            <div class="py-3 flex items-center justify-between text-xs">
+                            <div class="p-4 flex items-center justify-between text-xs gap-3">
                                 <div>
-                                    <strong class="text-slate-900 block font-semibold">@item.ProductName</strong>
-                                    <span class="text-slate-400">@item.VariantName · Qty: @item.Quantity</span>
+                                    <strong class="text-slate-900 block text-sm">@item.ProductName</strong>
+                                    <span class="text-slate-500">@item.VariantName · Qty: @item.Quantity</span>
                                 </div>
-                                <span class="font-semibold text-slate-900 tabular-nums">৳@item.LineTotal.ToString("N0")</span>
+                                <div class="text-right">
+                                    <span class="font-bold text-slate-900 text-sm tabular-nums">৳@item.LineTotal.ToString("N0")</span>
+                                    <span class="text-[11px] text-slate-400 block">৳@item.UnitPrice.ToString("N0") each</span>
+                                </div>
                             </div>
                         }
                     </div>
-
-                    <!-- Totals -->
-                    <div class="border-t border-slate-200 mt-4 pt-4 space-y-2 text-xs">
+                    <div class="bg-slate-50/80 p-4 border-t border-slate-200/80 space-y-1.5 text-xs">
                         <div class="flex justify-between text-slate-600">
                             <span>Subtotal</span>
-                            <span class="font-semibold text-slate-900 tabular-nums">৳@order.Subtotal.ToString("N0")</span>
+                            <span class="font-medium tabular-nums">৳@order.Subtotal.ToString("N0")</span>
                         </div>
                         <div class="flex justify-between text-slate-600">
                             <span>Delivery Fee</span>
-                            <span class="font-semibold text-slate-900 tabular-nums">৳@order.DeliveryCharge.ToString("N0")</span>
+                            <span class="font-medium tabular-nums">৳@order.DeliveryCharge.ToString("N0")</span>
                         </div>
                         @if (order.DiscountAmount > 0)
                         {
-                            <div class="flex justify-between text-emerald-600 font-semibold">
-                                <span>Coupon Discount (@order.CouponCode)</span>
+                            <div class="flex justify-between text-emerald-700 font-medium">
+                                <span>Discount @(string.IsNullOrEmpty(order.CouponCode) ? "" : $"({order.CouponCode})")</span>
                                 <span class="tabular-nums">-৳@order.DiscountAmount.ToString("N0")</span>
                             </div>
                         }
-                        <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base">
-                            <span class="font-bold text-slate-900">Total Order Amount</span>
-                            <span class="font-extrabold text-blue-600 text-xl tabular-nums">৳@order.Total.ToString("N0")</span>
+                        <div class="pt-2 border-t border-slate-200 flex justify-between text-sm font-extrabold text-slate-900">
+                            <span>Total Amount</span>
+                            <span class="text-blue-600 tabular-nums">৳@order.Total.ToString("N0")</span>
                         </div>
-
-                        <div class="rounded-xl bg-slate-50 border p-3 mt-2 text-[11px] space-y-1">
-                            @if (isPaymentVerified)
-                            {
-                                <div class="flex justify-between text-slate-700">
-                                    <span>Verified Paid Amount:</span>
-                                    <strong class="text-emerald-600">৳@order.PaidAmount.ToString("N0")</strong>
-                                </div>
-                                <div class="flex justify-between text-slate-700">
-                                    <span>Due on Delivery (Courier):</span>
-                                    <strong class="text-slate-900">৳@Math.Max(0, order.Total - order.PaidAmount).ToString("N0")</strong>
-                                </div>
-                            }
-                            else if (hasSubmittedTrx)
-                            {
-                                <div class="flex justify-between text-slate-700">
-                                    <span>Payment Status:</span>
-                                    <strong class="text-amber-600">Awaiting Verification</strong>
-                                </div>
-                                <div class="flex justify-between text-slate-500">
-                                    <span>Claimed TrxID:</span>
-                                    <span class="font-mono font-bold">@order.TransactionId</span>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="flex justify-between text-slate-700">
-                                    <span>Payment Status:</span>
-                                    <strong class="text-rose-600">Unpaid</strong>
-                                </div>
-                            }
-                        </div>
+                        @if (order.PaidAmount > 0)
+                        {
+                            <div class="flex justify-between text-xs font-semibold text-emerald-700">
+                                <span>Paid (Advance bKash)</span>
+                                <span class="tabular-nums">৳@order.PaidAmount.ToString("N0")</span>
+                            </div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700">
+                                <span>Balance Payable on Delivery</span>
+                                <span class="tabular-nums">৳@Math.Max(0, order.Total - order.PaidAmount).ToString("N0")</span>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -257,7 +366,7 @@
                 <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <a href="/orders" class="btn-primary w-full sm:w-auto text-xs">
                         <Icon Name="receipt" Class="size-4" />
-                        View Your Orders
+                        View All Orders
                     </a>
                     <a href="/products" class="btn-secondary w-full sm:w-auto text-xs">
                         Continue Shopping
@@ -277,42 +386,130 @@
     public Guid? Token { get; set; }
 
     private Order? order;
+    private bool isLoading = true;
+    private CancellationTokenSource? cts;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadOrderAsync();
     }
 
-    private async Task LoadOrderAsync()
+    protected override void OnAfterRender(bool firstRender)
     {
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var q = db.Orders.AsNoTracking()
-            .Include(o => o.Items)
-            .Include(o => o.DeliveryAddress)
-            .Include(o => o.Payments)
-            .AsQueryable();
-
-        if (Id.HasValue && Id.Value > 0)
+        if (firstRender && order != null && order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Cancelled)
         {
-            order = await q.FirstOrDefaultAsync(o => o.Id == Id.Value);
+            cts = new CancellationTokenSource();
+            _ = MonitorOrderStatusAsync(cts.Token);
         }
-        else if (Token.HasValue && Token.Value != Guid.Empty)
-        {
-            order = await q.FirstOrDefaultAsync(o => o.PublicToken == Token.Value);
-        }
+    }
 
-        if (order != null)
+    private async Task MonitorOrderStatusAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.5));
+        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
-            var isCancelled = order.Status == OrderStatus.Cancelled;
-
-            // Rule: Before payment is verified or cancelled, /order/{orderId} returns not found!
-            if (!isPaymentVerified && !isCancelled)
+            try
             {
-                order = null;
+                await using var scope = ScopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var latest = await db.Orders.AsNoTracking()
+                    .Where(o => o.Id == order!.Id)
+                    .Select(o => new
+                    {
+                        o.Status,
+                        o.DeliveredAt,
+                        o.CourierName,
+                        o.CourierTrackingId,
+                        o.CourierTrackingUrl,
+                        o.PaidAmount
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+                if (latest != null)
+                {
+                    bool changed = order!.Status != latest.Status
+                        || order.DeliveredAt != latest.DeliveredAt
+                        || order.CourierName != latest.CourierName
+                        || order.CourierTrackingId != latest.CourierTrackingId
+                        || order.CourierTrackingUrl != latest.CourierTrackingUrl
+                        || order.PaidAmount != latest.PaidAmount;
+
+                    if (changed)
+                    {
+                        order.Status = latest.Status;
+                        order.DeliveredAt = latest.DeliveredAt;
+                        order.CourierName = latest.CourierName;
+                        order.CourierTrackingId = latest.CourierTrackingId;
+                        order.CourierTrackingUrl = latest.CourierTrackingUrl;
+                        order.PaidAmount = latest.PaidAmount;
+
+                        await InvokeAsync(StateHasChanged);
+
+                        if (order.Status == OrderStatus.Delivered || order.Status == OrderStatus.Cancelled)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Silently retry next tick
             }
         }
+    }
+
+    private async Task LoadOrderAsync()
+    {
+        isLoading = true;
+        try
+        {
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var q = db.Orders.AsNoTracking()
+                .Include(o => o.Items)
+                .Include(o => o.DeliveryAddress)
+                .Include(o => o.Payments)
+                .AsQueryable();
+
+            if (Id.HasValue && Id.Value > 0)
+            {
+                order = await q.FirstOrDefaultAsync(o => o.Id == Id.Value);
+            }
+            else if (Token.HasValue && Token.Value != Guid.Empty)
+            {
+                order = await q.FirstOrDefaultAsync(o => o.PublicToken == Token.Value);
+            }
+
+            if (order != null)
+            {
+                var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
+                var isCancelled = order.Status == OrderStatus.Cancelled;
+                var isCodOnly = !order.Payments.Any(p => p.Method == PaymentMethod.Bkash) && string.IsNullOrEmpty(order.TransactionId);
+
+                // If bKash transaction is unverified, redirect customer to the payment-verification holding screen!
+                if (!isPaymentVerified && !isCancelled && !isCodOnly)
+                {
+                    Nav.NavigateTo($"/payment-verification?orderid={order.Id}", replace: true);
+                    return;
+                }
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        cts?.Dispose();
     }
 }
