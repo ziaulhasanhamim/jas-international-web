@@ -11,6 +11,7 @@ builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
 builder.Services.AddScoped<AdminService>();
