@@ -71,6 +71,26 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
                 IsBodyHtml = true,
                 BodyEncoding = Encoding.UTF8
             };
+
+            // Generate clean plain-text fallback (crucial for spam filter deliverability scores)
+            var plainText = System.Text.RegularExpressions.Regex.Replace(htmlBody, "<[^>]*>", " ")
+                .Replace("&bull;", "•")
+                .Replace("&times;", "x")
+                .Replace("&copy;", "©")
+                .Replace("&rarr;", "->")
+                .Replace("&nbsp;", " ");
+            plainText = System.Text.RegularExpressions.Regex.Replace(plainText, @"[ \t]+", " ");
+            plainText = System.Text.RegularExpressions.Regex.Replace(plainText, @"[\r\n]{3,}", "\n\n").Trim();
+
+            var textView = AlternateView.CreateAlternateViewFromString(plainText, Encoding.UTF8, "text/plain");
+            var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
+            message.AlternateViews.Add(textView);
+            message.AlternateViews.Add(htmlView);
+
+            // Standard transactional headers
+            message.Headers.Add("X-Auto-Response-Suppress", "All");
+            message.Headers.Add("Auto-Submitted", "auto-generated");
+
             await client.SendMailAsync(message);
             Console.WriteLine($"[Mail] SUCCESS: Email successfully sent to {to}!");
             log.LogInformation("Email sent successfully to {To} for '{Subject}'", to, subject);
