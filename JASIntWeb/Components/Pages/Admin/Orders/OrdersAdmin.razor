@@ -1,5 +1,7 @@
 @page "/admin/orders"
-@inject AppDbContext Db
+@rendermode InteractiveServer
+@inject IServiceScopeFactory ScopeFactory
+@inject ShoppingService Shop
 
 <PageTitle>Orders Management · JAS Admin</PageTitle>
 
@@ -125,21 +127,39 @@
                         <td>
                             @if (o.PaidAmount > 0)
                             {
-                                <span class="badge badge-emerald">
-                                    <Icon Name="check" Class="size-3" />
-                                    Verified (৳@o.PaidAmount.ToString("N0"))
-                                </span>
-                            }
-                            else if (!string.IsNullOrEmpty(o.TransactionId))
-                            {
-                                <span class="badge badge-amber font-bold animate-pulse">
-                                    Needs Confirmation
-                                    <span class="block font-mono text-[10px] font-normal">@o.TransactionId</span>
-                                </span>
+                                <div class="space-y-1">
+                                    <span class="badge badge-emerald">
+                                        <Icon Name="check" Class="size-3" />
+                                        Verified (৳@o.PaidAmount.ToString("N0"))
+                                    </span>
+                                    <div>
+                                        <button type="button" @onclick="() => QuickUnverify(o.Id)" class="text-[11px] text-rose-600 hover:text-rose-800 underline font-medium">
+                                            ✕ Unverify
+                                        </button>
+                                    </div>
+                                </div>
                             }
                             else
                             {
-                                <span class="badge badge-slate">Unpaid</span>
+                                <div class="space-y-1.5">
+                                    @if (!string.IsNullOrEmpty(o.TransactionId))
+                                    {
+                                        <span class="badge badge-amber font-bold animate-pulse">
+                                            Needs Confirmation
+                                            <span class="block font-mono text-[10px] font-normal">@o.TransactionId</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-slate">Unpaid</span>
+                                    }
+                                    <div>
+                                        <button type="button" @onclick="() => QuickVerify(o.Id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white !py-1 !px-2.5 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1">
+                                            <Icon Name="check" Class="size-3" />
+                                            <span>✓ Verify Payment</span>
+                                        </button>
+                                    </div>
+                                </div>
                             }
                         </td>
                         <td class="text-right font-bold text-slate-900 tabular-nums">
@@ -196,11 +216,19 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadOrdersAsync();
+    }
+
+    private async Task LoadOrdersAsync()
+    {
         Page = Math.Clamp(Page, 1, 10000);
 
-        unconfirmedPaymentCount = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var q = Db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
+        unconfirmedPaymentCount = await db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+
+        var q = db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
 
         if (PaymentFilter == "unconfirmed" || Status == "unconfirmed_payment")
         {
@@ -226,5 +254,17 @@
             .Skip((Page - 1) * 25)
             .Take(25)
             .ToListAsync();
+    }
+
+    private async Task QuickVerify(int orderId)
+    {
+        await Shop.VerifyPaymentAsync(orderId);
+        await LoadOrdersAsync();
+    }
+
+    private async Task QuickUnverify(int orderId)
+    {
+        await Shop.UnverifyPaymentAsync(orderId);
+        await LoadOrdersAsync();
     }
 }

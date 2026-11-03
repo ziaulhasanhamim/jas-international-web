@@ -445,10 +445,84 @@
     function initAdminExtensions() {
         initProductEditorMedia();
         initProductEditorWysiwyg();
+        initPaymentVerificationStream();
+    }
+
+    let paymentSse = null;
+    let paymentPollTimer = null;
+    let isPaymentRedirecting = false;
+
+    function cleanupPaymentVerification() {
+        if (paymentSse) {
+            paymentSse.close();
+            paymentSse = null;
+        }
+        if (paymentPollTimer) {
+            clearInterval(paymentPollTimer);
+            paymentPollTimer = null;
+        }
+    }
+
+    function initPaymentVerificationStream() {
+        const streamEl = document.getElementById("payment-verification-stream");
+        if (!streamEl) {
+            cleanupPaymentVerification();
+            return;
+        }
+
+        const orderId = streamEl.getAttribute("data-order-id");
+        if (!orderId) return;
+
+        cleanupPaymentVerification();
+        isPaymentRedirecting = false;
+
+        function redirectToOrder(targetId) {
+            if (isPaymentRedirecting) return;
+            isPaymentRedirecting = true;
+            cleanupPaymentVerification();
+            const label = document.getElementById("sse-status-label");
+            if (label) {
+                label.textContent = "Payment Verified! Redirecting to receipt...";
+            }
+            window.location.replace("/order/" + encodeURIComponent(targetId || orderId));
+        }
+
+        try {
+            paymentSse = new EventSource("/api/orders/" + encodeURIComponent(orderId) + "/sse");
+            paymentSse.onmessage = function (e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data && (data.isPaymentVerified || data.isCancelled)) {
+                        redirectToOrder(data.orderId || orderId);
+                    }
+                } catch (err) {}
+            };
+            paymentSse.onerror = function () {
+                // If SSE is interrupted or unsupported, parallel polling below seamlessly takes over
+            };
+        } catch (err) {
+            console.warn("[SSE] EventSource init failed, relying on polling fallback", err);
+        }
+
+        // Active 1.5s background polling fallback
+        paymentPollTimer = setInterval(async () => {
+            if (isPaymentRedirecting) return;
+            try {
+                const res = await fetch("/api/orders/" + encodeURIComponent(orderId) + "/status");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && (data.isPaymentVerified || data.isCancelled)) {
+                        redirectToOrder(data.id || orderId);
+                    }
+                }
+            } catch (err) {}
+        }, 1500);
     }
 
     if (window.Blazor) {
+        window.Blazor.addEventListener("enhancednavigationstart", cleanupPaymentVerification);
         window.Blazor.addEventListener("enhancednavigationend", initAdminExtensions);
     }
     document.addEventListener("DOMContentLoaded", initAdminExtensions);
+    window.addEventListener("beforeunload", cleanupPaymentVerification);
 })();
