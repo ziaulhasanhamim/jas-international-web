@@ -13,7 +13,16 @@ public sealed class CartRequestMiddleware(RequestDelegate next)
             return;
         }
 
-        context.Response.Headers.CacheControl = "no-store";
+        context.Response.OnStarting(static state =>
+        {
+            var headers = ((HttpResponse)state).Headers;
+            if (string.IsNullOrEmpty(headers.CacheControl))
+            {
+                headers.CacheControl = "no-store";
+                headers.Pragma = "no-cache";
+            }
+            return Task.CompletedTask;
+        }, context.Response);
         try
         {
             if (!HttpMethods.IsGet(context.Request.Method))

@@ -112,19 +112,33 @@ await app.Services.SeedBrandsAsync();
 await app.Services.SeedCommerceEnhancementsAsync();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.Use(async (context, next) =>
+{
+    var response = context.Response;
+    var headers = response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "SAMEORIGIN";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+    var path = context.Request.Path;
+    if (path.StartsWithSegments("/account")
+        || path.StartsWithSegments("/admin")
+        || path.StartsWithSegments("/checkout")
+        || path.StartsWithSegments("/order"))
     {
-        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-        context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
-        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-        if (context.Request.Path.StartsWithSegments("/account") || context.Request.Path.StartsWithSegments("/admin")
-            ||
-            context.Request.Path.StartsWithSegments("/checkout")
-            || context.Request.Path.StartsWithSegments("/order"))
+        response.OnStarting(static state =>
         {
-            context.Response.Headers.CacheControl = "no-store";
-        }
-        await next();
-    });
+            var respHeaders = ((HttpResponse)state).Headers;
+            if (string.IsNullOrEmpty(respHeaders.CacheControl))
+            {
+                respHeaders.CacheControl = "no-store";
+                respHeaders.Pragma = "no-cache";
+            }
+            return Task.CompletedTask;
+        }, response);
+    }
+
+    await next();
+});
 app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -147,16 +161,16 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IWe
     var uploadFolder = Path.Combine(env.WebRootPath, "uploads", "products");
     Directory.CreateDirectory(uploadFolder);
 
-    var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif" };
+    string[] allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif"];
     var urls = new List<string>();
 
     foreach (var file in files)
     {
         if (file.Length == 0 || file.Length > 10 * 1024 * 1024) continue;
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(ext)) continue;
+        var ext = Path.GetExtension(file.FileName);
+        if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
 
-        var filename = $"prod-{DateTime.UtcNow.Ticks}-{Guid.NewGuid():N}[..8]{ext}";
+        var filename = $"prod-{DateTime.UtcNow.Ticks}-{Guid.NewGuid().ToString("N")[..8]}{ext.ToLowerInvariant()}";
         var filePath = Path.Combine(uploadFolder, filename);
 
         await using var stream = new FileStream(filePath, FileMode.Create);
