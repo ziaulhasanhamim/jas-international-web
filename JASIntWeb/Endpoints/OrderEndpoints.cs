@@ -1,8 +1,18 @@
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Persistence;
+using JASIntWeb.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace JASIntWeb.Endpoints;
+
+public sealed record OrderPaymentSseDto(
+    int OrderId,
+    Guid PublicToken,
+    bool IsPaymentVerified,
+    bool IsCancelled,
+    string Status);
 
 public static class OrderEndpoints
 {
@@ -31,7 +41,7 @@ public static class OrderEndpoints
                     o.Items.Count,
                     o.Items.Select(i => i.ProductName + (string.IsNullOrEmpty(i.VariantName) ? "" : $" ({i.VariantName})")).ToList(),
                     o.DeliveryAddress != null ? o.DeliveryAddress.CustomerName : "Customer",
-                    o.PaidAmount > 0 && o.Payments.Any(p => p.Status == Persistence.Entities.PaymentStatus.Completed)
+                    o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed)
                 ))
                 .ToListAsync();
 
@@ -60,8 +70,8 @@ public static class OrderEndpoints
                 o.PublicToken,
                 Status = o.Status.ToString(),
                 PaidAmount = o.PaidAmount,
-                IsPaymentVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == Persistence.Entities.PaymentStatus.Completed),
-                IsCancelled = o.Status == Persistence.Entities.OrderStatus.Cancelled,
+                IsPaymentVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed),
+                IsCancelled = o.Status == OrderStatus.Cancelled,
                 HasSubmittedTrx = !string.IsNullOrEmpty(o.TransactionId),
                 TransactionId = o.TransactionId
             }).FirstOrDefaultAsync();
@@ -70,89 +80,76 @@ public static class OrderEndpoints
             return Results.Ok(order);
         });
 
-        async Task HandleOrderSse(string orderRef, HttpContext context, AppDbContext db, CancellationToken ct)
+        group.MapGet("/{ref}/sse", (string @ref, AppDbContext db, CancellationToken ct) =>
         {
-            context.Response.Headers.ContentType = "text/event-stream";
-            context.Response.Headers.CacheControl = "no-cache, no-transform";
-            context.Response.Headers.Connection = "keep-alive";
-            context.Response.Headers["X-Accel-Buffering"] = "no";
-
-            Order? order = null;
-            if (int.TryParse(orderRef, out int orderId))
-            {
-                order = await db.Orders.AsNoTracking().Include(o => o.Payments).FirstOrDefaultAsync(o => o.Id == orderId, ct);
-            }
-            else if (Guid.TryParse(orderRef, out Guid token))
-            {
-                order = await db.Orders.AsNoTracking().Include(o => o.Payments).FirstOrDefaultAsync(o => o.PublicToken == token, ct);
-            }
-
-            if (order == null)
-            {
-                await context.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { error = "not_found" })}\n\n", ct);
-                await context.Response.Body.FlushAsync(ct);
-                return;
-            }
-
-            var verified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == Persistence.Entities.PaymentStatus.Completed);
-            var cancelled = order.Status == Persistence.Entities.OrderStatus.Cancelled;
-
-            // Send initial state immediately
-            await context.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { isPaymentVerified = verified, isCancelled = cancelled, status = order.Status.ToString(), orderId = order.Id, token = order.PublicToken })}\n\n", ct);
-            await context.Response.Body.FlushAsync(ct);
-
-            if (verified || cancelled) return;
-
-            // Stream updates every 1 second
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
-            {
-                var cur = await db.Orders.AsNoTracking()
-                    .Where(o => o.Id == order.Id)
-                    .Select(o => new
-                    {
-                        o.Id,
-                        o.PublicToken,
-                        Status = o.Status.ToString(),
-                        IsVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == Persistence.Entities.PaymentStatus.Completed),
-                        IsCancelled = o.Status == Persistence.Entities.OrderStatus.Cancelled
-                    })
-                    .FirstOrDefaultAsync(ct);
-
-                if (cur == null) break;
-
-                if (cur.IsVerified || cur.IsCancelled)
-                {
-                    await context.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { isPaymentVerified = cur.IsVerified, isCancelled = cur.IsCancelled, status = cur.Status, orderId = cur.Id, token = cur.PublicToken })}\n\n", ct);
-                    await context.Response.Body.FlushAsync(ct);
-                    break;
-                }
-                else
-                {
-                    await context.Response.WriteAsync($": heartbeat\n\n", ct);
-                    await context.Response.Body.FlushAsync(ct);
-                }
-            }
-        }
-
-        group.MapGet("/{ref}/sse", async (string @ref, HttpContext context, AppDbContext db, CancellationToken ct) =>
-        {
-            await HandleOrderSse(@ref, context, db, ct);
+            return TypedResults.ServerSentEvents(StreamOrderPaymentEvents(@ref, db, ct));
         });
 
-        group.MapGet("/payment-sse", async (HttpContext context, AppDbContext db, CancellationToken ct) =>
+        group.MapGet("/payment-sse", (HttpContext context, AppDbContext db, CancellationToken ct) =>
         {
             var @ref = context.Request.Query["orderid"].ToString();
             if (string.IsNullOrWhiteSpace(@ref)) @ref = context.Request.Query["token"].ToString();
-            if (string.IsNullOrWhiteSpace(@ref))
-            {
-                context.Response.StatusCode = 400;
-                await context.Response.WriteAsync("orderid required");
-                return;
-            }
-            await HandleOrderSse(@ref, context, db, ct);
+            return TypedResults.ServerSentEvents(StreamOrderPaymentEvents(@ref, db, ct));
         });
 
         return endpoints;
+    }
+
+    private static async IAsyncEnumerable<SseItem<OrderPaymentSseDto>> StreamOrderPaymentEvents(
+        string? orderRef,
+        AppDbContext db,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(orderRef)) yield break;
+
+        Order? order = null;
+        if (int.TryParse(orderRef, out int orderId))
+        {
+            order = await db.Orders.AsNoTracking().Include(o => o.Payments).FirstOrDefaultAsync(o => o.Id == orderId, ct);
+        }
+        else if (Guid.TryParse(orderRef, out Guid token))
+        {
+            order = await db.Orders.AsNoTracking().Include(o => o.Payments).FirstOrDefaultAsync(o => o.PublicToken == token, ct);
+        }
+
+        if (order == null)
+        {
+            yield break;
+        }
+
+        var verified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
+        var cancelled = order.Status == OrderStatus.Cancelled;
+
+        // Yield initial state immediately
+        yield return new SseItem<OrderPaymentSseDto>(
+            new OrderPaymentSseDto(order.Id, order.PublicToken, verified, cancelled, order.Status.ToString()));
+
+        if (verified || cancelled) yield break;
+
+        // Stream updates every 1 second
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
+        {
+            var cur = await db.Orders.AsNoTracking()
+                .Where(o => o.Id == order.Id)
+                .Select(o => new
+                {
+                    o.Id,
+                    o.PublicToken,
+                    Status = o.Status.ToString(),
+                    IsVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed),
+                    IsCancelled = o.Status == OrderStatus.Cancelled
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (cur == null) yield break;
+
+            if (cur.IsVerified || cur.IsCancelled)
+            {
+                yield return new SseItem<OrderPaymentSseDto>(
+                    new OrderPaymentSseDto(cur.Id, cur.PublicToken, cur.IsVerified, cur.IsCancelled, cur.Status));
+                yield break;
+            }
+        }
     }
 }

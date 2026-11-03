@@ -46,10 +46,21 @@ public sealed class AccountMailService(
         }
     }
 
-    public string? FromEmail => config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"];
-    public string DisplayName => config["Mail:DisplayName"] ?? "JAS International";
-    public string ReplyToEmail => config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "";
-    public string ReplyToName => config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName;
+    public string? FromEmail => IsBrevo
+        ? (config["Mail:Brevo:From"] ?? config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"])
+        : (config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"]);
+
+    public string DisplayName => IsBrevo
+        ? (config["Mail:Brevo:DisplayName"] ?? config["Mail:DisplayName"] ?? "JAS International")
+        : (config["Mail:DisplayName"] ?? "JAS International");
+
+    public string ReplyToEmail => IsBrevo
+        ? (config["Mail:Brevo:ReplyTo:Email"] ?? config["Mail:Brevo:ReplyTo"] ?? config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "")
+        : (config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "");
+
+    public string ReplyToName => IsBrevo
+        ? (config["Mail:Brevo:ReplyTo:DisplayName"] ?? config["Mail:Brevo:ReplyTo:Name"] ?? config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName)
+        : (config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName);
 
     // SMTP Configuration (supports structured Mail:Smtp:* or flat Mail:*)
     private string? SmtpHost => config["Mail:Smtp:Host"] ?? config["Mail:Host"];
@@ -148,15 +159,19 @@ public sealed class AccountMailService(
             req.Headers.Add("api-key", BrevoApiKey);
             req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            var payload = new
+            var payload = new Dictionary<string, object?>
             {
-                sender = new { name = DisplayName, email = FromEmail },
-                replyTo = new { name = ReplyToName, email = ReplyToEmail },
-                to = new[] { new { email = to } },
-                subject = subject,
-                htmlContent = htmlBody,
-                textContent = plainText
+                ["sender"] = new { name = DisplayName, email = FromEmail },
+                ["to"] = new[] { new { email = to } },
+                ["subject"] = subject,
+                ["htmlContent"] = htmlBody,
+                ["textContent"] = plainText
             };
+
+            if (!string.IsNullOrWhiteSpace(ReplyToEmail))
+            {
+                payload["replyTo"] = new { name = ReplyToName, email = ReplyToEmail };
+            }
 
             req.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
