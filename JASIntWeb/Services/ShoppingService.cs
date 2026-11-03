@@ -381,6 +381,17 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+
+        // Dispatch order placed email
+        try
+        {
+            await mailService.SendOrderPlacedEmailAsync(order);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send order placed email: {ex.Message}");
+        }
+
         return new(order.Id, order.PublicToken, order.Total, order.PaymentReferenceCode, order.DeliveryCharge, order.DiscountAmount);
     }
 

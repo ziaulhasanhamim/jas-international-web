@@ -5,7 +5,7 @@ using JASIntWeb.Persistence.Entities;
 
 namespace JASIntWeb.Services;
 
-public sealed class AccountMailService(IConfiguration config, ILogger<AccountMailService> log)
+public sealed class AccountMailService(IConfiguration config, ILogger<AccountMailService> log, IWebHostEnvironment env)
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(config["Mail:Host"]) && !string.IsNullOrWhiteSpace(config["Mail:From"]);
 
@@ -14,6 +14,17 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         var fromEmail = config["Mail:From"]!;
         var displayName = config["Mail:DisplayName"] ?? "JAS International";
         return new MailAddress(fromEmail, displayName);
+    }
+
+    private string? GetRecipientEmail(Order order)
+    {
+        var recipientEmail = order.DeliveryAddress?.Email ?? order.User?.Email;
+        if (string.IsNullOrWhiteSpace(recipientEmail) && env.IsDevelopment())
+        {
+            // In development, fallback to developer's inbox so order update emails can always be tested
+            recipientEmail = config["Mail:Username"] ?? config["Mail:From"];
+        }
+        return recipientEmail;
     }
 
     public async Task<bool> SendAsync(string to, string subject, string text)
@@ -103,9 +114,56 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         return await SendHtmlAsync(email, subject, sb.ToString());
     }
 
+    public async Task<bool> SendOrderPlacedEmailAsync(Order order)
+    {
+        var recipientEmail = GetRecipientEmail(order);
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            log.LogInformation("No recipient email found for Order #{OrderId}. Skipping placed email.", order.Id);
+            return false;
+        }
+
+        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com";
+        var customerName = order.DeliveryAddress?.CustomerName ?? "Valued Customer";
+        var subject = $"[JAS International] Order #{order.Id} Placed Successfully (Ref: {order.PaymentReferenceCode})";
+
+        var sb = new StringBuilder();
+        sb.Append("<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;'>");
+
+        // Header
+        sb.Append("<div style='background:linear-gradient(135deg,#1e40af,#3b82f6);padding:32px 24px;text-align:center;color:#ffffff;'>");
+        sb.Append("<h1 style='margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;'>JAS International</h1>");
+        sb.Append("<p style='margin:8px 0 0;font-size:13px;color:#dbeafe;font-weight:600;text-transform:uppercase;letter-spacing:1px;'>Order Received &bull; Pending Review</p>");
+        sb.Append("</div>");
+
+        // Body
+        sb.Append("<div style='padding:28px 24px;color:#334155;font-size:14px;line-height:1.6;'>");
+        sb.Append($"<p style='margin:0 0 16px;font-size:16px;font-weight:700;color:#0f172a;'>Dear {System.Net.WebUtility.HtmlEncode(customerName)},</p>");
+        sb.Append($"<p style='margin:0 0 16px;'>Thank you for your purchase! We have received <strong>Order #{order.Id}</strong>. Our fulfillment team will review your order details shortly.</p>");
+
+        // Callout
+        sb.Append("<div style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin:20px 0;'>");
+        sb.Append("<div style='font-size:13px;color:#1e40af;'>");
+        sb.Append($"<div><strong>Order Reference:</strong> <span style='font-family:monospace;font-weight:700;'>{System.Net.WebUtility.HtmlEncode(order.PaymentReferenceCode ?? "N/A")}</span></div>");
+        sb.Append($"<div style='margin-top:4px;'><strong>Total Order Amount:</strong> <strong>৳{order.Total:N0}</strong></div>");
+        if (order.PaidAmount > 0)
+        {
+            sb.Append($"<div style='margin-top:4px;'><strong>bKash Paid:</strong> <strong style='color:#059669;'>৳{order.PaidAmount:N0}</strong> (TrxID: {System.Net.WebUtility.HtmlEncode(order.TransactionId ?? "Pending")})</div>");
+        }
+        else
+        {
+            sb.Append("<div style='margin-top:4px;color:#d97706;'><strong>Payment Status:</strong> Pending Verification</div>");
+        }
+        sb.Append("</div></div>");
+
+        AppendOrderSummaryAndFooter(sb, order, baseUrl);
+
+        return await SendHtmlAsync(recipientEmail, subject, sb.ToString());
+    }
+
     public async Task<bool> SendPaymentVerifiedEmailAsync(Order order)
     {
-        var recipientEmail = order.DeliveryAddress?.Email ?? order.User?.Email;
+        var recipientEmail = GetRecipientEmail(order);
         if (string.IsNullOrWhiteSpace(recipientEmail))
         {
             log.LogInformation("No customer email available for Order #{OrderId}. Skipping email notification.", order.Id);
@@ -139,6 +197,85 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         sb.Append("<div style='margin-top:8px;font-size:12px;color:#15803d;'>Your order is currently <strong>Pending Admin Confirmation</strong>. Our fulfillment team is reviewing your item specs and packing details. You will receive further updates as soon as your parcel is handed over to the courier.</div>");
         sb.Append("</div></div>");
 
+        AppendOrderSummaryAndFooter(sb, order, baseUrl);
+
+        return await SendHtmlAsync(recipientEmail, subject, sb.ToString());
+    }
+
+    public async Task<bool> SendOrderStatusUpdateEmailAsync(Order order, OrderStatus newStatus)
+    {
+        var recipientEmail = GetRecipientEmail(order);
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            log.LogInformation("No customer email available for Order #{OrderId}. Skipping status update email.", order.Id);
+            return false;
+        }
+
+        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com";
+        var customerName = order.DeliveryAddress?.CustomerName ?? "Valued Customer";
+
+        string headerGradient;
+        string badgeText;
+        string subject;
+        string mainHeading;
+        string statusMessage;
+
+        switch (newStatus)
+        {
+            case OrderStatus.Processing:
+                headerGradient = "linear-gradient(135deg,#4338ca,#6366f1)";
+                badgeText = "Order Confirmed & Preparing";
+                subject = $"[JAS International] Order #{order.Id} Confirmed & In Progress";
+                mainHeading = "Your Order is Confirmed!";
+                statusMessage = $"Great news! Your <strong>Order #{order.Id}</strong> has been confirmed by our staff. Our fulfillment team is currently inspecting and packing your gadgets.";
+                break;
+            case OrderStatus.InTransit:
+                headerGradient = "linear-gradient(135deg,#d97706,#f59e0b)";
+                badgeText = "Shipped & In Transit";
+                subject = $"[JAS International] Order #{order.Id} Has Been Dispatched!";
+                mainHeading = "Your Package is On Its Way!";
+                statusMessage = $"Your package for <strong>Order #{order.Id}</strong> has been handed over to our courier partner. It is now on its way to your destination.";
+                break;
+            case OrderStatus.Delivered:
+                headerGradient = "linear-gradient(135deg,#059669,#10b981)";
+                badgeText = "Delivered Successfully";
+                subject = $"[JAS International] Order #{order.Id} Delivered - Thank You!";
+                mainHeading = "Your Order Has Been Delivered!";
+                statusMessage = $"Your package for <strong>Order #{order.Id}</strong> has been successfully delivered. We hope you enjoy your new tech! All official warranties are now activated.";
+                break;
+            case OrderStatus.Cancelled:
+                headerGradient = "linear-gradient(135deg,#dc2626,#f43f5e)";
+                badgeText = "Order Cancelled";
+                subject = $"[JAS International] Notice: Order #{order.Id} Cancelled";
+                mainHeading = "Order Cancelled";
+                statusMessage = $"<strong>Order #{order.Id}</strong> has been cancelled. If you have any questions or require a refund of an advance payment, please reach out to our customer support.";
+                break;
+            default:
+                return false;
+        }
+
+        var sb = new StringBuilder();
+        sb.Append("<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;'>");
+
+        // Header
+        sb.Append($"<div style='background:{headerGradient};padding:32px 24px;text-align:center;color:#ffffff;'>");
+        sb.Append("<h1 style='margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;'>JAS International</h1>");
+        sb.Append($"<p style='margin:8px 0 0;font-size:13px;color:#ffffff;font-weight:600;text-transform:uppercase;letter-spacing:1px;opacity:0.9;'>{badgeText}</p>");
+        sb.Append("</div>");
+
+        // Body
+        sb.Append("<div style='padding:28px 24px;color:#334155;font-size:14px;line-height:1.6;'>");
+        sb.Append($"<p style='margin:0 0 16px;font-size:16px;font-weight:700;color:#0f172a;'>Dear {System.Net.WebUtility.HtmlEncode(customerName)},</p>");
+        sb.Append($"<h2 style='margin:0 0 12px;font-size:18px;color:#0f172a;font-weight:700;'>{mainHeading}</h2>");
+        sb.Append($"<p style='margin:0 0 20px;'>{statusMessage}</p>");
+
+        AppendOrderSummaryAndFooter(sb, order, baseUrl);
+
+        return await SendHtmlAsync(recipientEmail, subject, sb.ToString());
+    }
+
+    private void AppendOrderSummaryAndFooter(StringBuilder sb, Order order, string baseUrl)
+    {
         // Items Table
         sb.Append("<h3 style='margin:24px 0 12px;font-size:15px;color:#0f172a;border-bottom:1px solid #f1f5f9;padding-bottom:8px;'>Order Summary</h3>");
         sb.Append("<table style='width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;'>");
@@ -183,8 +320,6 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         sb.Append("<p style='margin:0;'>Khulna Showroom: Shopping Complex 3rd Floor &bull; Hotline: 01711465078</p>");
         sb.Append("</div>");
         sb.Append("</div>");
-
-        return await SendHtmlAsync(recipientEmail, subject, sb.ToString());
     }
 
     private SmtpClient CreateClient()

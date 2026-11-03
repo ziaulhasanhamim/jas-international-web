@@ -4,7 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace JASIntWeb.Services;
 // Called through AdminSession, which authorizes every operation in a fresh service scope.
 
-public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemoryCache cache)
+public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemoryCache cache, AccountMailService mailService)
 {
     private static void Validate(object input)
     {
@@ -477,8 +477,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         Validate(input);
         var id = input.Id;
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {id} FOR UPDATE");
-        var order = (await db.Orders.Include(o => o.Items)
+        var order = (await db.Orders
+            .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.User)
             .SingleOrDefaultAsync(o => o.Id == id)) ?? throw new ShopException("Order not found.");
         if (!Enum.TryParse<OrderStatus>(input.Status, out var status) || !Enum.IsDefined(status))
         {
@@ -538,6 +541,16 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+
+        // Dispatch order status update email to customer
+        try
+        {
+            await mailService.SendOrderStatusUpdateEmailAsync(order, status);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send order status update email: {ex.Message}");
+        }
     }
 
     public async Task SaveCategoryAsync(CategoryEditForm input)
