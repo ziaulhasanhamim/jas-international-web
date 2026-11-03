@@ -30,4 +30,10 @@ public sealed class AdminSession(IServiceScopeFactory scopes, AuthenticationStat
             await action(service);
             return true;
         });
+
+    public Task RunAsync(Func<AdminService, int, Task> action) => RunAsync(async (service, actorId) =>
+        {
+            await action(service, actorId);
+            return true;
+        });
 }

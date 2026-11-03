@@ -113,6 +113,47 @@ public sealed class RoleEditForm
     public bool Admin { get; set; }
 }
 
+public sealed class AdminUserCreateForm
+{
+    [Required, EmailAddress, StringLength(254)]
+    public string Email { get; set; } = "";
+
+    [StringLength(100)]
+    public string? FullName { get; set; }
+
+    [Phone, StringLength(20)]
+    public string? PhoneNumber { get; set; }
+
+    [Required, MinLength(8, ErrorMessage = "Password must be at least 8 characters long"), StringLength(128)]
+    public string Password { get; set; } = "";
+
+    public bool IsAdmin { get; set; }
+
+    public bool EmailConfirmed { get; set; } = true;
+}
+
+public sealed class AdminUserEditProfileForm
+{
+    public int Id { get; set; }
+
+    [Required, EmailAddress, StringLength(254)]
+    public string Email { get; set; } = "";
+
+    [StringLength(100)]
+    public string? FullName { get; set; }
+
+    [Phone, StringLength(20)]
+    public string? PhoneNumber { get; set; }
+}
+
+public sealed class AdminUserPasswordResetForm
+{
+    public int Id { get; set; }
+
+    [Required, MinLength(8, ErrorMessage = "Password must be at least 8 characters long"), StringLength(128)]
+    public string NewPassword { get; set; } = "";
+}
+
 public sealed class StockEditForm
 {
     public int VariantId { get; set; }

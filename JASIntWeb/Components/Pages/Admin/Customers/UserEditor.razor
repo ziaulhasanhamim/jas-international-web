@@ -1,46 +1,310 @@
 @page "/admin/users/{Id:int}/edit"
-@inject Microsoft.AspNetCore.Identity.UserManager<User> Users
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@inject UserManager<User> Users
+@inject AppDbContext Db
 @inject AdminSession Session
 @inject NavigationManager Nav
 
-<AdminPageHeader
-    Title="Manage account access"
-    Description="Role changes invalidate existing sessions. An administrator cannot change their own role."
-    ActionHref="/admin/users"
-    ActionText="Back to accounts"
-/>
+<PageTitle>@(user?.Email ?? "Manage User") · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <a href="/admin/users" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition mb-2">
+            <Icon Name="chevron-left" Class="size-3" />
+            Back to User Accounts
+        </a>
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                @(fullName ?? user?.Email ?? "User Account")
+            </h1>
+            @if (isAdmin)
+            {
+                <span class="badge badge-purple">
+                    <Icon Name="shield" Class="size-3" />
+                    Administrator
+                </span>
+            }
+            else
+            {
+                <span class="badge badge-slate">Customer</span>
+            }
+            @if (isLocked)
+            {
+                <span class="badge badge-rose font-bold">Locked Out</span>
+            }
+        </div>
+        <p class="text-xs text-slate-400 font-mono mt-1">User ID #@Id &bull; @(user?.Email)</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
+        <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+        <div>
+            <strong class="font-semibold block">Action Error</strong>
+            <span>@error</span>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(notice))
+{
+    <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800 flex items-start gap-2.5" role="status">
+        <Icon Name="check" Class="size-4 shrink-0 mt-0.5 text-emerald-600" />
+        <div>
+            <strong class="font-semibold block">Success</strong>
+            <span>@notice</span>
+        </div>
+    </div>
+}
+
 @if (user is null)
 {
-    <p class="admin-empty">Account not found.</p>
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-500">
+        Account not found.
+    </div>
 }
 else
 {
-    <div class="shop-panel admin-form">
-        <h2 class="admin-record-title">@user.Email</h2>
-        <p>@user.PhoneNumber</p>
-        @if (error is not null)
-        {
-            <p class="form-error" role="alert">@error</p>
-        }
-        @if (Input is null)
-        {
-            <p class="admin-help">Loading form…</p>
-        }
-        else
-        {
-            <EditForm Model="Input" OnValidSubmit="Save" FormName="account-access" method="post" Enhance>
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <label class="check-label">
-                    <input type="checkbox" name="Input.Admin" checked="@(Input!.Admin)" value="true" />
-                    <input type="hidden" name="Input.Admin" value="false" />
-                    Administrator access
-                </label>
-                <div class="form-actions">
-                    <button type="submit" class="shop-button">Save access</button>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left 2 Cols: Profile, Password, Addresses, Orders -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Edit Profile Card -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <h2 class="text-base font-bold text-slate-900 mb-1">Profile &amp; Contact Details</h2>
+                <p class="text-xs text-slate-500 mb-5">Update the user's primary email, full name, and mobile number.</p>
+
+                <EditForm Model="ProfileInput" OnValidSubmit="SaveProfile" FormName="edit-user-profile" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                    <input type="hidden" name="ProfileInput.Id" value="@Id" />
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="field-label">Email Address *</label>
+                            <InputText @bind-Value="ProfileInput!.Email" type="email" class="field" />
+                        </div>
+
+                        <div>
+                            <label class="field-label">Full Name</label>
+                            <InputText @bind-Value="ProfileInput!.FullName" class="field" placeholder="e.g. Tanvir Ahmed" />
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="field-label">Mobile Phone Number</label>
+                            <InputText @bind-Value="ProfileInput!.PhoneNumber" type="tel" class="field" placeholder="017xxxxxxxx" />
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit" class="btn-primary shadow-xs" data-pending-text="Saving...">
+                            <span class="form-submit-spinner" hidden></span>
+                            Save Profile Changes
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+
+            <!-- Password Reset by Admin Card -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <h2 class="text-base font-bold text-slate-900 mb-1">Reset Password</h2>
+                <p class="text-xs text-slate-500 mb-5">Assign a new password directly to this user. Their existing sessions will be terminated.</p>
+
+                <EditForm Model="PasswordInput" OnValidSubmit="ResetPassword" FormName="admin-reset-password" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                    <input type="hidden" name="PasswordInput.Id" value="@Id" />
+
+                    <div class="max-w-md">
+                        <label class="field-label">New Password (Min. 8 characters)</label>
+                        <InputText @bind-Value="PasswordInput!.NewPassword" type="password" autocomplete="new-password" class="field" placeholder="••••••••" />
+                    </div>
+
+                    <div class="pt-2 flex justify-start">
+                        <button type="submit" class="btn-secondary text-xs shadow-2xs" data-pending-text="Resetting...">
+                            <span class="form-submit-spinner" hidden></span>
+                            Set New Password
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+
+            <!-- Order History Card -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Order History</h2>
+                        <p class="text-xs text-slate-500">Orders placed under this user account.</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500">@userOrders.Count @(userOrders.Count == 1 ? "order" : "orders")</span>
                 </div>
-            </EditForm>
-        }
+
+                @if (userOrders.Count == 0)
+                {
+                    <p class="text-xs text-slate-400 py-4 text-center">No orders placed by this customer yet.</p>
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-slate-400 uppercase tracking-wider text-[10px]">
+                                    <th class="py-2.5 font-semibold">Order</th>
+                                    <th class="py-2.5 font-semibold">Date</th>
+                                    <th class="py-2.5 font-semibold">Status</th>
+                                    <th class="py-2.5 font-semibold text-right">Total</th>
+                                    <th class="py-2.5 font-semibold text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach (var o in userOrders)
+                                {
+                                    <tr class="hover:bg-slate-50/70 transition">
+                                        <td class="py-2.5 font-bold text-slate-900">#@o.Id</td>
+                                        <td class="py-2.5 text-slate-500 font-mono text-[11px]">@o.CreatedAt.ToString("MMM dd, yyyy")</td>
+                                        <td class="py-2.5">
+                                            <span class="badge @StatusBadge(o.Status)">@o.Status</span>
+                                        </td>
+                                        <td class="py-2.5 text-right font-bold text-slate-900">৳@o.Total.ToString("N0")</td>
+                                        <td class="py-2.5 text-right">
+                                            <a href="/admin/orders/@o.Id" class="text-blue-600 font-semibold hover:underline">View &rarr;</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <!-- Saved Delivery Addresses Card -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Saved Addresses</h2>
+                        <p class="text-xs text-slate-500">Shipping addresses recorded for this user.</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500">@userAddresses.Count @(userAddresses.Count == 1 ? "address" : "addresses")</span>
+                </div>
+
+                @if (userAddresses.Count == 0)
+                {
+                    <p class="text-xs text-slate-400 py-4 text-center">No saved delivery addresses found.</p>
+                }
+                else
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @foreach (var addr in userAddresses)
+                        {
+                            <div class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 text-xs text-slate-600">
+                                <strong class="text-slate-900 font-semibold block mb-0.5">@addr.CustomerName</strong>
+                                <span class="font-mono text-slate-500 block mb-1">@addr.PhoneNumber</span>
+                                <p class="text-slate-700 leading-snug">@addr.FullAddress</p>
+                                <span class="text-[11px] text-slate-400 mt-1 block">
+                                    @(addr.Thana), @(addr.District) (@(addr.Division))
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right Col: Access, Status, Statistics -->
+        <div class="space-y-6">
+            <!-- Role & Privilege Management -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <h3 class="text-sm font-bold text-slate-900 mb-1">Role &amp; Permissions</h3>
+                <p class="text-xs text-slate-500 mb-4">Grant or revoke store administrator privileges.</p>
+
+                <EditForm Model="RoleInput" OnValidSubmit="SaveRole" FormName="change-role" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <input type="hidden" name="RoleInput.Id" value="@Id" />
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" name="RoleInput.Admin" checked="@(RoleInput!.Admin)" value="true" class="size-4 mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                            <input type="hidden" name="RoleInput.Admin" value="false" />
+                            <div>
+                                <span class="text-xs font-bold text-slate-900 block">Administrator Privileges</span>
+                                <span class="text-[11px] text-slate-500 block mt-0.5">Full access to orders, products, inventory, coupons, and system settings.</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn-primary w-full shadow-xs" data-pending-text="Saving...">
+                        <span class="form-submit-spinner" hidden></span>
+                        Save Role
+                    </button>
+                </EditForm>
+            </div>
+
+            <!-- Verification & Account Status Actions -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
+                <h3 class="text-sm font-bold text-slate-900">Security &amp; Verification</h3>
+
+                <!-- Email Verification Toggle -->
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-800 block">Email Confirmation</span>
+                        <span class="text-[11px] text-slate-400">
+                            @(user.EmailConfirmed ? "Email is confirmed" : "Verification pending")
+                        </span>
+                    </div>
+
+                    <form method="post" @formname="toggle-email-confirm" @onsubmit="ToggleEmailConfirmed">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                            @(user.EmailConfirmed ? "Mark Unverified" : "Mark Verified")
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Account Lockout Toggle -->
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-800 block">Account Lockout</span>
+                        <span class="text-[11px] @(isLocked ? "text-rose-600 font-bold" : "text-slate-400")">
+                            @(isLocked ? "Account is locked" : "Account is active")
+                        </span>
+                    </div>
+
+                    <form method="post" @formname="toggle-lockout" @onsubmit="ToggleLockout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-secondary !px-2.5 !py-1 text-xs @(isLocked ? "!text-emerald-700 !border-emerald-300" : "!text-rose-700 !border-rose-300")">
+                            @(isLocked ? "Unlock Account" : "Lock Account")
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Customer Summary Card -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+                <h3 class="text-sm font-bold text-slate-900 mb-3">Customer Activity</h3>
+
+                <dl class="divide-y divide-slate-100 text-xs">
+                    <div class="py-2.5 flex justify-between">
+                        <dt class="text-slate-400">Total Spent</dt>
+                        <dd class="font-bold text-slate-900">৳@totalSpent.ToString("N0")</dd>
+                    </div>
+
+                    <div class="py-2.5 flex justify-between">
+                        <dt class="text-slate-400">Total Orders</dt>
+                        <dd class="font-bold text-slate-900">@userOrders.Count</dd>
+                    </div>
+
+                    <div class="py-2.5 flex justify-between">
+                        <dt class="text-slate-400">External Logins</dt>
+                        <dd class="font-medium text-slate-700">
+                            @(linkedProviders.Count > 0 ? string.Join(", ", linkedProviders) : "Password only")
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
     </div>
 }
 
@@ -48,36 +312,179 @@ else
 {
     [Parameter]
     public int Id { get; set; }
-    [SupplyParameterFromForm(FormName = "account-access")]
-    private RoleEditForm? Input { get; set; }
+
+    [SupplyParameterFromForm(FormName = "edit-user-profile")]
+    private AdminUserEditProfileForm? ProfileInput { get; set; }
+
+    [SupplyParameterFromForm(FormName = "admin-reset-password")]
+    private AdminUserPasswordResetForm? PasswordInput { get; set; }
+
+    [SupplyParameterFromForm(FormName = "change-role")]
+    private RoleEditForm? RoleInput { get; set; }
+
     private User? user;
+    private string? fullName;
+    private bool isAdmin;
+    private bool isLocked;
+    private decimal totalSpent;
+    private List<Order> userOrders = [];
+    private List<DeliveryAddress> userAddresses = [];
+    private List<string> linkedProviders = [];
+
     private string? error;
+    private string? notice;
 
     protected override async Task OnInitializedAsync()
     {
         user = await Users.FindByIdAsync(Id.ToString());
-        Input ??= new()
+        if (user is not null)
         {
-            Id = Id,
-            Admin = user is not null && await Users.IsInRoleAsync(user, "Admin")
-        };
+            isAdmin = await Users.IsInRoleAsync(user, "Admin");
+            isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+
+            var claims = await Users.GetClaimsAsync(user);
+            fullName = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var logins = await Users.GetLoginsAsync(user);
+            linkedProviders = logins.Select(l => l.ProviderDisplayName ?? l.LoginProvider).ToList();
+
+            ProfileInput ??= new()
+            {
+                Id = Id,
+                Email = user.Email ?? "",
+                FullName = fullName,
+                PhoneNumber = user.PhoneNumber
+            };
+
+            PasswordInput ??= new() { Id = Id };
+
+            RoleInput ??= new()
+            {
+                Id = Id,
+                Admin = isAdmin
+            };
+
+            userOrders = await Db.Orders.AsNoTracking()
+                .Where(o => o.UserId == Id)
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
+
+            totalSpent = userOrders.Sum(o => o.Total);
+
+            userAddresses = await Db.DeliveryAddresses.AsNoTracking()
+                .Where(a => a.CustomerId == Id)
+                .ToListAsync();
+        }
     }
 
-    private async Task Save()
+    private async Task SaveProfile()
     {
+        error = null;
+        notice = null;
         try
         {
-            Input!.Id = Id;
-            await Session.RunAsync(async (s, actor) =>
-                {
-                    await s.ChangeRoleAsync(Input, actor);
-                    return true;
-                });
-            Nav.NavigateTo("/admin/users");
+            ProfileInput!.Id = Id;
+            await Session.RunAsync(s => s.UpdateUserProfileAsync(ProfileInput));
+            notice = "User profile updated successfully.";
+            await RefreshData();
         }
         catch (ShopException ex)
         {
             error = ex.Message;
         }
     }
+
+    private async Task ResetPassword()
+    {
+        error = null;
+        notice = null;
+        try
+        {
+            PasswordInput!.Id = Id;
+            await Session.RunAsync(s => s.AdminResetPasswordAsync(PasswordInput));
+            notice = "Password reset successfully. User's existing sessions were invalidated.";
+            PasswordInput.NewPassword = "";
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveRole()
+    {
+        error = null;
+        notice = null;
+        try
+        {
+            RoleInput!.Id = Id;
+            await Session.RunAsync((s, actor) => s.ChangeRoleAsync(RoleInput, actor));
+            notice = "Account role updated successfully.";
+            await RefreshData();
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task ToggleEmailConfirmed()
+    {
+        error = null;
+        notice = null;
+        try
+        {
+            await Session.RunAsync(s => s.ToggleEmailConfirmationAsync(Id));
+            notice = "Email verification status toggled.";
+            await RefreshData();
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task ToggleLockout()
+    {
+        error = null;
+        notice = null;
+        try
+        {
+            await Session.RunAsync((s, actor) => s.ToggleLockoutAsync(Id, actor));
+            notice = "Account lockout status toggled.";
+            await RefreshData();
+        }
+        catch (ShopException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        user = await Users.FindByIdAsync(Id.ToString());
+        if (user != null)
+        {
+            isAdmin = await Users.IsInRoleAsync(user, "Admin");
+            isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+            var claims = await Users.GetClaimsAsync(user);
+            fullName = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+            if (RoleInput != null) RoleInput.Admin = isAdmin;
+            if (ProfileInput != null)
+            {
+                ProfileInput.Email = user.Email ?? "";
+                ProfileInput.FullName = fullName;
+                ProfileInput.PhoneNumber = user.PhoneNumber;
+            }
+        }
+    }
+
+    private static string StatusBadge(OrderStatus s) => s switch
+    {
+        OrderStatus.Delivered => "badge-emerald",
+        OrderStatus.Processing => "badge-purple",
+        OrderStatus.InTransit => "badge-amber",
+        OrderStatus.Cancelled => "badge-rose",
+        _ => "badge-slate"
+    };
 }

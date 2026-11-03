@@ -1,68 +1,119 @@
+@page "/admin/users/create"
 @page "/admin/users/new"
 @inject AdminSession Session
 @inject NavigationManager Nav
 
-<AdminPageHeader
-    Title="Add customer account"
-    Description="Create a customer account. Administrator access is managed separately after creation."
-    ActionHref="/admin/users"
-    ActionText="Back to accounts"
-/>
-@if (error is not null)
+<PageTitle>Add User Account · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <a href="/admin/users" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition mb-2">
+            <Icon Name="chevron-left" Class="size-3" />
+            Back to User Accounts
+        </a>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Create New User</h1>
+        <p class="text-sm text-slate-500 mt-1">Register a new store customer or administrator account.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
 {
-    <p role="alert" class="form-error">@error</p>
+    <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
+        <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+        <div>
+            <strong class="font-semibold block">Creation Error</strong>
+            <span>@error</span>
+        </div>
+    </div>
 }
-@if (Input is null)
-{
-    <p class="admin-help">Loading form…</p>
-}
-else
-{
-    <EditForm
-        Model="Input"
-        OnValidSubmit="Save"
-        FormName="create-customer"
-        method="post"
-        Enhance
-        class="shop-panel admin-form"
-    >
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-        <label class="shop-label">
-            Email
-            <InputText @bind-Value="Input!.Email" type="email" class="shop-input" />
-        </label>
-        <label class="shop-label">
-            Initial password
-            <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="shop-input" />
-        </label>
-        <label class="shop-label">
-            Confirm password
-            <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="shop-input" />
-        </label>
-        <button type="submit" class="shop-button">Create customer</button>
-    </EditForm>
-}
+
+<div class="max-w-2xl rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
+    @if (Input is null)
+    {
+        <p class="text-xs text-slate-400">Loading form…</p>
+    }
+    else
+    {
+        <EditForm Model="Input" OnValidSubmit="Save" FormName="create-user-admin" method="post" Enhance data-submit-indication="true" class="space-y-5">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="field-label">Email Address *</label>
+                    <InputText @bind-Value="Input!.Email" type="email" placeholder="user@example.com" class="field" />
+                </div>
+
+                <div>
+                    <label class="field-label">Full Name</label>
+                    <InputText @bind-Value="Input!.FullName" placeholder="e.g. Tanvir Ahmed" class="field" />
+                </div>
+
+                <div>
+                    <label class="field-label">Mobile Phone Number</label>
+                    <InputText @bind-Value="Input!.PhoneNumber" type="tel" placeholder="017xxxxxxxx" class="field" />
+                </div>
+
+                <div class="sm:col-span-2">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="field-label mb-0">Initial Password *</label>
+                        <span class="text-[11px] text-slate-400">Min. 8 characters</span>
+                    </div>
+                    <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="field" placeholder="••••••••" />
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 space-y-3">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="Input.IsAdmin" checked="@(Input!.IsAdmin)" value="true" class="size-4 mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500" />
+                    <input type="hidden" name="Input.IsAdmin" value="false" />
+                    <div>
+                        <span class="text-xs font-bold text-slate-900 block">Grant Administrator Privileges</span>
+                        <span class="text-[11px] text-slate-500 block">Allows access to the store management dashboard, orders, inventory, and users.</span>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="Input.EmailConfirmed" checked="@(Input!.EmailConfirmed)" value="true" class="size-4 mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                    <input type="hidden" name="Input.EmailConfirmed" value="false" />
+                    <div>
+                        <span class="text-xs font-bold text-slate-900 block">Mark Email as Confirmed</span>
+                        <span class="text-[11px] text-slate-500 block">User can immediately sign in without needing an email verification code.</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <a href="/admin/users" class="btn-secondary">Cancel</a>
+                <button type="submit" class="btn-primary shadow-xs" data-pending-text="Creating user...">
+                    <span class="form-submit-spinner" hidden></span>
+                    <span>Create User Account</span>
+                </button>
+            </div>
+        </EditForm>
+    }
+</div>
 
 @code
 {
-    [SupplyParameterFromForm(FormName = "create-customer")]
-    private SignupForm? Input { get; set; }
+    [SupplyParameterFromForm(FormName = "create-user-admin")]
+    private AdminUserCreateForm? Input { get; set; }
     private string? error;
 
     protected override void OnInitialized() => Input ??= new();
 
     private async Task Save()
     {
+        error = null;
         try
         {
-            var id = await Session.RunAsync((s, _) => s.CreateCustomerAsync(Input!));
+            var id = await Session.RunAsync((s, _) => s.CreateUserByAdminAsync(Input!));
             Nav.NavigateTo($"/admin/users/{id}/edit");
         }
         catch (ShopException ex)
         {
             error = ex.Message;
-            Input!.Password = Input.ConfirmPassword = "";
+            Input!.Password = "";
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Memory;
 namespace JASIntWeb.Services;
@@ -851,6 +852,137 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         await tx.CommitAsync();
         cache.Remove(CatalogService.SlidesCacheKey);
         cache.Remove(CatalogService.HomeCategoriesCacheKey);
+    }
+
+    public async Task<int> CreateUserByAdminAsync(AdminUserCreateForm input)
+    {
+        Validate(input);
+        var email = input.Email.Trim().ToLowerInvariant();
+        var existing = await users.FindByEmailAsync(email);
+        if (existing != null)
+        {
+            throw new ShopException("An account with this email address already exists.");
+        }
+
+        var user = new User
+        {
+            Email = email,
+            UserName = email,
+            PhoneNumber = string.IsNullOrWhiteSpace(input.PhoneNumber) ? null : input.PhoneNumber.Trim(),
+            EmailConfirmed = input.EmailConfirmed
+        };
+
+        var result = await users.CreateAsync(user, input.Password);
+        if (!result.Succeeded)
+        {
+            throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.FullName))
+        {
+            await users.AddClaimAsync(user, new Claim("name", input.FullName.Trim()));
+        }
+
+        if (input.IsAdmin)
+        {
+            await users.AddToRoleAsync(user, "Admin");
+        }
+
+        return user.Id;
+    }
+
+    public async Task UpdateUserProfileAsync(AdminUserEditProfileForm input)
+    {
+        Validate(input);
+        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
+        var newEmail = input.Email.Trim().ToLowerInvariant();
+
+        if (!string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await users.FindByEmailAsync(newEmail);
+            if (existing != null && existing.Id != user.Id)
+            {
+                throw new ShopException("Another user already has this email address.");
+            }
+            user.Email = newEmail;
+            user.UserName = newEmail;
+        }
+
+        user.PhoneNumber = string.IsNullOrWhiteSpace(input.PhoneNumber) ? null : input.PhoneNumber.Trim();
+
+        var updateResult = await users.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            throw new ShopException(string.Join(" ", updateResult.Errors.Select(e => e.Description)));
+        }
+
+        var existingClaims = await users.GetClaimsAsync(user);
+        var nameClaim = existingClaims.FirstOrDefault(c => c.Type == "name");
+        if (nameClaim != null)
+        {
+            await users.RemoveClaimAsync(user, nameClaim);
+        }
+        if (!string.IsNullOrWhiteSpace(input.FullName))
+        {
+            await users.AddClaimAsync(user, new Claim("name", input.FullName.Trim()));
+        }
+
+        await users.UpdateSecurityStampAsync(user);
+    }
+
+    public async Task AdminResetPasswordAsync(AdminUserPasswordResetForm input)
+    {
+        Validate(input);
+        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
+        
+        if (await users.HasPasswordAsync(user))
+        {
+            var removeResult = await users.RemovePasswordAsync(user);
+            if (!removeResult.Succeeded)
+            {
+                throw new ShopException(string.Join(" ", removeResult.Errors.Select(e => e.Description)));
+            }
+        }
+
+        var addResult = await users.AddPasswordAsync(user, input.NewPassword);
+        if (!addResult.Succeeded)
+        {
+            throw new ShopException(string.Join(" ", addResult.Errors.Select(e => e.Description)));
+        }
+
+        await users.UpdateSecurityStampAsync(user);
+    }
+
+    public async Task ToggleEmailConfirmationAsync(int userId)
+    {
+        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new ShopException("User not found.");
+        user.EmailConfirmed = !user.EmailConfirmed;
+        var result = await users.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+        }
+    }
+
+    public async Task ToggleLockoutAsync(int userId, int actorId)
+    {
+        if (userId == actorId)
+        {
+            throw new ShopException("You cannot lock out your own administrator account.");
+        }
+        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new ShopException("User not found.");
+        
+        var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+        if (isLocked)
+        {
+            await users.SetLockoutEndDateAsync(user, null);
+            await users.ResetAccessFailedCountAsync(user);
+        }
+        else
+        {
+            await users.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
+            await users.UpdateSecurityStampAsync(user);
+        }
     }
 
     public async Task<int> CreateCustomerAsync(SignupForm input)
