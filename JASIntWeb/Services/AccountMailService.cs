@@ -9,6 +9,13 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(config["Mail:Host"]) && !string.IsNullOrWhiteSpace(config["Mail:From"]);
 
+    private MailAddress GetFromAddress()
+    {
+        var fromEmail = config["Mail:From"]!;
+        var displayName = config["Mail:DisplayName"] ?? "JAS International";
+        return new MailAddress(fromEmail, displayName);
+    }
+
     public async Task<bool> SendAsync(string to, string subject, string text)
     {
         if (!IsConfigured)
@@ -19,7 +26,11 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         try
         {
             using var client = CreateClient();
-            using var message = new MailMessage(config["Mail:From"]!, to, subject, text);
+            using var message = new MailMessage(GetFromAddress(), new MailAddress(to))
+            {
+                Subject = subject,
+                Body = text
+            };
             await client.SendMailAsync(message);
             return true;
         }
@@ -40,8 +51,10 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         try
         {
             using var client = CreateClient();
-            using var message = new MailMessage(config["Mail:From"]!, to, subject, htmlBody)
+            using var message = new MailMessage(GetFromAddress(), new MailAddress(to))
             {
+                Subject = subject,
+                Body = htmlBody,
                 IsBodyHtml = true,
                 BodyEncoding = Encoding.UTF8
             };
@@ -180,9 +193,11 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         {
             EnableSsl = config.GetValue<bool>("Mail:EnableSsl", true)
         };
-        if (!string.IsNullOrWhiteSpace(config["Mail:Username"]))
+        var username = config["Mail:Username"];
+        var password = config["Mail:Password"]?.Replace(" ", "");
+        if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
         {
-            client.Credentials = new NetworkCredential(config["Mail:Username"], config["Mail:Password"]);
+            client.Credentials = new NetworkCredential(username, password);
         }
         return client;
     }
