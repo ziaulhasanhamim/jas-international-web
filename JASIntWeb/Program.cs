@@ -165,21 +165,40 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IWe
     return Results.Ok(new { urls });
 }).DisableAntiforgery();
 
-app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db, ILogger<Program> logger) =>
+app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db, ShoppingService shop, DeliverySettingsService settingsSvc, ILogger<Program> logger) =>
 {
     string message = "";
     string senderNumber = "";
     string secret = "";
+    string directTrxId = "";
+    string directRef = "";
+    decimal directAmount = 0;
 
     if (request.HasJsonContentType())
     {
         using var doc = await System.Text.Json.JsonDocument.ParseAsync(request.Body);
-        if (doc.RootElement.TryGetProperty("message", out var m)) message = m.GetString() ?? "";
-        else if (doc.RootElement.TryGetProperty("text", out var t)) message = t.GetString() ?? "";
-        else if (doc.RootElement.TryGetProperty("sms", out var s)) message = s.GetString() ?? "";
+        var root = doc.RootElement;
+        if (root.TryGetProperty("message", out var m)) message = m.GetString() ?? "";
+        else if (root.TryGetProperty("text", out var t)) message = t.GetString() ?? "";
+        else if (root.TryGetProperty("sms", out var s)) message = s.GetString() ?? "";
 
-        if (doc.RootElement.TryGetProperty("sender", out var snd)) senderNumber = snd.GetString() ?? "";
-        if (doc.RootElement.TryGetProperty("secret", out var sec)) secret = sec.GetString() ?? "";
+        if (root.TryGetProperty("sender", out var snd)) senderNumber = snd.GetString() ?? "";
+        else if (root.TryGetProperty("phone", out var ph)) senderNumber = ph.GetString() ?? "";
+
+        if (root.TryGetProperty("secret", out var sec)) secret = sec.GetString() ?? "";
+
+        if (root.TryGetProperty("trxId", out var tx1)) directTrxId = tx1.GetString() ?? "";
+        else if (root.TryGetProperty("trx_id", out var tx2)) directTrxId = tx2.GetString() ?? "";
+        else if (root.TryGetProperty("transactionId", out var tx3)) directTrxId = tx3.GetString() ?? "";
+
+        if (root.TryGetProperty("reference", out var rf1)) directRef = rf1.GetString() ?? "";
+        else if (root.TryGetProperty("ref", out var rf2)) directRef = rf2.GetString() ?? "";
+
+        if (root.TryGetProperty("amount", out var am))
+        {
+            if (am.ValueKind == System.Text.Json.JsonValueKind.Number) directAmount = am.GetDecimal();
+            else if (am.ValueKind == System.Text.Json.JsonValueKind.String) decimal.TryParse(am.GetString(), out directAmount);
+        }
     }
     else if (request.HasFormContentType)
     {
@@ -187,53 +206,97 @@ app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db
         message = form["message"].ToString();
         if (string.IsNullOrEmpty(message)) message = form["text"].ToString();
         senderNumber = form["sender"].ToString();
+        if (string.IsNullOrEmpty(senderNumber)) senderNumber = form["phone"].ToString();
         secret = form["secret"].ToString();
+        directTrxId = form["trxId"].ToString();
+        if (string.IsNullOrEmpty(directTrxId)) directTrxId = form["transactionId"].ToString();
+        directRef = form["reference"].ToString();
+        if (string.IsNullOrEmpty(directRef)) directRef = form["ref"].ToString();
+        decimal.TryParse(form["amount"].ToString(), out directAmount);
     }
 
-    if (string.IsNullOrWhiteSpace(message))
-        return Results.BadRequest(new { error = "No message provided" });
-
-    var amountMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:Tk|Tk\.|BDT|amount)\s*([\d\.]+)|\b([\d\.]+)\s*(?:Tk|BDT)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    var refMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:Ref|Reference|Ref:)\s*([A-Za-z0-9\-]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    var trxMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:TrxID|TxnId|TxnID|Transaction ID|ID)\s*:?\s*([A-Za-z0-9]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    var phoneMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:from|sender)\s*(01\d{9})", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-    decimal amount = 0;
-    if (amountMatch.Success)
+    // Verify secret if configured
+    var settings = await settingsSvc.GetSettingsAsync();
+    if (!string.IsNullOrWhiteSpace(settings.SmsWebhookSecret) && !string.IsNullOrWhiteSpace(secret))
     {
-        var val = amountMatch.Groups[1].Success ? amountMatch.Groups[1].Value : amountMatch.Groups[2].Value;
-        decimal.TryParse(val, out amount);
+        if (!string.Equals(settings.SmsWebhookSecret.Trim(), secret.Trim(), StringComparison.Ordinal))
+        {
+            return Results.Json(new { success = false, error = "Invalid secret key" }, statusCode: 401);
+        }
     }
-    string refCode = refMatch.Success ? refMatch.Groups[1].Value : "";
-    string trxId = trxMatch.Success ? trxMatch.Groups[1].Value : "";
-    string fromPhone = phoneMatch.Success ? phoneMatch.Groups[1].Value : senderNumber;
+
+    decimal amount = directAmount;
+    string refCode = directRef;
+    string trxId = directTrxId;
+    string fromPhone = senderNumber;
+
+    if (!string.IsNullOrWhiteSpace(message))
+    {
+        var amountMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:Tk|Tk\.|BDT|amount)\s*([\d\.]+)|\b([\d\.]+)\s*(?:Tk|BDT)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var refMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:Ref|Reference|Ref:)\s*([A-Za-z0-9\-]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var trxMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:TrxID|TxnId|TxnID|Transaction ID|ID)\s*:?\s*([A-Za-z0-9]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var phoneMatch = System.Text.RegularExpressions.Regex.Match(message, @"(?:from|sender)\s*(01\d{9})", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (amountMatch.Success && amount == 0)
+        {
+            var val = amountMatch.Groups[1].Success ? amountMatch.Groups[1].Value : amountMatch.Groups[2].Value;
+            decimal.TryParse(val, out amount);
+        }
+        if (refMatch.Success && string.IsNullOrEmpty(refCode)) refCode = refMatch.Groups[1].Value;
+        if (trxMatch.Success && string.IsNullOrEmpty(trxId)) trxId = trxMatch.Groups[1].Value;
+        if (phoneMatch.Success && string.IsNullOrEmpty(fromPhone)) fromPhone = phoneMatch.Groups[1].Value;
+    }
+
+    if (string.IsNullOrWhiteSpace(message) && string.IsNullOrWhiteSpace(trxId) && string.IsNullOrWhiteSpace(refCode))
+    {
+        return Results.BadRequest(new { error = "No message, TrxID, or reference provided" });
+    }
 
     Order? order = null;
     if (!string.IsNullOrEmpty(refCode))
     {
-        order = await db.Orders.FirstOrDefaultAsync(o => o.PaymentReferenceCode == refCode || o.PublicToken.ToString().EndsWith(refCode));
+        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.PaymentReferenceCode == refCode || o.PublicToken.ToString().EndsWith(refCode));
     }
     if (order == null && !string.IsNullOrEmpty(trxId))
     {
-        order = await db.Orders.FirstOrDefaultAsync(o => o.TransactionId == trxId);
+        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.TransactionId == trxId);
     }
-    if (order == null && !string.IsNullOrEmpty(fromPhone) && amount > 0)
+    if (order == null && !string.IsNullOrEmpty(fromPhone))
     {
-        order = await db.Orders.Where(o => o.SenderPhoneNumber == fromPhone && o.Status == OrderStatus.Pending)
+        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
+            .Where(o => o.SenderPhoneNumber == fromPhone && o.PaidAmount == 0)
             .OrderByDescending(o => o.CreatedAt)
             .FirstOrDefaultAsync();
     }
 
     if (order != null)
     {
-        order.Status = OrderStatus.Processing;
-        if (!string.IsNullOrEmpty(trxId)) order.TransactionId = trxId;
-        if (amount > 0) order.PaidAmount = amount;
-        await db.SaveChangesAsync();
-        return Results.Ok(new { success = true, matched = true, orderId = order.Id, trxId, amount });
+        var verified = await shop.VerifyPaymentAsync(order.Id, amount > 0 ? amount : null, !string.IsNullOrEmpty(trxId) ? trxId : null);
+        logger.LogInformation("SMS Webhook: Payment verified for Order #{OrderId} (TrxID: {TrxId}, Amount: {Amount})", verified.Id, verified.TransactionId, verified.PaidAmount);
+
+        return Results.Ok(new
+        {
+            success = true,
+            matched = true,
+            orderId = verified.Id,
+            reference = verified.PaymentReferenceCode,
+            trxId = verified.TransactionId,
+            amountPaid = verified.PaidAmount,
+            orderStatus = "Pending",
+            paymentStatus = "Verified",
+            message = "Payment verified successfully. Order status remains Pending until confirmed by admin in Admin Panel."
+        });
     }
 
-    return Results.Ok(new { success = true, matched = false, parsed = new { amount, refCode, trxId, fromPhone } });
+    return Results.Ok(new
+    {
+        success = true,
+        matched = false,
+        message = "No matching pending order found. Check reference code, TrxID, or sender number.",
+        parsed = new { amount, refCode, trxId, fromPhone }
+    });
 }).DisableAntiforgery();
 
 app.MapGet("/api/orders/{id:int}/payment-status", async (int id, AppDbContext db) =>

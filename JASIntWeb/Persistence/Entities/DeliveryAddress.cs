@@ -10,5 +10,6 @@ public class DeliveryAddress
     public required string City { get; set; }
     public required string PhoneNumber { get; set; }
     public required string CustomerName { get; set; }
+    public string? Email { get; set; }
     public int? CustomerId { get; set; }
 }

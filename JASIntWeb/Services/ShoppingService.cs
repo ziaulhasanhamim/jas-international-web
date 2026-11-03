@@ -4,7 +4,7 @@ namespace JASIntWeb.Services;
 
 public sealed class ShopException(string message) : Exception(message);
 
-public sealed class ShoppingService(AppDbContext db, IConfiguration config, DeliverySettingsService deliverySettings, CouponService couponService)
+public sealed class ShoppingService(AppDbContext db, IConfiguration config, DeliverySettingsService deliverySettings, CouponService couponService, AccountMailService mailService)
 {
     public static int? UserId(ClaimsPrincipal user) => int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 50), config.GetValue<decimal>("Delivery:OutsideKhulna", 150));
@@ -322,20 +322,26 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         {
             CustomerName = request.CustomerName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
+            Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
             FullAddress = request.Address.Trim(),
-            Division = request.Division?.Trim() ?? "Khulna",
+            Division = request.Division?.Trim() ?? "Dhaka",
             District = request.District.Trim(),
             Thana = request.Thana?.Trim() ?? request.City.Trim(),
             City = request.City.Trim(),
             CustomerId = userId
         };
+        if (string.IsNullOrWhiteSpace(address.Email) && userId.HasValue)
+        {
+            var u = await db.Users.FindAsync(userId.Value);
+            if (u != null) address.Email = u.Email;
+        }
+
         var refCode = $"JAS{Random.Shared.Next(1000, 9999)}";
-        var isAdvanceOrPaid = !string.IsNullOrWhiteSpace(request.TransactionId);
         var order = new Order
         {
             UserId = userId,
             CheckoutToken = request.RequestId,
-            Status = isAdvanceOrPaid ? OrderStatus.Processing : OrderStatus.Pending,
+            Status = OrderStatus.Pending,
             DeliveryAddressId = 0,
             DeliveryAddress = address,
             Subtotal = summary.Subtotal,
@@ -346,7 +352,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             PaymentReferenceCode = refCode,
             SenderPhoneNumber = request.SenderPhoneNumber?.Trim(),
             TransactionId = request.TransactionId?.Trim().ToUpperInvariant(),
-            PaidAmount = isAdvanceOrPaid ? (request.PaymentMethod == "FullPayment" ? calculatedTotal : (await deliverySettings.GetSettingsAsync()).AdvanceAmount) : 0m,
+            PaidAmount = 0m,
             Items = summary.Items.Select(i => new OrderItem
                 {
                     ProductVariantId = i.VariantId,
@@ -363,8 +369,8 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             {
                 OrderId = 0,
                 Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" || request.PaymentMethod == "Pending" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
-                Status = isAdvanceOrPaid ? PaymentStatus.Completed : PaymentStatus.Pending,
-                Amount = isAdvanceOrPaid ? order.PaidAmount : order.Total,
+                Status = PaymentStatus.Pending,
+                Amount = 0m,
                 ExternalReference = request.TransactionId
             });
         db.Orders.Add(order);
@@ -408,7 +414,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             }
 
             var isFull = request.PaymentMethod == "FullPayment";
-            var paidAmt = isFull ? order.Total : dSettings.AdvanceAmount;
+            var payableAmt = isFull ? order.Total : dSettings.AdvanceAmount;
 
             if (!string.IsNullOrWhiteSpace(request.ReferenceCode))
             {
@@ -416,14 +422,14 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             }
             order.SenderPhoneNumber = request.SenderPhoneNumber.Trim();
             order.TransactionId = request.TransactionId.Trim().ToUpperInvariant();
-            order.PaidAmount = paidAmt;
-            order.Status = OrderStatus.Processing;
+            order.PaidAmount = 0m; // Verification pending!
+            order.Status = OrderStatus.Pending; // Order remains pending until admin confirmation!
 
             var existingPayment = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash);
             if (existingPayment != null)
             {
-                existingPayment.Amount = paidAmt;
-                existingPayment.Status = PaymentStatus.Completed;
+                existingPayment.Amount = payableAmt;
+                existingPayment.Status = PaymentStatus.Pending; // Pending verification!
                 existingPayment.ExternalReference = order.TransactionId;
             }
             else
@@ -432,8 +438,8 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
                 {
                     OrderId = order.Id,
                     Method = PaymentMethod.Bkash,
-                    Status = PaymentStatus.Completed,
-                    Amount = paidAmt,
+                    Status = PaymentStatus.Pending,
+                    Amount = payableAmt,
                     ExternalReference = order.TransactionId
                 });
             }
@@ -449,6 +455,64 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         }
 
         await db.SaveChangesAsync();
+        return order;
+    }
+
+    public async Task<Order> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
+    {
+        var order = await db.Orders
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+        if (order is null)
+        {
+            throw new ShopException("Order not found.");
+        }
+
+        var dSettings = await deliverySettings.GetSettingsAsync();
+        var amount = verifiedAmount ?? (order.PaidAmount > 0 ? order.PaidAmount : dSettings.AdvanceAmount);
+
+        if (!string.IsNullOrEmpty(verifiedTrxId))
+        {
+            order.TransactionId = verifiedTrxId.Trim().ToUpperInvariant();
+        }
+        order.PaidAmount = amount;
+        // Keep order.Status as Pending! Admin must explicitly confirm the order.
+        order.Status = OrderStatus.Pending;
+
+        var bkashPayment = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash);
+        if (bkashPayment != null)
+        {
+            bkashPayment.Amount = amount;
+            bkashPayment.Status = PaymentStatus.Completed;
+            bkashPayment.ExternalReference = order.TransactionId;
+        }
+        else
+        {
+            order.Payments.Add(new Payment
+            {
+                OrderId = order.Id,
+                Method = PaymentMethod.Bkash,
+                Status = PaymentStatus.Completed,
+                Amount = amount,
+                ExternalReference = order.TransactionId
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        // Send payment verified email with full order summary
+        try
+        {
+            await mailService.SendPaymentVerifiedEmailAsync(order);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send payment verified email: {ex.Message}");
+        }
+
         return order;
     }
 }

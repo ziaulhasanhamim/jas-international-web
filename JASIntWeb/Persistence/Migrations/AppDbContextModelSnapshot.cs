@@ -18,7 +18,7 @@ namespace JASIntWeb.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -458,6 +458,9 @@ namespace JASIntWeb.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Division")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
                         .HasColumnType("text");
 
                     b.Property<string>("FullAddress")

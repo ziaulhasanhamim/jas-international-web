@@ -25,6 +25,8 @@ public sealed class CheckoutRequest
     public string CustomerName { get; set; } = "";
     [Required, RegularExpression(@"(?:\+?88)?01[3-9]\d{8}", ErrorMessage = "Enter a valid Bangladesh mobile number.")]
     public string PhoneNumber { get; set; } = "";
+    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    public string? Email { get; set; }
     [Required, StringLength(300)]
     public string Address { get; set; } = "";
     public string Division { get; set; } = "Khulna";

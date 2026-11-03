@@ -20,18 +20,64 @@
     {
         <CheckoutCompleted CheckoutToken="order.CheckoutToken" OrderId="order.Id" OrderPublicToken="order.PublicToken" Total="order.Total" />
 
+        var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
+        var hasSubmittedTrx = !string.IsNullOrEmpty(order.TransactionId);
+
         <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-700") p-8 text-white text-center">
-                <span class="flex size-14 items-center justify-center rounded-full bg-white @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "text-emerald-600" : "text-blue-600") mx-auto mb-4 shadow-md">
-                    <Icon Name="check" Class="size-8" />
+            <div class="bg-gradient-to-r @(isPaymentVerified ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-800") p-8 text-white text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-white @(isPaymentVerified ? "text-emerald-600" : "text-blue-600") mx-auto mb-4 shadow-md">
+                    @if (isPaymentVerified)
+                    {
+                        <Icon Name="check" Class="size-8" />
+                    }
+                    else
+                    {
+                        <svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    }
                 </span>
+
                 <span class="text-xs font-bold uppercase tracking-widest text-emerald-100 block mb-1">
-                    @(order.PaidAmount > 0 || order.Status == OrderStatus.Processing ? "ORDER CONFIRMED & PAID" : "ORDER PLACED · PAYMENT PENDING")
+                    @if (isPaymentVerified)
+                    {
+                        <span>PAYMENT VERIFIED · PENDING ADMIN CONFIRMATION</span>
+                    }
+                    else if (hasSubmittedTrx)
+                    {
+                        <span>ORDER PLACED · AWAITING PAYMENT VERIFICATION</span>
+                    }
+                    else
+                    {
+                        <span>ORDER PLACED · PAYMENT REQUIRED</span>
+                    }
                 </span>
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Thank You For Your Order!</h1>
-                <p class="text-xs text-emerald-100 mt-2">
-                    Order <strong>#@order.Id</strong> has been registered and inventory is reserved for fulfillment.
+
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    @if (isPaymentVerified)
+                    {
+                        <span>Payment Verified!</span>
+                    }
+                    else
+                    {
+                        <span>Thank You! Order #@order.Id Placed</span>
+                    }
+                </h1>
+
+                <p class="text-xs text-blue-100 mt-2 max-w-lg mx-auto">
+                    @if (isPaymentVerified)
+                    {
+                        <span>Your bKash payment of ৳@order.PaidAmount.ToString("N0") has been verified. Order #@order.Id is reserved and queued for admin dispatch confirmation.</span>
+                    }
+                    else if (hasSubmittedTrx)
+                    {
+                        <span>We have recorded your bKash transaction (TrxID: <strong>@order.TransactionId</strong>). Verification is in progress. <strong>You can safely close this page or browse other products.</strong></span>
+                    }
+                    else
+                    {
+                        <span>Order #@order.Id has been registered. Please complete your bKash payment to initiate shipping.</span>
+                    }
                 </p>
             </div>
 
@@ -43,13 +89,19 @@
                         <span class="text-slate-400 block font-medium">Deliver To:</span>
                         <strong class="text-slate-900 text-sm">@order.DeliveryAddress?.CustomerName</strong>
                         <p class="text-slate-600 mt-0.5 font-mono">@order.DeliveryAddress?.PhoneNumber</p>
-                        <p class="text-slate-600">@order.DeliveryAddress?.FullAddress</p>
+                        @if (!string.IsNullOrEmpty(order.DeliveryAddress?.Email))
+                        {
+                            <p class="text-slate-500 font-sans">@order.DeliveryAddress?.Email</p>
+                        }
+                        <p class="text-slate-600 mt-1">@order.DeliveryAddress?.FullAddress</p>
                         <p class="text-slate-500 text-[11px]">@order.DeliveryAddress?.Thana, @order.DeliveryAddress?.District (@order.DeliveryAddress?.Division)</p>
                     </div>
 
                     <div class="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
                         <span class="text-slate-400 block font-medium">Payment Mode:</span>
-                        <strong class="text-slate-900 text-sm">@(order.PaidAmount > 0 ? "Advance Paid (bKash)" : "Payment Pending / COD")</strong>
+                        <strong class="text-slate-900 text-sm">
+                            @(order.PaidAmount > 0 ? "Advance Paid (bKash)" : (hasSubmittedTrx ? "bKash Verification Pending" : "Cash on Delivery / Pending"))
+                        </strong>
                         @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
                         {
                             <span class="block text-[11px] font-mono text-blue-600 mt-0.5">Ref: @order.PaymentReferenceCode</span>
@@ -59,16 +111,16 @@
                             <span class="block text-[11px] font-mono text-slate-500">TrxID: @order.TransactionId</span>
                         }
                         <div class="mt-2">
-                            @if (order.PaidAmount > 0 || order.Status == OrderStatus.Processing)
+                            @if (isPaymentVerified)
                             {
                                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
                                     <span class="size-1.5 rounded-full bg-emerald-500"></span> Payment Verified (৳@order.PaidAmount.ToString("N0"))
                                 </span>
                             }
-                            else if (!string.IsNullOrEmpty(order.TransactionId))
+                            else if (hasSubmittedTrx)
                             {
-                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-600/20">
-                                    <span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span> Verifying via SMS Webhook...
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-600/20 animate-pulse">
+                                    <span class="size-1.5 rounded-full bg-amber-500"></span> Awaiting Payment Verification
                                 </span>
                             }
                             else
@@ -80,6 +132,28 @@
                         </div>
                     </div>
                 </div>
+
+                @if (!isPaymentVerified && hasSubmittedTrx)
+                {
+                    <!-- Reassuring Information Notice -->
+                    <div class="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 space-y-1.5">
+                        <div class="flex items-center gap-2 font-bold text-blue-950 text-sm">
+                            <span class="flex size-5 items-center justify-center rounded-full bg-blue-200 text-blue-800 text-xs font-bold">i</span>
+                            <span>Payment Verification in Progress</span>
+                        </div>
+                        <p class="text-blue-900 text-xs">
+                            Your transaction ID <strong class="font-mono text-slate-900">@order.TransactionId</strong> from sender <strong class="font-mono text-slate-900">@order.SenderPhoneNumber</strong> is recorded.
+                            Our automated bKash SMS system or admin will verify your payment shortly.
+                        </p>
+                        <p class="text-blue-800 text-[11px] pt-1 border-t border-blue-200/60">
+                            ✓ <strong>You can safely close this tab or browse other pages.</strong> Your item stock is secured.
+                            @if (!string.IsNullOrEmpty(order.DeliveryAddress?.Email))
+                            {
+                                <span> An email confirmation will be sent to <strong>@order.DeliveryAddress?.Email</strong> once payment is verified.</span>
+                            }
+                        </p>
+                    </div>
+                }
 
                 <!-- Line Items Table -->
                 <div class="border-t border-slate-100 pt-5">
@@ -120,22 +194,33 @@
                         </div>
 
                         <div class="rounded-xl bg-slate-50 border p-3 mt-2 text-[11px] space-y-1">
-                            @if (order.PaidAmount > 0)
+                            @if (isPaymentVerified)
                             {
                                 <div class="flex justify-between text-slate-700">
-                                    <span>Amount Paid via bKash:</span>
+                                    <span>Verified Paid Amount:</span>
                                     <strong class="text-emerald-600">৳@order.PaidAmount.ToString("N0")</strong>
                                 </div>
                                 <div class="flex justify-between text-slate-700">
-                                    <span>Due on Delivery:</span>
+                                    <span>Due on Delivery (Courier):</span>
                                     <strong class="text-slate-900">৳@Math.Max(0, order.Total - order.PaidAmount).ToString("N0")</strong>
+                                </div>
+                            }
+                            else if (hasSubmittedTrx)
+                            {
+                                <div class="flex justify-between text-slate-700">
+                                    <span>Payment Status:</span>
+                                    <strong class="text-amber-600">Awaiting Verification</strong>
+                                </div>
+                                <div class="flex justify-between text-slate-500">
+                                    <span>Claimed TrxID:</span>
+                                    <span class="font-mono font-bold">@order.TransactionId</span>
                                 </div>
                             }
                             else
                             {
                                 <div class="flex justify-between text-slate-700">
                                     <span>Payment Status:</span>
-                                    <strong class="text-amber-600">Pending bKash Confirmation</strong>
+                                    <strong class="text-rose-600">Unpaid</strong>
                                 </div>
                             }
                         </div>
@@ -170,6 +255,7 @@
         order = await db.Orders.AsNoTracking()
             .Include(o => o.Items)
             .Include(o => o.DeliveryAddress)
+            .Include(o => o.Payments)
             .SingleOrDefaultAsync(o => o.PublicToken == Token);
     }
 }

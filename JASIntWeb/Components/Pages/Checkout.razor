@@ -102,6 +102,24 @@
                             </div>
                         </div>
 
+                        <div>
+                            <label class="field-label flex items-center justify-between">
+                                <span>Email Address</span>
+                                <span class="text-slate-400 font-normal text-[11px]">(Optional — for order receipt &amp; status updates)</span>
+                            </label>
+                            <input
+                                type="email"
+                                class="field @(hasValidated && !IsEmailValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
+                                @bind="email"
+                                @bind:event="oninput"
+                                placeholder="name@example.com"
+                            />
+                            @if (hasValidated && !IsEmailValid)
+                            {
+                                <span class="text-rose-600 text-[11px] font-semibold mt-1 block">Please enter a valid email address (or leave empty).</span>
+                            }
+                        </div>
+
                         <!-- 3-Tier Bangladesh Location Cascading Selects -->
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div>
@@ -327,6 +345,7 @@
     // Delivery fields
     private string customerName = "";
     private string phoneNumber = "";
+    private string email = "";
     private string selectedDivision = "Dhaka";
     private string selectedDistrict = "Dhaka";
     private string selectedThana = "Dhanmondi";
@@ -351,6 +370,7 @@
 
     private bool IsCustomerNameValid => !string.IsNullOrWhiteSpace(customerName) && customerName.Trim().Length >= 2;
     private bool IsPhoneValid => !string.IsNullOrWhiteSpace(phoneNumber) && PhoneRegex.IsMatch(phoneNumber.Trim());
+    private bool IsEmailValid => string.IsNullOrWhiteSpace(email) || new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email.Trim());
     private bool IsAddressValid => !string.IsNullOrWhiteSpace(streetAddress) && streetAddress.Trim().Length >= 5;
     private bool IsDivisionValid => !string.IsNullOrWhiteSpace(selectedDivision);
     private bool IsDistrictValid => !string.IsNullOrWhiteSpace(selectedDistrict);
@@ -391,12 +411,18 @@
                         {
                             customerName = addr.CustomerName;
                             phoneNumber = addr.PhoneNumber;
+                            if (!string.IsNullOrWhiteSpace(addr.Email)) email = addr.Email;
                             streetAddress = addr.FullAddress;
                             if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
                             availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
                             if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
                             availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
                             if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
+                        }
+                        var userName = auth?.User?.Identity?.Name;
+                        if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(userName) && userName.Contains('@'))
+                        {
+                            email = userName;
                         }
                     }
                 }
@@ -498,6 +524,11 @@
             error = "Please enter a valid 11-digit Bangladesh phone number (01xxxxxxxxx).";
             return;
         }
+        if (!IsEmailValid)
+        {
+            error = "Please enter a valid email address (e.g. name@example.com) or leave it empty.";
+            return;
+        }
         if (!IsDivisionValid || !IsDistrictValid || !IsThanaValid)
         {
             error = "Please select your delivery Division, District, and Thana.";
@@ -530,6 +561,7 @@
                 RequestId = checkoutToken,
                 CustomerName = customerName.Trim(),
                 PhoneNumber = phoneNumber.Trim(),
+                Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
                 Division = selectedDivision,
                 District = selectedDistrict,
                 Thana = selectedThana,

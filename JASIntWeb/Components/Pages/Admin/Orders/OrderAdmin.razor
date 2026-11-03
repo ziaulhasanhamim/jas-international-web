@@ -1,6 +1,7 @@
 @page "/admin/orders/{Id:int}"
 @inject AppDbContext Db
 @inject AdminSession Session
+@inject ShoppingService Shop
 @inject NavigationManager Nav
 
 <PageTitle>Order #@Id · JAS Admin</PageTitle>
@@ -84,6 +85,10 @@ else
                     <a href="tel:@order.DeliveryAddress?.PhoneNumber" class="text-blue-600 font-mono font-medium hover:underline">
                         @order.DeliveryAddress?.PhoneNumber
                     </a>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 block">Customer Email</span>
+                    <p class="text-slate-700 text-xs">@(order.DeliveryAddress?.Email ?? order.User?.Email ?? "No email provided")</p>
                 </div>
                 <div>
                     <span class="text-xs text-slate-400 block">Street Address</span>
@@ -173,14 +178,14 @@ else
                 <div class="flex items-center gap-2">
                     @if (order.PaidAmount == 0 && (!string.IsNullOrEmpty(order.TransactionId) || order.Status == OrderStatus.Pending))
                     {
-                        <button type="button" @onclick="VerifyPayment" class="btn-secondary !text-emerald-700 !bg-emerald-50 !border-emerald-200 text-xs font-bold py-1 px-3">
-                            ✓ Mark Advance Paid (৳150)
+                        <button type="button" @onclick="VerifyPayment" class="btn-secondary !text-emerald-700 !bg-emerald-50 !border-emerald-200 text-xs font-bold py-1.5 px-3">
+                            ✓ Verify Payment &amp; Email Customer
                         </button>
                     }
                     else if (order.PaidAmount > 0)
                     {
                         <span class="badge badge-emerald">
-                            ✓ Paid ৳@order.PaidAmount.ToString("N0")
+                            ✓ Payment Verified (৳@order.PaidAmount.ToString("N0"))
                         </span>
                     }
                 </div>
@@ -317,13 +322,14 @@ else
 
     private async Task VerifyPayment()
     {
-        var existing = await Db.Orders.FirstOrDefaultAsync(o => o.Id == Id);
-        if (existing != null)
+        try
         {
-            existing.PaidAmount = 150m;
-            existing.Status = OrderStatus.Processing;
-            await Db.SaveChangesAsync();
+            await Shop.VerifyPaymentAsync(Id);
             Nav.NavigateTo($"/admin/orders/{Id}?saved=true", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
         }
     }
 }
