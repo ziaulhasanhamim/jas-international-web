@@ -1,6 +1,7 @@
 @page "/checkout/payment/{Token:guid}"
 @page "/payment/{Token:guid}"
 @rendermode InteractiveServer
+@implements IDisposable
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Persistence
@@ -379,6 +380,28 @@
     }
 </div>
 
+@if (order != null && order.PaidAmount == 0)
+{
+    <script>
+        (function() {
+            const token = "@Token";
+            const pollId = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/orders/${token}/status`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.isPaymentVerified) {
+                            clearInterval(pollId);
+                            window.location.href = `/order/${token}`;
+                        }
+                    }
+                } catch (e) {}
+            }, 2500);
+            window.addEventListener('beforeunload', () => clearInterval(pollId));
+        })();
+    </script>
+}
+
 @code
 {
     [Parameter]
@@ -455,6 +478,63 @@
         {
             isLoading = false;
         }
+    }
+
+    private CancellationTokenSource? pollCts;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && order != null && order.PaidAmount == 0)
+        {
+            StartPolling();
+        }
+    }
+
+    private void StartPolling()
+    {
+        pollCts = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2.5));
+            while (!pollCts.IsCancellationRequested && await timer.WaitForNextTickAsync(pollCts.Token))
+            {
+                try
+                {
+                    await using var scope = ScopeFactory.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var status = await db.Orders.AsNoTracking()
+                        .Where(o => o.PublicToken == Token)
+                        .Select(o => new
+                        {
+                            o.PaidAmount,
+                            o.Status,
+                            IsVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed)
+                        })
+                        .FirstOrDefaultAsync(pollCts.Token);
+
+                    if (status != null && (status.IsVerified || status.PaidAmount > 0 || status.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered))
+                    {
+                        pollCts.Cancel();
+                        await InvokeAsync(() => Nav.NavigateTo($"/order/{Token}"));
+                        break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch
+                {
+                    // Retry on next periodic tick
+                }
+            }
+        }, pollCts.Token);
+    }
+
+    public void Dispose()
+    {
+        pollCts?.Cancel();
+        pollCts?.Dispose();
     }
 
     private void SetPaymentMode(PaymentModeOption mode)

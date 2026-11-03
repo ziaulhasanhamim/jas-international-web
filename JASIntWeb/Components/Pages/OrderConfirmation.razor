@@ -1,8 +1,11 @@
 @page "/order/{Token:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
 @inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager Nav
 
 <PageTitle>Order Confirmation · JAS International</PageTitle>
 
@@ -83,6 +86,19 @@
 
             <!-- Receipt Body -->
             <div class="p-6 sm:p-8 space-y-6">
+                @if (newlyVerified)
+                {
+                    <div class="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-xs text-emerald-900 flex items-start gap-3 shadow-xs animate-pulse" role="alert">
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold">
+                            <Icon Name="check" Class="size-5" />
+                        </span>
+                        <div>
+                            <strong class="font-bold text-emerald-950 block text-sm">Payment Verified Successfully!</strong>
+                            <span class="text-emerald-800">Your bKash transaction has been verified. Your order is confirmed and queued for fulfillment.</span>
+                        </div>
+                    </div>
+                }
+
                 <!-- Delivery Info Card -->
                 <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
                     <div>
@@ -152,6 +168,13 @@
                                 <span> An email confirmation will be sent to <strong>@order.DeliveryAddress?.Email</strong> once payment is verified.</span>
                             }
                         </p>
+                        <div class="mt-2 pt-2 border-t border-blue-200/60 flex items-center gap-2 text-[11px] font-semibold text-blue-800">
+                            <span class="relative flex size-2 shrink-0">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full size-2 bg-blue-600"></span>
+                            </span>
+                            <span>Auto-checking live verification… Leaving this page open will automatically update to your final verified receipt upon confirmation.</span>
+                        </div>
                     </div>
                 }
 
@@ -242,13 +265,54 @@
     }
 </div>
 
+@if (order != null && !(order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed)))
+{
+    <script>
+        (function() {
+            const token = "@Token";
+            const pollId = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/orders/${token}/status`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.isPaymentVerified) {
+                            clearInterval(pollId);
+                            window.location.reload();
+                        }
+                    }
+                } catch (e) {}
+            }, 2500);
+            window.addEventListener('beforeunload', () => clearInterval(pollId));
+        })();
+    </script>
+}
+
 @code
 {
     [Parameter]
     public Guid Token { get; set; }
     private Order? order;
+    private bool newlyVerified;
+    private CancellationTokenSource? pollCts;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && order != null)
+        {
+            var isVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
+            if (!isVerified)
+            {
+                StartPolling();
+            }
+        }
+    }
+
+    private async Task LoadOrderAsync()
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -257,5 +321,57 @@
             .Include(o => o.DeliveryAddress)
             .Include(o => o.Payments)
             .SingleOrDefaultAsync(o => o.PublicToken == Token);
+    }
+
+    private void StartPolling()
+    {
+        pollCts = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2.5));
+            while (!pollCts.IsCancellationRequested && await timer.WaitForNextTickAsync(pollCts.Token))
+            {
+                try
+                {
+                    await using var scope = ScopeFactory.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var status = await db.Orders.AsNoTracking()
+                        .Where(o => o.PublicToken == Token)
+                        .Select(o => new
+                        {
+                            o.PaidAmount,
+                            o.Status,
+                            IsVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed)
+                        })
+                        .FirstOrDefaultAsync(pollCts.Token);
+
+                    if (status != null && (status.IsVerified || status.PaidAmount > 0 || status.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered))
+                    {
+                        pollCts.Cancel();
+                        await InvokeAsync(async () =>
+                        {
+                            await LoadOrderAsync();
+                            newlyVerified = true;
+                            StateHasChanged();
+                        });
+                        break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch
+                {
+                    // Retry on next tick
+                }
+            }
+        }, pollCts.Token);
+    }
+
+    public void Dispose()
+    {
+        pollCts?.Cancel();
+        pollCts?.Dispose();
     }
 }

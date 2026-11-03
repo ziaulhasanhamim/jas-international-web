@@ -37,6 +37,27 @@ public static class OrderEndpoints
             return Results.Ok(orders);
         });
 
+        group.MapGet("/{token:guid}/status", async (Guid token, AppDbContext db) =>
+        {
+            var order = await db.Orders.AsNoTracking()
+                .Include(o => o.Payments)
+                .Where(o => o.PublicToken == token)
+                .Select(o => new
+                {
+                    o.Id,
+                    o.PublicToken,
+                    Status = o.Status.ToString(),
+                    PaidAmount = o.PaidAmount,
+                    IsPaymentVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == Persistence.Entities.PaymentStatus.Completed),
+                    HasSubmittedTrx = !string.IsNullOrEmpty(o.TransactionId),
+                    TransactionId = o.TransactionId
+                })
+                .FirstOrDefaultAsync();
+
+            if (order is null) return Results.NotFound();
+            return Results.Ok(order);
+        });
+
         return endpoints;
     }
 }
