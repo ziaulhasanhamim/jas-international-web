@@ -549,4 +549,60 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         await db.SaveChangesAsync();
         return order;
     }
+
+    public async Task<Order> RejectPaymentAndCancelOrderAsync(int orderId, string? reason = null)
+    {
+        var order = await db.Orders
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+        if (order is null)
+        {
+            throw new ShopException("Order not found.");
+        }
+
+        if (order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)
+        {
+            throw new ShopException($"Order #{orderId} is already {order.Status}.");
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync();
+
+        // Release reserved inventory back to stock
+        foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
+            var stock = await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId);
+            if (stock != null && stock.QuantityReserved >= item.Quantity)
+            {
+                stock.QuantityReserved -= item.Quantity;
+            }
+        }
+
+        order.PaidAmount = 0m;
+        order.Status = OrderStatus.Cancelled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        foreach (var p in order.Payments)
+        {
+            p.Status = PaymentStatus.Failed;
+        }
+
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        // Dispatch cancellation email to customer
+        try
+        {
+            await mailService.SendOrderStatusUpdateEmailAsync(order, OrderStatus.Cancelled);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send cancellation email: {ex.Message}");
+        }
+
+        return order;
+    }
 }

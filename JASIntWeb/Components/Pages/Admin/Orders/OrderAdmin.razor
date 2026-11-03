@@ -66,14 +66,25 @@ else
             <p>@error</p>
         </div>
     }
-    @if (successMessage is not null)
+    @if (alertMessage is not null)
     {
-        <div class="rounded-xl border border-emerald-300 bg-emerald-50 p-4 mb-4 text-xs font-semibold text-emerald-900 flex items-center justify-between shadow-xs" role="alert">
+        <div class="rounded-xl border @(alertType == "rose" ? "border-rose-300 bg-rose-50 text-rose-900" : (alertType == "amber" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900")) p-3.5 mb-5 text-xs font-semibold flex items-center justify-between shadow-2xs" role="alert">
             <div class="flex items-center gap-2">
-                <Icon Name="check" Class="size-4 text-emerald-600" />
-                <span>@successMessage</span>
+                @if (alertType == "rose")
+                {
+                    <Icon Name="close" Class="size-4 text-rose-600" />
+                }
+                else if (alertType == "amber")
+                {
+                    <Icon Name="alert" Class="size-4 text-amber-600" />
+                }
+                else
+                {
+                    <Icon Name="check" Class="size-4 text-emerald-600" />
+                }
+                <span>@alertMessage</span>
             </div>
-            <button type="button" @onclick="() => successMessage = null" class="text-emerald-700 hover:text-emerald-900 font-bold">✕</button>
+            <button type="button" @onclick="() => alertMessage = null" class="text-slate-400 hover:text-slate-600 font-bold ml-2">✕</button>
         </div>
     }
 
@@ -132,61 +143,125 @@ else
                     <span class="text-xs text-slate-400">Order Token: <code class="font-mono text-slate-600 font-bold">@order.PublicToken.ToString()[..8]...</code></span>
                 </div>
 
-                <!-- Top Payment Verification Banner -->
-                <div class="mb-5 rounded-xl border @(order.PaidAmount > 0 ? "border-emerald-200 bg-emerald-50/70" : (!string.IsNullOrEmpty(order.TransactionId) ? "border-amber-300 bg-amber-50/80" : "border-slate-200 bg-slate-50/70")) p-4 text-xs">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div class="space-y-1.5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-slate-700 uppercase text-[11px] tracking-wider">PAYMENT:</span>
-                                @if (order.PaidAmount > 0)
-                                {
-                                    <span class="badge badge-emerald font-bold">
-                                        <Icon Name="check" Class="size-3" />
-                                        Verified (৳@order.PaidAmount.ToString("N0"))
-                                    </span>
-                                }
-                                else if (!string.IsNullOrEmpty(order.TransactionId))
-                                {
-                                    <span class="badge badge-amber font-bold animate-pulse">
-                                        Needs Confirmation
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="badge badge-slate">Unpaid</span>
-                                }
-                            </div>
-                            <div class="text-slate-600 space-y-0.5">
-                                <div>
-                                    Claimed bKash TrxID:
-                                    <strong class="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                                        @(string.IsNullOrEmpty(order.TransactionId) ? "None Submitted" : order.TransactionId)
-                                    </strong>
-                                </div>
-                                @if (!string.IsNullOrEmpty(order.SenderPhoneNumber))
-                                {
-                                    <div>Sender Phone: <strong class="font-mono text-slate-800">@order.SenderPhoneNumber</strong></div>
-                                }
-                                @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
-                                {
-                                    <div>Payment Ref: <strong class="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-bold">@order.PaymentReferenceCode</strong></div>
-                                }
-                            </div>
-                        </div>
-
+                <!-- Payment Verification Panel -->
+                <div class="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 text-xs space-y-3 mb-6">
+                    <div class="flex items-center justify-between pb-2.5 border-b border-slate-200/70">
                         <div class="flex items-center gap-2">
-                            @if (order.PaidAmount == 0)
+                            <span class="flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+                                <Icon Name="wallet" Class="size-3.5" />
+                            </span>
+                            <span class="font-bold text-slate-800 text-xs">Payment Verification</span>
+                        </div>
+                        <div>
+                            @if (order.Status == OrderStatus.Cancelled)
                             {
-                                <button type="button" @onclick="VerifyPayment" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-2.5 px-4 shadow-sm whitespace-nowrap flex items-center gap-1.5">
-                                    <Icon Name="check" Class="size-4" />
-                                    <span>✓ Verify Payment</span>
-                                </button>
+                                <span class="badge badge-rose font-bold">Order Cancelled</span>
+                            }
+                            else if (order.PaidAmount > 0)
+                            {
+                                <span class="badge badge-emerald font-bold">
+                                    <Icon Name="check" Class="size-3" />
+                                    <span>Verified (৳@order.PaidAmount.ToString("N0"))</span>
+                                </span>
+                            }
+                            else if (!string.IsNullOrEmpty(order.TransactionId))
+                            {
+                                <span class="badge badge-amber font-bold animate-pulse">
+                                    Needs Confirmation
+                                </span>
                             }
                             else
                             {
-                                <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-2 px-3.5 shadow-2xs whitespace-nowrap">
-                                    ✕ Unverify Payment
-                                </button>
+                                <span class="badge badge-slate">Unpaid</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Payment Details Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 py-1">
+                        <div>
+                            <span class="text-[11px] text-slate-400 block mb-0.5">Claimed bKash TrxID</span>
+                            @if (!string.IsNullOrEmpty(order.TransactionId))
+                            {
+                                <strong class="font-mono text-xs text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 inline-block font-bold">
+                                    @order.TransactionId
+                                </strong>
+                            }
+                            else
+                            {
+                                <span class="font-mono text-slate-400 italic text-[11px]">None Submitted</span>
+                            }
+                        </div>
+
+                        <div>
+                            <span class="text-[11px] text-slate-400 block mb-0.5">Sender Phone</span>
+                            @if (!string.IsNullOrEmpty(order.SenderPhoneNumber))
+                            {
+                                <a href="tel:@order.SenderPhoneNumber" class="font-mono text-xs text-blue-600 hover:underline font-semibold">
+                                    @order.SenderPhoneNumber
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="text-slate-400">-</span>
+                            }
+                        </div>
+
+                        <div>
+                            <span class="text-[11px] text-slate-400 block mb-0.5">Payment Reference</span>
+                            @if (!string.IsNullOrEmpty(order.PaymentReferenceCode))
+                            {
+                                <span class="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-bold border border-blue-100">
+                                    @order.PaymentReferenceCode
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-slate-400">-</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
+                        <div class="text-slate-500 text-xs">
+                            Order Total: <strong class="text-slate-900 font-bold text-sm">৳@order.Total.ToString("N0")</strong>
+                            @if (order.PaidAmount > 0)
+                            {
+                                <span class="ml-1 text-emerald-700 font-semibold">(Paid: ৳@order.PaidAmount.ToString("N0"))</span>
+                            }
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            @if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Delivered)
+                            {
+                                @if (order.PaidAmount == 0)
+                                {
+                                    <button type="button" @onclick="VerifyPayment" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5">
+                                        <Icon Name="check" Class="size-3.5" />
+                                        <span>Verify Payment</span>
+                                    </button>
+
+                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5">
+                                        <Icon Name="close" Class="size-3" />
+                                        <span>Payment Not Received (Cancel Order)</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl">
+                                        Mark as Unverified
+                                    </button>
+
+                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1">
+                                        <Icon Name="close" Class="size-3" />
+                                        <span>Cancel Order</span>
+                                    </button>
+                                }
+                            }
+                            else if (order.Status == OrderStatus.Cancelled)
+                            {
+                                <span class="text-xs text-rose-600 font-semibold italic">Order is cancelled &amp; inventory released.</span>
                             }
                         </div>
                     </div>
@@ -357,7 +432,8 @@ else
         }
     }
 
-    private string? successMessage;
+    private string? alertMessage;
+    private string alertType = "emerald";
 
     private async Task VerifyPayment()
     {
@@ -365,13 +441,9 @@ else
         {
             error = null;
             await Shop.VerifyPaymentAsync(Id);
-            order = await Db.Orders
-                .Include(o => o.DeliveryAddress)
-                .Include(o => o.Items)
-                .Include(o => o.Payments)
-                .Include(o => o.User)
-                .FirstOrDefaultAsync(o => o.Id == Id);
-            successMessage = "Payment verified successfully! Customer has been notified.";
+            await ReloadOrderAsync();
+            alertType = "emerald";
+            alertMessage = "Payment verified successfully! Customer has been notified.";
         }
         catch (Exception ex)
         {
@@ -385,17 +457,44 @@ else
         {
             error = null;
             await Shop.UnverifyPaymentAsync(Id);
-            order = await Db.Orders
-                .Include(o => o.DeliveryAddress)
-                .Include(o => o.Items)
-                .Include(o => o.Payments)
-                .Include(o => o.User)
-                .FirstOrDefaultAsync(o => o.Id == Id);
-            successMessage = "Payment marked as unverified.";
+            await ReloadOrderAsync();
+            alertType = "amber";
+            alertMessage = "Payment marked as unverified.";
         }
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+    }
+
+    private async Task RejectPaymentAndCancel()
+    {
+        try
+        {
+            error = null;
+            await Shop.RejectPaymentAndCancelOrderAsync(Id, "Payment not received");
+            await ReloadOrderAsync();
+            alertType = "rose";
+            alertMessage = "Payment marked as not received. Order has been cancelled and reserved inventory released.";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task ReloadOrderAsync()
+    {
+        order = await Db.Orders
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == Id);
+
+        if (order != null && Input != null)
+        {
+            Input.Status = order.Status.ToString();
         }
     }
 }

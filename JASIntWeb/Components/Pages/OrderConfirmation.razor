@@ -23,13 +23,18 @@
         <CheckoutCompleted CheckoutToken="order.CheckoutToken" OrderId="order.Id" OrderPublicToken="order.PublicToken" Total="order.Total" />
 
         var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
+        var isCancelled = order.Status == OrderStatus.Cancelled;
         var hasSubmittedTrx = !string.IsNullOrEmpty(order.TransactionId);
 
         <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
-            <div class="bg-gradient-to-r @(isPaymentVerified ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-800") p-8 text-white text-center">
-                <span class="flex size-14 items-center justify-center rounded-full bg-white @(isPaymentVerified ? "text-emerald-600" : "text-blue-600") mx-auto mb-4 shadow-md">
-                    @if (isPaymentVerified)
+            <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isPaymentVerified ? "from-emerald-600 to-teal-700" : "from-blue-600 to-indigo-800")) p-8 text-white text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isPaymentVerified ? "text-emerald-600" : "text-blue-600")) mx-auto mb-4 shadow-md">
+                    @if (isCancelled)
+                    {
+                        <Icon Name="close" Class="size-8" />
+                    }
+                    else if (isPaymentVerified)
                     {
                         <Icon Name="check" Class="size-8" />
                     }
@@ -41,8 +46,12 @@
                     }
                 </span>
 
-                <span class="text-xs font-bold uppercase tracking-widest text-emerald-100 block mb-1">
-                    @if (isPaymentVerified)
+                <span class="text-xs font-bold uppercase tracking-widest text-white/90 block mb-1">
+                    @if (isCancelled)
+                    {
+                        <span>ORDER CANCELLED · PAYMENT NOT RECEIVED</span>
+                    }
+                    else if (isPaymentVerified)
                     {
                         <span>PAYMENT VERIFIED · PENDING ADMIN CONFIRMATION</span>
                     }
@@ -57,7 +66,11 @@
                 </span>
 
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                    @if (isPaymentVerified)
+                    @if (isCancelled)
+                    {
+                        <span>Order #@order.Id Cancelled</span>
+                    }
+                    else if (isPaymentVerified)
                     {
                         <span>Payment Verified!</span>
                     }
@@ -67,8 +80,12 @@
                     }
                 </h1>
 
-                <p class="text-xs text-blue-100 mt-2 max-w-lg mx-auto">
-                    @if (isPaymentVerified)
+                <p class="text-xs text-white/90 mt-2 max-w-lg mx-auto">
+                    @if (isCancelled)
+                    {
+                        <span>This order was cancelled because advance payment was not received or could not be verified. Any reserved stock has been released. If you have questions, please contact our support team.</span>
+                    }
+                    else if (isPaymentVerified)
                     {
                         <span>Your bKash payment of ৳@order.PaidAmount.ToString("N0") has been verified. Order #@order.Id is reserved and queued for admin dispatch confirmation.</span>
                     }
