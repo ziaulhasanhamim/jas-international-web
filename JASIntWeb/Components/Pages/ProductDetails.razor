@@ -192,8 +192,24 @@ else
                             <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
                             <span class="text-xs font-semibold text-emerald-700">In Stock — @selected.Stock units ready for shipment</span>
                         </div>
-                        <AddToCart @key="selected.Id" VariantId="selected.Id" Stock="selected.Stock" />
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1">
+                                <AddToCart @key="selected.Id" VariantId="selected.Id" Stock="selected.Stock" />
+                            </div>
+                            <WishlistButton Product="CurrentSummary" />
+                        </div>
                     }
+                </div>
+
+                <!-- Delivery Urgency & Dispatch Guarantee Banner -->
+                <div class="mt-6 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 flex items-center gap-3 text-xs text-orange-950">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white font-bold shadow-xs">
+                        <Icon Name="truck" Class="size-4" />
+                    </span>
+                    <div>
+                        <p class="font-bold">Fast Dispatch Guarantee</p>
+                        <p class="text-orange-900/80 mt-0.5">Orders confirmed before 4:00 PM are dispatched on the same business day with live Steadfast tracking.</p>
+                    </div>
                 </div>
 
                 <!-- Delivery & Warranty Guarantee Box -->
@@ -237,6 +253,19 @@ else
             </div>
         </section>
 
+        <!-- Related Products Section (Gadget & Gear style slider) -->
+        @if (relatedProducts.Count > 0)
+        {
+            <div class="mt-16 border-t border-slate-200 pt-10">
+                <ProductSection
+                    Title="Similar &amp; Recommended Gadgets"
+                    Eyebrow="Explore more"
+                    Products="relatedProducts"
+                    ViewAllHref="@($"/category/{product.CategorySlug}")"
+                />
+            </div>
+        }
+
         <!-- Mobile Sticky Bottom Buy Bar (visible only on mobile md:hidden, above the 5-tab mobile bottom nav) -->
         @if (selected is { Stock: > 0 })
         {
@@ -263,6 +292,20 @@ else
     private ProductVariantDto? selected;
     private Dictionary<string, string> choices = [];
     private string image = "";
+    private List<ProductSummaryDto> relatedProducts = [];
+
+    private ProductSummaryDto CurrentSummary => new(
+        product!.Id,
+        product.Name,
+        product.Slug,
+        selected?.Price ?? 0,
+        product.Category,
+        product.MainImage,
+        selected?.Id,
+        selected?.Stock ?? 0,
+        product.BrandName,
+        product.BrandSlug
+    );
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,5 +326,8 @@ else
         choices = ProductOptions.Selection(product, requested);
         selected = ProductOptions.Match(product, choices);
         image = product.Images.ElementAtOrDefault(ImageIndex ?? 0) ?? product.MainImage;
+
+        var related = await Catalog.LatestAsync(product.CategorySlug, 8);
+        relatedProducts = related.Where(p => p.Id != product.Id).ToList();
     }
 }

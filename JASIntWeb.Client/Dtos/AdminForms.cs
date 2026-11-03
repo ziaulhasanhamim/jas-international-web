@@ -20,6 +20,9 @@ public sealed class ProductEditForm
     [StringLength(50000)]
     public string Images { get; set; } = "";
     public bool Hidden { get; set; }
+    public bool IsFeatured { get; set; }
+    public bool IsNewArrival { get; set; } = true;
+    public decimal? CompareAtPrice { get; set; }
 }
 
 public sealed class VariantEditForm

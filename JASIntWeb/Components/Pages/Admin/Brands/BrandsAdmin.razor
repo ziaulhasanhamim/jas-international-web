@@ -1,6 +1,8 @@
 @page "/admin/brands"
+@rendermode InteractiveServer
 @inject AppDbContext Db
 @inject AdminSession Session
+@inject CatalogService Catalog
 @inject NavigationManager Nav
 
 <PageTitle>Brands · JAS Admin</PageTitle>
@@ -8,8 +10,10 @@
 <div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
     <div>
         <p class="eyebrow">CATALOG BRANDS</p>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Brands</h1>
-        <p class="text-sm text-slate-500 mt-1">Manage gadget manufacturers, featured brand strip on the homepage, and brand filters.</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Brands &amp; Featured Strips</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Manage gadget manufacturers, toggle which brands appear on the homepage featured brand strip, and configure logos.
+        </p>
     </div>
 
     <div class="flex items-center gap-2.5">
@@ -20,21 +24,49 @@
     </div>
 </div>
 
-<!-- Search Bar -->
-<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
-    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
-        <div class="relative flex-1 min-w-[220px]">
-            <input name="q" value="@Query" class="field pr-9" placeholder="Search brands..." />
-            <span class="absolute right-3 top-3 text-slate-400">
-                <Icon Name="search" Class="size-4" />
-            </span>
-        </div>
-        <button type="submit" class="btn-primary">Search</button>
-        @if (!string.IsNullOrWhiteSpace(Query))
-        {
-            <a href="/admin/brands" class="btn-secondary">Clear</a>
-        }
-    </form>
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<!-- Filters Bar -->
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <div class="flex flex-wrap items-center gap-2">
+        <button
+            type="button"
+            @onclick='() => SetFilter("all")'
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            All Brands (@totalAll)
+        </button>
+        <button
+            type="button"
+            @onclick='() => SetFilter("featured")'
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            ⭐ Featured on Homepage (@totalFeatured)
+        </button>
+    </div>
+
+    <div class="relative w-64">
+        <input
+            @bind="_searchTerm"
+            @bind:event="oninput"
+            class="field pr-9 !py-1.5 text-xs"
+            placeholder="Search brands..."
+        />
+        <span class="absolute right-3 top-2 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+    </div>
 </div>
 
 <!-- Brands Table -->
@@ -45,7 +77,7 @@
                 <tr>
                     <th>Brand Name</th>
                     <th>Slug</th>
-                    <th>Featured</th>
+                    <th class="text-center">Homepage Strip</th>
                     <th>Sort Order</th>
                     <th>Products</th>
                     <th>Status</th>
@@ -53,14 +85,14 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var b in brands)
+                @foreach (var b in DisplayedBrands)
                 {
                     <tr>
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (!string.IsNullOrEmpty(b.LogoUrl))
                                 {
-                                    <img src="@b.LogoUrl" alt="@b.Name" class="size-8 object-contain rounded-lg border border-slate-100 p-1" />
+                                    <img src="@b.LogoUrl" alt="@b.Name" class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" />
                                 }
                                 else
                                 {
@@ -80,15 +112,16 @@
                         <td class="font-mono text-xs text-slate-600">
                             /@b.Slug
                         </td>
-                        <td>
-                            @if (b.IsFeatured)
-                            {
-                                <span class="badge badge-indigo">Featured</span>
-                            }
-                            else
-                            {
-                                <span class="text-xs text-slate-400">Standard</span>
-                            }
+                        <td class="text-center">
+                            <button
+                                type="button"
+                                @onclick="() => ToggleFeatured(b)"
+                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                title="Click to toggle homepage visibility"
+                            >
+                                <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                                @(b.IsFeatured ? "⭐ Featured" : "Hidden")
+                            </button>
                         </td>
                         <td class="text-xs font-medium text-slate-700">
                             @b.SortOrder
@@ -114,46 +147,33 @@
         </table>
     </div>
 
-    @if (brands.Count == 0)
+    @if (DisplayedBrands.Count == 0)
     {
         <div class="empty-state py-12">
             <Icon Name="box" Class="size-10 text-slate-300" />
-            <p>No brands found.</p>
+            <p>No brands found matching your criteria.</p>
         </div>
     }
 </div>
 
-<div class="mt-4">
-    <AdminPagination Total="total" Page="Page" />
-</div>
-
 @code {
-    [SupplyParameterFromQuery(Name = "q")]
-    private string? Query { get; set; }
-    [SupplyParameterFromQuery(Name = "page")]
-    private int Page { get; set; } = 1;
+    private List<AdminBrandRow> _allBrands = [];
+    private string _filter = "all";
+    private string _searchTerm = "";
+    private string? _toast;
+    private int totalAll;
+    private int totalFeatured;
 
-    private List<AdminBrandRow> brands = [];
-    private int total;
-    private const int PageSize = 25;
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnInitializedAsync()
     {
-        var q = Db.Brands.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(Query))
-        {
-            var term = Query.Trim().ToLower();
-            q = q.Where(b => b.Name.ToLower().Contains(term) || b.Slug.ToLower().Contains(term));
-        }
+        await LoadBrands();
+    }
 
-        total = await q.CountAsync();
-        var currentPage = Math.Max(1, Page);
-
-        brands = await q
+    private async Task LoadBrands()
+    {
+        var list = await Db.Brands.AsNoTracking()
             .OrderBy(b => b.SortOrder)
             .ThenBy(b => b.Name)
-            .Skip((currentPage - 1) * PageSize)
-            .Take(PageSize)
             .Select(b => new AdminBrandRow(
                 b.Id,
                 b.Name,
@@ -166,5 +186,41 @@
                 b.IsDeleted
             ))
             .ToListAsync();
+
+        _allBrands = list;
+        totalAll = list.Count;
+        totalFeatured = list.Count(b => b.IsFeatured);
+    }
+
+    private void SetFilter(string filter) => _filter = filter;
+
+    private List<AdminBrandRow> DisplayedBrands
+    {
+        get
+        {
+            var q = _allBrands.AsEnumerable();
+            if (_filter == "featured") q = q.Where(b => b.IsFeatured);
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant();
+                q = q.Where(b => b.Name.ToLowerInvariant().Contains(term) || b.Slug.ToLowerInvariant().Contains(term));
+            }
+            return q.ToList();
+        }
+    }
+
+    private async Task ToggleFeatured(AdminBrandRow b)
+    {
+        var brand = await Db.Brands.FindAsync(b.Id);
+        if (brand != null)
+        {
+            brand.IsFeatured = !brand.IsFeatured;
+            brand.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+        }
+        Catalog.InvalidateBrandsCache();
+        _toast = $"Updated homepage visibility for {b.Name}.";
+        await LoadBrands();
     }
 }

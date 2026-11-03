@@ -19,14 +19,16 @@
     <SidebarGroup Title="Products & Catalog" IconName="box" Prefix="/admin/products" AlternatePrefix="/admin/inventory">
         <NavLink href="/admin/products" Match="NavLinkMatch.All">All Products</NavLink>
         <NavLink href="/admin/products/new">Add Product</NavLink>
+        <NavLink href="/admin/featured-products">Featured &amp; Badges</NavLink>
         <NavLink href="/admin/brands">Brands &amp; Featured</NavLink>
         <NavLink href="/admin/inventory">Stock Inventory</NavLink>
         <NavLink href="/admin/categories">Categories</NavLink>
         <NavLink href="/admin/attributes">Attribute Library</NavLink>
     </SidebarGroup>
 
-    <SidebarGroup Title="Storefront Content" IconName="camera" Prefix="/admin/carousel">
+    <SidebarGroup Title="Storefront Content" IconName="camera" Prefix="/admin/carousel" AlternatePrefix="/admin/homepage-sections">
         <NavLink href="/admin/carousel" Match="NavLinkMatch.All">Hero Carousel</NavLink>
+        <NavLink href="/admin/homepage-sections">Category Sections</NavLink>
     </SidebarGroup>
 
     <SidebarGroup Title="Customers & Access" IconName="users" Prefix="/admin/users">

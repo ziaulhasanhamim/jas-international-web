@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<CartService>();
+builder.Services.AddScoped<WishlistService>();
 builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);

@@ -1,0 +1,274 @@
+@page "/admin/featured-products"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+@inject AdminSession Session
+
+<PageTitle>Featured Products &amp; Merchandising · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">MERCHANDISING &amp; BADGES</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Featured &amp; New Arrivals</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Toggle which products appear as Featured or carry the red "NEW ARRIVAL" diagonal badge on the storefront.
+        </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/products" class="btn-secondary text-xs shadow-xs">
+            <Icon Name="box" Class="size-3.5" />
+            <span>All Products</span>
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<!-- Filters Bar -->
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <div class="flex flex-wrap items-center gap-2">
+        <button
+            type="button"
+            @onclick='() => SetTab("all")'
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            All Active Products
+        </button>
+        <button
+            type="button"
+            @onclick='() => SetTab("featured")'
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            ⭐ Featured Only (@_products.Count(p => p.IsFeatured))
+        </button>
+        <button
+            type="button"
+            @onclick='() => SetTab("new")'
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "new" ? "bg-rose-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            🏷️ New Arrivals (@_products.Count(p => p.IsNewArrival))
+        </button>
+    </div>
+
+    <!-- Search Input -->
+    <div class="relative w-64">
+        <input
+            @bind="_searchTerm"
+            @bind:event="oninput"
+            class="field pr-9 !py-1.5 text-xs"
+            placeholder="Filter by product name..."
+        />
+        <span class="absolute right-3 top-2 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+    </div>
+</div>
+
+<!-- Products Table -->
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category &amp; Brand</th>
+                    <th>Pricing</th>
+                    <th class="text-center">⭐ Featured</th>
+                    <th class="text-center">🏷️ New Arrival</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in FilteredProducts)
+                {
+                    <tr>
+                        <td>
+                            <div class="flex items-center gap-3">
+                                <img
+                                    src="@p.MainImageUrl"
+                                    alt="@p.Name"
+                                    class="size-11 rounded-lg border border-slate-100 object-contain p-1 shrink-0 bg-white"
+                                    loading="lazy"
+                                />
+                                <div>
+                                    <strong class="text-slate-900 block font-semibold text-xs sm:text-sm">@p.Name</strong>
+                                    <span class="font-mono text-[11px] text-slate-400">/@p.Slug</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="space-y-0.5">
+                                <span class="badge badge-slate text-[11px]">@p.CategoryName</span>
+                                @if (!string.IsNullOrWhiteSpace(p.BrandName))
+                                {
+                                    <span class="block text-[11px] font-bold text-slate-600">@p.BrandName</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                <span class="font-bold text-xs sm:text-sm text-slate-900">
+                                    Tk. @p.Price.ToString("N0")
+                                </span>
+                                @if (p.CompareAtPrice.HasValue && p.CompareAtPrice.Value > p.Price)
+                                {
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <span class="text-[11px] text-slate-400 line-through">Tk. @p.CompareAtPrice.Value.ToString("N0")</span>
+                                        <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-1 rounded border border-orange-200">
+                                            SAVE ৳ @((p.CompareAtPrice.Value - p.Price).ToString("N0"))
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button
+                                type="button"
+                                @onclick="() => ToggleFeatured(p)"
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                            >
+                                <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
+                            </button>
+                        </td>
+                        <td class="text-center">
+                            <button
+                                type="button"
+                                @onclick="() => ToggleNewArrival(p)"
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                            >
+                                <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
+                            </button>
+                        </td>
+                        <td class="text-right">
+                            <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Edit Product
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (FilteredProducts.Count == 0)
+    {
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No products match the selected filter.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private sealed record FeaturedProductItem(
+        int Id,
+        string Name,
+        string Slug,
+        string MainImageUrl,
+        string CategoryName,
+        string? BrandName,
+        decimal Price,
+        decimal? CompareAtPrice,
+        bool IsFeatured,
+        bool IsNewArrival
+    );
+
+    private List<FeaturedProductItem> _products = [];
+    private string _activeTab = "all";
+    private string _searchTerm = "";
+    private string? _toast;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        var raw = await Db.Products
+            .AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.ProductVariants)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        _products = raw.Select(p =>
+        {
+            var defaultVar = p.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
+                ?? p.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+            var price = defaultVar?.SellingPrice ?? 0m;
+            return new FeaturedProductItem(
+                p.Id,
+                p.Name,
+                p.Slug,
+                p.MainImageUrl,
+                p.Category?.Name ?? "Uncategorized",
+                p.Brand?.Name,
+                price,
+                p.CompareAtPrice,
+                p.IsFeatured,
+                p.IsNewArrival
+            );
+        }).ToList();
+    }
+
+    private void SetTab(string tab) => _activeTab = tab;
+
+    private List<FeaturedProductItem> FilteredProducts
+    {
+        get
+        {
+            var q = _products.AsEnumerable();
+            if (_activeTab == "featured") q = q.Where(p => p.IsFeatured);
+            else if (_activeTab == "new") q = q.Where(p => p.IsNewArrival);
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant();
+                q = q.Where(p => p.Name.ToLowerInvariant().Contains(term)
+                    || (p.BrandName != null && p.BrandName.ToLowerInvariant().Contains(term))
+                    || p.CategoryName.ToLowerInvariant().Contains(term));
+            }
+            return q.ToList();
+        }
+    }
+
+    private async Task ToggleFeatured(FeaturedProductItem item)
+    {
+        var p = await Db.Products.FindAsync(item.Id);
+        if (p != null)
+        {
+            p.IsFeatured = !p.IsFeatured;
+            p.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+        }
+        _toast = $"Updated featured status for {item.Name}.";
+        await LoadProducts();
+    }
+
+    private async Task ToggleNewArrival(FeaturedProductItem item)
+    {
+        var p = await Db.Products.FindAsync(item.Id);
+        if (p != null)
+        {
+            p.IsNewArrival = !p.IsNewArrival;
+            p.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+        }
+        _toast = $"Updated new arrival status for {item.Name}.";
+        await LoadProducts();
+    }
+}

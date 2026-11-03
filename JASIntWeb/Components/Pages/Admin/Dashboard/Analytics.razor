@@ -1,5 +1,6 @@
 @page "/admin/analytics"
 @inject SalesMetricsService Metrics
+@inject AppDbContext Db
 
 <PageTitle>Sales &amp; profit — JAS Admin</PageTitle>
 <AdminPageHeader Title="Sales &amp; profit" Description="Delivered sales, product performance and historical records. All dates use Bangladesh time." ActionHref="/admin" ActionText="Back to dashboard" />
@@ -29,6 +30,80 @@
     </div>
 
     <SalesPeriodSummary Summary="summary" Selected="selected.Period.Key" />
+
+    <!-- Omnichannel Payment & Operations Analytics -->
+    <section class="shop-panel sales-section">
+        <div class="admin-section-heading">
+            <div>
+                <h2>Payment Methods &amp; Fulfillment Operations</h2>
+                <p>Breakdown of digital prepayments vs Cash on Delivery, order processing funnel, and basket statistics.</p>
+            </div>
+            <span class="admin-help">@allOrders.Count Total Store Orders</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- AOV -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Average Order Value (AOV)</span>
+                <p class="font-display text-2xl font-black text-slate-900 mt-2">৳@averageOrderValue.ToString("N0")</p>
+                <p class="text-xs text-slate-500 mt-1">Gross basket size across confirmed orders</p>
+            </div>
+
+            <!-- bKash Prepayments -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">bKash Prepayments</span>
+                    <span class="text-[10px] font-bold text-pink-700 bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded">Digital</span>
+                </div>
+                <p class="font-display text-2xl font-black text-pink-600 mt-2">৳@bkashRevenue.ToString("N0")</p>
+                <p class="text-xs text-slate-500 mt-1">@bkashOrders.Count orders (@bkashVerified verified TrxIDs)</p>
+            </div>
+
+            <!-- Cash on Delivery -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cash on Delivery</span>
+                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">COD</span>
+                </div>
+                <p class="font-display text-2xl font-black text-slate-900 mt-2">৳@codRevenue.ToString("N0")</p>
+                <p class="text-xs text-slate-500 mt-1">@codOrders.Count orders collected via courier</p>
+            </div>
+
+            <!-- Customer Loyalty -->
+            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Registered Accounts</span>
+                <p class="font-display text-2xl font-black text-blue-600 mt-2">@registeredAccounts</p>
+                <p class="text-xs text-slate-500 mt-1">@guestAccounts guest checkout orders</p>
+            </div>
+        </div>
+
+        <!-- Order Funnel Progress -->
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-4">Order Lifecycle Distribution</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                    <span class="text-xs font-semibold text-amber-700 block">Pending Review</span>
+                    <strong class="text-xl font-black text-amber-900 block mt-1">@statusPending</strong>
+                </div>
+                <div class="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                    <span class="text-xs font-semibold text-blue-700 block">Confirmed</span>
+                    <strong class="text-xl font-black text-blue-900 block mt-1">@statusConfirmed</strong>
+                </div>
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                    <span class="text-xs font-semibold text-indigo-700 block">In Delivery</span>
+                    <strong class="text-xl font-black text-indigo-900 block mt-1">@statusShipped</strong>
+                </div>
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                    <span class="text-xs font-semibold text-emerald-700 block">Delivered</span>
+                    <strong class="text-xl font-black text-emerald-900 block mt-1">@statusDelivered</strong>
+                </div>
+                <div class="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+                    <span class="text-xs font-semibold text-rose-700 block">Cancelled</span>
+                    <strong class="text-xl font-black text-rose-900 block mt-1">@statusCancelled</strong>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <section class="shop-panel sales-section">
         @if (selected.Totals.Orders == 0)
@@ -125,8 +200,40 @@
     private IReadOnlyList<SalesBucket> trend = [];
     private bool monthlyTrend;
 
+    private List<Order> allOrders = [];
+    private List<Order> bkashOrders = [];
+    private List<Order> codOrders = [];
+    private decimal bkashRevenue;
+    private decimal codRevenue;
+    private int bkashVerified;
+    private int statusPending;
+    private int statusConfirmed;
+    private int statusShipped;
+    private int statusDelivered;
+    private int statusCancelled;
+    private decimal averageOrderValue;
+    private int registeredAccounts;
+    private int guestAccounts;
+
     protected override async Task OnInitializedAsync()
     {
+        allOrders = await Db.Orders.AsNoTracking().Include(o => o.Payments).ToListAsync();
+        bkashOrders = allOrders.Where(o => o.Payments.Any(p => p.Method == PaymentMethod.Bkash) || !string.IsNullOrEmpty(o.TransactionId) || !string.IsNullOrEmpty(o.PaymentReferenceCode)).ToList();
+        codOrders = allOrders.Where(o => o.Payments.Any(p => p.Method == PaymentMethod.CashOnDelivery) || (string.IsNullOrEmpty(o.TransactionId) && string.IsNullOrEmpty(o.PaymentReferenceCode))).ToList();
+        bkashRevenue = bkashOrders.Sum(o => o.Total);
+        codRevenue = codOrders.Sum(o => o.Total);
+        bkashVerified = bkashOrders.Count(o => o.PaidAmount > 0 || o.Payments.Any(p => p.Status == PaymentStatus.Completed));
+
+        statusPending = allOrders.Count(o => o.Status == OrderStatus.Pending);
+        statusConfirmed = allOrders.Count(o => o.Status == OrderStatus.Processing);
+        statusShipped = allOrders.Count(o => o.Status == OrderStatus.InTransit);
+        statusDelivered = allOrders.Count(o => o.Status == OrderStatus.Delivered);
+        statusCancelled = allOrders.Count(o => o.Status == OrderStatus.Cancelled);
+
+        averageOrderValue = allOrders.Count > 0 ? (allOrders.Where(o => o.Status != OrderStatus.Cancelled).Average(o => (decimal?)o.Total) ?? 0m) : 0m;
+        registeredAccounts = allOrders.Count(o => o.UserId.HasValue);
+        guestAccounts = allOrders.Count(o => !o.UserId.HasValue);
+
         summary = await Metrics.GetSummaryAsync();
         selected = summary.Select(Period);
         Sort = Sort is "profit" or "units" or "name" ? Sort : "sales";

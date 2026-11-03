@@ -1,28 +1,99 @@
-<section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-    <div class="mb-6 flex items-end justify-between gap-4">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-volt">@Eyebrow</p>
-            <h2 class="font-display mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">@Title</h2>
+@rendermode InteractiveAuto
+@inject IJSRuntime JS
+
+@if (Products.Count > 0)
+{
+    <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <!-- Section Header (Gadget & Gear style) -->
+        <div class="mb-5 flex items-baseline justify-between gap-4">
+            <div>
+                @if (!string.IsNullOrWhiteSpace(Eyebrow))
+                {
+                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#ea580c] mb-1">@Eyebrow</p>
+                }
+                <h2 class="font-display text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">@Title</h2>
+            </div>
+            <a href="@ViewAllHref" class="inline-flex items-center gap-1 text-sm font-bold text-[#ea580c] hover:text-orange-700 transition">
+                <span>Show All</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                </svg>
+            </a>
         </div>
-        <a href="@ViewAllHref"
-        class="text-sm font-medium text-slate-500 transition hover:text-ink">View all →</a>
-    </div>
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
-        @foreach (var product in Products)
-        {
-            <ProductCard Product="product" />
-        }
-    </div>
-</section>
+
+        <!-- Carousel Slider Track with Arrow Controls -->
+        <div class="relative group/slider">
+            <!-- Left Arrow Button -->
+            <button
+                type="button"
+                @onclick="ScrollLeft"
+                class="absolute -left-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95"
+                aria-label="Previous products"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+
+            <!-- Scrollable Cards Row -->
+            <div
+                @ref="sliderRef"
+                class="flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0"
+            >
+                @foreach (var product in Products)
+                {
+                    <div class="w-[230px] sm:w-[250px] md:w-[260px] lg:w-[270px] shrink-0 snap-start">
+                        <ProductCard Product="product" />
+                    </div>
+                }
+            </div>
+
+            <!-- Right Arrow Button (matches Gadget & Gear screenshot) -->
+            <button
+                type="button"
+                @onclick="ScrollRight"
+                class="absolute -right-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95"
+                aria-label="Next products"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                </svg>
+            </button>
+        </div>
+    </section>
+}
 
 @code
 {
+    private ElementReference sliderRef;
+
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
-    [Parameter, EditorRequired]
-    public string Eyebrow { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Eyebrow { get; set; }
+
     [Parameter, EditorRequired]
     public ICollection<ProductSummaryDto> Products { get; set; } = [];
+
     [Parameter]
     public string ViewAllHref { get; set; } = "/products";
+
+    private async Task ScrollLeft()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("window.scrollElement", sliderRef, -320);
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    private async Task ScrollRight()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("window.scrollElement", sliderRef, 320);
+        }
+        catch (InvalidOperationException) { }
+    }
 }

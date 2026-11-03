@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Services.AddScoped<CartService>();
+builder.Services.AddScoped<WishlistService>();
 builder.Services.AddHttpClient("Shop", c => c.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
 builder.Services.AddScoped<ICartBackend, HttpCartBackend>();
 builder.Services.AddAuthorizationCore();

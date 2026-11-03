@@ -77,11 +77,21 @@
     };
 
     function attach() {
-        if (window.Blazor) {
+        window.scrollElement = function (el, delta) {
+        if (!el) return;
+        el.scrollBy({ left: delta, behavior: "smooth" });
+    };
+
+    if (window.Blazor) {
             window.Blazor.addEventListener("enhancednavigationstart", startProgress);
             window.Blazor.addEventListener("enhancednavigationend", finishProgress);
         }
     }
+
+    window.scrollElement = function (el, delta) {
+        if (!el) return;
+        el.scrollBy({ left: delta, behavior: "smooth" });
+    };
 
     if (window.Blazor) {
         attach();
@@ -518,6 +528,11 @@
             } catch (err) {}
         }, 1500);
     }
+
+    window.scrollElement = function (el, delta) {
+        if (!el) return;
+        el.scrollBy({ left: delta, behavior: "smooth" });
+    };
 
     if (window.Blazor) {
         window.Blazor.addEventListener("enhancednavigationstart", cleanupPaymentVerification);

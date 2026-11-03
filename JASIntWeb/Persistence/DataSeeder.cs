@@ -314,9 +314,81 @@ public static class JsonTestDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
+        if (!await db.HomepageSections.AnyAsync(ct))
+        {
+            db.HomepageSections.AddRange(
+                new HomepageSection
+                {
+                    Title = "Sound Surround",
+                    Eyebrow = "HEAR MORE",
+                    CategorySlug = "audio",
+                    ViewAllHref = "/category/audio",
+                    SortOrder = 1,
+                    IsActive = true,
+                    ItemLimit = 8
+                },
+                new HomepageSection
+                {
+                    Title = "New Arrivals",
+                    Eyebrow = "JUST LANDED",
+                    CategorySlug = null,
+                    ViewAllHref = "/products?sort=newest",
+                    SortOrder = 2,
+                    IsActive = true,
+                    ItemLimit = 8
+                },
+                new HomepageSection
+                {
+                    Title = "Smart Watches & Bands",
+                    Eyebrow = "STAY CONNECTED",
+                    CategorySlug = "wearables",
+                    ViewAllHref = "/category/wearables",
+                    SortOrder = 3,
+                    IsActive = true,
+                    ItemLimit = 8
+                },
+                new HomepageSection
+                {
+                    Title = "Wireless Speakers",
+                    Eyebrow = "TURN IT UP",
+                    CategorySlug = "speakers",
+                    ViewAllHref = "/category/speakers",
+                    SortOrder = 4,
+                    IsActive = true,
+                    ItemLimit = 8
+                },
+                new HomepageSection
+                {
+                    Title = "Power & Fast Chargers",
+                    Eyebrow = "DAILY ESSENTIALS",
+                    CategorySlug = "power-charging",
+                    ViewAllHref = "/category/power-charging",
+                    SortOrder = 5,
+                    IsActive = true,
+                    ItemLimit = 8
+                }
+            );
+            await db.SaveChangesAsync(ct);
+        }
+
+        var productsWithoutCompare = await db.Products.Include(p => p.ProductVariants).Where(p => p.CompareAtPrice == null).ToListAsync(ct);
+        if (productsWithoutCompare.Count > 0)
+        {
+            foreach (var p in productsWithoutCompare)
+            {
+                var price = p.ProductVariants.FirstOrDefault()?.SellingPrice ?? 0;
+                if (price > 0)
+                {
+                    p.CompareAtPrice = Math.Round((price * 1.08m) / 100m) * 100m;
+                    if (p.CompareAtPrice <= price) p.CompareAtPrice = price + 500m;
+                }
+            }
+            await db.SaveChangesAsync(ct);
+        }
+
         // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery
         var hasPlaceholders = await db.Products.AnyAsync(p => p.MainImageUrl != null && p.MainImageUrl.Contains("placehold.co"), ct);
-        var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday"), ct);
+        var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title != null && (s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday")), ct);
         if (hasPlaceholders || hasOldSlides)
         {
             var seedPath = Path.Combine(AppContext.BaseDirectory, "data", "JasTestSeedData.json");

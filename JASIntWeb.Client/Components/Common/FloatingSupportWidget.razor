@@ -1,0 +1,122 @@
+@rendermode InteractiveAuto
+
+<!-- Floating Support Widget (Gadget & Gear style chat bubble in bottom-right) -->
+<div class="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end">
+    <!-- Popover Menu -->
+    @if (_isOpen)
+    {
+        <div class="mb-3 w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 ring-1 ring-slate-900/5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="relative flex size-9 items-center justify-center rounded-xl bg-orange-500 text-white font-bold">
+                        <Icon Name="message" Class="size-5" />
+                        <span class="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">JAS Support</h3>
+                        <p class="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+                            <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                            Online &bull; Instant Help
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    @onclick="() => _isOpen = false"
+                    class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                    aria-label="Close support menu"
+                >
+                    <Icon Name="close" Class="size-4" />
+                </button>
+            </div>
+
+            <!-- Quick Channels -->
+            <div class="space-y-2">
+                <!-- WhatsApp Option -->
+                <a
+                    href="https://wa.me/8801711465078?text=Hello%20JAS%20International%2C%20I%20have%20an%20inquiry%20regarding%20products%20and%20orders."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 hover:bg-emerald-100/70 transition group"
+                >
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold shadow-xs">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.299.144.347.491 1.2.534 1.287.043.087.072.188.014.303-.058.116-.087.188-.173.289l-.26.302c-.087.087-.179.182-.077.357.101.174.45 1.018 1.157 1.649.914.814 1.684 1.066 1.923 1.182.239.116.379.101.52-.058.142-.159.606-.707.768-.952.162-.246.323-.203.541-.116l1.708.805c.217.101.363.159.418.26.055.101.055.586-.089.991z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-emerald-950">Chat on WhatsApp</h4>
+                            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-200/60 px-1.5 py-0.5 rounded">Fastest</span>
+                        </div>
+                        <p class="text-[11px] text-emerald-800 truncate">Get instant product advice &amp; order updates</p>
+                    </div>
+                </a>
+
+                <!-- Phone Hotline Option -->
+                <a
+                    href="tel:01711465078"
+                    class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 hover:bg-slate-100 transition group"
+                >
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white font-bold shadow-xs">
+                        <Icon Name="phone" Class="size-4" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-xs font-bold text-slate-900">Direct Sales Hotline</h4>
+                        <p class="text-[11px] font-mono text-slate-600">01711465078 &bull; 10 AM – 9 PM</p>
+                    </div>
+                </a>
+
+                <!-- Showroom Location -->
+                <a
+                    href="/contact"
+                    class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 hover:bg-slate-100 transition group"
+                >
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white font-bold shadow-xs">
+                        <Icon Name="map-pin" Class="size-4" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-xs font-bold text-slate-900">Khulna Showroom</h4>
+                        <p class="text-[11px] text-slate-500 truncate">Khulna Shopping Complex, 3rd Floor</p>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Footer note -->
+            <div class="mt-3 pt-2.5 border-t border-slate-100 text-center text-[10px] text-slate-400">
+                Authorized genuine tech retailer in Bangladesh
+            </div>
+        </div>
+    }
+
+    <!-- Main Floating Trigger Button (Orange bubble matching Gadget & Gear screenshot) -->
+    <button
+        type="button"
+        @onclick="Toggle"
+        class="flex size-14 items-center justify-center rounded-full bg-[#f97316] text-white shadow-xl shadow-orange-500/30 hover:bg-[#ea580c] hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all duration-200 ring-4 ring-orange-400/20"
+        aria-label="Open customer support"
+    >
+        @if (_isOpen)
+        {
+            <Icon Name="close" Class="size-6 text-white" />
+        }
+        else
+        {
+            <!-- Speech bubble icon exactly like the screenshot -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-7 text-white fill-white" viewBox="0 0 24 24">
+                <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+            </svg>
+        }
+    </button>
+</div>
+
+@code
+{
+    private bool _isOpen;
+
+    private void Toggle()
+    {
+        _isOpen = !_isOpen;
+    }
+}

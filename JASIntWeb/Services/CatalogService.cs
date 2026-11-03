@@ -33,6 +33,12 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                 .ToListAsync();
             }))!;
 
+    public void InvalidateBrandsCache()
+    {
+        cache.Remove(BrandsCacheKey);
+        cache.Remove(FeaturedBrandsCacheKey);
+    }
+
     public async Task<List<CategoryLinkDto>> CategoriesAsync() =>
     (await cache.GetOrCreateAsync(CategoriesCacheKey, async entry =>
             {
@@ -198,8 +204,42 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                 .Select(i => i.QuantityOnHand - i.QuantityReserved)
                 .FirstOrDefault(),
                 p.Brand != null ? p.Brand.Name : null,
-                p.Brand != null ? p.Brand.Slug : null))
+                p.Brand != null ? p.Brand.Slug : null,
+                p.CompareAtPrice,
+                p.Rating > 0 ? p.Rating : 5.0m,
+                p.ReviewCount > 0 ? p.ReviewCount : 12,
+                p.IsNewArrival,
+                p.IsFeatured))
             .ToListAsync();
+    }
+
+    public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync()
+    {
+        var sections = await db.HomepageSections.AsNoTracking()
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.SortOrder)
+            .ToListAsync();
+
+        var result = new List<HomepageSectionDto>();
+        foreach (var s in sections)
+        {
+            var products = await LatestAsync(s.CategorySlug, s.ItemLimit);
+            if (products.Count > 0)
+            {
+                result.Add(new HomepageSectionDto(
+                    s.Id,
+                    s.Title,
+                    s.Eyebrow,
+                    s.CategorySlug,
+                    s.ViewAllHref,
+                    s.SortOrder,
+                    s.IsActive,
+                    s.ItemLimit,
+                    products
+                ));
+            }
+        }
+        return result;
     }
 
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
@@ -266,7 +306,12 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                     .Select(i => i.QuantityOnHand - i.QuantityReserved)
                     .FirstOrDefault(),
                     p.Product.Brand != null ? p.Product.Brand.Name : null,
-                    p.Product.Brand != null ? p.Product.Brand.Slug : null))
+                    p.Product.Brand != null ? p.Product.Brand.Slug : null,
+                    p.Product.CompareAtPrice,
+                    p.Product.Rating > 0 ? p.Product.Rating : 5.0m,
+                    p.Product.ReviewCount > 0 ? p.Product.ReviewCount : 12,
+                    p.Product.IsNewArrival,
+                    p.Product.IsFeatured))
             .ToListAsync(), count);
     }
 }

@@ -31,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CartMergeReceipt> CartMergeReceipts => Set<CartMergeReceipt>();
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
+    public DbSet<HomepageSection> HomepageSections => Set<HomepageSection>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

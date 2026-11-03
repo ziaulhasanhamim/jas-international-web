@@ -136,6 +136,30 @@ else
                     <textarea name="Input.Details" id="input-details-html" class="w-full min-h-[380px] p-4 text-sm font-sans focus:outline-none border-0 text-slate-800 leading-relaxed">@Input!.Details</textarea>
                 </div>
             </div>
+            <!-- Merchandising & Storefront Badges -->
+            <div class="mt-6 border-t border-slate-200/80 pt-6">
+                <h3 class="text-sm font-bold text-slate-900 mb-3">Merchandising &amp; Badges</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label class="shop-label">
+                        Regular / Compare-At Price (৳)
+                        <InputNumber @bind-Value="Input!.CompareAtPrice" class="shop-input" placeholder="e.g. 40999" />
+                        <small>If set higher than the selling price, the storefront displays an orange "SAVE ৳ X" pill and strikethrough price.</small>
+                    </label>
+                </div>
+                <div class="mt-3 space-y-2">
+                    <label class="check-label">
+                        <input type="checkbox" name="Input.IsFeatured" checked="@(Input!.IsFeatured)" value="true" />
+                        <input type="hidden" name="Input.IsFeatured" value="false" />
+                        ⭐ Feature product on homepage highlights and recommendations
+                    </label>
+                    <label class="check-label">
+                        <input type="checkbox" name="Input.IsNewArrival" checked="@(Input!.IsNewArrival)" value="true" />
+                        <input type="hidden" name="Input.IsNewArrival" value="false" />
+                        🏷️ Display red diagonal "NEW ARRIVAL" corner badge on product card
+                    </label>
+                </div>
+            </div>
+
             <label class="check-label">
                 <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
                 <input type="hidden" name="Input.Hidden" value="false" />
@@ -209,7 +233,10 @@ else
             Details = p.Details,
             Image = p.MainImageUrl,
             Images = string.Join("\n", p.ProductImages.OrderBy(i => i.SortOrder).Select(i => i.ImageUrl)),
-            Hidden = p.IsDeleted
+            Hidden = p.IsDeleted,
+            IsFeatured = p.IsFeatured,
+            IsNewArrival = p.IsNewArrival,
+            CompareAtPrice = p.CompareAtPrice
         };
     }
 

@@ -86,6 +86,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
             p.BrandId = null;
         }
         p.IsDeleted = input.Hidden;
+        p.IsFeatured = input.IsFeatured;
+        p.IsNewArrival = input.IsNewArrival;
+        p.CompareAtPrice = input.CompareAtPrice;
         p.UpdatedAt = DateTimeOffset.UtcNow;
         if (!await db.Categories.AnyAsync(c => c.Id == p.CategoryId && !c.IsDeleted && (c.ParentCategory == null || !c.ParentCategory.IsDeleted)))
         {

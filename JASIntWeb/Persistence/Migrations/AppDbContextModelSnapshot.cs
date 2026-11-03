@@ -536,6 +536,42 @@ namespace JASIntWeb.Persistence.Migrations
                     b.ToTable("DeliverySettings");
                 });
 
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.HomepageSection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CategorySlug")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Eyebrow")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ItemLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ViewAllHref")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("HomepageSections");
+                });
+
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.InventoryItem", b =>
                 {
                     b.Property<int>("Id")
@@ -827,6 +863,9 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("CompareAtPrice")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -846,6 +885,12 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsNewArrival")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("MainImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
@@ -853,6 +898,12 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("Rating")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("ReviewCount")
+                        .HasColumnType("integer");
 
                     b.Property<NpgsqlTsVector>("SearchVector")
                         .ValueGeneratedOnAddOrUpdate()

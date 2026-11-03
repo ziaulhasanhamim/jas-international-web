@@ -1,7 +1,19 @@
 namespace JASIntWeb.Client.Dtos;
 
 public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal Price, string Category, string Image,
-    int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null);
+    int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,
+    decimal? OriginalPrice = null, decimal Rating = 5.0m, int ReviewCount = 12, bool IsNewArrival = true, bool IsFeatured = false);
+
+public sealed record HomepageSectionDto(
+    int Id,
+    string Title,
+    string? Eyebrow,
+    string? CategorySlug,
+    string ViewAllHref,
+    int SortOrder,
+    bool IsActive,
+    int ItemLimit,
+    List<ProductSummaryDto> Products);
 
 public sealed record ProductDetailsDto(int Id, string Name, string Slug, string Category, string CategorySlug,
     string? Description, string Details, string MainImage, List<string> Images,
