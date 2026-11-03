@@ -384,20 +384,21 @@
 {
     <script>
         (function() {
-            const token = "@Token";
-            const pollId = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/orders/${token}/status`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data && data.isPaymentVerified) {
-                            clearInterval(pollId);
-                            window.location.href = `/order/${token}`;
+            const orderId = "@(order.Id)";
+            let sse;
+            try {
+                sse = new EventSource('/api/orders/' + encodeURIComponent(orderId) + '/sse');
+                sse.onmessage = function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data && (data.isPaymentVerified || data.isCancelled)) {
+                            sse.close();
+                            window.location.href = '/order/' + (data.orderId || orderId);
                         }
-                    }
-                } catch (e) {}
-            }, 2500);
-            window.addEventListener('beforeunload', () => clearInterval(pollId));
+                    } catch(err) {}
+                };
+            } catch(e) {}
+            window.addEventListener('beforeunload', () => { if (sse) sse.close(); });
         })();
     </script>
 }
@@ -465,7 +466,7 @@
                 // If order is already paid, redirect straight to confirmation page
                 if (order.PaidAmount > 0 || order.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered)
                 {
-                    Nav.NavigateTo($"/order/{order.PublicToken}");
+                    Nav.NavigateTo($"/order/{order.Id}");
                     return;
                 }
             }
@@ -515,7 +516,7 @@
                     if (status != null && (status.IsVerified || status.PaidAmount > 0 || status.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered))
                     {
                         pollCts.Cancel();
-                        await InvokeAsync(() => Nav.NavigateTo($"/order/{Token}"));
+                        await InvokeAsync(() => Nav.NavigateTo($"/order/{order!.Id}"));
                         break;
                     }
                 }
@@ -623,7 +624,7 @@
             var req = new ConfirmPaymentRequest(pMode, senderPhoneNumber?.Trim(), transactionId?.Trim().ToUpperInvariant(), order.PaymentReferenceCode);
             await Shop.ConfirmPaymentAsync(order.PublicToken, req);
 
-            Nav.NavigateTo($"/order/{order.PublicToken}");
+            Nav.NavigateTo($"/payment-verification?orderid={order.Id}");
         }
         catch (ShopException ex)
         {

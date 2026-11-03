@@ -113,10 +113,19 @@
 
                             <div class="flex items-center gap-3">
                                 <span class="font-bold text-slate-900 text-lg tabular-nums">৳@o.Total.ToString("N0")</span>
-                                <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
-                                    <Icon Name="receipt" Class="size-3.5 text-blue-600" />
-                                    Receipt
-                                </a>
+                                @if (o.PaidAmount == 0 && o.Status != OrderStatus.Cancelled)
+                                {
+                                    <a href="/payment-verification?orderid=@o.Id" class="btn-primary !px-3 !py-1.5 text-xs">
+                                        Verification →
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a href="/order/@o.Id" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                        <Icon Name="receipt" Class="size-3.5 text-blue-600" />
+                                        Receipt
+                                    </a>
+                                }
                             </div>
                         </div>
 

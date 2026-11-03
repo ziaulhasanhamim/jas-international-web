@@ -187,6 +187,9 @@ else
                         <span class="badge badge-emerald">
                             ✓ Payment Verified (৳@order.PaidAmount.ToString("N0"))
                         </span>
+                        <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-rose-700 !bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3">
+                            ✕ Unverify Payment
+                        </button>
                     }
                 </div>
             </div>
@@ -325,6 +328,19 @@ else
         try
         {
             await Shop.VerifyPaymentAsync(Id);
+            Nav.NavigateTo($"/admin/orders/{Id}?saved=true", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task UnverifyPayment()
+    {
+        try
+        {
+            await Shop.UnverifyPaymentAsync(Id);
             Nav.NavigateTo($"/admin/orders/{Id}?saved=true", forceLoad: true);
         }
         catch (Exception ex)

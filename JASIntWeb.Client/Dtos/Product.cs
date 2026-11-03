@@ -35,4 +35,5 @@ public sealed record DeviceOrderDto(
     decimal Total,
     int ItemCount,
     List<string> ItemNames,
-    string CustomerName);
+    string CustomerName,
+    bool IsVerified = false);

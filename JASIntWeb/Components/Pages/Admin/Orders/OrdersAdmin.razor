@@ -12,10 +12,10 @@
 </div>
 
 <!-- Filter Toolbar -->
-<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+<div class="mb-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
         <div class="relative flex-1 min-w-[220px]">
-            <input name="q" value="@Query" placeholder="Search Order #, customer name, or phone..." class="field pr-9" />
+            <input name="q" value="@Query" placeholder="Search Order #, customer name, phone, or TrxID..." class="field pr-9" />
             <span class="absolute right-3 top-3 text-slate-400">
                 <Icon Name="search" Class="size-4" />
             </span>
@@ -24,19 +24,43 @@
             <option value="">All Statuses</option>
             @foreach (var s in Enum.GetValues<OrderStatus>())
             {
-                <option value="@s" selected="@(Status == s.ToString())">@s</option>
+                <option value="@s" selected="@(Status == s.ToString() && string.IsNullOrEmpty(PaymentFilter))">@s</option>
             }
         </select>
         <button type="submit" class="btn-primary">
             Filter
         </button>
-        @if (!string.IsNullOrWhiteSpace(Query) || !string.IsNullOrWhiteSpace(Status))
+        @if (!string.IsNullOrWhiteSpace(Query) || !string.IsNullOrWhiteSpace(Status) || !string.IsNullOrWhiteSpace(PaymentFilter))
         {
             <a href="/admin/orders" class="btn-secondary">
                 Reset
             </a>
         }
     </form>
+</div>
+
+<!-- Quick Filter Tabs -->
+<div class="mb-5 flex flex-wrap items-center gap-2 text-xs">
+    <a href="@FilterUrl(null, null)" class="rounded-xl px-3.5 py-1.5 font-bold transition @(string.IsNullOrEmpty(Status) && string.IsNullOrEmpty(PaymentFilter) ? "bg-slate-900 text-white shadow-xs" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80")">
+        All Orders
+    </a>
+
+    <a href="@FilterUrl(null, "unconfirmed")" class="rounded-xl px-3.5 py-1.5 font-bold transition flex items-center gap-2 @(PaymentFilter == "unconfirmed" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300/80")">
+        <span>Needs Payment Confirmation</span>
+        @if (unconfirmedPaymentCount > 0)
+        {
+            <span class="rounded-full bg-amber-900 text-white px-1.5 py-0.5 text-[10px] font-extrabold leading-none @(PaymentFilter == "unconfirmed" ? "!bg-white !text-amber-700" : "")">
+                @unconfirmedPaymentCount
+            </span>
+        }
+    </a>
+
+    @foreach (var s in Enum.GetValues<OrderStatus>())
+    {
+        <a href="@FilterUrl(s.ToString(), null)" class="rounded-xl px-3 py-1.5 font-bold transition @(Status == s.ToString() && string.IsNullOrEmpty(PaymentFilter) ? "bg-slate-900 text-white shadow-xs" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80")">
+            @s
+        </a>
+    }
 </div>
 
 <!-- Orders Table -->
@@ -51,6 +75,7 @@
                     <th>Contact Phone</th>
                     <th>Delivery Area</th>
                     <th>Status</th>
+                    <th>Payment</th>
                     <th class="text-right">Total Amount</th>
                     <th class="text-right">Action</th>
                 </tr>
@@ -97,6 +122,26 @@
                                     break;
                             }
                         </td>
+                        <td>
+                            @if (o.PaidAmount > 0)
+                            {
+                                <span class="badge badge-emerald">
+                                    <Icon Name="check" Class="size-3" />
+                                    Verified (৳@o.PaidAmount.ToString("N0"))
+                                </span>
+                            }
+                            else if (!string.IsNullOrEmpty(o.TransactionId))
+                            {
+                                <span class="badge badge-amber font-bold animate-pulse">
+                                    Needs Confirmation
+                                    <span class="block font-mono text-[10px] font-normal">@o.TransactionId</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-slate">Unpaid</span>
+                            }
+                        </td>
                         <td class="text-right font-bold text-slate-900 tabular-nums">
                             ৳@o.Total.ToString("N0")
                         </td>
@@ -130,25 +175,51 @@
     public string? Query { get; set; }
     [SupplyParameterFromQuery(Name = "status")]
     public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "payment")]
+    public string? PaymentFilter { get; set; }
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
+
     private List<Order> orders = [];
     private int total;
+    private int unconfirmedPaymentCount;
+
+    private string FilterUrl(string? status, string? payment)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status)) parts.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(payment)) parts.Add($"payment={Uri.EscapeDataString(payment)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        parts.Add("page=1");
+        return $"/admin/orders?{string.Join("&", parts)}";
+    }
 
     protected override async Task OnInitializedAsync()
     {
         Page = Math.Clamp(Page, 1, 10000);
+
+        unconfirmedPaymentCount = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+
         var q = Db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
-        if (Enum.TryParse<OrderStatus>(Status, out var status))
+
+        if (PaymentFilter == "unconfirmed" || Status == "unconfirmed_payment")
+        {
+            q = q.Where(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+        }
+        else if (Enum.TryParse<OrderStatus>(Status, out var status))
         {
             q = q.Where(o => o.Status == status);
         }
+
         if (!string.IsNullOrWhiteSpace(Query))
         {
-            q = q.Where(o => o.Id.ToString() == Query
-                || o.DeliveryAddress!.CustomerName.ToLower().Contains(Query.ToLower())
-                || o.DeliveryAddress.PhoneNumber.Contains(Query));
+            var search = Query.Trim().ToLower();
+            q = q.Where(o => o.Id.ToString() == search
+                || (o.TransactionId != null && o.TransactionId.ToLower().Contains(search))
+                || (o.DeliveryAddress != null && o.DeliveryAddress.CustomerName.ToLower().Contains(search))
+                || (o.DeliveryAddress != null && o.DeliveryAddress.PhoneNumber.Contains(search)));
         }
+
         total = await q.CountAsync();
         orders = await q.OrderByDescending(o => o.CreatedAt)
             .ThenByDescending(o => o.Id)

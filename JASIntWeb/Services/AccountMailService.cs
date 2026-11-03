@@ -519,7 +519,7 @@ public sealed class AccountMailService(
         sb.Append("</div>");
 
         // CTA Button
-        var orderUrl = $"{baseUrl}/order/{order.PublicToken}";
+        var orderUrl = order.PaidAmount > 0 || order.Status == OrderStatus.Cancelled ? $"{baseUrl}/order/{order.Id}" : $"{baseUrl}/payment-verification?orderid={order.Id}";
         sb.Append($"<div style='text-align:center;margin:28px 0;'><a href='{orderUrl}' style='display:inline-block;background:#2563eb;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;text-decoration:none;'>View Live Order Status &rarr;</a></div>");
 
         sb.Append("</div>"); // Body

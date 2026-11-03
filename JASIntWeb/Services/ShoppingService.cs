@@ -526,4 +526,27 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
 
         return order;
     }
+
+    public async Task<Order> UnverifyPaymentAsync(int orderId)
+    {
+        var order = await db.Orders
+            .Include(o => o.DeliveryAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+        if (order is null)
+        {
+            throw new ShopException("Order not found.");
+        }
+
+        order.PaidAmount = 0m;
+        foreach (var p in order.Payments.Where(p => p.Method == PaymentMethod.Bkash))
+        {
+            p.Status = PaymentStatus.Pending;
+        }
+
+        await db.SaveChangesAsync();
+        return order;
+    }
 }

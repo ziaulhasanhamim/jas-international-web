@@ -98,16 +98,23 @@
 
                             <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
                                 <span class="text-[11px] text-slate-400">@(o.PaidAmount > 0 ? $"bKash Paid (৳{o.PaidAmount:N0})" : "Payment Pending")</span>
+                                @{
+                                    var isVerified = o.PaidAmount > 0;
+                                    var isCancelled = o.Status == OrderStatus.Cancelled;
+                                }
                                 <div class="flex items-center gap-2">
-                                    @if (o.Status == OrderStatus.Pending && o.PaidAmount == 0)
+                                    @if (!isVerified && !isCancelled)
                                     {
-                                        <a href="/checkout/payment/@o.PublicToken" class="btn-primary !px-3 !py-1.5 text-xs">
-                                            Pay Now
+                                        <a href="/payment-verification?orderid=@o.Id" class="btn-primary !px-3 !py-1.5 text-xs">
+                                            Awaiting Verification →
                                         </a>
                                     }
-                                    <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
-                                        View Order Receipt
-                                    </a>
+                                    else
+                                    {
+                                        <a href="/order/@o.Id" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                            View Order Receipt
+                                        </a>
+                                    }
                                 </div>
                             </div>
                         </div>

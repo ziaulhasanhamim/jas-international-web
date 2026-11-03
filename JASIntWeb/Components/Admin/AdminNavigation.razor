@@ -10,6 +10,7 @@
 
     <SidebarGroup Title="Orders & Commerce" IconName="cart" Prefix="/admin/orders">
         <NavLink href="/admin/orders" Match="NavLinkMatch.All">All Orders</NavLink>
+        <NavLink href="/admin/orders?payment=unconfirmed">Needs Payment Verification</NavLink>
         <NavLink href="/admin/orders?status=Pending">Pending Review</NavLink>
         <NavLink href="/admin/orders?status=Confirmed">Confirmed</NavLink>
         <NavLink href="/admin/orders?status=Shipped">In Delivery</NavLink>
