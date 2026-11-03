@@ -68,6 +68,9 @@ public sealed class ResetPasswordForm
 
 public sealed class SimpleSignupForm
 {
+    [Required(ErrorMessage = "Full name is required"), StringLength(100, ErrorMessage = "Full name cannot exceed 100 characters")]
+    public string FullName { get; set; } = "";
+
     [Required(ErrorMessage = "Email address is required"), EmailAddress(ErrorMessage = "Please enter a valid email address"), StringLength(254)]
     public string Email { get; set; } = "";
 

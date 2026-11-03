@@ -73,8 +73,8 @@ else
         <div class="lg:col-span-2 space-y-6">
             <!-- Edit Profile Card -->
             <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
-                <h2 class="text-base font-bold text-slate-900 mb-1">Profile &amp; Contact Details</h2>
-                <p class="text-xs text-slate-500 mb-5">Update the user's primary email, full name, and mobile number.</p>
+                <h2 class="text-base font-bold text-slate-900 mb-1">Profile &amp; Account Details</h2>
+                <p class="text-xs text-slate-500 mb-5">Update the user's primary email and full name.</p>
 
                 <EditForm Model="ProfileInput" OnValidSubmit="SaveProfile" FormName="edit-user-profile" method="post" Enhance data-submit-indication="true" class="space-y-4">
                     <DataAnnotationsValidator />
@@ -84,18 +84,13 @@ else
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="field-label">Email Address *</label>
-                            <InputText @bind-Value="ProfileInput!.Email" type="email" class="field" />
-                        </div>
-
-                        <div>
-                            <label class="field-label">Full Name</label>
+                            <label class="field-label">Full Name *</label>
                             <InputText @bind-Value="ProfileInput!.FullName" class="field" placeholder="e.g. Tanvir Ahmed" />
                         </div>
 
-                        <div class="sm:col-span-2">
-                            <label class="field-label">Mobile Phone Number</label>
-                            <InputText @bind-Value="ProfileInput!.PhoneNumber" type="tel" class="field" placeholder="017xxxxxxxx" />
+                        <div>
+                            <label class="field-label">Email Address *</label>
+                            <InputText @bind-Value="ProfileInput!.Email" type="email" class="field" />
                         </div>
                     </div>
 
@@ -352,8 +347,7 @@ else
             {
                 Id = Id,
                 Email = user.Email ?? "",
-                FullName = fullName,
-                PhoneNumber = user.PhoneNumber
+                FullName = fullName ?? ""
             };
 
             PasswordInput ??= new() { Id = Id };
@@ -473,8 +467,7 @@ else
             if (ProfileInput != null)
             {
                 ProfileInput.Email = user.Email ?? "";
-                ProfileInput.FullName = fullName;
-                ProfileInput.PhoneNumber = user.PhoneNumber;
+                ProfileInput.FullName = fullName ?? "";
             }
         }
     }

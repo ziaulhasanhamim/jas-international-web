@@ -115,14 +115,11 @@ public sealed class RoleEditForm
 
 public sealed class AdminUserCreateForm
 {
-    [Required, EmailAddress, StringLength(254)]
+    [Required(ErrorMessage = "Email address is required"), EmailAddress, StringLength(254)]
     public string Email { get; set; } = "";
 
-    [StringLength(100)]
-    public string? FullName { get; set; }
-
-    [Phone, StringLength(20)]
-    public string? PhoneNumber { get; set; }
+    [Required(ErrorMessage = "Full name is required"), StringLength(100)]
+    public string FullName { get; set; } = "";
 
     [Required, MinLength(8, ErrorMessage = "Password must be at least 8 characters long"), StringLength(128)]
     public string Password { get; set; } = "";
@@ -136,14 +133,11 @@ public sealed class AdminUserEditProfileForm
 {
     public int Id { get; set; }
 
-    [Required, EmailAddress, StringLength(254)]
+    [Required(ErrorMessage = "Email address is required"), EmailAddress, StringLength(254)]
     public string Email { get; set; } = "";
 
-    [StringLength(100)]
-    public string? FullName { get; set; }
-
-    [Phone, StringLength(20)]
-    public string? PhoneNumber { get; set; }
+    [Required(ErrorMessage = "Full name is required"), StringLength(100)]
+    public string FullName { get; set; } = "";
 }
 
 public sealed class AdminUserPasswordResetForm

@@ -121,7 +121,6 @@
             <thead>
                 <tr>
                     <th>User / Account</th>
-                    <th>Mobile Phone</th>
                     <th>System Role</th>
                     <th>Email Status</th>
                     <th>Account Status</th>
@@ -154,10 +153,6 @@
                                     </span>
                                 </div>
                             </div>
-                        </td>
-
-                        <td class="font-mono text-xs text-slate-600">
-                            @(u.PhoneNumber ?? "—")
                         </td>
 
                         <td>
@@ -325,7 +320,6 @@
                 .ToListAsync();
 
             q = q.Where(u => u.Email!.ToLower().Contains(search)
-                          || (u.PhoneNumber != null && u.PhoneNumber.Contains(search))
                           || matchingUserIdsFromClaims.Contains(u.Id));
         }
 

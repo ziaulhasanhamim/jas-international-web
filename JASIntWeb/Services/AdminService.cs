@@ -868,7 +868,6 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         {
             Email = email,
             UserName = email,
-            PhoneNumber = string.IsNullOrWhiteSpace(input.PhoneNumber) ? null : input.PhoneNumber.Trim(),
             EmailConfirmed = input.EmailConfirmed
         };
 
@@ -907,8 +906,6 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
             user.Email = newEmail;
             user.UserName = newEmail;
         }
-
-        user.PhoneNumber = string.IsNullOrWhiteSpace(input.PhoneNumber) ? null : input.PhoneNumber.Trim();
 
         var updateResult = await users.UpdateAsync(user);
         if (!updateResult.Succeeded)

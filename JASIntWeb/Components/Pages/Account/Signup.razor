@@ -1,4 +1,5 @@
 @page "/account/signup"
+@using System.Security.Claims
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
 @inject EmailVerificationService Verification
@@ -27,7 +28,7 @@
             else
             {
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900">Create Account</h1>
-                <p class="text-xs text-slate-500 mt-1">Fast signup with just your email and password.</p>
+                <p class="text-xs text-slate-500 mt-1">Fast signup with your full name, email and password.</p>
             }
         </div>
 
@@ -122,6 +123,11 @@
                         <EditForm Model="SignupInput" OnValidSubmit="SubmitSignup" FormName="signup" method="post" Enhance data-submit-indication="true" class="space-y-4">
                             <DataAnnotationsValidator />
                             <ValidationSummary class="text-xs text-rose-600 mb-2" />
+
+                            <div>
+                                <label class="field-label">Full Name</label>
+                                <InputText @bind-Value="SignupInput!.FullName" autocomplete="name" class="field" placeholder="e.g. Tanvir Ahmed" />
+                            </div>
 
                             <div>
                                 <label class="field-label">Email Address</label>
@@ -222,6 +228,7 @@
         error = null;
         notice = null;
         var email = SignupInput!.Email.Trim();
+        var fullName = SignupInput.FullName.Trim();
 
         var existing = await Users.FindByEmailAsync(email);
         if (existing != null)
@@ -240,6 +247,18 @@
                 error = string.Join(" ", resetResult.Errors.Select(e => e.Description));
                 return;
             }
+
+            // Sync name claim
+            var existingClaims = await Users.GetClaimsAsync(existing);
+            var nameClaim = existingClaims.FirstOrDefault(c => c.Type == "name");
+            if (nameClaim != null)
+            {
+                await Users.RemoveClaimAsync(existing, nameClaim);
+            }
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                await Users.AddClaimAsync(existing, new Claim("name", fullName));
+            }
         }
         else
         {
@@ -255,6 +274,11 @@
             {
                 error = string.Join(" ", createResult.Errors.Select(e => e.Description));
                 return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                await Users.AddClaimAsync(user, new Claim("name", fullName));
             }
         }
 

@@ -38,23 +38,18 @@
             <DataAnnotationsValidator />
             <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="sm:col-span-2">
+            <div class="space-y-4">
+                <div>
+                    <label class="field-label">Full Name *</label>
+                    <InputText @bind-Value="Input!.FullName" placeholder="e.g. Tanvir Ahmed" class="field" />
+                </div>
+
+                <div>
                     <label class="field-label">Email Address *</label>
                     <InputText @bind-Value="Input!.Email" type="email" placeholder="user@example.com" class="field" />
                 </div>
 
                 <div>
-                    <label class="field-label">Full Name</label>
-                    <InputText @bind-Value="Input!.FullName" placeholder="e.g. Tanvir Ahmed" class="field" />
-                </div>
-
-                <div>
-                    <label class="field-label">Mobile Phone Number</label>
-                    <InputText @bind-Value="Input!.PhoneNumber" type="tel" placeholder="017xxxxxxxx" class="field" />
-                </div>
-
-                <div class="sm:col-span-2">
                     <div class="flex items-center justify-between mb-1">
                         <label class="field-label mb-0">Initial Password *</label>
                         <span class="text-[11px] text-slate-400">Min. 8 characters</span>
