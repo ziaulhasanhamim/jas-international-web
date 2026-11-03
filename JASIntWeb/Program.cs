@@ -4,6 +4,7 @@ using JASIntWeb.Client.Contracts;
 using JASIntWeb.Endpoints;
 using JASIntWeb.Services;
 using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
@@ -18,26 +19,28 @@ builder.Services.AddScoped<AdminSession>();
 builder.Services.AddScoped<AccountMailService>();
 builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
+builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents().AddInteractiveWebAssemblyComponents()
+    .AddAuthenticationStateSerialization();
+builder.Services.AddCascadingAuthenticationState();
+var authBuilder = builder.Services.AddAuthentication(o =>
+    {
+        o.DefaultScheme = IdentityConstants.ApplicationScheme;
+        o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+    });
+authBuilder.AddIdentityCookies();
+
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
-    builder.Services.AddAuthentication()
-        .AddGoogle(options =>
-        {
-            options.ClientId = googleClientId;
-            options.ClientSecret = googleClientSecret;
-        });
-}
-builder.Services.AddRazorComponents().AddInteractiveServerComponents().AddInteractiveWebAssemblyComponents()
-    .AddAuthenticationStateSerialization();
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddAuthentication(o =>
+    authBuilder.AddGoogle(options =>
     {
-        o.DefaultScheme = IdentityConstants.ApplicationScheme;
-        o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-    })
-    .AddIdentityCookies();
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
+        options.SignInScheme = IdentityConstants.ExternalScheme;
+    });
+}
 builder.Services.ConfigureApplicationCookie(o =>
     {
         o.LoginPath = "/account/login";
@@ -311,6 +314,96 @@ app.MapGet("/api/orders/{id:int}/payment-status", async (int id, AppDbContext db
         paidAmount = order.PaidAmount,
         trxId = order.TransactionId
     });
+});
+
+app.MapGet("/account/external-login", (string provider, string? returnUrl, SignInManager<User> signInManager) =>
+{
+    var redirectUrl = $"/account/external-login-callback?returnUrl={Uri.EscapeDataString(returnUrl ?? "/")}";
+    var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+    return Results.Challenge(properties, [provider]);
+});
+
+app.MapGet("/account/external-login-callback", async (
+    string? returnUrl,
+    string? remoteError,
+    SignInManager<User> signInManager,
+    UserManager<User> userManager,
+    ILogger<Program> logger) =>
+{
+    returnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
+    if (!string.IsNullOrEmpty(remoteError))
+    {
+        logger.LogWarning("External login callback error: {RemoteError}", remoteError);
+        return Results.Redirect($"/account/login?error={Uri.EscapeDataString($"Error from Google: {remoteError}")}");
+    }
+
+    var info = await signInManager.GetExternalLoginInfoAsync();
+    if (info == null)
+    {
+        logger.LogWarning("GetExternalLoginInfoAsync returned null.");
+        return Results.Redirect($"/account/login?error={Uri.EscapeDataString("Failed to receive authentication details from Google. Please try again.")}");
+    }
+
+    // Try signing in if provider login already linked
+    var signInResult = await signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: true, bypassTwoFactor: true);
+    if (signInResult.Succeeded)
+    {
+        logger.LogInformation("User logged in with Google via linked external login.");
+        return Results.Redirect(returnUrl);
+    }
+
+    if (signInResult.IsLockedOut)
+    {
+        return Results.Redirect("/account/access-denied");
+    }
+
+    // Match by email or create new user
+    var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        return Results.Redirect($"/account/login?error={Uri.EscapeDataString("Google did not provide an email address.")}");
+    }
+
+    var user = await userManager.FindByEmailAsync(email);
+    if (user == null)
+    {
+        user = new User
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true // Verified by Google
+        };
+
+        var createResult = await userManager.CreateAsync(user);
+        if (!createResult.Succeeded)
+        {
+            var msg = string.Join(", ", createResult.Errors.Select(e => e.Description));
+            return Results.Redirect($"/account/login?error={Uri.EscapeDataString(msg)}");
+        }
+
+        var name = info.Principal.FindFirstValue(ClaimTypes.Name);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            await userManager.AddClaimAsync(user, new Claim("name", name));
+        }
+    }
+    else
+    {
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await userManager.UpdateAsync(user);
+        }
+    }
+
+    var addLoginResult = await userManager.AddLoginAsync(user, info);
+    if (!addLoginResult.Succeeded)
+    {
+        logger.LogDebug("AddLogin result: {Errors}", string.Join(", ", addLoginResult.Errors.Select(e => e.Description)));
+    }
+
+    await signInManager.SignInAsync(user, isPersistent: true, info.LoginProvider);
+    return Results.Redirect(returnUrl);
 });
 
 app.MapGet("/robots.txt", () => Results.Text("User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /account/\nSitemap: https://jasinternational.com/sitemap.xml\n", "text/plain"));

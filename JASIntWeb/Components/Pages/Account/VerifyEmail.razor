@@ -1,0 +1,19 @@
+@page "/account/verify-email"
+@inject NavigationManager Navigation
+
+@code {
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromQuery(Name = "notice")]
+    public string? Notice { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var target = $"/account/signup?step=verify&email={Uri.EscapeDataString(Email ?? "")}&notice={Uri.EscapeDataString(Notice ?? "")}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}";
+        Navigation.NavigateTo(target, replace: true);
+    }
+}

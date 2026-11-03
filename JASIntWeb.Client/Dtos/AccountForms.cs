@@ -65,3 +65,28 @@ public sealed class ResetPasswordForm
     [Compare(nameof(Password))]
     public string ConfirmPassword { get; set; } = "";
 }
+
+public sealed class SimpleSignupForm
+{
+    [Required(ErrorMessage = "Email address is required"), EmailAddress(ErrorMessage = "Please enter a valid email address"), StringLength(254)]
+    public string Email { get; set; } = "";
+
+    [Required(ErrorMessage = "Password is required"), MinLength(8, ErrorMessage = "Password must be at least 8 characters long"), StringLength(128)]
+    public string Password { get; set; } = "";
+}
+
+public sealed class VerifyCodeForm
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+
+    [Required(ErrorMessage = "Verification code is required")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Verification code must be 6 digits")]
+    public string Code { get; set; } = "";
+}
+
+public sealed class ResendCodeForm
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+}

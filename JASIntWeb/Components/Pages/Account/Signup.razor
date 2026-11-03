@@ -1,6 +1,8 @@
 @page "/account/signup"
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
+@inject EmailVerificationService Verification
+@inject NavigationManager Navigation
 
 <PageTitle>Create Account · JAS International</PageTitle>
 
@@ -15,90 +17,153 @@
                     <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">International</span>
                 </div>
             </a>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Create an Account</h1>
-            <p class="text-xs text-slate-500 mt-1">Join JAS International to track orders and save your delivery details.</p>
+            @if (IsVerifyStep)
+            {
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Verify Your Email</h1>
+                <p class="text-xs text-slate-500 mt-1">
+                    Enter the 6-digit verification code sent to <strong class="text-slate-800">@(ActiveEmail)</strong>
+                </p>
+            }
+            else
+            {
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Create Account</h1>
+                <p class="text-xs text-slate-500 mt-1">Fast signup with just your email and password.</p>
+            }
         </div>
 
         <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
             @if (completed)
             {
-                <SessionRedirect Destination="/account" />
+                <SessionRedirect Destination="@AccountNavigation.SafeReturn(ReturnUrl)" />
             }
             else
             {
-                @if (error is not null)
+                @if (!string.IsNullOrWhiteSpace(error))
                 {
                     <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
                         <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
                         <div>
-                            <strong class="font-semibold block">Registration Error</strong>
+                            <strong class="font-semibold block">Notification</strong>
                             <span>@error</span>
                         </div>
                     </div>
                 }
 
-                @if (Input is null)
+                @if (!string.IsNullOrWhiteSpace(notice))
                 {
-                    <p class="text-xs text-slate-400">Loading form…</p>
+                    <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800 flex items-start gap-2.5" role="status">
+                        <Icon Name="check" Class="size-4 shrink-0 mt-0.5 text-emerald-600" />
+                        <div>
+                            <strong class="font-semibold block">Success</strong>
+                            <span>@notice</span>
+                        </div>
+                    </div>
                 }
-                else
+
+                @if (IsVerifyStep)
                 {
-                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="signup" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <!-- STEP 2: VERIFICATION CODE FORM -->
+                    <EditForm Model="VerifyInput" OnValidSubmit="SubmitVerification" FormName="verify-code" method="post" Enhance data-submit-indication="true" class="space-y-4">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
-                        <div>
-                            <label class="field-label">Full Name</label>
-                            <InputText @bind-Value="Input!.FullName" class="field" placeholder="e.g. Tanvir Ahmed" />
-                        </div>
+                        <input type="hidden" name="VerifyInput.Email" value="@ActiveEmail" />
 
                         <div>
-                            <label class="field-label">Mobile Phone Number</label>
-                            <InputText @bind-Value="Input!.PhoneNumber" type="tel" class="field" placeholder="017xxxxxxxx" />
+                            <label class="field-label text-center block mb-2">6-Digit Confirmation Code</label>
+                            <InputText @bind-Value="VerifyInput!.Code"
+                                       maxlength="6"
+                                       placeholder="••••••"
+                                       autocomplete="one-time-code"
+                                       class="field text-center font-mono text-2xl font-bold tracking-[0.4em] py-3 uppercase focus:tracking-[0.4em]" />
+                            <p class="text-[11px] text-slate-400 text-center mt-2">Code is valid for 15 minutes.</p>
                         </div>
 
-                        <div>
-                            <label class="field-label">Email Address</label>
-                            <InputText @bind-Value="Input!.Email" type="email" autocomplete="username" class="field" placeholder="you@example.com" />
-                        </div>
+                        @{
+                            var devCode = Verification.GetDevCode(ActiveEmail);
+                            if (!string.IsNullOrEmpty(devCode))
+                            {
+                                <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs text-amber-800">
+                                    <span class="font-semibold">Local Dev Code:</span> <code class="font-mono font-bold text-amber-950 text-sm">@devCode</code>
+                                </div>
+                            }
+                        }
 
-                        <div>
-                            <label class="field-label">Password</label>
-                            <InputText @bind-Value="Input!.Password" type="password" autocomplete="new-password" class="field" placeholder="At least 8 characters" />
-                        </div>
-
-                        <div>
-                            <label class="field-label">Confirm Password</label>
-                            <InputText @bind-Value="Input!.ConfirmPassword" type="password" autocomplete="new-password" class="field" placeholder="Re-type password" />
-                        </div>
-
-                        <button class="btn-primary w-full shadow-xs mt-2" type="submit" data-pending-text="Creating account...">
+                        <button class="btn-primary w-full shadow-xs mt-2" type="submit" data-pending-text="Verifying...">
                             <span class="form-submit-spinner" hidden></span>
-                            <span>Create Customer Account</span>
+                            <span>Verify Code & Continue</span>
                         </button>
                     </EditForm>
+
+                    <!-- Resend Code form -->
+                    <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <form method="post" action="/account/signup?step=verify&email=@Uri.EscapeDataString(ActiveEmail)&returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "")" @formname="resend-code" @onsubmit="ResendCode">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="resendEmail" value="@ActiveEmail" />
+                            <button type="submit" class="text-blue-600 font-semibold hover:underline">
+                                Resend Code
+                            </button>
+                        </form>
+
+                        <a href="/account/signup?returnUrl=@Uri.EscapeDataString(ReturnUrl ?? "")" class="text-slate-500 hover:text-slate-700">
+                            Change email
+                        </a>
+                    </div>
                 }
+                else
+                {
+                    <!-- STEP 1: EMAIL & PASSWORD REGISTRATION -->
+                    @if (SignupInput is null)
+                    {
+                        <p class="text-xs text-slate-400">Loading form…</p>
+                    }
+                    else
+                    {
+                        <EditForm Model="SignupInput" OnValidSubmit="SubmitSignup" FormName="signup" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
-                <div class="my-5 flex items-center">
-                    <div class="flex-1 border-t border-slate-200"></div>
-                    <span class="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">or</span>
-                    <div class="flex-1 border-t border-slate-200"></div>
-                </div>
+                            <div>
+                                <label class="field-label">Email Address</label>
+                                <InputText @bind-Value="SignupInput!.Email" type="email" autocomplete="username" class="field" placeholder="you@example.com" />
+                            </div>
 
-                <a href="/account/external-login?provider=Google" class="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs">
-                    <svg class="size-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                    </svg>
-                    <span>Sign up with Google</span>
-                </a>
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="field-label mb-0">Password</label>
+                                    <span class="text-[11px] text-slate-400">Min. 8 characters with 1 digit</span>
+                                </div>
+                                <InputText @bind-Value="SignupInput!.Password" type="password" autocomplete="new-password" class="field" placeholder="••••••••" />
+                            </div>
 
-                <div class="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-500">
-                    Already have an account?
-                    <a href="/account/login" class="text-blue-600 font-semibold hover:underline ml-1">Sign in here</a>
-                </div>
+                            <button class="btn-primary w-full shadow-xs mt-2" type="submit" data-pending-text="Creating account...">
+                                <span class="form-submit-spinner" hidden></span>
+                                <span>Create Account</span>
+                            </button>
+                        </EditForm>
+                    }
+
+                    <div class="my-5 flex items-center">
+                        <div class="flex-1 border-t border-slate-200"></div>
+                        <span class="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">or</span>
+                        <div class="flex-1 border-t border-slate-200"></div>
+                    </div>
+
+                    <a href="/account/external-login?provider=Google&returnUrl=@Uri.EscapeDataString(AccountNavigation.SafeReturn(ReturnUrl))" class="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs">
+                        <svg class="size-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Continue with Google</span>
+                    </a>
+
+                    <div class="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-500">
+                        Already have an account?
+                        <a href="/account/login?returnUrl=@Uri.EscapeDataString(AccountNavigation.SafeReturn(ReturnUrl))" class="text-blue-600 font-semibold hover:underline ml-1">Sign in here</a>
+                    </div>
+                }
             }
         </div>
     </div>
@@ -107,35 +172,147 @@
 @code
 {
     [SupplyParameterFromForm(FormName = "signup")]
-    private SignupForm? Input { get; set; }
+    private SimpleSignupForm? SignupInput { get; set; }
+
+    [SupplyParameterFromForm(FormName = "verify-code")]
+    private VerifyCodeForm? VerifyInput { get; set; }
+
+    [SupplyParameterFromQuery(Name = "step")]
+    public string? QueryStep { get; set; }
+
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? QueryEmail { get; set; }
+
+    [SupplyParameterFromQuery(Name = "notice")]
+    public string? QueryNotice { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
     private string? error;
+    private string? notice;
     private bool completed;
 
-    protected override void OnInitialized() => Input ??= new();
+    private bool IsVerifyStep => string.Equals(QueryStep, "verify", StringComparison.OrdinalIgnoreCase);
 
-    private async Task Submit()
+    private string ActiveEmail => !string.IsNullOrWhiteSpace(VerifyInput?.Email)
+        ? VerifyInput.Email.Trim()
+        : (!string.IsNullOrWhiteSpace(QueryEmail) ? QueryEmail.Trim() : (SignupInput?.Email?.Trim() ?? ""));
+
+    protected override void OnInitialized()
     {
-        var email = Input!.Email.Trim();
-        var user = new User
+        SignupInput ??= new();
+        VerifyInput ??= new() { Email = ActiveEmail };
+
+        if (!string.IsNullOrWhiteSpace(QueryNotice))
         {
-            UserName = email,
-            Email = email,
-            PhoneNumber = Input.PhoneNumber.Trim()
-        };
-        var result = await Users.CreateAsync(user, Input.Password);
-        if (result.Succeeded)
-        {
-            if (!string.IsNullOrWhiteSpace(Input.FullName))
+            if (QueryNotice == "unconfirmed")
             {
-                await Users.AddClaimAsync(user, new System.Security.Claims.Claim("name", Input.FullName.Trim()));
+                notice = "Your email has not been verified yet. We sent a 6-digit code to your inbox.";
             }
-            await SignIn.SignInAsync(user, false);
-            completed = true;
+            else
+            {
+                notice = QueryNotice;
+            }
+        }
+    }
+
+    private async Task SubmitSignup()
+    {
+        error = null;
+        notice = null;
+        var email = SignupInput!.Email.Trim();
+
+        var existing = await Users.FindByEmailAsync(email);
+        if (existing != null)
+        {
+            if (existing.EmailConfirmed)
+            {
+                error = "An account with this email address already exists. Please sign in.";
+                return;
+            }
+
+            // User exists but was not confirmed; reset password and re-issue code
+            var resetToken = await Users.GeneratePasswordResetTokenAsync(existing);
+            var resetResult = await Users.ResetPasswordAsync(existing, resetToken, SignupInput.Password);
+            if (!resetResult.Succeeded)
+            {
+                error = string.Join(" ", resetResult.Errors.Select(e => e.Description));
+                return;
+            }
         }
         else
         {
-            error = string.Join(" ", result.Errors.Select(e => e.Description));
+            var user = new User
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = false
+            };
+
+            var createResult = await Users.CreateAsync(user, SignupInput.Password);
+            if (!createResult.Succeeded)
+            {
+                error = string.Join(" ", createResult.Errors.Select(e => e.Description));
+                return;
+            }
         }
-        Input.Password = Input.ConfirmPassword = "";
+
+        // Generate and dispatch verification code
+        await Verification.GenerateAndSendCodeAsync(email);
+
+        // Transition to verification step
+        Navigation.NavigateTo($"/account/signup?step=verify&email={Uri.EscapeDataString(email)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}");
+    }
+
+    private async Task SubmitVerification()
+    {
+        error = null;
+        notice = null;
+        var email = ActiveEmail;
+        var code = VerifyInput?.Code?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(code))
+        {
+            error = "Please enter the 6-digit verification code.";
+            return;
+        }
+
+        var isValid = Verification.ValidateCode(email, code);
+        if (!isValid)
+        {
+            error = "Invalid or expired verification code. Please check the code or click Resend.";
+            return;
+        }
+
+        var user = await Users.FindByEmailAsync(email);
+        if (user == null)
+        {
+            error = "Account not found. Please sign up again.";
+            return;
+        }
+
+        user.EmailConfirmed = true;
+        var updateResult = await Users.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            error = string.Join(" ", updateResult.Errors.Select(e => e.Description));
+            return;
+        }
+
+        // Sign the newly verified user in
+        await SignIn.SignInAsync(user, isPersistent: true);
+        completed = true;
+    }
+
+    private async Task ResendCode()
+    {
+        error = null;
+        var email = ActiveEmail;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            await Verification.GenerateAndSendCodeAsync(email);
+            notice = $"A fresh 6-digit verification code was sent to {email}.";
+        }
     }
 }

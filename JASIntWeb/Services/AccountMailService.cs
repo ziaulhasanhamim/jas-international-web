@@ -56,6 +56,40 @@ public sealed class AccountMailService(IConfiguration config, ILogger<AccountMai
         }
     }
 
+    public async Task<bool> SendVerificationCodeEmailAsync(string email, string code)
+    {
+        var subject = $"[JAS International] Verification Code: {code}";
+        var sb = new StringBuilder();
+        sb.Append("<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;'>");
+        
+        // Header
+        sb.Append("<div style='background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:32px 24px;text-align:center;color:#ffffff;'>");
+        sb.Append("<h1 style='margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;'>JAS International</h1>");
+        sb.Append("<p style='margin:8px 0 0;font-size:13px;color:#bfdbfe;font-weight:600;text-transform:uppercase;letter-spacing:1px;'>Email Verification</p>");
+        sb.Append("</div>");
+
+        // Body
+        sb.Append("<div style='padding:32px 24px;color:#334155;font-size:14px;line-height:1.6;'>");
+        sb.Append("<p style='margin:0 0 16px;font-size:15px;color:#0f172a;font-weight:600;'>Welcome to JAS International!</p>");
+        sb.Append("<p style='margin:0 0 16px;'>Please use the 6-digit confirmation code below to verify your email address and activate your account:</p>");
+
+        // Code Box
+        sb.Append("<div style='text-align:center;margin:24px 0;padding:20px;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;'>");
+        sb.Append($"<div style='font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:36px;font-weight:800;letter-spacing:8px;color:#2563eb;'>{System.Net.WebUtility.HtmlEncode(code)}</div>");
+        sb.Append("<p style='margin:8px 0 0;font-size:12px;color:#64748b;'>This code is valid for 15 minutes.</p>");
+        sb.Append("</div>");
+
+        sb.Append("<p style='margin:0;font-size:13px;color:#64748b;'>If you did not request this verification code, you can safely ignore this email.</p>");
+        sb.Append("</div>");
+
+        // Footer
+        sb.Append("<div style='background:#f8fafc;padding:16px 24px;text-align:center;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9;'>");
+        sb.Append("&copy; ").Append(DateTime.UtcNow.Year).Append(" JAS International. All rights reserved.");
+        sb.Append("</div></div>");
+
+        return await SendHtmlAsync(email, subject, sb.ToString());
+    }
+
     public async Task<bool> SendPaymentVerifiedEmailAsync(Order order)
     {
         var recipientEmail = order.DeliveryAddress?.Email ?? order.User?.Email;

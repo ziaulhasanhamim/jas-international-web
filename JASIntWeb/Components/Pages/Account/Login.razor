@@ -1,6 +1,8 @@
 @page "/account/login"
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
+@inject EmailVerificationService Verification
+@inject NavigationManager Navigation
 
 <PageTitle>Sign In · JAS International</PageTitle>
 
@@ -106,23 +108,52 @@
     private LoginForm? Input { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ExternalError { get; set; }
     private string? error;
     private bool completed;
 
-    protected override void OnInitialized() => Input ??= new();
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+        if (!string.IsNullOrWhiteSpace(ExternalError))
+        {
+            error = ExternalError;
+        }
+    }
 
     private async Task Submit()
     {
-        var user = await Users.FindByEmailAsync(Input!.Email.Trim());
-        var result = user is null ? SignInResult.Failed : await SignIn.PasswordSignInAsync(user, Input.Password, Input.Remember, lockoutOnFailure: true);
-        if (result.Succeeded)
+        error = null;
+        var email = Input!.Email.Trim();
+        var user = await Users.FindByEmailAsync(email);
+        if (user is not null)
         {
-            completed = true;
+            var passwordValid = await Users.CheckPasswordAsync(user, Input.Password);
+            if (passwordValid)
+            {
+                if (!user.EmailConfirmed)
+                {
+                    await Verification.GenerateAndSendCodeAsync(user.Email!);
+                    Navigation.NavigateTo($"/account/signup?step=verify&email={Uri.EscapeDataString(user.Email!)}&notice=unconfirmed&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}");
+                    return;
+                }
+
+                var result = await SignIn.PasswordSignInAsync(user, Input.Password, Input.Remember, lockoutOnFailure: true);
+                if (result.Succeeded)
+                {
+                    completed = true;
+                    return;
+                }
+                if (result.IsLockedOut)
+                {
+                    error = "Your account is temporarily locked due to multiple failed login attempts. Please try again later.";
+                    return;
+                }
+            }
         }
-        else
-        {
-            error = "Email or password is incorrect, or your account is temporarily locked.";
-        }
+
+        error = "Email or password is incorrect.";
         Input.Password = "";
     }
 }
