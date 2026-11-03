@@ -48,6 +48,8 @@ public sealed class AccountMailService(
 
     public string? FromEmail => config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"];
     public string DisplayName => config["Mail:DisplayName"] ?? "JAS International";
+    public string ReplyToEmail => config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "";
+    public string ReplyToName => config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName;
 
     // SMTP Configuration (supports structured Mail:Smtp:* or flat Mail:*)
     private string? SmtpHost => config["Mail:Smtp:Host"] ?? config["Mail:Host"];
@@ -97,6 +99,10 @@ public sealed class AccountMailService(
                 Subject = subject,
                 Body = text
             };
+            if (!string.IsNullOrWhiteSpace(ReplyToEmail))
+            {
+                message.ReplyToList.Add(new MailAddress(ReplyToEmail, ReplyToName));
+            }
             await client.SendMailAsync(message);
             Console.WriteLine($"[Mail:{Provider}] SUCCESS: Plain text email delivered to {to}!");
             return true;
@@ -145,6 +151,7 @@ public sealed class AccountMailService(
             var payload = new
             {
                 sender = new { name = DisplayName, email = FromEmail },
+                replyTo = new { name = ReplyToName, email = ReplyToEmail },
                 to = new[] { new { email = to } },
                 subject = subject,
                 htmlContent = htmlBody,
@@ -226,6 +233,11 @@ public sealed class AccountMailService(
             IsBodyHtml = true,
             BodyEncoding = Encoding.UTF8
         };
+
+        if (!string.IsNullOrWhiteSpace(ReplyToEmail))
+        {
+            message.ReplyToList.Add(new MailAddress(ReplyToEmail, ReplyToName));
+        }
 
         var textView = AlternateView.CreateAlternateViewFromString(plainText, Encoding.UTF8, "text/plain");
         var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
