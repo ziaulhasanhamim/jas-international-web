@@ -245,6 +245,9 @@
     [SupplyParameterFromQuery(Name = "tab")]
     public string? TabQuery { get; set; }
 
+    [SupplyParameterFromQuery(Name = "saved")]
+    public string? SavedQuery { get; set; }
+
     [SupplyParameterFromForm(FormName = "customer-profile")]
     private ProfileEditForm? profileForm { get; set; }
 
@@ -268,6 +271,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (SavedQuery == "1")
+        {
+            flashMessage = tab == "security"
+                ? "Your password was successfully changed."
+                : "Your profile and default delivery address have been updated successfully.";
+        }
+
         profileForm ??= new();
         passwordForm ??= new();
         var authState = await AuthStateTask;
@@ -350,9 +360,7 @@
         }
 
         await Db.SaveChangesAsync();
-        customerName = FormProfile.FullName;
-        phoneNumber = FormProfile.PhoneNumber;
-        flashMessage = "Your profile and default delivery address have been updated successfully.";
+        Nav.NavigateTo("/account?tab=profile&saved=1");
     }
 
     private async Task ChangePassword()
@@ -364,8 +372,7 @@
         if (result.Succeeded)
         {
             await SignIn.RefreshSignInAsync(currentUser);
-            flashMessage = "Your password was successfully changed.";
-            passwordForm = new();
+            Nav.NavigateTo("/account?tab=security&saved=1");
         }
         else
         {

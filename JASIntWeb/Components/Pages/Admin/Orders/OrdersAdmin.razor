@@ -2,6 +2,7 @@
 @attribute [StreamRendering]
 @inject IServiceScopeFactory ScopeFactory
 @inject ShoppingService Shop
+@inject NavigationManager Nav
 
 <PageTitle>Orders Management · JAS Admin</PageTitle>
 
@@ -66,8 +67,10 @@
 </div>
 
 <!-- Orders Table -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
+<form method="post" @formname="orders-quick-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -137,13 +140,9 @@
                                         <span>Verified (৳@o.PaidAmount.ToString("N0"))</span>
                                     </span>
                                     <div>
-                                        <form method="post" @formname="quick-action" data-enhance class="inline">
-                                            <AntiforgeryToken />
-                                            <input type="hidden" name="QuickOrderId" value="@o.Id" />
-                                            <button type="submit" name="QuickAction" value="unverify" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium cursor-pointer">
-                                                Mark Unverified
-                                            </button>
-                                        </form>
+                                        <button type="submit" name="Action" value="@($"unverify:{o.Id}")" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium cursor-pointer">
+                                            Mark Unverified
+                                        </button>
                                     </div>
                                 </div>
                             }
@@ -161,18 +160,16 @@
                                     {
                                         <span class="badge badge-slate">Unpaid</span>
                                     }
-                                    <form method="post" @formname="quick-action" data-enhance class="flex items-center gap-1.5 pt-0.5">
-                                        <AntiforgeryToken />
-                                        <input type="hidden" name="QuickOrderId" value="@o.Id" />
-                                        <button type="submit" name="QuickAction" value="verify" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                    <div class="flex items-center gap-1.5 pt-0.5">
+                                        <button type="submit" name="Action" value="@($"verify:{o.Id}")" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
                                             <Icon Name="check" Class="size-3" />
                                             <span>Verify</span>
                                         </button>
-                                        <button type="submit" name="QuickAction" value="reject" class="btn-secondary text-rose-700! hover:bg-rose-50! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                        <button type="submit" name="Action" value="@($"reject:{o.Id}")" class="btn-secondary text-rose-700! hover:bg-rose-50! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
                                             <Icon Name="close" Class="size-3" />
                                             <span>Not Received</span>
                                         </button>
-                                    </form>
+                                    </div>
                                 </div>
                             }
                         </td>
@@ -198,6 +195,7 @@
         </div>
     }
 </div>
+</form>
 
 <div class="mt-4">
     <AdminPagination Total="total" Page="Page" />
@@ -214,10 +212,8 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm(FormName = "quick-action")]
-    public string? QuickAction { get; set; }
-    [SupplyParameterFromForm(FormName = "quick-action")]
-    public int QuickOrderId { get; set; }
+    [SupplyParameterFromForm(FormName = "orders-quick-action")]
+    public string? Action { get; set; }
 
     private List<Order> orders = [];
     private int total;
@@ -235,19 +231,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrWhiteSpace(QuickAction) && QuickOrderId > 0)
+        if (!string.IsNullOrWhiteSpace(Action))
         {
-            if (QuickAction == "verify")
+            var colonIdx = Action.IndexOf(':');
+            if (colonIdx > 0 && int.TryParse(Action[(colonIdx + 1)..], out var orderId))
             {
-                await Shop.VerifyPaymentAsync(QuickOrderId);
-            }
-            else if (QuickAction == "unverify")
-            {
-                await Shop.UnverifyPaymentAsync(QuickOrderId);
-            }
-            else if (QuickAction == "reject")
-            {
-                await Shop.RejectPaymentAndCancelOrderAsync(QuickOrderId, "Payment not received");
+                var actionType = Action[..colonIdx];
+                if (actionType == "verify")
+                {
+                    await Shop.VerifyPaymentAsync(orderId);
+                }
+                else if (actionType == "unverify")
+                {
+                    await Shop.UnverifyPaymentAsync(orderId);
+                }
+                else if (actionType == "reject")
+                {
+                    await Shop.RejectPaymentAndCancelOrderAsync(orderId, "Payment not received");
+                }
+
+                Nav.NavigateTo(FilterUrl(Status, PaymentFilter));
+                return;
             }
         }
 

@@ -241,39 +241,36 @@ else
             <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
                 <h3 class="text-sm font-bold text-slate-900">Security &amp; Verification</h3>
 
-                <!-- Email Verification Toggle -->
-                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <div>
-                        <span class="text-xs font-semibold text-slate-800 block">Email Confirmation</span>
-                        <span class="text-[11px] text-slate-400">
-                            @(user.EmailConfirmed ? "Email is confirmed" : "Verification pending")
-                        </span>
-                    </div>
+                <form method="post" @formname="user-security-action" data-enhance class="space-y-4">
+                    <AntiforgeryToken />
+                    <!-- Email Verification Toggle -->
+                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-800 block">Email Confirmation</span>
+                            <span class="text-[11px] text-slate-400">
+                                @(user.EmailConfirmed ? "Email is confirmed" : "Verification pending")
+                            </span>
+                        </div>
 
-                    <form method="post" @formname="toggle-email-confirm" @onsubmit="ToggleEmailConfirmed">
-                        <AntiforgeryToken />
-                        <button type="submit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        <button type="submit" name="SecurityAction" value="toggle-email" class="btn-secondary !px-2.5 !py-1 text-xs cursor-pointer">
                             @(user.EmailConfirmed ? "Mark Unverified" : "Mark Verified")
                         </button>
-                    </form>
-                </div>
-
-                <!-- Account Lockout Toggle -->
-                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <div>
-                        <span class="text-xs font-semibold text-slate-800 block">Account Lockout</span>
-                        <span class="text-[11px] @(isLocked ? "text-rose-600 font-bold" : "text-slate-400")">
-                            @(isLocked ? "Account is locked" : "Account is active")
-                        </span>
                     </div>
 
-                    <form method="post" @formname="toggle-lockout" @onsubmit="ToggleLockout">
-                        <AntiforgeryToken />
-                        <button type="submit" class="btn-secondary !px-2.5 !py-1 text-xs @(isLocked ? "!text-emerald-700 !border-emerald-300" : "!text-rose-700 !border-rose-300")">
+                    <!-- Account Lockout Toggle -->
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-800 block">Account Lockout</span>
+                            <span class="text-[11px] @(isLocked ? "text-rose-600 font-bold" : "text-slate-400")">
+                                @(isLocked ? "Account is locked" : "Account is active")
+                            </span>
+                        </div>
+
+                        <button type="submit" name="SecurityAction" value="toggle-lockout" class="btn-secondary !px-2.5 !py-1 text-xs cursor-pointer @(isLocked ? "!text-emerald-700 !border-emerald-300" : "!text-rose-700 !border-rose-300")">
                             @(isLocked ? "Unlock Account" : "Lock Account")
                         </button>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
 
             <!-- Customer Summary Card -->
@@ -326,11 +323,55 @@ else
     private List<DeliveryAddress> userAddresses = [];
     private List<string> linkedProviders = [];
 
+    [SupplyParameterFromQuery(Name = "notice")]
+    public string? NoticeQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ErrorQuery { get; set; }
+
+    [SupplyParameterFromForm(FormName = "user-security-action")]
+    public string? SecurityAction { get; set; }
+
     private string? error;
     private string? notice;
 
     protected override async Task OnInitializedAsync()
     {
+        if (!string.IsNullOrWhiteSpace(NoticeQuery)) notice = NoticeQuery;
+        if (!string.IsNullOrWhiteSpace(ErrorQuery)) error = ErrorQuery;
+
+        if (!string.IsNullOrEmpty(SecurityAction))
+        {
+            if (SecurityAction == "toggle-email")
+            {
+                try
+                {
+                    await Session.RunAsync(s => s.ToggleEmailConfirmationAsync(Id));
+                    Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Email verification status toggled."));
+                    return;
+                }
+                catch (ShopException ex)
+                {
+                    Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
+                    return;
+                }
+            }
+            else if (SecurityAction == "toggle-lockout")
+            {
+                try
+                {
+                    await Session.RunAsync((s, actor) => s.ToggleLockoutAsync(Id, actor));
+                    Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account lockout status toggled."));
+                    return;
+                }
+                catch (ShopException ex)
+                {
+                    Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
+                    return;
+                }
+            }
+        }
+
         user = await Users.FindByIdAsync(Id.ToString());
         if (user is not null)
         {
@@ -379,8 +420,7 @@ else
         {
             ProfileInput!.Id = Id;
             await Session.RunAsync(s => s.UpdateUserProfileAsync(ProfileInput));
-            notice = "User profile updated successfully.";
-            await RefreshData();
+            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("User profile updated successfully."));
         }
         catch (ShopException ex)
         {
@@ -396,8 +436,8 @@ else
         {
             PasswordInput!.Id = Id;
             await Session.RunAsync(s => s.AdminResetPasswordAsync(PasswordInput));
-            notice = "Password reset successfully. User's existing sessions were invalidated.";
             PasswordInput.NewPassword = "";
+            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Password reset successfully. User's existing sessions were invalidated."));
         }
         catch (ShopException ex)
         {
@@ -413,8 +453,7 @@ else
         {
             RoleInput!.Id = Id;
             await Session.RunAsync((s, actor) => s.ChangeRoleAsync(RoleInput, actor));
-            notice = "Account role updated successfully.";
-            await RefreshData();
+            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account role updated successfully."));
         }
         catch (ShopException ex)
         {
@@ -422,37 +461,7 @@ else
         }
     }
 
-    private async Task ToggleEmailConfirmed()
-    {
-        error = null;
-        notice = null;
-        try
-        {
-            await Session.RunAsync(s => s.ToggleEmailConfirmationAsync(Id));
-            notice = "Email verification status toggled.";
-            await RefreshData();
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
-        }
-    }
 
-    private async Task ToggleLockout()
-    {
-        error = null;
-        notice = null;
-        try
-        {
-            await Session.RunAsync((s, actor) => s.ToggleLockoutAsync(Id, actor));
-            notice = "Account lockout status toggled.";
-            await RefreshData();
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
-        }
-    }
 
     private async Task RefreshData()
     {

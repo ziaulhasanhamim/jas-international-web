@@ -95,7 +95,7 @@ else
 
                 @if (Id != 0 && productCount == 0)
                 {
-                    <button type="button" class="btn-danger !px-3 !py-2 text-xs" @onclick="Delete">
+                    <button type="submit" name="FormAction" value="delete" class="btn-danger !px-3 !py-2 text-xs cursor-pointer" onclick="return confirm('Are you sure you want to delete this brand?');">
                         Delete Brand
                     </button>
                 }
@@ -110,6 +110,9 @@ else
 
     [SupplyParameterFromForm(FormName = "BrandEditor")]
     private BrandEditForm? Input { get; set; }
+
+    [SupplyParameterFromForm(FormName = "BrandEditor")]
+    private string? FormAction { get; set; }
 
     private string? error;
     private bool notFound;
@@ -158,6 +161,12 @@ else
 
     private async Task Save()
     {
+        if (FormAction == "delete")
+        {
+            await Delete();
+            return;
+        }
+
         error = null;
         try
         {

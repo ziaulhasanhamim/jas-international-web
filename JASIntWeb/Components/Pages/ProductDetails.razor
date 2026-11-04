@@ -486,6 +486,8 @@ else
     public string Slug { get; set; } = "";
     [SupplyParameterFromQuery(Name = "image")]
     public int? ImageIndex { get; set; }
+    [SupplyParameterFromQuery(Name = "review")]
+    public string? ReviewQuery { get; set; }
     [SupplyParameterFromForm(FormName = "submit-review")]
     public ReviewFormModel? ReviewForm { get; set; }
 
@@ -513,6 +515,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (ReviewQuery == "success")
+        {
+            reviewSuccessMessage = "Thank you! Your verified review has been published.";
+        }
+
         try
         {
             product = await Catalog.DetailsAsync(Slug);
@@ -575,8 +582,6 @@ else
         Db.ProductReviews.Add(review);
         await Db.SaveChangesAsync();
 
-        reviewSuccessMessage = "Thank you! Your verified review has been published.";
-        await LoadReviewsAsync();
-        ReviewForm = new();
+        Nav.NavigateTo($"/product/{Slug}?review=success");
     }
 }

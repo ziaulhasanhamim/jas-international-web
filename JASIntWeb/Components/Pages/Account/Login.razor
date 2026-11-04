@@ -22,22 +22,16 @@
         </div>
 
         <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-            @if (completed)
+            @if (error is not null)
             {
-                <SessionRedirect Destination="@AccountNavigation.SafeReturn(ReturnUrl)" />
-            }
-            else
-            {
-                @if (error is not null)
-                {
-                    <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
-                        <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
-                        <div>
-                            <strong class="font-semibold block">Authentication Error</strong>
-                            <span>@error</span>
-                        </div>
+                <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
+                    <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+                    <div>
+                        <strong class="font-semibold block">Authentication Error</strong>
+                        <span>@error</span>
                     </div>
-                }
+                </div>
+            }
 
                 @if (Input is null)
                 {
@@ -97,7 +91,6 @@
                     Don't have an account yet?
                     <a href="/account/signup" class="text-blue-600 font-semibold hover:underline ml-1">Create an account</a>
                 </div>
-            }
         </div>
     </div>
 </div>
@@ -111,7 +104,6 @@
     [SupplyParameterFromQuery(Name = "error")]
     public string? ExternalError { get; set; }
     private string? error;
-    private bool completed;
 
     protected override void OnInitialized()
     {
@@ -142,7 +134,7 @@
                 var result = await SignIn.PasswordSignInAsync(user, Input.Password, Input.Remember, lockoutOnFailure: true);
                 if (result.Succeeded)
                 {
-                    completed = true;
+                    Navigation.NavigateTo(AccountNavigation.SafeReturn(ReturnUrl), forceLoad: true);
                     return;
                 }
                 if (result.IsLockedOut)

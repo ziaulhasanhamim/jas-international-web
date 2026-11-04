@@ -33,22 +33,16 @@
         </div>
 
         <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-            @if (completed)
+            @if (!string.IsNullOrWhiteSpace(error))
             {
-                <SessionRedirect Destination="@AccountNavigation.SafeReturn(ReturnUrl)" />
-            }
-            else
-            {
-                @if (!string.IsNullOrWhiteSpace(error))
-                {
-                    <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
-                        <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
-                        <div>
-                            <strong class="font-semibold block">Notification</strong>
-                            <span>@error</span>
-                        </div>
+                <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 flex items-start gap-2.5" role="alert">
+                    <Icon Name="alert" Class="size-4 shrink-0 mt-0.5" />
+                    <div>
+                        <strong class="font-semibold block">Notification</strong>
+                        <span>@error</span>
                     </div>
-                }
+                </div>
+            }
 
                 @if (!string.IsNullOrWhiteSpace(notice))
                 {
@@ -170,7 +164,6 @@
                         <a href="/account/login?returnUrl=@Uri.EscapeDataString(AccountNavigation.SafeReturn(ReturnUrl))" class="text-blue-600 font-semibold hover:underline ml-1">Sign in here</a>
                     </div>
                 }
-            }
         </div>
     </div>
 </div>
@@ -197,7 +190,6 @@
 
     private string? error;
     private string? notice;
-    private bool completed;
 
     private bool IsVerifyStep => string.Equals(QueryStep, "verify", StringComparison.OrdinalIgnoreCase);
 
@@ -326,7 +318,7 @@
 
         // Sign the newly verified user in
         await SignIn.SignInAsync(user, isPersistent: true);
-        completed = true;
+        Navigation.NavigateTo(AccountNavigation.SafeReturn(ReturnUrl), forceLoad: true);
     }
 
     private async Task ResendCode()

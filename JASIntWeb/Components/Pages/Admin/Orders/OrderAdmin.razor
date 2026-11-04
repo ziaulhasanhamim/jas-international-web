@@ -424,46 +424,33 @@ else
                             <span class="ml-2 font-bold text-amber-700">COD Due: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</span>
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <form method="post" @formname="order-payment-action" data-enhance class="inline-flex items-center gap-2">
+                            <AntiforgeryToken />
                             @if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Delivered)
                             {
                                 @if (order.PaidAmount == 0)
                                 {
-                                    <form method="post" @formname="verify-payment" @onsubmit="VerifyPaymentAsync" data-enhance class="inline">
-                                        <AntiforgeryToken />
-                                        <button type="submit" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
-                                            <Icon Name="check" Class="size-3.5" />
-                                            <span>Verify Payment</span>
-                                        </button>
-                                    </form>
-
-                                    <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
-                                        <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
-                                            <Icon Name="close" Class="size-3.5" />
-                                            <span>Payment Not Received (Cancel Order)</span>
-                                        </button>
-                                    </form>
+                                    <button type="submit" name="PaymentAction" value="verify" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+                                        <Icon Name="check" Class="size-3.5" />
+                                        <span>Verify Payment</span>
+                                    </button>                                    <button type="submit" name="PaymentAction" value="reject" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                                        <Icon Name="close" Class="size-3.5" />
+                                        <span>Payment Not Received (Cancel Order)</span>
+                                    </button>
                                 }
                                 else
                                 {
-                                    <form method="post" @formname="unverify-payment" @onsubmit="UnverifyPaymentAsync" data-enhance class="inline">
-                                        <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary text-slate-700! bg-white! hover:bg-slate-100! border-slate-300! text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
-                                            Mark as Unverified
-                                        </button>
-                                    </form>
+                                    <button type="submit" name="PaymentAction" value="unverify" class="btn-secondary text-slate-700! bg-white! hover:bg-slate-100! border-slate-300! text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
+                                        Mark as Unverified
+                                    </button>
 
-                                    <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
-                                        <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
-                                            <Icon Name="close" Class="size-3" />
-                                            <span>Cancel Order</span>
-                                        </button>
-                                    </form>
+                                    <button type="submit" name="PaymentAction" value="reject" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
+                                        <Icon Name="close" Class="size-3.5" />
+                                        <span>Cancel Order</span>
+                                    </button>
                                 }
                             }
-                        </div>
+                        </form>
                     </div>
                 </div>
 
@@ -691,6 +678,15 @@ else
     [Parameter]
     public int Id { get; set; }
 
+    [SupplyParameterFromQuery(Name = "notice")]
+    public string? NoticeQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? NoticeTypeQuery { get; set; }
+
+    [SupplyParameterFromForm(FormName = "order-payment-action")]
+    private string? PaymentAction { get; set; }
+
     [SupplyParameterFromForm(FormName = "change-status")]
     private ChangeStatusForm? StatusForm { get; set; }
 
@@ -707,6 +703,31 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (!string.IsNullOrWhiteSpace(NoticeQuery))
+        {
+            alertMessage = NoticeQuery;
+            alertType = string.IsNullOrWhiteSpace(NoticeTypeQuery) ? "emerald" : NoticeTypeQuery;
+        }
+
+        if (!string.IsNullOrWhiteSpace(PaymentAction))
+        {
+            if (PaymentAction == "verify")
+            {
+                await VerifyPaymentAsync();
+                return;
+            }
+            else if (PaymentAction == "unverify")
+            {
+                await UnverifyPaymentAsync();
+                return;
+            }
+            else if (PaymentAction == "reject")
+            {
+                await RejectPaymentAndCancelAsync();
+                return;
+            }
+        }
+
         await ReloadOrderAsync();
     }
 
@@ -764,6 +785,8 @@ else
             await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
             alertType = "emerald";
             alertMessage = $"Order #{Id} status changed to {StatusForm.Status} successfully!";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {
@@ -780,6 +803,8 @@ else
             await Shop.VerifyPaymentAsync(Id);
             alertType = "emerald";
             alertMessage = "Payment verified successfully! Customer notified.";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {
@@ -796,6 +821,8 @@ else
             await Shop.UnverifyPaymentAsync(Id);
             alertType = "amber";
             alertMessage = "Payment marked as unverified.";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {
@@ -812,6 +839,8 @@ else
             await Shop.RejectPaymentAndCancelOrderAsync(Id, "Payment not received");
             alertType = "rose";
             alertMessage = "Payment marked as not received. Order has been cancelled and reserved inventory released.";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {
@@ -856,6 +885,8 @@ else
             await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
             alertType = "emerald";
             alertMessage = $"Courier & tracking details updated for Order #{Id}!";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {
@@ -885,6 +916,8 @@ else
             await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
             alertType = "emerald";
             alertMessage = $"Fulfillment notes for Order #{Id} saved successfully!";
+            Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
+            return;
         }
         catch (Exception ex)
         {

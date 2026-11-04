@@ -1,4 +1,5 @@
 @page "/contact"
+@inject NavigationManager Nav
 
 <PageTitle>Contact Us &amp; Showroom · JAS International</PageTitle>
 
@@ -74,9 +75,9 @@
             <h2 class="text-xl font-bold text-slate-900 mb-1">Send Us a Direct Message</h2>
             <p class="text-xs text-slate-500 mb-6">Fill in your inquiry details and our customer support desk will get back to you promptly.</p>
 
-            @if (submitted)
+            @if (Success == "1")
             {
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center mb-6 animate-fadeIn" role="status">
                     <span class="flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mx-auto mb-3">
                         <Icon Name="check" Class="size-6" />
                     </span>
@@ -84,64 +85,79 @@
                     <p class="text-xs text-emerald-700 max-w-sm mx-auto">
                         Thank you for reaching out. A JAS International representative will contact you via phone or email shortly.
                     </p>
-                    <button type="button" @onclick="() => submitted = false" class="btn-secondary mt-4 text-xs">
+                    <a href="/contact" class="btn-secondary mt-4 text-xs inline-block">
                         Send Another Message
-                    </button>
+                    </a>
                 </div>
             }
-            else
-            {
-                <form @onsubmit="HandleSubmit" class="space-y-4">
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label class="field-label">Your Full Name</label>
-                            <input @bind="name" required class="field" placeholder="e.g. Tanvir Hasan" />
-                        </div>
-                        <div>
-                            <label class="field-label">Contact Mobile Number</label>
-                            <input @bind="phone" required type="tel" class="field" placeholder="017xxxxxxxx" />
-                        </div>
+
+            <form method="post" @formname="contact-form" @onsubmit="HandleSubmit" data-enhance class="space-y-4">
+                <AntiforgeryToken />
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="field-label">Your Full Name *</label>
+                        <input name="Name" value="@Name" required class="field" placeholder="e.g. Tanvir Hasan" />
                     </div>
                     <div>
-                        <label class="field-label">Email Address (Optional)</label>
-                        <input @bind="email" type="email" class="field" placeholder="you@example.com" />
+                        <label class="field-label">Contact Mobile Number *</label>
+                        <input name="Phone" value="@Phone" required type="tel" class="field" placeholder="017xxxxxxxx" />
                     </div>
-                    <div>
-                        <label class="field-label">Subject</label>
-                        <select @bind="subject" class="field">
-                            <option value="Product Inquiry">Product Inquiry / Stock Check</option>
-                            <option value="Order Tracking">Order Tracking &amp; Delivery</option>
-                            <option value="Warranty Claim">Warranty Claim / Replacement</option>
-                            <option value="Corporate / Bulk Order">Corporate / Bulk Order</option>
-                            <option value="General Inquiry">General Inquiry</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="field-label">Message Details</label>
-                        <textarea @bind="message" required rows="4" class="field" placeholder="Tell us what product or assistance you need..."></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary w-full sm:w-auto">
-                        Submit Message
-                    </button>
-                </form>
-            }
+                </div>
+                <div>
+                    <label class="field-label">Email Address (Optional)</label>
+                    <input name="Email" value="@Email" type="email" class="field" placeholder="you@example.com" />
+                </div>
+                <div>
+                    <label class="field-label">Subject</label>
+                    <select name="Subject" class="field">
+                        <option value="Product Inquiry" selected="@(Subject == "Product Inquiry")">Product Inquiry / Stock Check</option>
+                        <option value="Order Tracking" selected="@(Subject == "Order Tracking")">Order Tracking &amp; Delivery</option>
+                        <option value="Warranty Claim" selected="@(Subject == "Warranty Claim")">Warranty Claim / Replacement</option>
+                        <option value="Corporate / Bulk Order" selected="@(Subject == "Corporate / Bulk Order")">Corporate / Bulk Order</option>
+                        <option value="General Inquiry" selected="@(Subject == "General Inquiry")">General Inquiry</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label">Message Details *</label>
+                    <textarea name="Message" required rows="4" class="field" placeholder="Tell us what product or assistance you need...">@Message</textarea>
+                </div>
+                <button type="submit" class="btn-primary w-full sm:w-auto">
+                    Submit Message
+                </button>
+            </form>
         </div>
     </div>
 </div>
 
 @code {
-    private string name = "";
-    private string phone = "";
-    private string email = "";
-    private string subject = "Product Inquiry";
-    private string message = "";
-    private bool submitted;
+    [SupplyParameterFromQuery(Name = "success")]
+    public string? Success { get; set; }
+
+    [SupplyParameterFromForm(FormName = "contact-form")]
+    public string? Name { get; set; }
+
+    [SupplyParameterFromForm(FormName = "contact-form")]
+    public string? Phone { get; set; }
+
+    [SupplyParameterFromForm(FormName = "contact-form")]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromForm(FormName = "contact-form")]
+    public string? Subject { get; set; }
+
+    [SupplyParameterFromForm(FormName = "contact-form")]
+    public string? Message { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Subject ??= "Product Inquiry";
+    }
 
     private void HandleSubmit()
     {
-        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(phone) && !string.IsNullOrWhiteSpace(message))
+        if (!string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Phone) && !string.IsNullOrWhiteSpace(Message))
         {
-            submitted = true;
+            Nav.NavigateTo("/contact?success=1");
         }
     }
 }

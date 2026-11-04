@@ -69,8 +69,8 @@ else
             <InputText @bind-Value="coupon.Description" class="shop-input" placeholder="e.g. Eid Campaign 2026 promotion for new users" />
         </label>
 
-        <label class="check-label">
-            <input type="checkbox" @bind="coupon.IsActive" />
+        <label class="check-label flex items-center gap-2">
+            <InputCheckbox @bind-Value="coupon.IsActive" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
             <span class="font-bold text-slate-800">Coupon is Active</span>
         </label>
 

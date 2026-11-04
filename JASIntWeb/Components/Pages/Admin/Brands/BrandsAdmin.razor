@@ -77,8 +77,10 @@
 }
 
 <!-- Brands Table -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
+<form method="post" @formname="brands-table-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -120,20 +122,16 @@
                             /@b.Slug
                         </td>
                         <td class="text-center">
-                            <form method="post" @formname="toggle-brand" data-enhance class="inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="ToggleBrandId" value="@b.Id" />
-                                <button
-                                    type="submit"
-                                    name="ToggleAction"
-                                    value="featured"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                    title="Click to toggle homepage visibility"
-                                >
-                                    <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
-                                    @(b.IsFeatured ? "⭐ Featured" : "Hidden")
-                                </button>
-                            </form>
+                            <button
+                                type="submit"
+                                name="ToggleBrandId"
+                                value="@b.Id"
+                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                title="Click to toggle homepage visibility"
+                            >
+                                <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                                @(b.IsFeatured ? "⭐ Featured" : "Hidden")
+                            </button>
                         </td>
                         <td class="text-xs font-medium text-slate-700">
                             @b.SortOrder
@@ -167,6 +165,7 @@
         </div>
     }
 </div>
+</form>
 
 @code {
     [SupplyParameterFromQuery(Name = "status")]
@@ -175,11 +174,8 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    [SupplyParameterFromForm(FormName = "toggle-brand")]
+    [SupplyParameterFromForm(FormName = "brands-table-action")]
     public int ToggleBrandId { get; set; }
-
-    [SupplyParameterFromForm(FormName = "toggle-brand")]
-    public string? ToggleAction { get; set; }
 
     private List<AdminBrandRow> _allBrands = [];
     private string? _toast;
@@ -196,7 +192,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (ToggleBrandId > 0 && ToggleAction == "featured")
+        if (ToggleBrandId > 0)
         {
             var brand = await Db.Brands.FindAsync(ToggleBrandId);
             if (brand != null)
@@ -205,7 +201,8 @@
                 brand.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
                 Catalog.InvalidateBrandsCache();
-                _toast = $"Updated homepage visibility for {brand.Name}.";
+                Nav.NavigateTo(FilterUrl(Filter));
+                return;
             }
         }
 

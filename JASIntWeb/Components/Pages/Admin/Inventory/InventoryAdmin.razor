@@ -68,8 +68,10 @@
 </div>
 
 <!-- Inventory Table -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
+<form method="post" @formname="inventory-table-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -105,25 +107,13 @@
                             ৳@row.Price.ToString("N0")
                         </td>
                         <td class="text-right whitespace-nowrap space-x-2">
-                            <form method="post" @formname="quick-restock" data-enhance class="inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="QuickVariantId" value="@row.Id" />
-                                <button type="submit" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
-                                    <span>+10 Restock</span>
-                                </button>
-                            </form>
+                            <button type="submit" name="QuickRestockId" value="@row.Id" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
+                                <span>+10 Restock</span>
+                            </button>
 
-                            <details class="inline-block relative text-left">
-                                <summary class="btn-secondary !px-2.5 !py-1 text-xs cursor-pointer">Set Qty</summary>
-                                <form method="post" @formname="adjust-stock" data-enhance class="absolute right-0 mt-1 z-30 p-3 bg-white rounded-xl shadow-xl border border-slate-200 space-y-2 w-56 text-left">
-                                    <AntiforgeryToken />
-                                    <input type="hidden" name="AdjustVariantId" value="@row.Id" />
-                                    <label class="block font-bold text-slate-800 text-[11px]">New On-Hand Qty:</label>
-                                    <input type="number" name="AdjustQuantity" value="@row.OnHand" min="0" class="field !py-1 text-xs font-bold" />
-                                    <input type="text" name="AdjustNote" placeholder="Reason..." class="field !py-1 text-xs" />
-                                    <button type="submit" class="btn-primary !py-1 !px-3 text-xs w-full">Update</button>
-                                </form>
-                            </details>
+                            <a href="/admin/inventory/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                Adjust Stock
+                            </a>
 
                             <a href="/admin/products/@row.ProductId/variants/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                                 Edit Variant
@@ -143,6 +133,7 @@
         </div>
     }
 </div>
+</form>
 
 @if (_totalPages > 1)
 {
@@ -175,17 +166,8 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm(FormName = "quick-restock")]
-    public int QuickVariantId { get; set; }
-
-    [SupplyParameterFromForm(FormName = "adjust-stock")]
-    public int AdjustVariantId { get; set; }
-
-    [SupplyParameterFromForm(FormName = "adjust-stock")]
-    public int AdjustQuantity { get; set; }
-
-    [SupplyParameterFromForm(FormName = "adjust-stock")]
-    public string? AdjustNote { get; set; }
+    [SupplyParameterFromForm(FormName = "inventory-table-action")]
+    public int QuickRestockId { get; set; }
 
     private string? _toast;
     private int _totalAll;
@@ -207,15 +189,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (QuickVariantId > 0)
+        if (QuickRestockId > 0)
         {
-            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == QuickVariantId);
+            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == QuickRestockId);
             if (inv != null)
             {
                 inv.QuantityOnHand += 10;
                 Db.InventoryTransactions.Add(new()
                 {
-                    ProductVariantId = QuickVariantId,
+                    ProductVariantId = QuickRestockId,
                     QuantityChange = 10,
                     Type = InventoryTransactionType.Adjustment,
                     ReferenceType = "AdminRestock",
@@ -223,28 +205,8 @@
                 });
 
                 await Db.SaveChangesAsync();
-                _toast = $"Stock updated to {inv.QuantityOnHand} units.";
-            }
-        }
-        else if (AdjustVariantId > 0)
-        {
-            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == AdjustVariantId);
-            if (inv != null)
-            {
-                var diff = AdjustQuantity - inv.QuantityOnHand;
-                inv.QuantityOnHand = AdjustQuantity;
-
-                Db.InventoryTransactions.Add(new()
-                {
-                    ProductVariantId = AdjustVariantId,
-                    QuantityChange = diff,
-                    Type = InventoryTransactionType.Adjustment,
-                    ReferenceType = "AdminRestock",
-                    Note = string.IsNullOrWhiteSpace(AdjustNote) ? "Restock via Admin Hub" : AdjustNote.Trim()
-                });
-
-                await Db.SaveChangesAsync();
-                _toast = $"Stock updated to {AdjustQuantity} units.";
+                Nav.NavigateTo(FilterUrl(Filter, Page));
+                return;
             }
         }
 

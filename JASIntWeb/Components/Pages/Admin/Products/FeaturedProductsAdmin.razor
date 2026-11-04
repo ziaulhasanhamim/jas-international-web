@@ -2,6 +2,7 @@
 @attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
+@inject NavigationManager Nav
 
 <PageTitle>Featured Products &amp; Merchandising · JAS Admin</PageTitle>
 
@@ -74,8 +75,10 @@
 </div>
 
 <!-- Products Table -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
+<form method="post" @formname="featured-table-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -131,28 +134,24 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            <form method="post" @formname="toggle-featured" data-enhance class="inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="ToggleFeaturedId" value="@p.Id" />
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                >
-                                    <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
-                                </button>
-                            </form>
+                            <button
+                                type="submit"
+                                name="Action"
+                                value="@($"featured:{p.Id}")"
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                            >
+                                <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
+                            </button>
                         </td>
                         <td class="text-center">
-                            <form method="post" @formname="toggle-new" data-enhance class="inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="ToggleNewId" value="@p.Id" />
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                >
-                                    <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
-                                </button>
-                            </form>
+                            <button
+                                type="submit"
+                                name="Action"
+                                value="@($"new:{p.Id}")"
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                            >
+                                <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
+                            </button>
                         </td>
                         <td class="text-right">
                             <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -173,6 +172,7 @@
         </div>
     }
 </div>
+</form>
 
 @code {
     [SupplyParameterFromQuery(Name = "tab")]
@@ -181,11 +181,8 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    [SupplyParameterFromForm(FormName = "toggle-featured")]
-    public int ToggleFeaturedId { get; set; }
-
-    [SupplyParameterFromForm(FormName = "toggle-new")]
-    public int ToggleNewId { get; set; }
+    [SupplyParameterFromForm(FormName = "featured-table-action")]
+    public string? Action { get; set; }
 
     private sealed record FeaturedProductItem(
         int Id,
@@ -213,26 +210,29 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (ToggleFeaturedId > 0)
+        if (!string.IsNullOrWhiteSpace(Action))
         {
-            var p = await Db.Products.FindAsync(ToggleFeaturedId);
-            if (p != null)
+            var colonIdx = Action.IndexOf(':');
+            if (colonIdx > 0 && int.TryParse(Action[(colonIdx + 1)..], out var productId))
             {
-                p.IsFeatured = !p.IsFeatured;
-                p.UpdatedAt = DateTimeOffset.UtcNow;
-                await Db.SaveChangesAsync();
-                _toast = $"Updated featured status for {p.Name}.";
-            }
-        }
-        else if (ToggleNewId > 0)
-        {
-            var p = await Db.Products.FindAsync(ToggleNewId);
-            if (p != null)
-            {
-                p.IsNewArrival = !p.IsNewArrival;
-                p.UpdatedAt = DateTimeOffset.UtcNow;
-                await Db.SaveChangesAsync();
-                _toast = $"Updated new arrival status for {p.Name}.";
+                var actionType = Action[..colonIdx];
+                var p = await Db.Products.FindAsync(productId);
+                if (p != null)
+                {
+                    if (actionType == "featured")
+                    {
+                        p.IsFeatured = !p.IsFeatured;
+                    }
+                    else if (actionType == "new")
+                    {
+                        p.IsNewArrival = !p.IsNewArrival;
+                    }
+                    p.UpdatedAt = DateTimeOffset.UtcNow;
+                    await Db.SaveChangesAsync();
+
+                    Nav.NavigateTo(FilterUrl(Tab));
+                    return;
+                }
             }
         }
 

@@ -85,8 +85,10 @@
 </div>
 
 <!-- Products Table -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
+<form method="post" @formname="products-table-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
         <table class="data-table">
             <thead>
                 <tr>
@@ -128,32 +130,24 @@
                             </span>
                         </td>
                         <td class="text-center">
-                            <form method="post" @formname="toggle-product" data-enhance class="inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
-                                <button
-                                    type="submit"
-                                    name="ToggleAction"
-                                    value="toggle"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.Hidden ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100")"
-                                    title="Click to @(p.Hidden ? "publish this product to storefront" : "archive this product")"
-                                >
-                                    <span class="size-1.5 rounded-full @(p.Hidden ? "bg-rose-500" : "bg-emerald-500")"></span>
-                                    <span>@(p.Hidden ? "Archived" : "Published")</span>
-                                </button>
-                            </form>
+                            <button
+                                type="submit"
+                                name="ToggleProductId"
+                                value="@p.Id"
+                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.Hidden ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100")"
+                                title="Click to @(p.Hidden ? "publish this product to storefront" : "archive this product")"
+                            >
+                                <span class="size-1.5 rounded-full @(p.Hidden ? "bg-rose-500" : "bg-emerald-500")"></span>
+                                <span>@(p.Hidden ? "Archived" : "Published")</span>
+                            </button>
                         </td>
                         <td class="text-right whitespace-nowrap space-x-2">
                             @if (p.Hidden)
                             {
-                                <form method="post" @formname="toggle-product" data-enhance class="inline">
-                                    <AntiforgeryToken />
-                                    <input type="hidden" name="ToggleProductId" value="@p.Id" />
-                                    <button type="submit" name="ToggleAction" value="toggle" class="btn-primary !px-2.5 !py-1 text-xs !bg-emerald-600 hover:!bg-emerald-700 inline-flex items-center gap-1 cursor-pointer" title="Publish product to storefront immediately">
-                                        <Icon Name="check" Class="size-3" />
-                                        Publish
-                                    </button>
-                                </form>
+                                <button type="submit" name="ToggleProductId" value="@p.Id" class="btn-primary !px-2.5 !py-1 text-xs !bg-emerald-600 hover:!bg-emerald-700 inline-flex items-center gap-1 cursor-pointer" title="Publish product to storefront immediately">
+                                    <Icon Name="check" Class="size-3" />
+                                    Publish
+                                </button>
                             }
                             <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                                 Edit
@@ -183,6 +177,7 @@
         </div>
     }
 </div>
+</form>
 
 @if (_totalPages > 1)
 {
@@ -218,11 +213,8 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm(FormName = "toggle-product")]
+    [SupplyParameterFromForm(FormName = "products-table-action")]
     public int ToggleProductId { get; set; }
-
-    [SupplyParameterFromForm(FormName = "toggle-product")]
-    public string? ToggleAction { get; set; }
 
     private string? _toast;
     private int _totalAll;
@@ -254,7 +246,7 @@
             .Select(c => new CategoryItem(c.Id, c.Name))
             .ToListAsync();
 
-        if (ToggleProductId > 0 && ToggleAction == "toggle")
+        if (ToggleProductId > 0)
         {
             var product = await Db.Products.FindAsync(ToggleProductId);
             if (product != null)
@@ -263,9 +255,8 @@
                 product.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
 
-                _toast = product.IsDeleted
-                    ? $"Archived \"{product.Name}\" — it is now hidden from the storefront."
-                    : $"Published \"{product.Name}\" — it is now live on the storefront!";
+                Nav.NavigateTo(FilterUrl(Filter, Page));
+                return;
             }
         }
 
