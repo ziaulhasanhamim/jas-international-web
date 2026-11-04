@@ -1,0 +1,413 @@
+@page "/admin/promo-cards"
+@attribute [StreamRendering]
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Curated Promo Cards · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">STOREFRONT MARKETING</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Curated Promo Cards</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Manage the 3-column flagship feature cards under category navigation. Built with guardrailed design presets so typography, gradients, and ambient glows always remain pixel-perfect.
+        </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/" target="_blank" class="btn-secondary text-xs shadow-xs">
+            <Icon Name="eye" Class="size-3.5" />
+            <span>View Storefront</span>
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <a href="/admin/promo-cards" class="text-emerald-600 hover:text-emerald-950 font-bold">✕</a>
+    </div>
+}
+
+<!-- Table Action Form -->
+<form method="post" @formname="cards-table-action" data-enhance>
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-8">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="w-16 text-center">Order</th>
+                        <th>Card Title &amp; Eyebrow</th>
+                        <th>Subtitle</th>
+                        <th>Theme Preset</th>
+                        <th>Target Destination</th>
+                        <th class="text-center">Live Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _cards)
+                    {
+                        <tr>
+                            <td class="text-center font-mono font-bold text-slate-700">
+                                #@c.SortOrder
+                            </td>
+                            <td>
+                                <div>
+                                    <strong class="text-slate-900 block font-semibold">@c.Title</strong>
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 font-mono">@c.Eyebrow</span>
+                                </div>
+                            </td>
+                            <td class="text-xs text-slate-600 max-w-xs truncate">
+                                @c.Subtitle
+                            </td>
+                            <td>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold @GetThemePillStyle(c.Theme)">
+                                    <span class="size-2 rounded-full @GetThemeDotStyle(c.Theme)"></span>
+                                    <span>@GetThemeDisplayName(c.Theme)</span>
+                                </span>
+                            </td>
+                            <td class="text-xs font-mono text-blue-600">
+                                <a href="@c.LinkUrl" target="_blank" class="hover:underline">@c.LinkUrl</a>
+                            </td>
+                            <td class="text-center">
+                                <button
+                                    type="submit"
+                                    name="Action"
+                                    value="@($"toggle:{c.Id}")"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(c.IsActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200")"
+                                    title="Click to toggle visibility"
+                                >
+                                    <span class="size-1.5 rounded-full @(c.IsActive ? "bg-emerald-500" : "bg-slate-400")"></span>
+                                    <span>@(c.IsActive ? "Live" : "Disabled")</span>
+                                </button>
+                            </td>
+                            <td class="text-right whitespace-nowrap space-x-2">
+                                <a href="/admin/promo-cards?edit=@c.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                    Edit
+                                </a>
+                                <button
+                                    type="submit"
+                                    name="Action"
+                                    value="@($"delete:{c.Id}")"
+                                    class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50"
+                                    onclick="return confirm('Are you sure you want to delete this promo card?');"
+                                >
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_cards.Count == 0)
+        {
+            <div class="empty-state py-12">
+                <Icon Name="box" Class="size-10 text-slate-300" />
+                <p>No curated promo cards configured.</p>
+            </div>
+        }
+    </div>
+</form>
+
+<!-- Create / Edit Card Form (Option A: Guardrailed Presets) -->
+<div class="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs max-w-4xl">
+    <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
+        <div>
+            <h2 class="text-lg font-bold text-slate-900">
+                @(editCard != null ? $"Edit Promo Card: {editCard.Title}" : "Add New Curated Promo Card")
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Inputs enforce character limits and preset color harmonies to maintain design balance.
+            </p>
+        </div>
+        @if (editCard != null)
+        {
+            <a href="/admin/promo-cards" class="btn-secondary text-xs">Cancel Editing</a>
+        }
+    </div>
+
+    <form method="post" @formname="save-promo-card" data-enhance class="space-y-4">
+        <AntiforgeryToken />
+        <input type="hidden" name="FormId" value="@(editCard?.Id ?? 0)" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Eyebrow Badge * (Max 25 chars)
+                </label>
+                <input
+                    name="FormEyebrow"
+                    value="@(editCard?.Eyebrow ?? "FLAGSHIP ECOSYSTEM")"
+                    maxlength="25"
+                    required
+                    class="field text-xs uppercase tracking-wider font-semibold"
+                    placeholder="e.g. FLAGSHIP ECOSYSTEM"
+                />
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Card Title * (Max 30 chars)
+                </label>
+                <input
+                    name="FormTitle"
+                    value="@(editCard?.Title ?? "Apple Intelligence")"
+                    maxlength="30"
+                    required
+                    class="field text-xs font-bold"
+                    placeholder="e.g. Apple Intelligence"
+                />
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Subtitle / Description * (Max 80 chars)
+            </label>
+            <input
+                name="FormSubtitle"
+                value="@(editCard?.Subtitle ?? "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.")"
+                maxlength="80"
+                required
+                class="field text-xs"
+                placeholder="e.g. iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC."
+            />
+            <span class="text-[11px] text-slate-400 mt-1 block">Short description kept within 2 lines for optical symmetry across all 3 cards.</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Target Link URL *
+                </label>
+                <input
+                    name="FormLinkUrl"
+                    value="@(editCard?.LinkUrl ?? "/category/phones")"
+                    required
+                    class="field text-xs font-mono"
+                    placeholder="e.g. /category/phones or /products?brand=apple"
+                />
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Button Text * (Max 20 chars)
+                </label>
+                <input
+                    name="FormLinkText"
+                    value="@(editCard?.LinkText ?? "Explore Devices")"
+                    maxlength="20"
+                    required
+                    class="field text-xs font-semibold"
+                    placeholder="e.g. Explore Devices"
+                />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Curated Color Theme Preset *
+                </label>
+                <select name="FormTheme" class="field text-xs font-medium">
+                    <option value="navy" selected="@(editCard?.Theme == "navy")">Navy (Apple / Flagship Ecosystem)</option>
+                    <option value="amber" selected="@(editCard?.Theme == "amber")">Amber (Acoustics / Studio ANC Sound)</option>
+                    <option value="indigo" selected="@(editCard?.Theme == "indigo")">Indigo (High Efficiency / GaN Fast Charge)</option>
+                    <option value="emerald" selected="@(editCard?.Theme == "emerald")">Emerald (Smart Tech / Eco Essentials)</option>
+                    <option value="crimson" selected="@(editCard?.Theme == "crimson")">Crimson (Hot Deals / Limited Editions)</option>
+                </select>
+                <span class="text-[11px] text-slate-400 mt-1 block">Pre-calibrated gradient, ambient glow, and accent typography.</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Display Order
+                    </label>
+                    <input
+                        type="number"
+                        name="FormSortOrder"
+                        value="@(editCard?.SortOrder ?? (_cards.Count + 1))"
+                        min="1"
+                        max="99"
+                        class="field text-xs font-mono"
+                    />
+                </div>
+                <div class="flex items-center pt-5">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            name="FormIsActive"
+                            value="true"
+                            checked="@(editCard?.IsActive ?? true)"
+                            class="size-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span class="text-xs font-bold text-slate-800">Live on Storefront</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 flex items-center gap-3">
+            <button type="submit" class="btn-primary text-xs font-bold px-6 py-2.5 shadow-sm">
+                <Icon Name="check" Class="size-3.5" />
+                <span>@(editCard != null ? "Update Promo Card" : "Add Promo Card")</span>
+            </button>
+            @if (editCard != null)
+            {
+                <a href="/admin/promo-cards" class="btn-secondary text-xs">Cancel</a>
+            }
+        </div>
+    </form>
+</div>
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "edit")]
+    public int? EditId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "notice")]
+    public string? Notice { get; set; }
+
+    [SupplyParameterFromForm(FormName = "cards-table-action")]
+    public string? Action { get; set; }
+
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public int FormId { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormEyebrow { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormTitle { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormSubtitle { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormLinkUrl { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormLinkText { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public string? FormTheme { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public int? FormSortOrder { get; set; }
+    [SupplyParameterFromForm(FormName = "save-promo-card")]
+    public bool FormIsActive { get; set; }
+
+    private List<CuratedPromoCard> _cards = [];
+    private CuratedPromoCard? editCard;
+    private string? _toast;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _toast = Notice;
+
+        if (!string.IsNullOrWhiteSpace(Action))
+        {
+            var parts = Action.Split(':');
+            if (parts.Length == 2 && int.TryParse(parts[1], out var targetId))
+            {
+                var item = await Db.CuratedPromoCards.FindAsync(targetId);
+                if (item != null)
+                {
+                    if (parts[0] == "toggle")
+                    {
+                        item.IsActive = !item.IsActive;
+                        await Db.SaveChangesAsync();
+                        Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString(item.IsActive ? "Card enabled." : "Card disabled."));
+                        return;
+                    }
+                    if (parts[0] == "delete")
+                    {
+                        Db.CuratedPromoCards.Remove(item);
+                        await Db.SaveChangesAsync();
+                        Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString("Promo card deleted."));
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(FormTitle) && !string.IsNullOrWhiteSpace(FormEyebrow))
+        {
+            if (FormId > 0)
+            {
+                var existing = await Db.CuratedPromoCards.FindAsync(FormId);
+                if (existing != null)
+                {
+                    existing.Eyebrow = FormEyebrow.Trim();
+                    existing.Title = FormTitle.Trim();
+                    existing.Subtitle = FormSubtitle?.Trim() ?? "";
+                    existing.LinkUrl = string.IsNullOrWhiteSpace(FormLinkUrl) ? "/products" : FormLinkUrl.Trim();
+                    existing.LinkText = string.IsNullOrWhiteSpace(FormLinkText) ? "Explore" : FormLinkText.Trim();
+                    existing.Theme = FormTheme?.ToLowerInvariant() ?? "navy";
+                    existing.SortOrder = FormSortOrder ?? existing.SortOrder;
+                    existing.IsActive = FormIsActive;
+                    await Db.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                Db.CuratedPromoCards.Add(new CuratedPromoCard
+                {
+                    Eyebrow = FormEyebrow.Trim(),
+                    Title = FormTitle.Trim(),
+                    Subtitle = FormSubtitle?.Trim() ?? "",
+                    LinkUrl = string.IsNullOrWhiteSpace(FormLinkUrl) ? "/products" : FormLinkUrl.Trim(),
+                    LinkText = string.IsNullOrWhiteSpace(FormLinkText) ? "Explore" : FormLinkText.Trim(),
+                    Theme = FormTheme?.ToLowerInvariant() ?? "navy",
+                    SortOrder = FormSortOrder ?? 1,
+                    IsActive = FormIsActive
+                });
+                await Db.SaveChangesAsync();
+            }
+
+            Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString("Promo card saved successfully."));
+            return;
+        }
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _cards = await Db.CuratedPromoCards.AsNoTracking().OrderBy(c => c.SortOrder).ToListAsync();
+
+        if (EditId.HasValue && EditId.Value > 0)
+        {
+            editCard = _cards.FirstOrDefault(c => c.Id == EditId.Value);
+        }
+    }
+
+    private static string GetThemeDisplayName(string? theme) => (theme?.ToLowerInvariant()) switch
+    {
+        "amber" => "Amber (Sound)",
+        "indigo" => "Indigo (Charging)",
+        "emerald" => "Emerald (Tech)",
+        "crimson" => "Crimson (Hot Deals)",
+        _ => "Navy (Flagship)"
+    };
+
+    private static string GetThemePillStyle(string? theme) => (theme?.ToLowerInvariant()) switch
+    {
+        "amber" => "bg-amber-50 text-amber-800 border border-amber-200",
+        "indigo" => "bg-indigo-50 text-indigo-800 border border-indigo-200",
+        "emerald" => "bg-emerald-50 text-emerald-800 border border-emerald-200",
+        "crimson" => "bg-rose-50 text-rose-800 border border-rose-200",
+        _ => "bg-blue-50 text-blue-800 border border-blue-200"
+    };
+
+    private static string GetThemeDotStyle(string? theme) => (theme?.ToLowerInvariant()) switch
+    {
+        "amber" => "bg-amber-500",
+        "indigo" => "bg-indigo-500",
+        "emerald" => "bg-emerald-500",
+        "crimson" => "bg-rose-500",
+        _ => "bg-blue-500"
+    };
+}

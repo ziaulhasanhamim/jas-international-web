@@ -434,6 +434,49 @@ namespace JASIntWeb.Persistence.Migrations
                     b.ToTable("Coupons");
                 });
 
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.CuratedPromoCard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Eyebrow")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LinkText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LinkUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subtitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CuratedPromoCards");
+                });
+
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.DeliveryAddress", b =>
                 {
                     b.Property<int>("Id")

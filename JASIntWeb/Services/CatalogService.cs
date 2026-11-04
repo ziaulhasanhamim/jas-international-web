@@ -246,6 +246,59 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
         return result;
     }
 
+    public async Task<List<CuratedPromoCard>> GetCuratedPromoCardsAsync()
+    {
+        var cards = await db.CuratedPromoCards.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .ToListAsync();
+
+        if (cards.Count == 0)
+        {
+            return
+            [
+                new CuratedPromoCard
+                {
+                    Id = 1,
+                    Eyebrow = "FLAGSHIP ECOSYSTEM",
+                    Title = "Apple Intelligence",
+                    Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
+                    LinkUrl = "/category/phones",
+                    LinkText = "Explore Devices",
+                    Theme = "navy",
+                    SortOrder = 1,
+                    IsActive = true
+                },
+                new CuratedPromoCard
+                {
+                    Id = 2,
+                    Eyebrow = "PURE ACOUSTICS",
+                    Title = "Studio ANC Sound",
+                    Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
+                    LinkUrl = "/category/headphones",
+                    LinkText = "Hear the Difference",
+                    Theme = "amber",
+                    SortOrder = 2,
+                    IsActive = true
+                },
+                new CuratedPromoCard
+                {
+                    Id = 3,
+                    Eyebrow = "HIGH EFFICIENCY",
+                    Title = "GaN Fast Charge",
+                    Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
+                    LinkUrl = "/category/power-charging",
+                    LinkText = "Power Up Fast",
+                    Theme = "indigo",
+                    SortOrder = 3,
+                    IsActive = true
+                }
+            ];
+        }
+
+        return cards;
+    }
+
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
         string? sort, decimal? min, decimal? max, int page, int pageSize = 18, string? brand = null)
     {

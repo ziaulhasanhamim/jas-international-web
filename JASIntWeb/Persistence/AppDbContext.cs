@@ -32,6 +32,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
     public DbSet<HomepageSection> HomepageSections => Set<HomepageSection>();
+    public DbSet<CuratedPromoCard> CuratedPromoCards => Set<CuratedPromoCard>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
     public DbSet<OrderTimelineEvent> OrderTimelineEvents => Set<OrderTimelineEvent>();
 

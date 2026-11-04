@@ -383,6 +383,46 @@ public static class JsonTestDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
+        if (!await db.CuratedPromoCards.AnyAsync(ct))
+        {
+            db.CuratedPromoCards.AddRange(
+                new CuratedPromoCard
+                {
+                    Eyebrow = "FLAGSHIP ECOSYSTEM",
+                    Title = "Apple Intelligence",
+                    Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
+                    LinkUrl = "/category/phones",
+                    LinkText = "Explore Devices",
+                    Theme = "navy",
+                    SortOrder = 1,
+                    IsActive = true
+                },
+                new CuratedPromoCard
+                {
+                    Eyebrow = "PURE ACOUSTICS",
+                    Title = "Studio ANC Sound",
+                    Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
+                    LinkUrl = "/category/headphones",
+                    LinkText = "Hear the Difference",
+                    Theme = "amber",
+                    SortOrder = 2,
+                    IsActive = true
+                },
+                new CuratedPromoCard
+                {
+                    Eyebrow = "HIGH EFFICIENCY",
+                    Title = "GaN Fast Charge",
+                    Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
+                    LinkUrl = "/category/power-charging",
+                    LinkText = "Power Up Fast",
+                    Theme = "indigo",
+                    SortOrder = 3,
+                    IsActive = true
+                }
+            );
+            await db.SaveChangesAsync(ct);
+        }
+
         var productsWithoutCompare = await db.Products.Include(p => p.ProductVariants).Where(p => p.CompareAtPrice == null).ToListAsync(ct);
         if (productsWithoutCompare.Count > 0)
         {

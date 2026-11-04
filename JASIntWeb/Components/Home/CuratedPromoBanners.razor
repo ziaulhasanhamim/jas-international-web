@@ -1,70 +1,89 @@
-<!-- 3-Column Curated Promotional Feature Cards (Gadget & Gear style) -->
-<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        <!-- 1. Apple Ecosystem -->
-        <a href="/category/phones" class="group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6 sm:p-7 text-white shadow-xs hover:shadow-lg transition-all border border-slate-800">
-            <div class="relative z-10 flex flex-col justify-between h-full min-h-[160px]">
-                <div>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300 mb-2">
-                        FLAGSHIP ECOSYSTEM
-                    </span>
-                    <h3 class="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-blue-400 transition-colors">
-                        Apple Intelligence
-                    </h3>
-                    <p class="text-xs text-slate-300 mt-1 max-w-[200px]">
-                        iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.
-                    </p>
-                </div>
-                <div class="mt-4 flex items-center gap-1.5 text-xs font-bold text-blue-400 group-hover:translate-x-1 transition-transform">
-                    <span>Explore Devices</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
-                </div>
-            </div>
-            <div class="absolute -right-6 -bottom-6 size-36 rounded-full bg-blue-500/10 blur-2xl group-hover:bg-blue-500/20 transition-all pointer-events-none"></div>
-        </a>
+@inject JASIntWeb.Services.CatalogService Catalog
 
-        <!-- 2. Studio Sound & ANC -->
-        <a href="/category/headphones" class="group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-950/80 via-stone-900 to-slate-950 p-6 sm:p-7 text-white shadow-xs hover:shadow-lg transition-all border border-stone-800">
-            <div class="relative z-10 flex flex-col justify-between h-full min-h-[160px]">
-                <div>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-2">
-                        PURE ACOUSTICS
-                    </span>
-                    <h3 class="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-amber-400 transition-colors">
-                        Studio ANC Sound
-                    </h3>
-                    <p class="text-xs text-slate-300 mt-1 max-w-[200px]">
-                        Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.
-                    </p>
-                </div>
-                <div class="mt-4 flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform">
-                    <span>Hear the Difference</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
-                </div>
-            </div>
-            <div class="absolute -right-6 -bottom-6 size-36 rounded-full bg-amber-500/10 blur-2xl group-hover:bg-amber-500/20 transition-all pointer-events-none"></div>
-        </a>
+@if (_cards.Count > 0)
+{
+    <!-- Curated Promotional Feature Cards (Option A: Guardrailed Presets) -->
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            @foreach (var card in _cards)
+            {
+                var theme = GetThemeStyles(card.Theme);
+                <a href="@card.LinkUrl" class="group relative overflow-hidden rounded-2xl sm:rounded-3xl p-6 sm:p-7 text-white shadow-xs hover:shadow-lg transition-all border @theme.CardBorder @theme.CardBg">
+                    <div class="relative z-10 flex flex-col justify-between h-full min-h-[160px]">
+                        <div>
+                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-2 border @theme.Badge">
+                                @card.Eyebrow
+                            </span>
+                            <h3 class="text-xl sm:text-2xl font-bold tracking-tight text-white @theme.TitleHover transition-colors line-clamp-1">
+                                @card.Title
+                            </h3>
+                            <p class="text-xs text-slate-300 mt-1 max-w-[220px] line-clamp-2 leading-relaxed">
+                                @card.Subtitle
+                            </p>
+                        </div>
+                        <div class="mt-4 flex items-center gap-1.5 text-xs font-bold @theme.LinkColor group-hover:translate-x-1 transition-transform">
+                            <span>@(string.IsNullOrWhiteSpace(card.LinkText) ? "Explore" : card.LinkText)</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+                        </div>
+                    </div>
+                    <div class="absolute -right-6 -bottom-6 size-36 rounded-full @theme.Glow blur-2xl transition-all pointer-events-none"></div>
+                </a>
+            }
+        </div>
+    </section>
+}
 
-        <!-- 3. GaN Fast Charge -->
-        <a href="/category/power-charging" class="group relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 p-6 sm:p-7 text-white shadow-xs hover:shadow-lg transition-all border border-indigo-900/60">
-            <div class="relative z-10 flex flex-col justify-between h-full min-h-[160px]">
-                <div>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300 mb-2">
-                        HIGH EFFICIENCY
-                    </span>
-                    <h3 class="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-indigo-400 transition-colors">
-                        GaN Fast Charge
-                    </h3>
-                    <p class="text-xs text-slate-300 mt-1 max-w-[200px]">
-                        Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.
-                    </p>
-                </div>
-                <div class="mt-4 flex items-center gap-1.5 text-xs font-bold text-indigo-400 group-hover:translate-x-1 transition-transform">
-                    <span>Power Up Fast</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
-                </div>
-            </div>
-            <div class="absolute -right-6 -bottom-6 size-36 rounded-full bg-indigo-500/10 blur-2xl group-hover:bg-indigo-500/20 transition-all pointer-events-none"></div>
-        </a>
-    </div>
-</section>
+@code {
+    private List<JASIntWeb.Persistence.Entities.CuratedPromoCard> _cards = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cards = await Catalog.GetCuratedPromoCardsAsync();
+    }
+
+    private sealed record ThemeConfig(string CardBg, string CardBorder, string Badge, string TitleHover, string LinkColor, string Glow);
+
+    private static ThemeConfig GetThemeStyles(string? theme) => (theme?.ToLowerInvariant()) switch
+    {
+        "amber" => new(
+            "bg-gradient-to-br from-amber-950/80 via-stone-900 to-slate-950",
+            "border-stone-800",
+            "bg-amber-500/20 border-amber-400/30 text-amber-300",
+            "group-hover:text-amber-400",
+            "text-amber-400",
+            "bg-amber-500/10 group-hover:bg-amber-500/20"
+        ),
+        "indigo" => new(
+            "bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950",
+            "border-indigo-900/60",
+            "bg-indigo-500/20 border-indigo-400/30 text-indigo-300",
+            "group-hover:text-indigo-400",
+            "text-indigo-400",
+            "bg-indigo-500/10 group-hover:bg-indigo-500/20"
+        ),
+        "emerald" => new(
+            "bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950",
+            "border-emerald-900/60",
+            "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
+            "group-hover:text-emerald-400",
+            "text-emerald-400",
+            "bg-emerald-500/10 group-hover:bg-emerald-500/20"
+        ),
+        "crimson" => new(
+            "bg-gradient-to-br from-rose-950 via-slate-900 to-slate-950",
+            "border-rose-900/60",
+            "bg-rose-500/20 border-rose-400/30 text-rose-300",
+            "group-hover:text-rose-400",
+            "text-rose-400",
+            "bg-rose-500/10 group-hover:bg-rose-500/20"
+        ),
+        _ => new( // Default: navy / flagship
+            "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950",
+            "border-slate-800",
+            "bg-blue-500/20 border-blue-400/30 text-blue-300",
+            "group-hover:text-blue-400",
+            "text-blue-400",
+            "bg-blue-500/10 group-hover:bg-blue-500/20"
+        )
+    };
+}
