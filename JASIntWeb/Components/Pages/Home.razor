@@ -1,11 +1,12 @@
 @page "/"
+@attribute [StreamRendering]
 @inject JASIntWeb.Services.CatalogService Catalog
 
-<PageTitle>JAS International — Gadgets &amp; Premium Tech Accessories</PageTitle>
+<PageTitle>JAS International — Gadgets &amp; Premium Tech Accessories (Since 2005)</PageTitle>
 
 <HeadContent>
-    <meta name="description" content="JAS International is Khulna's premier gadget boutique offering authentic smartphones, audio gear, smartwatches, laptops, and accessories with nationwide cash on delivery." />
-    <meta property="og:title" content="JAS International — Premium Gadgets &amp; Tech Accessories" />
+    <meta name="description" content="JAS International is Khulna's premier gadget boutique offering authentic smartphones, audio gear, smartwatches, laptops, and accessories with nationwide cash on delivery since 2005." />
+    <meta property="og:title" content="JAS International — Premium Gadgets &amp; Tech Accessories (Since 2005)" />
     <meta property="og:description" content="Shop 100% genuine tech gadgets from Apple, Samsung, Google Pixel, Anker, Sony, and more. Physical showroom in Khulna with nationwide delivery." />
     <meta property="og:image" content="/jas-logo.png" />
     <meta property="og:type" content="website" />
@@ -18,6 +19,7 @@
         "name": "JAS International",
         "image": "https://jasinternational.com/jas-logo.png",
         "telephone": "+8801711465078",
+        "foundingDate": "2005",
         "address": {
             "@@type": "PostalAddress",
             "streetAddress": "Khulna Shopping Complex, 3rd Floor",
@@ -32,144 +34,219 @@
     </script>
 </HeadContent>
 
-<HeroCarousel Slides="slides" />
-
-<!-- Featured Brands Strip -->
-@if (featuredBrands.Count > 0)
+@if (!_isLoaded)
 {
-    <section class="border-y border-slate-200/80 bg-white/95 backdrop-blur-xs py-3.5 shadow-2xs">
+    <!-- StreamRendering Skeleton Loading UI (Gadget & Gear style) -->
+    <div class="animate-pulse space-y-6">
+        <!-- Hero Carousel Skeleton -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
+            <div class="aspect-[16/8] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[220px] max-h-[460px] w-full rounded-2xl sm:rounded-3xl bg-slate-200"></div>
+        </div>
+
+        <!-- Trust Bar Skeleton -->
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between gap-3 sm:gap-6">
-                <!-- Label / Eyebrow -->
-                <div class="flex items-center gap-2 shrink-0">
-                    <span class="size-2 rounded-full bg-blue-600 animate-pulse"></span>
-                    <span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Featured Brands</span>
-                </div>
-
-                <!-- Brand Pills Ribbon (Single-row scrollable ribbon with top 10 limit) -->
-                <div class="flex-1 min-w-0 flex items-center justify-start sm:justify-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-1">
-                    @foreach (var b in featuredBrands.Take(10))
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    @for (var i = 0; i < 6; i++)
                     {
-                        <a href="/products?brand=@b.Slug"
-                           title="Browse @b.Name products"
-                           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/80 hover:bg-white hover:border-blue-500 hover:text-blue-600 hover:shadow-2xs active:scale-95 transition-all text-xs font-bold text-slate-800 shrink-0 select-none">
-                            @if (!string.IsNullOrEmpty(b.LogoUrl))
-                            {
-                                <img src="@b.LogoUrl" alt="@b.Name" class="size-4 object-contain" loading="lazy" />
-                            }
-                            else
-                            {
-                                <span class="flex size-4 items-center justify-center rounded bg-slate-200 text-[9px] font-black text-slate-600">
-                                    @b.Name[..Math.Min(1, b.Name.Length)].ToUpperInvariant()
-                                </span>
-                            }
-                            <span class="truncate max-w-[120px]">@b.Name</span>
-                        </a>
+                        <div class="flex items-center gap-3 px-2 py-1.5">
+                            <div class="size-9 rounded-xl bg-slate-200 shrink-0"></div>
+                            <div class="space-y-1.5 flex-1">
+                                <div class="h-3 w-16 bg-slate-200 rounded"></div>
+                                <div class="h-2 w-12 bg-slate-100 rounded"></div>
+                            </div>
+                        </div>
                     }
-                </div>
-
-                <!-- View All Brands Link -->
-                <div class="shrink-0">
-                    <a href="/products" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition">
-                        <span>All Brands</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
-                    </a>
                 </div>
             </div>
         </div>
-    </section>
-}
 
-<CategoryGrid Categories="categories" />
-
-<!-- Dynamic Configured Homepage Sections (Configurable via Admin) -->
-@if (customSections.Count > 0)
-{
-    var count = 0;
-    @foreach (var section in customSections)
-    {
-        count++;
-        <ProductSection
-            Title="@section.Title"
-            Eyebrow="@section.Eyebrow"
-            Products="@section.Products"
-            ViewAllHref="@section.ViewAllHref"
-        />
-
-        @if (count == 1)
-        {
-            <!-- Highlight Showroom Banner -->
-            <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
-                    <div class="max-w-xl">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300 ring-1 ring-blue-400/30 mb-4">
-                            <Icon Name="map-pin" Class="size-3.5" />
-                            Khulna Shopping Complex, 3rd Floor
-                        </span>
-                        <h2 class="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-                            Experience Gadgets In Person At Our Khulna Showroom
-                        </h2>
-                        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                            Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
-                        </p>
-                    </div>
-                    <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-                        <a href="/contact" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-6 !py-3 text-xs sm:text-sm font-bold shadow-md">
-                            Showroom Location &amp; Hours
-                        </a>
-                        <a href="tel:01711465078" class="btn-secondary !bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !px-5 !py-3 text-xs sm:text-sm font-semibold">
-                            Call 01711465078
-                        </a>
-                    </div>
+        <!-- Featured Brands Skeleton -->
+        <div class="border-y border-slate-200 bg-white py-3.5">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center gap-3">
+                <div class="h-4 w-28 bg-slate-200 rounded shrink-0"></div>
+                <div class="flex gap-2 flex-1 overflow-hidden">
+                    @for (var i = 0; i < 6; i++)
+                    {
+                        <div class="h-8 w-24 bg-slate-100 rounded-xl shrink-0"></div>
+                    }
                 </div>
-            </section>
-        }
-    }
+            </div>
+        </div>
+
+        <!-- Category Grid Skeleton -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+            <div class="h-6 w-40 bg-slate-200 rounded mb-4"></div>
+            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4">
+                @for (var i = 0; i < 8; i++)
+                {
+                    <div class="aspect-square rounded-2xl bg-slate-100 border border-slate-200/60"></div>
+                }
+            </div>
+        </div>
+    </div>
 }
 else
 {
-    <ProductSection
-        Title="New arrivals"
-        Eyebrow="Just landed"
-        Products="newArrivals"
-        ViewAllHref="/products?sort=newest"
-    />
+    <!-- Hero Carousel (Contained, clean modern look matching Gadget & Gear) -->
+    <HeroCarousel Slides="slides" />
 
-    <!-- Highlight Showroom Banner -->
-    <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
-            <div class="max-w-xl">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300 ring-1 ring-blue-400/30 mb-4">
-                    <Icon Name="map-pin" Class="size-3.5" />
-                    Khulna Shopping Complex, 3rd Floor
-                </span>
-                <h2 class="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-                    Experience Gadgets In Person At Our Khulna Showroom
-                </h2>
-                <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
-                </p>
-            </div>
-            <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-                <a href="/contact" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-6 !py-3 text-xs sm:text-sm font-bold shadow-md">
-                    Showroom Location &amp; Hours
-                </a>
-                <a href="tel:01711465078" class="btn-secondary !bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !px-5 !py-3 text-xs sm:text-sm font-semibold">
-                    Call 01711465078
-                </a>
-            </div>
-        </div>
-    </section>
+    <!-- Trust Bar Strip directly below Hero Carousel -->
+    <TrustBar />
 
-    <ProductSection Title="Audio &amp; Earbuds" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/headphones" />
-    <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/wearables" />
-    <ProductSection Title="Wireless Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
+    <!-- Featured Brands Strip (Fixed layout: Apple never hidden behind label) -->
+    @if (featuredBrands.Count > 0)
+    {
+        <section class="border-y border-slate-200/80 bg-white/95 backdrop-blur-xs py-3.5 shadow-2xs">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between gap-3 sm:gap-6">
+                    <!-- Label / Eyebrow with boundary border -->
+                    <div class="flex items-center gap-2 shrink-0 pr-3 sm:pr-4 border-r border-slate-200">
+                        <span class="size-2 rounded-full bg-blue-600 animate-pulse"></span>
+                        <span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 whitespace-nowrap">Featured Brands</span>
+                    </div>
+
+                    <!-- Brand Pills Ribbon (strictly justify-start so first brand is never clipped or pushed negative) -->
+                    <div class="flex-1 min-w-0 flex items-center justify-start gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-1">
+                        @foreach (var b in featuredBrands.Take(10))
+                        {
+                            <a href="/products?brand=@b.Slug"
+                               title="Browse @b.Name products"
+                               class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/80 hover:bg-white hover:border-blue-500 hover:text-blue-600 hover:shadow-2xs active:scale-95 transition-all text-xs font-bold text-slate-800 shrink-0 select-none">
+                                @if (!string.IsNullOrEmpty(b.LogoUrl))
+                                {
+                                    <img src="@b.LogoUrl" alt="@b.Name" class="size-4 object-contain" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span class="flex size-4 items-center justify-center rounded bg-slate-200 text-[9px] font-black text-slate-600">
+                                        @b.Name[..Math.Min(1, b.Name.Length)].ToUpperInvariant()
+                                    </span>
+                                }
+                                <span class="truncate max-w-[120px]">@b.Name</span>
+                            </a>
+                        }
+                    </div>
+
+                    <!-- View All Brands Link -->
+                    <div class="shrink-0 pl-3 sm:pl-4 border-l border-slate-200">
+                        <a href="/products" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition whitespace-nowrap">
+                            <span>All Brands</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+
+    <!-- Shop by Category Grid -->
+    <CategoryGrid Categories="categories" />
+
+    <!-- Curated Flagship Promotional Cards (Gadget & Gear style 3-column feature) -->
+    <CuratedPromoBanners />
+
+    <!-- Dynamic Configured Homepage Sections (Configurable via Admin) -->
+    @if (customSections.Count > 0)
+    {
+        var count = 0;
+        @foreach (var section in customSections)
+        {
+            count++;
+            <ProductSection
+                Title="@section.Title"
+                Eyebrow="@section.Eyebrow"
+                Products="@section.Products"
+                ViewAllHref="@section.ViewAllHref"
+            />
+
+            @if (count == 1)
+            {
+                <!-- Highlight Showroom Banner with Since 2005 Trust Marker -->
+                <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                    <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
+                        <div class="max-w-xl">
+                            <div class="flex flex-wrap items-center gap-2 mb-4">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300 ring-1 ring-blue-400/30">
+                                    <Icon Name="map-pin" Class="size-3.5" />
+                                    Khulna Shopping Complex, 3rd Floor
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-300 ring-1 ring-amber-400/30">
+                                    ★ SINCE 2005 · 20+ Years of Customer Trust
+                                </span>
+                            </div>
+                            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+                                Experience Gadgets In Person At Our Khulna Showroom
+                            </h2>
+                            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                                Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
+                            </p>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+                            <a href="/contact" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-6 !py-3 text-xs sm:text-sm font-bold shadow-md">
+                                Showroom Location &amp; Hours
+                            </a>
+                            <a href="tel:01711465078" class="btn-secondary !bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !px-5 !py-3 text-xs sm:text-sm font-semibold">
+                                Call 01711465078
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            }
+        }
+    }
+    else
+    {
+        <ProductSection
+            Title="New arrivals"
+            Eyebrow="Just landed"
+            Products="newArrivals"
+            ViewAllHref="/products?sort=newest"
+        />
+
+        <!-- Highlight Showroom Banner with Since 2005 Trust Marker -->
+        <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
+                <div class="max-w-xl">
+                    <div class="flex flex-wrap items-center gap-2 mb-4">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300 ring-1 ring-blue-400/30">
+                            <Icon Name="map-pin" Class="size-3.5" />
+                            Khulna Shopping Complex, 3rd Floor
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-300 ring-1 ring-amber-400/30">
+                            ★ SINCE 2005 · 20+ Years of Customer Trust
+                        </span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+                        Experience Gadgets In Person At Our Khulna Showroom
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
+                    </p>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+                    <a href="/contact" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-6 !py-3 text-xs sm:text-sm font-bold shadow-md">
+                        Showroom Location &amp; Hours
+                    </a>
+                    <a href="tel:01711465078" class="btn-secondary !bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !px-5 !py-3 text-xs sm:text-sm font-semibold">
+                        Call 01711465078
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <ProductSection Title="Audio &amp; Earbuds" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/headphones" />
+        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/wearables" />
+        <ProductSection Title="Wireless Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
+    }
+
+    <!-- Bottom 4 Pillars Trust Features -->
+    <TrustFeatures />
 }
-
-<TrustFeatures />
 
 @code
 {
+    private bool _isLoaded;
     private List<CarouselSlideDto> slides = [];
     private List<BrandLinkDto> featuredBrands = [];
     private ICollection<CategoryDto> categories = [];
@@ -190,5 +267,7 @@ else
             watches = await Catalog.LatestAsync("wearables");
             speakers = await Catalog.LatestAsync("speakers");
         }
+
+        _isLoaded = true;
     }
 }

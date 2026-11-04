@@ -3,134 +3,75 @@
 
 @if (Slides.Count > 0)
 {
-    <section
-        class="brand-hero relative overflow-hidden bg-slate-950 text-white group"
-        aria-roledescription="carousel"
-        aria-label="Featured gadgets"
-        @onmouseenter="Pause"
-        @onmouseleave="Resume"
-    >
-        <!-- Slide Stage -->
-        <div class="relative min-h-[22rem] sm:min-h-[28rem] lg:min-h-[34rem] w-full overflow-hidden">
-            @for (var i = 0; i < _slides.Count; i++)
-            {
-                var slide = _slides[i];
-                var active = i == _index;
-                <div
-                    class="absolute inset-0 transition-all duration-700 ease-in-out
-                        @(active ? "opacity-100 scale-100 z-10" : "pointer-events-none opacity-0 scale-105 z-0")"
-                    role="group"
-                    aria-roledescription="slide"
-                    aria-hidden="@(!active)"
-                >
-                    <!-- Hero image -->
-                    <img
-                        src="@slide.Image"
-                        alt="@slide.ImageAlt"
-                        loading="@(i == 0 ? "eager" : "lazy")"
-                        fetchpriority="@(i == 0 ? "high" : "low")"
-                        decoding="async"
-                        class="absolute inset-0 h-full w-full object-cover object-center filter brightness-95"
-                    />
-
-                    <!-- Clickable banner overlay when no separate button is rendered -->
-                    @if (!slide.HasText && !string.IsNullOrWhiteSpace(slide.LinkUrl))
-                    {
-                        <a href="@slide.LinkUrl" aria-label="@(slide.LinkText ?? slide.ImageAlt)" class="absolute inset-0 z-10">
+    <!-- Contained, modern hero carousel matching Gadget & Gear layout -->
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
+        <section
+            class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 border border-slate-200/70 shadow-xs group select-none aspect-[16/8] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[200px] max-h-[460px] w-full"
+            aria-roledescription="carousel"
+            aria-label="Featured promotions"
+            @onmouseenter="Pause"
+            @onmouseleave="Resume"
+        >
+            <!-- Slide Stage -->
+            <div class="relative h-full w-full overflow-hidden">
+                @for (var i = 0; i < _slides.Count; i++)
+                {
+                    var slide = _slides[i];
+                    var active = i == _index;
+                    var targetUrl = string.IsNullOrWhiteSpace(slide.LinkUrl) ? "/products" : slide.LinkUrl;
+                    <div
+                        class="absolute inset-0 transition-opacity duration-700 ease-in-out
+                            @(active ? "opacity-100 z-10" : "pointer-events-none opacity-0 z-0")"
+                        role="group"
+                        aria-roledescription="slide"
+                        aria-hidden="@(!active)"
+                    >
+                        <!-- Pure clean banner artwork without text clutter (Gadget & Gear style) -->
+                        <a href="@targetUrl" class="block w-full h-full relative" title="@slide.ImageAlt">
+                            <img
+                                src="@slide.Image"
+                                alt="@slide.ImageAlt"
+                                loading="@(i == 0 ? "eager" : "lazy")"
+                                fetchpriority="@(i == 0 ? "high" : "low")"
+                                decoding="async"
+                                class="w-full h-full object-cover object-center"
+                            />
                         </a>
-                    }
+                    </div>
+                }
+            </div>
 
-                    @if (slide.HasText)
-                    {
-                        <!-- Premium gradient overlay -->
-                        <div class="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-transparent">
-                        </div>
+            <!-- Vertically Centered Subtle Navigation Arrows (Glassmorphic, appear on hover) -->
+            <button
+                type="button"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-white/80 hover:bg-white text-slate-800 shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 cursor-pointer active:scale-95"
+                aria-label="Previous slide"
+                @onclick="Prev"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <button
+                type="button"
+                class="absolute right-3.5 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-white/80 hover:bg-white text-slate-800 shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 cursor-pointer active:scale-95"
+                aria-label="Next slide"
+                @onclick="Next"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                </svg>
+            </button>
 
-                        <!-- Content Container -->
-                        <div class="relative z-20 mx-auto flex h-full max-w-7xl items-center px-6 py-12 sm:px-8 lg:px-12">
-                            <div class="max-w-xl">
-                                @if (!string.IsNullOrWhiteSpace(slide.Eyebrow))
-                                {
-                                    <div class="inline-flex items-center gap-2 rounded-full bg-blue-500/20 border border-blue-400/30 px-3.5 py-1 text-xs font-bold uppercase tracking-widest text-blue-300 backdrop-blur-md mb-4">
-                                        <span class="size-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                                        @slide.Eyebrow
-                                    </div>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(slide.Title))
-                                {
-                                    @if (i == 0)
-                                    {
-                                        <h1 class="font-display text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-white drop-shadow-sm leading-tight">
-                                            @slide.Title
-                                        </h1>
-                                    }
-                                    else
-                                    {
-                                        <h2 class="font-display text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-white drop-shadow-sm leading-tight">
-                                            @slide.Title
-                                        </h2>
-                                    }
-                                }
-                                @if (!string.IsNullOrWhiteSpace(slide.Copy))
-                                {
-                                    <p class="mt-4 max-w-lg text-sm sm:text-base text-slate-200 leading-relaxed drop-shadow-xs">
-                                        @slide.Copy
-                                    </p>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(slide.LinkUrl))
-                                {
-                                    <div class="mt-6 flex flex-wrap items-center gap-3">
-                                        <a href="@slide.LinkUrl" class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-600/30 hover:bg-orange-500 hover:shadow-orange-600/50 active:scale-95 transition-all">
-                                            <span>@(slide.LinkText ?? "Shop Now")</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
-                                            </svg>
-                                        </a>
-                                        <a href="/products" class="inline-flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 transition">
-                                            Explore All
-                                        </a>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-
-        <!-- Vertically Centered Navigation Arrows (Glassmorphic) -->
-        <button
-            type="button"
-            class="absolute left-3 top-1/2 -translate-y-1/2 z-30 flex size-11 items-center justify-center rounded-full bg-slate-900/60 backdrop-blur-md border border-white/20 text-white shadow-xl opacity-70 group-hover:opacity-100 hover:bg-orange-600 hover:border-orange-500 transition-all"
-            aria-label="Previous slide"
-            @onclick="Prev"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-        </button>
-        <button
-            type="button"
-            class="absolute right-3 top-1/2 -translate-y-1/2 z-30 flex size-11 items-center justify-center rounded-full bg-slate-900/60 backdrop-blur-md border border-white/20 text-white shadow-xl opacity-70 group-hover:opacity-100 hover:bg-orange-600 hover:border-orange-500 transition-all"
-            aria-label="Next slide"
-            @onclick="Next"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
-            </svg>
-        </button>
-
-        <!-- Bottom Bar: Indicators & Slide Counter -->
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-30 mx-auto flex max-w-7xl items-end justify-between px-6 pb-5 sm:px-8">
-            <!-- Sleek Bar Indicators -->
-            <div class="pointer-events-auto flex items-center gap-2 bg-slate-950/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10" role="tablist" aria-label="Slides">
+            <!-- Minimal Pagination Dots (Centered at bottom, Gadget & Gear style) -->
+            <div class="absolute inset-x-0 bottom-3.5 z-20 flex items-center justify-center gap-1.5 sm:gap-2 pointer-events-auto" role="tablist" aria-label="Slides">
                 @for (var idx = 0; idx < _slides.Count; idx++)
                 {
                     var slideIdx = idx;
                     <button
                         type="button"
-                        class="relative h-2 rounded-full transition-all duration-300 overflow-hidden
-                               @(_index == slideIdx ? "w-8 bg-orange-500 shadow-sm shadow-orange-500/50" : "w-3 bg-white/40 hover:bg-white/70")"
+                        class="h-2 rounded-full transition-all duration-300 cursor-pointer
+                               @(_index == slideIdx ? "w-6 sm:w-7 bg-slate-900 shadow-xs" : "w-2 bg-slate-400/60 hover:bg-slate-700")"
                         aria-label="Go to slide @(idx + 1)"
                         aria-selected="@(_index == idx)"
                         @onclick="() => GoTo(slideIdx)"
@@ -138,15 +79,8 @@
                     </button>
                 }
             </div>
-
-            <!-- Slide Number Counter -->
-            <div class="pointer-events-auto hidden sm:flex items-center gap-1 bg-slate-950/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-xs font-mono font-bold text-slate-300">
-                <span class="text-orange-400">@((_index + 1).ToString("D2"))</span>
-                <span class="text-white/40">/</span>
-                <span>@(_slides.Count.ToString("D2"))</span>
-            </div>
-        </div>
-    </section>
+        </section>
+    </div>
 }
 
 @code
@@ -159,55 +93,43 @@
     public List<CarouselSlideDto> Slides { get; set; } = [];
     private List<CarouselSlideDto> _slides => Slides;
 
-    protected override void OnParametersSet()
+    protected override void OnInitialized()
     {
-        if (_index >= _slides.Count && _slides.Count > 0)
-        {
-            _index = 0;
-        }
+        StartTimer();
     }
 
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (!firstRender || _slides.Count < 2)
-        {
-            return;
-        }
-        StartAutoplay();
-    }
-
-    private void StartAutoplay()
+    private void StartTimer()
     {
         _cts?.Cancel();
-        _cts?.Dispose();
         _cts = new CancellationTokenSource();
-        _ = AutoPlayAsync(_cts.Token);
-    }
+        var token = _cts.Token;
 
-    private async Task AutoPlayAsync(CancellationToken token)
-    {
-        try
+        _ = Task.Run(async () =>
         {
+            using var periodic = new PeriodicTimer(TimeSpan.FromSeconds(5));
             while (!token.IsCancellationRequested)
             {
-                await Task.Delay(5500, token);
-                if (!_paused)
+                try
                 {
-                    await InvokeAsync(() =>
+                    if (await periodic.WaitForNextTickAsync(token))
                     {
-                        Next();
-                        StateHasChanged();
-                    });
+                        if (!_paused && _slides.Count > 1)
+                        {
+                            await InvokeAsync(() =>
+                            {
+                                _index = (_index + 1) % _slides.Count;
+                                StateHasChanged();
+                            });
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
             }
-        }
-        catch (TaskCanceledException)
-        {
-        }
+        }, token);
     }
-
-    private void Pause() => _paused = true;
-    private void Resume() => _paused = false;
 
     private void Next()
     {
@@ -228,6 +150,9 @@
             _index = index;
         }
     }
+
+    private void Pause() => _paused = true;
+    private void Resume() => _paused = false;
 
     public ValueTask DisposeAsync()
     {
