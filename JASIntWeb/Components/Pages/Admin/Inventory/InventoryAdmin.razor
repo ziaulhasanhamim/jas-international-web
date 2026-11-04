@@ -105,10 +105,9 @@
                             ৳@row.Price.ToString("N0")
                         </td>
                         <td class="text-right whitespace-nowrap space-x-2">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="quick-restock" data-enhance class="inline">
                                 <AntiforgeryToken />
-                                <input type="hidden" name="RestockVariantId" value="@row.Id" />
-                                <input type="hidden" name="RestockAction" value="add10" />
+                                <input type="hidden" name="QuickVariantId" value="@row.Id" />
                                 <button type="submit" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
                                     <span>+10 Restock</span>
                                 </button>
@@ -116,13 +115,12 @@
 
                             <details class="inline-block relative text-left">
                                 <summary class="btn-secondary !px-2.5 !py-1 text-xs cursor-pointer">Set Qty</summary>
-                                <form method="post" data-enhance class="absolute right-0 mt-1 z-30 p-3 bg-white rounded-xl shadow-xl border border-slate-200 space-y-2 w-56 text-left">
+                                <form method="post" @formname="adjust-stock" data-enhance class="absolute right-0 mt-1 z-30 p-3 bg-white rounded-xl shadow-xl border border-slate-200 space-y-2 w-56 text-left">
                                     <AntiforgeryToken />
-                                    <input type="hidden" name="RestockVariantId" value="@row.Id" />
-                                    <input type="hidden" name="RestockAction" value="custom" />
+                                    <input type="hidden" name="AdjustVariantId" value="@row.Id" />
                                     <label class="block font-bold text-slate-800 text-[11px]">New On-Hand Qty:</label>
-                                    <input type="number" name="RestockQuantity" value="@row.OnHand" min="0" class="field !py-1 text-xs font-bold" />
-                                    <input type="text" name="RestockNote" placeholder="Reason..." class="field !py-1 text-xs" />
+                                    <input type="number" name="AdjustQuantity" value="@row.OnHand" min="0" class="field !py-1 text-xs font-bold" />
+                                    <input type="text" name="AdjustNote" placeholder="Reason..." class="field !py-1 text-xs" />
                                     <button type="submit" class="btn-primary !py-1 !px-3 text-xs w-full">Update</button>
                                 </form>
                             </details>
@@ -177,17 +175,17 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm]
-    public int RestockVariantId { get; set; }
+    [SupplyParameterFromForm(FormName = "quick-restock")]
+    public int QuickVariantId { get; set; }
 
-    [SupplyParameterFromForm]
-    public string? RestockAction { get; set; }
+    [SupplyParameterFromForm(FormName = "adjust-stock")]
+    public int AdjustVariantId { get; set; }
 
-    [SupplyParameterFromForm]
-    public int RestockQuantity { get; set; }
+    [SupplyParameterFromForm(FormName = "adjust-stock")]
+    public int AdjustQuantity { get; set; }
 
-    [SupplyParameterFromForm]
-    public string? RestockNote { get; set; }
+    [SupplyParameterFromForm(FormName = "adjust-stock")]
+    public string? AdjustNote { get; set; }
 
     private string? _toast;
     private int _totalAll;
@@ -209,26 +207,44 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (RestockVariantId > 0 && !string.IsNullOrEmpty(RestockAction))
+        if (QuickVariantId > 0)
         {
-            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == RestockVariantId);
+            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == QuickVariantId);
             if (inv != null)
             {
-                var newQty = RestockAction == "add10" ? inv.QuantityOnHand + 10 : RestockQuantity;
-                var diff = newQty - inv.QuantityOnHand;
-                inv.QuantityOnHand = newQty;
-
+                inv.QuantityOnHand += 10;
                 Db.InventoryTransactions.Add(new()
                 {
-                    ProductVariantId = RestockVariantId,
-                    QuantityChange = diff,
+                    ProductVariantId = QuickVariantId,
+                    QuantityChange = 10,
                     Type = InventoryTransactionType.Adjustment,
                     ReferenceType = "AdminRestock",
-                    Note = string.IsNullOrWhiteSpace(RestockNote) ? "Restock via Admin Hub" : RestockNote.Trim()
+                    Note = "Restock via Admin Hub (+10)"
                 });
 
                 await Db.SaveChangesAsync();
-                _toast = $"Stock updated to {newQty} units.";
+                _toast = $"Stock updated to {inv.QuantityOnHand} units.";
+            }
+        }
+        else if (AdjustVariantId > 0)
+        {
+            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == AdjustVariantId);
+            if (inv != null)
+            {
+                var diff = AdjustQuantity - inv.QuantityOnHand;
+                inv.QuantityOnHand = AdjustQuantity;
+
+                Db.InventoryTransactions.Add(new()
+                {
+                    ProductVariantId = AdjustVariantId,
+                    QuantityChange = diff,
+                    Type = InventoryTransactionType.Adjustment,
+                    ReferenceType = "AdminRestock",
+                    Note = string.IsNullOrWhiteSpace(AdjustNote) ? "Restock via Admin Hub" : AdjustNote.Trim()
+                });
+
+                await Db.SaveChangesAsync();
+                _toast = $"Stock updated to {AdjustQuantity} units.";
             }
         }
 

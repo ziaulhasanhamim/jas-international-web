@@ -1,10 +1,11 @@
 @page "/products"
 @page "/category/{CategorySlug}"
+@attribute [StreamRendering]
 @inject JASIntWeb.Services.CatalogService Catalog
 @inject NavigationManager Nav
 @using Microsoft.AspNetCore.WebUtilities
 
-<PageTitle>@(string.IsNullOrWhiteSpace(Query) ? "All Products" : $"“{Query}”") · JAS International</PageTitle>
+<PageTitle>@(string.IsNullOrWhiteSpace(Query) ? (activeCategoryName ?? "All Products") : $"“{Query}”") · JAS International</PageTitle>
 
 <div class="shop-container py-8">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -18,89 +19,200 @@
         </div>
         <div class="flex items-center gap-2">
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                @total product@(total == 1 ? "" : "s")
+                @(loading ? "Loading…" : $"{total} product{(total == 1 ? "" : "s")}")
             </span>
         </div>
     </div>
 
     <div class="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
-        <!-- Sidebar Filter Column -->
-        <aside class="space-y-6">
-            <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <Icon Name="filter" Class="size-4 text-blue-600" />
-                        Categories
-                    </h2>
-                    @if (CategorySlug != null)
-                    {
-                        <a href="/products" class="text-[11px] text-blue-600 font-semibold hover:underline">Reset</a>
-                    }
+        <!-- Desktop Sidebar Filter Column (hidden on mobile) -->
+        <aside class="hidden lg:block space-y-6">
+            @if (loading)
+            {
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs animate-pulse space-y-3">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <div class="h-4 w-24 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                    </div>
                 </div>
-
-                <div class="space-y-1 text-xs">
-                    <a href="@CategoryUrl(null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(CategorySlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
-                        <span>All Products</span>
-                    </a>
-                    @foreach (var parent in categories.Where(c => !c.ParentId.HasValue))
-                    {
-                        var isParentActive = parent.Slug == CategorySlug;
-                        var hasActiveChild = children.TryGetValue(parent.Id, out var sub) && sub.Any(s => s.Slug == CategorySlug);
-
-                        <details class="group" open="@(isParentActive || hasActiveChild)">
-                            <summary class="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer list-none select-none transition">
-                                <a href="@CategoryUrl(parent.Slug)" class="@(isParentActive ? "text-blue-600 font-bold" : "")">
-                                    @parent.Name
-                                </a>
-                                @if (children.ContainsKey(parent.Id))
-                                {
-                                    <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
-                                }
-                            </summary>
-                            @if (children.TryGetValue(parent.Id, out var subcategories))
-                            {
-                                <div class="ml-4 pl-2 border-l border-slate-200 space-y-1 py-1">
-                                    @foreach (var child in subcategories)
-                                    {
-                                        <a href="@CategoryUrl(child.Slug)" class="block rounded-lg px-2.5 py-1.5 transition @(child.Slug == CategorySlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")">
-                                            @child.Name
-                                        </a>
-                                    }
-                                </div>
-                            }
-                        </details>
-                    }
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs animate-pulse space-y-3">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <div class="h-4 w-20 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 bg-slate-100 rounded-xl"></div>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <Icon Name="filter" Class="size-4 text-blue-600" />
+                            Categories
+                        </h2>
+                        @if (CategorySlug != null)
+                        {
+                            <a href="@CategoryRemovalUrl()" class="text-[11px] text-blue-600 font-semibold hover:underline">Reset</a>
+                        }
+                    </div>
 
-            <!-- Brand Filter -->
-            <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                    <h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <Icon Name="box" Class="size-4 text-blue-600" />
-                        Brands
-                    </h2>
-                    @if (BrandSlug != null)
-                    {
-                        <a href="@FilterUrl(CategorySlug, null)" class="text-[11px] text-blue-600 font-semibold hover:underline">Clear</a>
-                    }
-                </div>
-                <div class="space-y-1 text-xs max-h-56 overflow-y-auto pr-1 scrollbar-none">
-                    <a href="@FilterUrl(CategorySlug, null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(BrandSlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
-                        <span>All Brands</span>
-                    </a>
-                    @foreach (var b in brands)
-                    {
-                        <a href="@FilterUrl(CategorySlug, b.Slug)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(b.Slug == BrandSlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
-                            <span>@b.Name</span>
+                    <div class="space-y-1 text-xs">
+                        <a href="@CategoryUrl(null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(CategorySlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                            <span>All Products</span>
                         </a>
-                    }
+                        @foreach (var parent in categories.Where(c => !c.ParentId.HasValue))
+                        {
+                            var isParentActive = parent.Slug == CategorySlug;
+                            var hasActiveChild = children.TryGetValue(parent.Id, out var sub) && sub.Any(s => s.Slug == CategorySlug);
+
+                            <details class="group" open="@(isParentActive || hasActiveChild)">
+                                <summary class="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer list-none select-none transition">
+                                    <a href="@CategoryUrl(parent.Slug)" class="@(isParentActive ? "text-blue-600 font-bold" : "")">
+                                        @parent.Name
+                                    </a>
+                                    @if (children.ContainsKey(parent.Id))
+                                    {
+                                        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+                                    }
+                                </summary>
+                                @if (children.TryGetValue(parent.Id, out var subcategories))
+                                {
+                                    <div class="ml-4 pl-2 border-l border-slate-200 space-y-1 py-1">
+                                        @foreach (var child in subcategories)
+                                        {
+                                            <a href="@CategoryUrl(child.Slug)" class="block rounded-lg px-2.5 py-1.5 transition @(child.Slug == CategorySlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")">
+                                                @child.Name
+                                            </a>
+                                        }
+                                    </div>
+                                }
+                            </details>
+                        }
+                    </div>
                 </div>
-            </div>
+
+                <!-- Brand Filter -->
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <Icon Name="box" Class="size-4 text-blue-600" />
+                            Brands
+                        </h2>
+                        @if (BrandSlug != null)
+                        {
+                            <a href="@BrandRemovalUrl()" class="text-[11px] text-blue-600 font-semibold hover:underline">Clear</a>
+                        }
+                    </div>
+                    <div class="space-y-1 text-xs max-h-56 overflow-y-auto pr-1 scrollbar-none">
+                        <a href="@FilterUrl(CategorySlug, null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(BrandSlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                            <span>All Brands</span>
+                        </a>
+                        @foreach (var b in brands)
+                        {
+                            <a href="@FilterUrl(CategorySlug, b.Slug)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(b.Slug == BrandSlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                                <span>@b.Name</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
         </aside>
 
-        <!-- Product Grid & Search Toolbar -->
-        <section>
+        <!-- Product Grid & Search Section -->
+        <section class="min-w-0">
+            <!-- Mobile Filter Bar (lg:hidden) -->
+            <div class="lg:hidden mb-4">
+                <button type="button"
+                        onclick="document.getElementById('mobile-filter-drawer').classList.remove('hidden'); document.body.classList.add('overflow-hidden');"
+                        class="w-full flex items-center justify-between gap-2 rounded-2xl bg-white border border-slate-200/90 px-4 py-3 shadow-2xs hover:border-slate-300 active:bg-slate-50 transition cursor-pointer">
+                    <div class="flex items-center gap-2.5">
+                        <span class="flex size-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                            <Icon Name="filter" Class="size-4" />
+                        </span>
+                        <span class="font-bold text-slate-800 text-xs sm:text-sm">Filter &amp; Categories</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if (CategorySlug != null && !string.IsNullOrWhiteSpace(BrandSlug))
+                        {
+                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                                2 active
+                            </span>
+                        }
+                        else if (CategorySlug != null)
+                        {
+                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 max-w-[130px] truncate">
+                                @(activeCategoryName ?? CategorySlug)
+                            </span>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(BrandSlug))
+                        {
+                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 max-w-[130px] truncate">
+                                @ActiveBrandName
+                            </span>
+                        }
+                        <span class="text-slate-400 text-xs font-semibold">Browse ▾</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Active Filter Pills (1-click removal) -->
+            @if (CategorySlug != null || !string.IsNullOrWhiteSpace(BrandSlug) || MinPrice != null || MaxPrice != null || !string.IsNullOrWhiteSpace(Query))
+            {
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <span class="text-xs font-semibold text-slate-500">Active filters:</span>
+                    @if (CategorySlug != null)
+                    {
+                        <a href="@CategoryRemovalUrl()"
+                           class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition shadow-2xs group"
+                           title="Remove category filter">
+                            <span>Category: <strong>@(activeCategoryName ?? CategorySlug)</strong></span>
+                            <span class="text-blue-500 font-bold group-hover:text-blue-800">✕</span>
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(BrandSlug))
+                    {
+                        <a href="@BrandRemovalUrl()"
+                           class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition shadow-2xs group"
+                           title="Remove brand filter">
+                            <span>Brand: <strong>@ActiveBrandName</strong></span>
+                            <span class="text-blue-500 font-bold group-hover:text-blue-800">✕</span>
+                        </a>
+                    }
+                    @if (MinPrice.HasValue || MaxPrice.HasValue)
+                    {
+                        <a href="@PriceRemovalUrl()"
+                           class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition shadow-2xs group"
+                           title="Remove price filter">
+                            <span>Price: <strong>৳@(MinPrice?.ToString("N0") ?? "0") - ৳@(MaxPrice?.ToString("N0") ?? "Any")</strong></span>
+                            <span class="text-blue-500 font-bold group-hover:text-blue-800">✕</span>
+                        </a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Query))
+                    {
+                        <a href="@QueryRemovalUrl()"
+                           class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition shadow-2xs group"
+                           title="Remove search query">
+                            <span>Search: <strong>“@Query”</strong></span>
+                            <span class="text-blue-500 font-bold group-hover:text-blue-800">✕</span>
+                        </a>
+                    }
+                    <a href="/products" class="text-xs text-slate-500 hover:text-blue-600 underline font-semibold ml-1 py-1">
+                        Clear all
+                    </a>
+                </div>
+            }
+
             <!-- Filter & Sort Toolbar -->
             <div class="mb-6 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs">
                 <form method="get" class="flex flex-wrap items-center gap-3">
@@ -142,7 +254,28 @@
             </div>
 
             <!-- Product Grid -->
-            @if (products.Count == 0)
+            @if (loading)
+            {
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading products">
+                    @for (int i = 0; i < 8; i++)
+                    {
+                        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs animate-pulse flex flex-col justify-between h-full overflow-hidden">
+                            <div class="aspect-square bg-slate-200/90 w-full"></div>
+                            <div class="p-4 flex flex-col flex-1 items-center text-center space-y-2.5">
+                                <div class="h-3 w-16 bg-slate-200 rounded"></div>
+                                <div class="h-4 w-4/5 bg-slate-200 rounded"></div>
+                                <div class="h-4 w-3/5 bg-slate-200 rounded"></div>
+                                <div class="h-5 w-24 bg-slate-200 rounded mt-1"></div>
+                                <div class="h-3 w-14 bg-slate-200 rounded"></div>
+                                <div class="w-full pt-3 border-t border-slate-100 mt-auto">
+                                    <div class="h-9 bg-slate-200 rounded-xl w-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (products.Count == 0)
             {
                 <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
                     <Icon Name="box" Class="size-12 text-slate-300 mx-auto mb-3" />
@@ -161,7 +294,7 @@
             }
 
             <!-- Pagination Bar -->
-            @if (total > 18)
+            @if (!loading && total > 18)
             {
                 <div class="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
                     <div>
@@ -189,6 +322,148 @@
             }
         </section>
     </div>
+
+    <!-- Mobile Filter Drawer / Modal (lg:hidden) -->
+    <div id="mobile-filter-drawer" class="fixed inset-0 z-50 lg:hidden hidden" role="dialog" aria-modal="true" aria-labelledby="mobile-filter-title">
+        <!-- Backdrop overlay -->
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+             onclick="document.getElementById('mobile-filter-drawer').classList.add('hidden'); document.body.classList.remove('overflow-hidden');"></div>
+
+        <!-- Drawer Panel -->
+        <div class="fixed inset-y-0 left-0 max-w-xs sm:max-w-sm w-full bg-white shadow-2xl flex flex-col z-10 overscroll-contain animate-fadeIn">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <span class="flex size-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <Icon Name="filter" Class="size-4" />
+                    </span>
+                    <h2 id="mobile-filter-title" class="font-bold text-slate-900 text-sm sm:text-base">Filter &amp; Categories</h2>
+                </div>
+                <button type="button"
+                        onclick="document.getElementById('mobile-filter-drawer').classList.add('hidden'); document.body.classList.remove('overflow-hidden');"
+                        class="rounded-xl p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                        aria-label="Close filters">
+                    <span class="text-base font-bold leading-none">✕</span>
+                </button>
+            </div>
+
+            <!-- Scrollable Drawer Body -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-6">
+                <!-- Active filters summary in drawer if any -->
+                @if (CategorySlug != null || !string.IsNullOrWhiteSpace(BrandSlug))
+                {
+                    <div class="rounded-2xl bg-blue-50/60 border border-blue-100 p-3.5 space-y-2">
+                        <div class="flex items-center justify-between text-xs font-bold text-blue-900">
+                            <span>Active Filters</span>
+                            <a href="/products" class="text-blue-600 hover:underline font-semibold text-[11px]">Clear All</a>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            @if (CategorySlug != null)
+                            {
+                                <a href="@CategoryRemovalUrl()" class="inline-flex items-center gap-1 rounded-lg bg-white border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 shadow-2xs">
+                                    <span>@(activeCategoryName ?? CategorySlug)</span>
+                                    <span class="text-blue-500 font-bold">✕</span>
+                                </a>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(BrandSlug))
+                            {
+                                <a href="@BrandRemovalUrl()" class="inline-flex items-center gap-1 rounded-lg bg-white border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 shadow-2xs">
+                                    <span>@ActiveBrandName</span>
+                                    <span class="text-blue-500 font-bold">✕</span>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Category Tree -->
+                <div>
+                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <Icon Name="filter" Class="size-4 text-blue-600" />
+                            Categories
+                        </h3>
+                        @if (CategorySlug != null)
+                        {
+                            <a href="@CategoryRemovalUrl()" class="text-[11px] text-blue-600 font-semibold hover:underline">Reset</a>
+                        }
+                    </div>
+
+                    <div class="space-y-1 text-xs">
+                        <a href="@CategoryUrl(null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(CategorySlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                            <span>All Products</span>
+                        </a>
+                        @foreach (var parent in categories.Where(c => !c.ParentId.HasValue))
+                        {
+                            var isParentActive = parent.Slug == CategorySlug;
+                            var hasActiveChild = children.TryGetValue(parent.Id, out var sub) && sub.Any(s => s.Slug == CategorySlug);
+
+                            <details class="group" open="@(isParentActive || hasActiveChild)">
+                                <summary class="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer list-none select-none transition">
+                                    <a href="@CategoryUrl(parent.Slug)" class="@(isParentActive ? "text-blue-600 font-bold" : "")">
+                                        @parent.Name
+                                    </a>
+                                    @if (children.ContainsKey(parent.Id))
+                                    {
+                                        <span class="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+                                    }
+                                </summary>
+                                @if (children.TryGetValue(parent.Id, out var subcategories))
+                                {
+                                    <div class="ml-4 pl-2 border-l border-slate-200 space-y-1 py-1">
+                                        @foreach (var child in subcategories)
+                                        {
+                                            <a href="@CategoryUrl(child.Slug)" class="block rounded-lg px-2.5 py-1.5 transition @(child.Slug == CategorySlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50")">
+                                                @child.Name
+                                            </a>
+                                        }
+                                    </div>
+                                }
+                            </details>
+                        }
+                    </div>
+                </div>
+
+                <!-- Brand Filter -->
+                <div>
+                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <Icon Name="box" Class="size-4 text-blue-600" />
+                            Brands
+                        </h3>
+                        @if (BrandSlug != null)
+                        {
+                            <a href="@BrandRemovalUrl()" class="text-[11px] text-blue-600 font-semibold hover:underline">Clear</a>
+                        }
+                    </div>
+                    <div class="space-y-1 text-xs max-h-60 overflow-y-auto pr-1">
+                        <a href="@FilterUrl(CategorySlug, null)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(BrandSlug == null ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                            <span>All Brands</span>
+                        </a>
+                        @foreach (var b in brands)
+                        {
+                            <a href="@FilterUrl(CategorySlug, b.Slug)" class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition @(b.Slug == BrandSlug ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50")">
+                                <span>@b.Name</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Drawer Footer -->
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center gap-3">
+                @if (CategorySlug != null || !string.IsNullOrWhiteSpace(BrandSlug))
+                {
+                    <a href="/products" class="btn-secondary !py-2.5 text-xs text-center">Reset</a>
+                }
+                <button type="button"
+                        onclick="document.getElementById('mobile-filter-drawer').classList.add('hidden'); document.body.classList.remove('overflow-hidden');"
+                        class="btn-primary !py-2.5 text-xs text-center flex-1">
+                    Apply / View Products (@(loading ? "…" : total))
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @code
@@ -208,6 +483,7 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
+    private bool loading = true;
     private List<ProductSummaryDto> products = [];
     private List<CategoryLinkDto> categories = [];
     private List<BrandLinkDto> brands = [];
@@ -215,24 +491,56 @@
     private string? activeCategoryName;
     private int total;
 
+    private string? ActiveBrandName => brands.FirstOrDefault(b => b.Slug == BrandSlug)?.Name ?? BrandSlug;
+
     protected override async Task OnInitializedAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
-        (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page, pageSize: 18, brand: BrandSlug);
-
-        categories = await Catalog.CategoriesAsync();
-        brands = await Catalog.BrandsAsync();
-        children = categories.Where(c => c.ParentId.HasValue)
-            .GroupBy(c => c.ParentId!.Value)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        if (CategorySlug != null)
+        try
         {
-            activeCategoryName = categories.FirstOrDefault(c => c.Slug == CategorySlug)?.Name;
+            Page = Math.Clamp(Page, 1, 10000);
+            (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page, pageSize: 18, brand: BrandSlug);
+
+            categories = await Catalog.CategoriesAsync();
+            brands = await Catalog.BrandsAsync();
+            children = categories.Where(c => c.ParentId.HasValue)
+                .GroupBy(c => c.ParentId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            if (CategorySlug != null)
+            {
+                activeCategoryName = categories.FirstOrDefault(c => c.Slug == CategorySlug)?.Name;
+            }
+        }
+        finally
+        {
+            loading = false;
         }
     }
 
     private string CategoryUrl(string? slug) => FilterUrl(slug, BrandSlug);
+    private string CategoryRemovalUrl() => FilterUrl(null, BrandSlug);
+    private string BrandRemovalUrl() => FilterUrl(CategorySlug, null);
+
+    private string PriceRemovalUrl()
+    {
+        var baseUri = CategorySlug is null ? "/products" : $"/category/{CategorySlug}";
+        var query = new Dictionary<string, string?>();
+        if (!string.IsNullOrWhiteSpace(Query)) query["q"] = Query;
+        if (!string.IsNullOrWhiteSpace(BrandSlug)) query["brand"] = BrandSlug;
+        if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
+        return QueryHelpers.AddQueryString(baseUri, query);
+    }
+
+    private string QueryRemovalUrl()
+    {
+        var baseUri = CategorySlug is null ? "/products" : $"/category/{CategorySlug}";
+        var query = new Dictionary<string, string?>();
+        if (!string.IsNullOrWhiteSpace(BrandSlug)) query["brand"] = BrandSlug;
+        if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
+        if (MinPrice.HasValue) query["min-price"] = MinPrice.Value.ToString();
+        if (MaxPrice.HasValue) query["max-price"] = MaxPrice.Value.ToString();
+        return QueryHelpers.AddQueryString(baseUri, query);
+    }
 
     private string FilterUrl(string? catSlug, string? brand)
     {

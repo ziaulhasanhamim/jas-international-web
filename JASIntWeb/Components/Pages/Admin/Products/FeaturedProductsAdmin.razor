@@ -131,13 +131,11 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="toggle-featured" data-enhance class="inline">
                                 <AntiforgeryToken />
-                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                <input type="hidden" name="ToggleFeaturedId" value="@p.Id" />
                                 <button
                                     type="submit"
-                                    name="ToggleField"
-                                    value="featured"
                                     class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
                                 >
                                     <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
@@ -145,13 +143,11 @@
                             </form>
                         </td>
                         <td class="text-center">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="toggle-new" data-enhance class="inline">
                                 <AntiforgeryToken />
-                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                <input type="hidden" name="ToggleNewId" value="@p.Id" />
                                 <button
                                     type="submit"
-                                    name="ToggleField"
-                                    value="newarrival"
                                     class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
                                 >
                                     <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
@@ -185,11 +181,11 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    [SupplyParameterFromForm]
-    public int ToggleProductId { get; set; }
+    [SupplyParameterFromForm(FormName = "toggle-featured")]
+    public int ToggleFeaturedId { get; set; }
 
-    [SupplyParameterFromForm]
-    public string? ToggleField { get; set; }
+    [SupplyParameterFromForm(FormName = "toggle-new")]
+    public int ToggleNewId { get; set; }
 
     private sealed record FeaturedProductItem(
         int Id,
@@ -217,16 +213,26 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (ToggleProductId > 0 && !string.IsNullOrEmpty(ToggleField))
+        if (ToggleFeaturedId > 0)
         {
-            var p = await Db.Products.FindAsync(ToggleProductId);
+            var p = await Db.Products.FindAsync(ToggleFeaturedId);
             if (p != null)
             {
-                if (ToggleField == "featured") p.IsFeatured = !p.IsFeatured;
-                else if (ToggleField == "newarrival") p.IsNewArrival = !p.IsNewArrival;
+                p.IsFeatured = !p.IsFeatured;
                 p.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
-                _toast = $"Updated status for {p.Name}.";
+                _toast = $"Updated featured status for {p.Name}.";
+            }
+        }
+        else if (ToggleNewId > 0)
+        {
+            var p = await Db.Products.FindAsync(ToggleNewId);
+            if (p != null)
+            {
+                p.IsNewArrival = !p.IsNewArrival;
+                p.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+                _toast = $"Updated new arrival status for {p.Name}.";
             }
         }
 

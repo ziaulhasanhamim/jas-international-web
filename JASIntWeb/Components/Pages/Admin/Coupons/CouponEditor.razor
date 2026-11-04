@@ -19,7 +19,7 @@
 }
 else
 {
-    <EditForm Model="coupon" OnValidSubmit="Save" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-4">
+    <EditForm Model="coupon" OnValidSubmit="Save" FormName="coupon-editor" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-4">
         <DataAnnotationsValidator />
 
         <div class="admin-form-grid">
@@ -88,10 +88,20 @@ else
 {
     [Parameter]
     public int Id { get; set; }
+
+    [SupplyParameterFromForm(FormName = "coupon-editor")]
+    public Coupon? CouponInput { get; set; }
+
     private Coupon? coupon;
 
     protected override async Task OnInitializedAsync()
     {
+        if (CouponInput is not null)
+        {
+            coupon = CouponInput;
+            return;
+        }
+
         if (Id == 0)
         {
             coupon = new Coupon
@@ -120,6 +130,21 @@ else
         if (Id == 0)
         {
             Db.Coupons.Add(coupon);
+        }
+        else
+        {
+            var existing = await Db.Coupons.FindAsync(Id);
+            if (existing != null)
+            {
+                existing.Code = coupon.Code;
+                existing.DiscountType = coupon.DiscountType;
+                existing.DiscountValue = coupon.DiscountValue;
+                existing.MaxDiscountAmount = coupon.MaxDiscountAmount;
+                existing.MinOrderAmount = coupon.MinOrderAmount;
+                existing.UsageLimit = coupon.UsageLimit;
+                existing.Description = coupon.Description;
+                existing.IsActive = coupon.IsActive;
+            }
         }
         await Db.SaveChangesAsync();
         Nav.NavigateTo("/admin/coupons?saved=true");

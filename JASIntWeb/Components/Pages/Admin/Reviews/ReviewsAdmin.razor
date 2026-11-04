@@ -113,13 +113,11 @@
                 </div>
 
                 <div class="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
-                    <form method="post" data-enhance class="inline">
+                    <form method="post" @formname="review-toggle" data-enhance class="inline">
                         <AntiforgeryToken />
-                        <input type="hidden" name="ReviewId" value="@r.Id" />
+                        <input type="hidden" name="ToggleReviewId" value="@r.Id" />
                         <button
                             type="submit"
-                            name="ReviewAction"
-                            value="toggle"
                             class="btn-secondary !px-3 !py-1.5 text-xs font-bold cursor-pointer @(r.IsApproved ? "!text-rose-600 hover:!bg-rose-50" : "!text-emerald-700 hover:!bg-emerald-50")"
                         >
                             @(r.IsApproved ? "Hide / Unpublish" : "✓ Approve & Publish")
@@ -130,10 +128,9 @@
                         <summary class="btn-secondary !px-3 !py-1.5 text-xs font-medium text-slate-700 cursor-pointer">
                             @(string.IsNullOrEmpty(r.StaffReply) ? "Reply to Review" : "Edit Reply")
                         </summary>
-                        <form method="post" data-enhance class="mt-2 space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <form method="post" @formname="review-reply" data-enhance class="mt-2 space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
                             <AntiforgeryToken />
-                            <input type="hidden" name="ReviewId" value="@r.Id" />
-                            <input type="hidden" name="ReviewAction" value="reply" />
+                            <input type="hidden" name="ReplyReviewId" value="@r.Id" />
                             <textarea name="StaffReply" rows="3" class="field text-xs w-full" placeholder="Thank you for your feedback! Our support team is here...">@r.StaffReply</textarea>
                             <div class="flex justify-end gap-2">
                                 <button type="submit" class="btn-primary !px-3 !py-1 text-xs">Save Response</button>
@@ -162,13 +159,13 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    [SupplyParameterFromForm]
-    public int ReviewId { get; set; }
+    [SupplyParameterFromForm(FormName = "review-toggle")]
+    public int ToggleReviewId { get; set; }
 
-    [SupplyParameterFromForm]
-    public string? ReviewAction { get; set; }
+    [SupplyParameterFromForm(FormName = "review-reply")]
+    public int ReplyReviewId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "review-reply")]
     public string? StaffReply { get; set; }
 
     private string? _toast;
@@ -201,25 +198,26 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (ReviewId > 0 && !string.IsNullOrEmpty(ReviewAction))
+        if (ToggleReviewId > 0)
         {
-            var rev = await Db.ProductReviews.FindAsync(ReviewId);
+            var rev = await Db.ProductReviews.FindAsync(ToggleReviewId);
             if (rev != null)
             {
-                if (ReviewAction == "toggle")
-                {
-                    rev.IsApproved = !rev.IsApproved;
-                    rev.UpdatedAt = DateTimeOffset.UtcNow;
-                    await Db.SaveChangesAsync();
-                    _toast = rev.IsApproved ? "Review approved and published to storefront." : "Review hidden from storefront.";
-                }
-                else if (ReviewAction == "reply")
-                {
-                    rev.StaffReply = string.IsNullOrWhiteSpace(StaffReply) ? null : StaffReply.Trim();
-                    rev.UpdatedAt = DateTimeOffset.UtcNow;
-                    await Db.SaveChangesAsync();
-                    _toast = "Saved official response to customer review.";
-                }
+                rev.IsApproved = !rev.IsApproved;
+                rev.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+                _toast = rev.IsApproved ? "Review approved and published to storefront." : "Review hidden from storefront.";
+            }
+        }
+        else if (ReplyReviewId > 0)
+        {
+            var rev = await Db.ProductReviews.FindAsync(ReplyReviewId);
+            if (rev != null)
+            {
+                rev.StaffReply = string.IsNullOrWhiteSpace(StaffReply) ? null : StaffReply.Trim();
+                rev.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+                _toast = "Saved official response to customer review.";
             }
         }
 

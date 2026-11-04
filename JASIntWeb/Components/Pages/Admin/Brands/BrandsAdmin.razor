@@ -112,7 +112,7 @@
                             /@b.Slug
                         </td>
                         <td class="text-center">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="toggle-brand" data-enhance class="inline">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="ToggleBrandId" value="@b.Id" />
                                 <button
@@ -167,10 +167,10 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "toggle-brand")]
     public int ToggleBrandId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "toggle-brand")]
     public string? ToggleAction { get; set; }
 
     private List<AdminBrandRow> _allBrands = [];

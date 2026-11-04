@@ -16,13 +16,13 @@
 <!-- Filter Toolbar -->
 <div class="mb-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
-        <div class="relative flex-1 min-w-[220px]">
+        <div class="relative flex-1 min-w-55">
             <input name="q" value="@Query" placeholder="Search Order #, customer name, phone, or TrxID..." class="field pr-9" />
             <span class="absolute right-3 top-3 text-slate-400">
                 <Icon Name="search" Class="size-4" />
             </span>
         </div>
-        <select name="status" class="field w-auto min-w-[150px]">
+        <select name="status" class="field w-auto min-w-37.5">
             <option value="">All Statuses</option>
             @foreach (var s in Enum.GetValues<OrderStatus>())
             {
@@ -137,7 +137,7 @@
                                         <span>Verified (৳@o.PaidAmount.ToString("N0"))</span>
                                     </span>
                                     <div>
-                                        <form method="post" data-enhance class="inline">
+                                        <form method="post" @formname="quick-action" data-enhance class="inline">
                                             <AntiforgeryToken />
                                             <input type="hidden" name="QuickOrderId" value="@o.Id" />
                                             <button type="submit" name="QuickAction" value="unverify" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium cursor-pointer">
@@ -161,14 +161,14 @@
                                     {
                                         <span class="badge badge-slate">Unpaid</span>
                                     }
-                                    <form method="post" data-enhance class="flex items-center gap-1.5 pt-0.5">
+                                    <form method="post" @formname="quick-action" data-enhance class="flex items-center gap-1.5 pt-0.5">
                                         <AntiforgeryToken />
                                         <input type="hidden" name="QuickOrderId" value="@o.Id" />
-                                        <button type="submit" name="QuickAction" value="verify" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white !py-1 !px-2 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                        <button type="submit" name="QuickAction" value="verify" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
                                             <Icon Name="check" Class="size-3" />
                                             <span>Verify</span>
                                         </button>
-                                        <button type="submit" name="QuickAction" value="reject" class="btn-secondary !text-rose-700 hover:!bg-rose-50 !py-1 !px-2 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                        <button type="submit" name="QuickAction" value="reject" class="btn-secondary text-rose-700! hover:bg-rose-50! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
                                             <Icon Name="close" Class="size-3" />
                                             <span>Not Received</span>
                                         </button>
@@ -180,7 +180,7 @@
                             ৳@o.Total.ToString("N0")
                         </td>
                         <td class="text-right whitespace-nowrap">
-                            <a href="/admin/orders/@o.Id" class="btn-secondary !px-3 !py-1 text-xs">
+                            <a href="/admin/orders/@o.Id" class="btn-secondary px-3! py-1! text-xs">
                                 View & Fulfill
                             </a>
                         </td>
@@ -214,9 +214,9 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "quick-action")]
     public string? QuickAction { get; set; }
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "quick-action")]
     public int QuickOrderId { get; set; }
 
     private List<Order> orders = [];

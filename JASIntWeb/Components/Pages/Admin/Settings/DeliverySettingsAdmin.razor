@@ -24,7 +24,7 @@
 }
 else
 {
-    <EditForm Model="settings" OnValidSubmit="SaveSettings" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-6">
+    <EditForm Model="settings" OnValidSubmit="SaveSettings" FormName="delivery-settings" method="post" Enhance data-submit-indication="true" class="shop-panel admin-form space-y-6">
         <DataAnnotationsValidator />
 
         <!-- 1. Delivery Rates Section -->
@@ -118,11 +118,20 @@ else
 
 @code
 {
+    [SupplyParameterFromForm(FormName = "delivery-settings")]
+    public DeliverySettings? SettingsInput { get; set; }
+
     private DeliverySettings? settings;
     private bool saved;
 
     protected override async Task OnInitializedAsync()
     {
+        if (SettingsInput is not null)
+        {
+            settings = SettingsInput;
+            return;
+        }
+
         settings = await Db.DeliverySettings.FirstOrDefaultAsync();
         if (settings == null)
         {
@@ -147,9 +156,20 @@ else
 
     private async Task SaveSettings()
     {
-        if (settings != null)
+        var existing = await Db.DeliverySettings.FirstOrDefaultAsync();
+        if (existing != null && settings != null)
         {
-            settings.UpdatedAt = DateTimeOffset.UtcNow;
+            existing.HubDistrict = settings.HubDistrict;
+            existing.HubCity = settings.HubCity;
+            existing.HubCityFee = settings.HubCityFee;
+            existing.OutsideFee = settings.OutsideFee;
+            existing.FreeDeliveryThreshold = settings.FreeDeliveryThreshold;
+            existing.RequireAdvanceForCOD = settings.RequireAdvanceForCOD;
+            existing.AdvanceAmount = settings.AdvanceAmount;
+            existing.BkashNumber = settings.BkashNumber;
+            existing.NagadNumber = settings.NagadNumber;
+            existing.BanglaQrImageUrl = settings.BanglaQrImageUrl;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
             saved = true;
         }

@@ -55,14 +55,14 @@
                             <div class="flex items-center justify-center gap-1 font-mono font-bold text-slate-700">
                                 <span>#@s.SortOrder</span>
                                 <div class="flex flex-col">
-                                    <form method="post" data-enhance class="inline">
+                                    <form method="post" @formname="section-action" data-enhance class="inline">
                                         <AntiforgeryToken />
                                         <input type="hidden" name="SectionId" value="@s.Id" />
                                         <button type="submit" name="Action" value="up" class="p-0.5 text-slate-400 hover:text-slate-800 cursor-pointer" title="Move Up">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>
                                         </button>
                                     </form>
-                                    <form method="post" data-enhance class="inline">
+                                    <form method="post" @formname="section-action" data-enhance class="inline">
                                         <AntiforgeryToken />
                                         <input type="hidden" name="SectionId" value="@s.Id" />
                                         <button type="submit" name="Action" value="down" class="p-0.5 text-slate-400 hover:text-slate-800 cursor-pointer" title="Move Down">
@@ -95,7 +95,7 @@
                             </span>
                         </td>
                         <td class="text-center">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="section-action" data-enhance class="inline">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="SectionId" value="@s.Id" />
                                 <button
@@ -114,7 +114,7 @@
                                 <a href="/admin/homepage-sections?edit=@s.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
                                     Edit
                                 </a>
-                                <form method="post" data-enhance class="inline">
+                                <form method="post" @formname="section-action" data-enhance class="inline">
                                     <AntiforgeryToken />
                                     <input type="hidden" name="SectionId" value="@s.Id" />
                                     <button type="submit" name="Action" value="delete" class="btn-danger !px-2 !py-1 text-xs cursor-pointer" title="Delete section">
@@ -147,9 +147,9 @@
         <p class="text-xs text-slate-500">Configure section title, category filter, and display limit.</p>
     </div>
 
-    <form method="post" data-enhance class="space-y-4">
+    <form method="post" @formname="save-section" data-enhance class="space-y-4">
         <AntiforgeryToken />
-        <input type="hidden" name="Action" value="save" />
+        <input type="hidden" name="SaveAction" value="save" />
         <input type="hidden" name="FormId" value="@(editSection?.Id ?? 0)" />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -205,28 +205,31 @@
     [SupplyParameterFromQuery(Name = "edit")]
     public int EditId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "section-action")]
     public int SectionId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "section-action")]
     public string? Action { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
+    public string? SaveAction { get; set; }
+
+    [SupplyParameterFromForm(FormName = "save-section")]
     public int FormId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
     public string? FormTitle { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
     public string? FormEyebrow { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
     public string? FormCategorySlug { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
     public int FormItemLimit { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "save-section")]
     public int FormSortOrder { get; set; }
 
     private List<HomepageSection> _sections = [];
@@ -236,42 +239,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrEmpty(Action))
+        if (!string.IsNullOrEmpty(Action) && SectionId > 0)
         {
-            if (Action == "save" && !string.IsNullOrWhiteSpace(FormTitle))
-            {
-                var viewHref = string.IsNullOrWhiteSpace(FormCategorySlug) ? "/products" : $"/category/{FormCategorySlug}";
-                if (FormId == 0)
-                {
-                    Db.HomepageSections.Add(new HomepageSection
-                    {
-                        Title = FormTitle.Trim(),
-                        Eyebrow = FormEyebrow?.Trim(),
-                        CategorySlug = FormCategorySlug,
-                        ViewAllHref = viewHref,
-                        ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit,
-                        SortOrder = FormSortOrder,
-                        IsActive = true
-                    });
-                    _toast = "Created new homepage section.";
-                }
-                else
-                {
-                    var existing = await Db.HomepageSections.FindAsync(FormId);
-                    if (existing != null)
-                    {
-                        existing.Title = FormTitle.Trim();
-                        existing.Eyebrow = FormEyebrow?.Trim();
-                        existing.CategorySlug = FormCategorySlug;
-                        existing.ViewAllHref = viewHref;
-                        existing.ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit;
-                        existing.SortOrder = FormSortOrder;
-                        _toast = "Updated homepage section.";
-                    }
-                }
-                await Db.SaveChangesAsync();
-            }
-            else if (Action == "toggle" && SectionId > 0)
+            if (Action == "toggle")
             {
                 var item = await Db.HomepageSections.FindAsync(SectionId);
                 if (item != null)
@@ -280,7 +250,7 @@
                     await Db.SaveChangesAsync();
                 }
             }
-            else if (Action == "up" && SectionId > 0)
+            else if (Action == "up")
             {
                 var item = await Db.HomepageSections.FindAsync(SectionId);
                 if (item != null)
@@ -289,7 +259,7 @@
                     await Db.SaveChangesAsync();
                 }
             }
-            else if (Action == "down" && SectionId > 0)
+            else if (Action == "down")
             {
                 var item = await Db.HomepageSections.FindAsync(SectionId);
                 if (item != null)
@@ -298,7 +268,7 @@
                     await Db.SaveChangesAsync();
                 }
             }
-            else if (Action == "delete" && SectionId > 0)
+            else if (Action == "delete")
             {
                 var item = await Db.HomepageSections.FindAsync(SectionId);
                 if (item != null)
@@ -308,6 +278,39 @@
                     _toast = "Deleted section.";
                 }
             }
+        }
+        else if (SaveAction == "save" && !string.IsNullOrWhiteSpace(FormTitle))
+        {
+            var viewHref = string.IsNullOrWhiteSpace(FormCategorySlug) ? "/products" : $"/category/{FormCategorySlug}";
+            if (FormId == 0)
+            {
+                Db.HomepageSections.Add(new HomepageSection
+                {
+                    Title = FormTitle.Trim(),
+                    Eyebrow = FormEyebrow?.Trim(),
+                    CategorySlug = FormCategorySlug,
+                    ViewAllHref = viewHref,
+                    ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit,
+                    SortOrder = FormSortOrder,
+                    IsActive = true
+                });
+                _toast = "Created new homepage section.";
+            }
+            else
+            {
+                var existing = await Db.HomepageSections.FindAsync(FormId);
+                if (existing != null)
+                {
+                    existing.Title = FormTitle.Trim();
+                    existing.Eyebrow = FormEyebrow?.Trim();
+                    existing.CategorySlug = FormCategorySlug;
+                    existing.ViewAllHref = viewHref;
+                    existing.ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit;
+                    existing.SortOrder = FormSortOrder;
+                    _toast = "Updated homepage section.";
+                }
+            }
+            await Db.SaveChangesAsync();
         }
 
         await LoadData();

@@ -64,7 +64,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button type="button" onclick="window.print()" class="btn-primary !px-3 !py-1 text-xs cursor-pointer">🖨️ Print Now</button>
+                                <button type="button" onclick="window.print()" class="btn-primary px-3! py-1! text-xs cursor-pointer">🖨️ Print Now</button>
                                 <button type="button" onclick="this.closest('details').removeAttribute('open')" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer" aria-label="Close">✕</button>
                             </div>
                         </div>
@@ -140,7 +140,7 @@
             </details>
             @if (!string.IsNullOrWhiteSpace(order.DeliveryAddress?.PhoneNumber))
             {
-                <a href="@GetWhatsAppUrl(order.DeliveryAddress.PhoneNumber)" target="_blank" rel="noopener" class="btn-secondary !text-emerald-700 !bg-emerald-50 hover:!bg-emerald-100 !border-emerald-200 text-xs inline-flex items-center gap-1.5 shadow-2xs">
+                <a href="@GetWhatsAppUrl(order.DeliveryAddress.PhoneNumber)" target="_blank" rel="noopener" class="btn-secondary text-emerald-700! bg-emerald-50! hover:bg-emerald-100! border-emerald-200! text-xs inline-flex items-center gap-1.5 shadow-2xs">
                     <span>💬 WhatsApp Customer</span>
                 </a>
             }
@@ -431,7 +431,7 @@ else
                                 {
                                     <form method="post" @formname="verify-payment" @onsubmit="VerifyPaymentAsync" data-enhance class="inline">
                                         <AntiforgeryToken />
-                                        <button type="submit" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+                                        <button type="submit" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
                                             <Icon Name="check" Class="size-3.5" />
                                             <span>Verify Payment</span>
                                         </button>
@@ -439,7 +439,7 @@ else
 
                                     <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
                                         <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                                        <button type="submit" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                                             <Icon Name="close" Class="size-3.5" />
                                             <span>Payment Not Received (Cancel Order)</span>
                                         </button>
@@ -449,14 +449,14 @@ else
                                 {
                                     <form method="post" @formname="unverify-payment" @onsubmit="UnverifyPaymentAsync" data-enhance class="inline">
                                         <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
+                                        <button type="submit" class="btn-secondary text-slate-700! bg-white! hover:bg-slate-100! border-slate-300! text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
                                             Mark as Unverified
                                         </button>
                                     </form>
 
                                     <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
                                         <AntiforgeryToken />
-                                        <button type="submit" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
+                                        <button type="submit" class="btn-secondary text-rose-700! bg-white! hover:bg-rose-50! border-rose-300! text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
                                             <Icon Name="close" Class="size-3" />
                                             <span>Cancel Order</span>
                                         </button>
@@ -471,7 +471,7 @@ else
                 <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                        <label class="field-label font-bold text-slate-800 !mb-0">Fulfillment Lifecycle Status</label>
+                        <label class="field-label font-bold text-slate-800 mb-0!">Fulfillment Lifecycle Status</label>
                         <span class="text-[11px] text-slate-500">Current: <span class="font-bold text-slate-800">@order.Status</span></span>
                     </div>
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -492,7 +492,7 @@ else
                 <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                        <label class="field-label font-bold text-slate-800 !mb-0">Courier Logistics &amp; Consignment</label>
+                        <label class="field-label font-bold text-slate-800 mb-0!">Courier Logistics &amp; Consignment</label>
                         @if (!string.IsNullOrWhiteSpace(order.CourierTrackingUrl))
                         {
                             <a href="@order.CourierTrackingUrl" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-[11px] font-bold">
@@ -542,7 +542,7 @@ else
                 <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                        <label class="field-label font-bold text-slate-800 !mb-0">Internal Fulfillment &amp; Packaging Notes</label>
+                        <label class="field-label font-bold text-slate-800 mb-0!">Internal Fulfillment &amp; Packaging Notes</label>
                         @if (!string.IsNullOrWhiteSpace(order.CourierTrackingId))
                         {
                             var smsSnippet = Courier.BuildCustomerSmsText(

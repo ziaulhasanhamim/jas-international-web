@@ -128,7 +128,7 @@
                             </span>
                         </td>
                         <td class="text-center">
-                            <form method="post" data-enhance class="inline">
+                            <form method="post" @formname="toggle-product" data-enhance class="inline">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="ToggleProductId" value="@p.Id" />
                                 <button
@@ -146,7 +146,7 @@
                         <td class="text-right whitespace-nowrap space-x-2">
                             @if (p.Hidden)
                             {
-                                <form method="post" data-enhance class="inline">
+                                <form method="post" @formname="toggle-product" data-enhance class="inline">
                                     <AntiforgeryToken />
                                     <input type="hidden" name="ToggleProductId" value="@p.Id" />
                                     <button type="submit" name="ToggleAction" value="toggle" class="btn-primary !px-2.5 !py-1 text-xs !bg-emerald-600 hover:!bg-emerald-700 inline-flex items-center gap-1 cursor-pointer" title="Publish product to storefront immediately">
@@ -218,10 +218,10 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "toggle-product")]
     public int ToggleProductId { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "toggle-product")]
     public string? ToggleAction { get; set; }
 
     private string? _toast;
