@@ -220,7 +220,7 @@ public enum OrderableKind
     FeaturedCategories
 }
 
-public sealed record AdminProductRow(int Id, string Name, string Slug, string Category, int VariantCount, bool Hidden);
+public sealed record AdminProductRow(int Id, string Name, string Slug, string Category, int VariantCount, bool Hidden, string? ImageUrl = null);
 
 public sealed record AdminBrandRow(int Id, string Name, string Slug, string? Description, string? LogoUrl, bool IsFeatured, int SortOrder, int ProductCount, bool Hidden);
 

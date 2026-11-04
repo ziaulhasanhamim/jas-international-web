@@ -8,7 +8,9 @@ public sealed class ServerCartBackend(IServiceScopeFactory scopes, Authenticatio
     private async Task<T> RunAsync<T>(Func<ShoppingService, int?, Task<T>> action)
     {
         await using var scope = scopes.CreateAsyncScope();
+#pragma warning disable BL0013 // Cart backend queries authentication state per request
         var principal = (await auth.GetAuthenticationStateAsync()).User;
+#pragma warning restore BL0013
         int? id = ShoppingService.UserId(principal);
         try
         {

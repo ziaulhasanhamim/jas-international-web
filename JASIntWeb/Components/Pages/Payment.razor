@@ -555,7 +555,6 @@
                 StateHasChanged();
                 await Task.Delay(2000);
                 copiedNumber = false;
-                StateHasChanged();
             }
             catch
             {
@@ -575,7 +574,6 @@
                 StateHasChanged();
                 await Task.Delay(2000);
                 copiedRef = false;
-                StateHasChanged();
             }
             catch
             {
@@ -614,7 +612,6 @@
         }
 
         isSubmitting = true;
-        StateHasChanged();
 
         try
         {

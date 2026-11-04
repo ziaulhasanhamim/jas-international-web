@@ -9,7 +9,9 @@ public sealed class AdminSession(IServiceScopeFactory scopes, AuthenticationStat
     {
         await using var scope = scopes.CreateAsyncScope();
         var signIn = scope.ServiceProvider.GetRequiredService<SignInManager<User>>();
+#pragma warning disable BL0013 // Scoped admin session explicitly re-checks current security stamp per operation
         var user = await signIn.ValidateSecurityStampAsync((await auth.GetAuthenticationStateAsync()).User);
+#pragma warning restore BL0013
         var users = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
         if (user is null || !await users.IsInRoleAsync(user, "Admin"))
         {

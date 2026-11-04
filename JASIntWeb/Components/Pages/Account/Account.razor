@@ -1,7 +1,6 @@
 @page "/account"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject AppDbContext Db
-@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider Auth
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
 @inject NavigationManager Nav
@@ -264,11 +263,14 @@
     private List<Order> orders = [];
     private User? currentUser;
 
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
     protected override async Task OnInitializedAsync()
     {
         profileForm ??= new();
         passwordForm ??= new();
-        var authState = await Auth.GetAuthenticationStateAsync();
+        var authState = await AuthStateTask;
         var userClaims = authState.User;
         email = userClaims.Identity?.Name;
         currentUser = await Users.GetUserAsync(userClaims);

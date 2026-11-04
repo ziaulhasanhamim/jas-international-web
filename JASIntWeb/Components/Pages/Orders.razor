@@ -1,6 +1,5 @@
 @page "/orders"
 @inject IServiceScopeFactory ScopeFactory
-@inject AuthenticationStateProvider AuthState
 @using Microsoft.AspNetCore.Components.Authorization
 @using JASIntWeb.Client.Components.Orders
 @using JASIntWeb.Persistence
@@ -148,9 +147,12 @@
 @code {
     private List<Order> accountOrders = [];
 
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthState.GetAuthenticationStateAsync();
+        var auth = await AuthStateTask;
         if (auth.User.Identity?.IsAuthenticated == true)
         {
             var userId = ShoppingService.UserId(auth.User);
