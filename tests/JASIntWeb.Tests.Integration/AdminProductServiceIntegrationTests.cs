@@ -133,15 +133,19 @@ public class AdminProductServiceIntegrationTests
             Name = $"Nothing Technologies {suffix}",
             Slug = "",
             Description = "London-based tech company.",
-            IsFeatured = true,
+            IsFeatured = false,
             SortOrder = 10,
             Hidden = false
         };
 
         await admin.SaveBrandAsync(form);
 
-        var saved = await db.Brands.AsNoTracking().FirstOrDefaultAsync(b => b.Name == $"Nothing Technologies {suffix}");
+        var saved = await db.Brands.FirstOrDefaultAsync(b => b.Name == $"Nothing Technologies {suffix}");
         await saved.Should().NotBeNull();
         await saved!.Slug.Should().BeEqualTo($"nothing-technologies-{suffix}");
+
+        // Clean up test entity to prevent database test clutter
+        db.Brands.Remove(saved);
+        await db.SaveChangesAsync();
     }
 }

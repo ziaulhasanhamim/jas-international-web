@@ -952,6 +952,9 @@
   .max-w-\[100px\] {
     max-width: 100px;
   }
+  .max-w-\[120px\] {
+    max-width: 120px;
+  }
   .max-w-\[130px\] {
     max-width: 130px;
   }
@@ -2137,6 +2140,9 @@
   .py-3 {
     padding-block: calc(var(--spacing) * 3);
   }
+  .py-3\.5 {
+    padding-block: calc(var(--spacing) * 3.5);
+  }
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
   }
@@ -3107,6 +3113,9 @@
     .hover\:bg-slate-800:hover {
       background-color: var(--color-slate-800);
     }
+    .hover\:bg-white:hover {
+      background-color: var(--color-white);
+    }
     .hover\:bg-white\/10:hover {
       background-color: color-mix(in srgb, #fff 10%, transparent);
     }
@@ -3201,6 +3210,10 @@
     }
     .hover\:underline:hover {
       text-decoration-line: underline;
+    }
+    .hover\:shadow-2xs:hover {
+      --tw-shadow: 0 1px var(--tw-shadow-color, rgb(0 0 0 / 0.05));
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
     .hover\:shadow-md:hover {
       --tw-shadow: 0 4px 6px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 2px 4px -2px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
@@ -3374,11 +3387,17 @@
     .sm\:justify-between {
       justify-content: space-between;
     }
+    .sm\:justify-center {
+      justify-content: center;
+    }
     .sm\:justify-end {
       justify-content: flex-end;
     }
     .sm\:gap-2 {
       gap: calc(var(--spacing) * 2);
+    }
+    .sm\:gap-2\.5 {
+      gap: calc(var(--spacing) * 2.5);
     }
     .sm\:gap-3 {
       gap: calc(var(--spacing) * 3);

@@ -22,13 +22,14 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
                 .ToListAsync();
             }))!;
 
-    public async Task<List<BrandLinkDto>> FeaturedBrandsAsync() =>
-    (await cache.GetOrCreateAsync(FeaturedBrandsCacheKey, async entry =>
+    public async Task<List<BrandLinkDto>> FeaturedBrandsAsync(int limit = 10) =>
+    (await cache.GetOrCreateAsync($"{FeaturedBrandsCacheKey}_{limit}", async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
                 return await db.Brands.AsNoTracking().Where(b => !b.IsDeleted && b.IsFeatured)
                 .OrderBy(b => b.SortOrder)
                 .ThenBy(b => b.Name)
+                .Take(limit)
                 .Select(b => new BrandLinkDto(b.Id, b.Name, b.Slug, b.LogoUrl, b.IsFeatured, b.SortOrder))
                 .ToListAsync();
             }))!;
@@ -37,6 +38,9 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     {
         cache.Remove(BrandsCacheKey);
         cache.Remove(FeaturedBrandsCacheKey);
+        cache.Remove($"{FeaturedBrandsCacheKey}_10");
+        cache.Remove($"{FeaturedBrandsCacheKey}_8");
+        cache.Remove($"{FeaturedBrandsCacheKey}_12");
     }
 
     public async Task<List<CategoryLinkDto>> CategoriesAsync() =>

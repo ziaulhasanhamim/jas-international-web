@@ -216,6 +216,18 @@ public static class JsonTestDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
+        // Clean up any test dummy brands generated during automated integration test runs
+        var testBrands = await db.Brands.Where(b => b.Name.StartsWith("Nothing Technologies ") && !b.IsDeleted).ToListAsync(ct);
+        if (testBrands.Count > 0)
+        {
+            foreach (var tb in testBrands)
+            {
+                tb.IsFeatured = false;
+                tb.IsDeleted = true;
+            }
+            await db.SaveChangesAsync(ct);
+        }
+
         // Link any unassigned products to matching brands
         var brands = await db.Brands.Where(b => !b.IsDeleted).ToListAsync(ct);
         var unlinkedProducts = await db.Products.Where(p => p.BrandId == null && !p.IsDeleted).ToListAsync(ct);

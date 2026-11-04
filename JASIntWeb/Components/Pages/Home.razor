@@ -34,24 +34,46 @@
 
 <HeroCarousel Slides="slides" />
 
-<!-- Popular Brands Strip -->
+<!-- Featured Brands Strip -->
 @if (featuredBrands.Count > 0)
 {
-    <section class="border-y border-slate-200/80 bg-white py-5">
+    <section class="border-y border-slate-200/80 bg-white/95 backdrop-blur-xs py-3.5 shadow-2xs">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-wrap items-center justify-between gap-4 sm:gap-8">
-                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 shrink-0">Featured Brands</span>
-                <div class="flex flex-wrap items-center gap-3 sm:gap-6 text-sm font-bold text-slate-700">
-                    @foreach (var b in featuredBrands)
+            <div class="flex items-center justify-between gap-3 sm:gap-6">
+                <!-- Label / Eyebrow -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="size-2 rounded-full bg-blue-600 animate-pulse"></span>
+                    <span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Featured Brands</span>
+                </div>
+
+                <!-- Brand Pills Ribbon (Single-row scrollable ribbon with top 10 limit) -->
+                <div class="flex-1 min-w-0 flex items-center justify-start sm:justify-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-1">
+                    @foreach (var b in featuredBrands.Take(10))
                     {
-                        <a href="/products?brand=@b.Slug" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-100 bg-slate-50 text-slate-800 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50/50 transition">
+                        <a href="/products?brand=@b.Slug"
+                           title="Browse @b.Name products"
+                           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50/80 hover:bg-white hover:border-blue-500 hover:text-blue-600 hover:shadow-2xs active:scale-95 transition-all text-xs font-bold text-slate-800 shrink-0 select-none">
                             @if (!string.IsNullOrEmpty(b.LogoUrl))
                             {
-                                <img src="@b.LogoUrl" alt="@b.Name" class="size-5 object-contain" />
+                                <img src="@b.LogoUrl" alt="@b.Name" class="size-4 object-contain" loading="lazy" />
                             }
-                            <span>@b.Name</span>
+                            else
+                            {
+                                <span class="flex size-4 items-center justify-center rounded bg-slate-200 text-[9px] font-black text-slate-600">
+                                    @b.Name[..Math.Min(1, b.Name.Length)].ToUpperInvariant()
+                                </span>
+                            }
+                            <span class="truncate max-w-[120px]">@b.Name</span>
                         </a>
                     }
+                </div>
+
+                <!-- View All Brands Link -->
+                <div class="shrink-0">
+                    <a href="/products" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition">
+                        <span>All Brands</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+                    </a>
                 </div>
             </div>
         </div>
@@ -157,7 +179,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         slides = await Catalog.SlidesAsync();
-        featuredBrands = await Catalog.FeaturedBrandsAsync();
+        featuredBrands = await Catalog.FeaturedBrandsAsync(10);
         categories = await Catalog.HomeCategoriesAsync();
         customSections = await Catalog.GetHomepageSectionsAsync();
 
