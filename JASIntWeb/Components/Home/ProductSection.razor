@@ -1,6 +1,3 @@
-@rendermode InteractiveAuto
-@inject IJSRuntime JS
-
 @if (Products.Count > 0)
 {
     <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -23,11 +20,11 @@
 
         <!-- Carousel Slider Track with Arrow Controls -->
         <div class="relative group/slider">
-            <!-- Left Arrow Button -->
+            <!-- Left Arrow Button (Client-side smooth scroll) -->
             <button
                 type="button"
-                @onclick="ScrollLeft"
-                class="absolute -left-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95"
+                onclick="this.parentElement.querySelector('.slider-track').scrollBy({left: -320, behavior: 'smooth'})"
+                class="absolute -left-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95 cursor-pointer"
                 aria-label="Previous products"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -37,8 +34,7 @@
 
             <!-- Scrollable Cards Row -->
             <div
-                @ref="sliderRef"
-                class="flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0"
+                class="slider-track flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-1 snap-x snap-mandatory scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0"
             >
                 @foreach (var product in Products)
                 {
@@ -48,11 +44,11 @@
                 }
             </div>
 
-            <!-- Right Arrow Button (matches Gadget & Gear screenshot) -->
+            <!-- Right Arrow Button (Client-side smooth scroll) -->
             <button
                 type="button"
-                @onclick="ScrollRight"
-                class="absolute -right-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95"
+                onclick="this.parentElement.querySelector('.slider-track').scrollBy({left: 320, behavior: 'smooth'})"
+                class="absolute -right-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95 cursor-pointer"
                 aria-label="Next products"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -65,8 +61,6 @@
 
 @code
 {
-    private ElementReference sliderRef;
-
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 
@@ -78,22 +72,4 @@
 
     [Parameter]
     public string ViewAllHref { get; set; } = "/products";
-
-    private async Task ScrollLeft()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("window.scrollElement", sliderRef, -320);
-        }
-        catch (InvalidOperationException) { }
-    }
-
-    private async Task ScrollRight()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("window.scrollElement", sliderRef, 320);
-        }
-        catch (InvalidOperationException) { }
-    }
 }
