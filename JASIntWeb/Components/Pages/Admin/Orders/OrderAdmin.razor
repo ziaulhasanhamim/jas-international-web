@@ -4,13 +4,16 @@
 @inject IServiceScopeFactory ScopeFactory
 @inject AdminSession Session
 @inject ShoppingService Shop
+@inject CourierLogisticsService Courier
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<PageTitle>Order #@Id · JAS Admin</PageTitle>
+<PageTitle>Order #@Id · JAS Admin Hub</PageTitle>
 
+<!-- Top Navigation & Actions Bar -->
 <div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
     <div>
-        <p class="eyebrow">ORDER DETAILS</p>
+        <p class="eyebrow">ORDER FULFILLMENT</p>
         <div class="flex items-center gap-3">
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Order #@Id</h1>
             @if (order is not null)
@@ -18,19 +21,19 @@
                 @switch (order.Status)
                 {
                     case OrderStatus.Pending:
-                        <span class="badge badge-amber text-xs">Pending Review</span>
+                        <span class="badge badge-amber text-xs font-bold">Pending Review</span>
                         break;
                     case OrderStatus.Processing:
-                        <span class="badge badge-blue text-xs">Processing</span>
+                        <span class="badge badge-blue text-xs font-bold">Processing &amp; Packing</span>
                         break;
                     case OrderStatus.InTransit:
-                        <span class="badge badge-purple text-xs">In Delivery</span>
+                        <span class="badge badge-purple text-xs font-bold">Dispatched / In Transit</span>
                         break;
                     case OrderStatus.Delivered:
-                        <span class="badge badge-emerald text-xs">Delivered &amp; Collected</span>
+                        <span class="badge badge-emerald text-xs font-bold">Delivered &amp; Collected</span>
                         break;
                     case OrderStatus.Cancelled:
-                        <span class="badge badge-rose text-xs">Cancelled</span>
+                        <span class="badge badge-rose text-xs font-bold">Cancelled &amp; Restocked</span>
                         break;
                     default:
                         <span class="badge badge-slate text-xs">@order.Status</span>
@@ -43,17 +46,30 @@
         </p>
     </div>
 
-    <div class="flex items-center gap-2">
-        <a href="/admin/orders" class="btn-secondary">
+    <div class="flex flex-wrap items-center gap-2">
+        @if (order is not null)
+        {
+            <button type="button" @onclick="() => _showPrintModal = true" class="btn-secondary text-xs inline-flex items-center gap-1.5 shadow-2xs">
+                <Icon Name="receipt" Class="size-4 text-slate-600" />
+                <span>Print Packing Slip / Invoice</span>
+            </button>
+            @if (!string.IsNullOrWhiteSpace(order.DeliveryAddress?.PhoneNumber))
+            {
+                <a href="@GetWhatsAppUrl(order.DeliveryAddress.PhoneNumber)" target="_blank" rel="noopener" class="btn-secondary !text-emerald-700 !bg-emerald-50 hover:!bg-emerald-100 !border-emerald-200 text-xs inline-flex items-center gap-1.5 shadow-2xs">
+                    <span>💬 WhatsApp Customer</span>
+                </a>
+            }
+        }
+        <a href="/admin/orders" class="btn-secondary text-xs inline-flex items-center gap-1.5">
             <Icon Name="back" Class="size-4" />
-            Back to Orders
+            <span>Back to Orders</span>
         </a>
     </div>
 </div>
 
 @if (order is null)
 {
-    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
         <Icon Name="alert" Class="size-10 text-slate-300 mx-auto mb-3" />
         <p class="text-slate-500">Order #@Id was not found.</p>
     </div>
@@ -62,14 +78,18 @@ else
 {
     @if (error is not null)
     {
-        <div class="error-panel" role="alert">
-            <p class="font-medium">Action Failed</p>
-            <p>@error</p>
+        <div class="mb-5 rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-900 shadow-2xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <Icon Name="close" Class="size-4 text-rose-600 shrink-0" />
+                <span>@error</span>
+            </div>
+            <button type="button" @onclick="() => error = null" class="text-rose-500 hover:text-rose-700 font-bold">✕</button>
         </div>
     }
+
     @if (alertMessage is not null)
     {
-        <div class="rounded-xl border @(alertType == "rose" ? "border-rose-300 bg-rose-50 text-rose-900" : (alertType == "amber" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900")) p-3.5 mb-5 text-xs font-semibold flex items-center justify-between shadow-2xs" role="alert">
+        <div class="mb-5 rounded-xl border @(alertType == "rose" ? "border-rose-300 bg-rose-50 text-rose-900" : (alertType == "amber" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900")) p-3.5 text-xs font-semibold flex items-center justify-between shadow-2xs">
             <div class="flex items-center gap-2">
                 @if (alertType == "rose")
                 {
@@ -92,20 +112,26 @@ else
     <!-- Visual Order Progress Stepper -->
     <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs mb-6">
         <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-            <span class="text-xs font-bold uppercase tracking-widest text-slate-500">Order Progress Timeline</span>
+            <span class="text-xs font-bold uppercase tracking-widest text-slate-500">Order Fulfillment Lifecycle</span>
             @if (order.DeliveredAt.HasValue)
             {
-                <span class="text-xs text-emerald-700 font-semibold">Delivered on @order.DeliveredAt.Value.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</span>
+                <span class="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
+                    <span class="size-2 rounded-full bg-emerald-500"></span>
+                    Delivered on @order.DeliveredAt.Value.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
+                </span>
             }
             else if (order.Status == OrderStatus.Cancelled)
             {
-                <span class="text-xs text-rose-600 font-bold">Cancelled &amp; Reserved Stock Released</span>
+                <span class="text-xs text-rose-600 font-bold flex items-center gap-1.5">
+                    <span class="size-2 rounded-full bg-rose-500"></span>
+                    Cancelled &amp; Inventory Restocked
+                </span>
             }
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <!-- Step 1: Placed -->
-            <div class="rounded-xl border p-3 @(order.Status != OrderStatus.Cancelled ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : "border-slate-200 bg-slate-50 text-slate-500")">
+            <div class="rounded-xl border p-3.5 @(order.Status != OrderStatus.Cancelled ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : "border-slate-200 bg-slate-50 text-slate-500")">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold">✓</span>
                     <span class="text-xs font-bold">1. Order Placed</span>
@@ -117,26 +143,26 @@ else
             @{
                 var isStep2Active = order.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered;
             }
-            <div class="rounded-xl border p-3 @(isStep2Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Cancelled ? "border-slate-200 bg-slate-50 text-slate-400" : "border-blue-200 bg-blue-50/60 text-blue-950"))">
+            <div class="rounded-xl border p-3.5 @(isStep2Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Cancelled ? "border-slate-200 bg-slate-50 text-slate-400" : "border-blue-200 bg-blue-50/60 text-blue-950"))">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="flex size-5 items-center justify-center rounded-full @(isStep2Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
                         @(isStep2Active ? "✓" : "2")
                     </span>
-                    <span class="text-xs font-bold">2. Confirmed &amp; Packing</span>
+                    <span class="text-xs font-bold">2. Packing &amp; Ready</span>
                 </div>
-                <p class="text-[11px] text-slate-500">@(order.PaidAmount > 0 ? "Payment verified" : "Payment confirmation")</p>
+                <p class="text-[11px] text-slate-500">@(order.PaidAmount > 0 ? "Advance verified" : "Awaiting confirmation")</p>
             </div>
 
             <!-- Step 3: In Transit -->
             @{
                 var isStep3Active = order.Status is OrderStatus.InTransit or OrderStatus.Delivered;
             }
-            <div class="rounded-xl border p-3 @(isStep3Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Processing ? "border-blue-200 bg-blue-50/60 text-blue-950" : "border-slate-200 bg-slate-50 text-slate-400"))">
+            <div class="rounded-xl border p-3.5 @(isStep3Active ? "border-emerald-200 bg-emerald-50/60 text-emerald-950" : (order.Status == OrderStatus.Processing ? "border-blue-200 bg-blue-50/60 text-blue-950" : "border-slate-200 bg-slate-50 text-slate-400"))">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="flex size-5 items-center justify-center rounded-full @(isStep3Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
                         @(isStep3Active ? "✓" : "3")
                     </span>
-                    <span class="text-xs font-bold">3. In Transit / Dispatched</span>
+                    <span class="text-xs font-bold">3. Dispatched / Courier</span>
                 </div>
                 <p class="text-[11px] text-slate-500">@(string.IsNullOrEmpty(order.CourierName) ? "Pending dispatch" : order.CourierName)</p>
             </div>
@@ -145,57 +171,68 @@ else
             @{
                 var isStep4Active = order.Status == OrderStatus.Delivered;
             }
-            <div class="rounded-xl border p-3 @(isStep4Active ? "border-emerald-300 bg-emerald-100 text-emerald-950 font-bold" : "border-slate-200 bg-slate-50 text-slate-400")">
+            <div class="rounded-xl border p-3.5 @(isStep4Active ? "border-emerald-300 bg-emerald-100 text-emerald-950 font-bold" : "border-slate-200 bg-slate-50 text-slate-400")">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="flex size-5 items-center justify-center rounded-full @(isStep4Active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700") text-[10px] font-bold">
                         @(isStep4Active ? "✓" : "4")
                     </span>
-                    <span class="text-xs font-bold">4. Delivered</span>
+                    <span class="text-xs font-bold">4. Delivered &amp; Paid</span>
                 </div>
-                <p class="text-[11px] text-slate-500">@(isStep4Active ? "Completed & collected" : "Pending delivery")</p>
+                <p class="text-[11px] text-slate-500">@(isStep4Active ? "Completed" : "Pending delivery")</p>
             </div>
         </div>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-3 mb-7">
         <!-- Customer & Delivery Card -->
-        <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs">
-            <div class="flex items-center gap-3 mb-4 text-slate-900 font-bold border-b border-slate-100 pb-3">
-                <span class="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                    <Icon Name="map-pin" Class="size-4" />
-                </span>
-                <span>Delivery Information</span>
-            </div>
-            <div class="space-y-2 text-sm">
-                <div>
-                    <span class="text-xs text-slate-400 block">Customer Name</span>
-                    <strong class="text-slate-900 text-base">@order.DeliveryAddress?.CustomerName</strong>
-                </div>
-                <div>
-                    <span class="text-xs text-slate-400 block">Contact Phone</span>
-                    <a href="tel:@order.DeliveryAddress?.PhoneNumber" class="text-blue-600 font-mono font-medium hover:underline">
-                        @order.DeliveryAddress?.PhoneNumber
-                    </a>
-                </div>
-                <div>
-                    <span class="text-xs text-slate-400 block">Customer Email</span>
-                    <p class="text-slate-700 text-xs">@(order.DeliveryAddress?.Email ?? order.User?.Email ?? "No email provided")</p>
-                </div>
-                <div>
-                    <span class="text-xs text-slate-400 block">Street Address</span>
-                    <p class="text-slate-700">@order.DeliveryAddress?.FullAddress</p>
-                </div>
-                <div>
-                    <span class="text-xs text-slate-400 block">City &amp; District</span>
-                    <p class="text-slate-700">@order.DeliveryAddress?.City, @order.DeliveryAddress?.District</p>
-                </div>
-                <div class="pt-3 border-t border-slate-100">
-                    <span class="text-xs text-slate-400 block">Customer Type</span>
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 mt-0.5">
-                        <Icon Name="user" Class="size-3.5" />
-                        @(order.UserId.HasValue ? "Registered Account Customer" : "Guest Customer")
+        <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4 text-slate-900 font-bold border-b border-slate-100 pb-3">
+                    <span class="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                        <Icon Name="map-pin" Class="size-4" />
                     </span>
+                    <span>Delivery Address</span>
                 </div>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">Recipient Name</span>
+                        <strong class="text-slate-900 text-base font-bold">@order.DeliveryAddress?.CustomerName</strong>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">Primary Phone</span>
+                        <div class="flex items-center gap-2">
+                            <a href="tel:@order.DeliveryAddress?.PhoneNumber" class="text-blue-600 font-mono font-bold hover:underline">
+                                @order.DeliveryAddress?.PhoneNumber
+                            </a>
+                            @if (!string.IsNullOrWhiteSpace(order.DeliveryAddress?.PhoneNumber))
+                            {
+                                <a href="@GetWhatsAppUrl(order.DeliveryAddress.PhoneNumber)" target="_blank" rel="noopener" class="text-emerald-600 hover:text-emerald-800 text-xs font-medium" title="Chat on WhatsApp">
+                                    WhatsApp ↗
+                                </a>
+                            }
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">Customer Email</span>
+                        <p class="text-slate-700 text-xs font-mono">@(order.DeliveryAddress?.Email ?? order.User?.Email ?? "No email provided")</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">Street Address</span>
+                        <p class="text-slate-700 text-xs leading-relaxed">@order.DeliveryAddress?.FullAddress</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">City &amp; District</span>
+                        <p class="text-slate-900 font-semibold text-xs">@order.DeliveryAddress?.City, @order.DeliveryAddress?.District</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 mt-4">
+                <span class="text-xs text-slate-400 block">Account Status</span>
+                <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 mt-1">
+                    <span class="size-2 rounded-full @(order.UserId.HasValue ? "bg-emerald-500" : "bg-slate-400")"></span>
+                    @(order.UserId.HasValue ? "Registered Account Customer" : "Guest Checkout")
+                </span>
             </div>
         </div>
 
@@ -207,7 +244,7 @@ else
                         <span class="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                             <Icon Name="receipt" Class="size-4" />
                         </span>
-                        <span>Fulfillment Operations</span>
+                        <span>Fulfillment &amp; Verification</span>
                     </div>
                     <span class="text-xs text-slate-400">Order Token: <code class="font-mono text-slate-600 font-bold">@order.PublicToken.ToString()[..8]...</code></span>
                 </div>
@@ -219,7 +256,7 @@ else
                             <span class="flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-700">
                                 <Icon Name="wallet" Class="size-3.5" />
                             </span>
-                            <span class="font-bold text-slate-800 text-xs">Payment Verification</span>
+                            <span class="font-bold text-slate-800 text-xs">MFS / bKash Verification</span>
                         </div>
                         <div>
                             @if (order.Status == OrderStatus.Cancelled)
@@ -228,7 +265,7 @@ else
                             }
                             else if (order.PaidAmount > 0)
                             {
-                                <span class="badge badge-emerald font-bold">
+                                <span class="badge badge-emerald font-bold inline-flex items-center gap-1">
                                     <Icon Name="check" Class="size-3" />
                                     <span>Verified (৳@order.PaidAmount.ToString("N0"))</span>
                                 </span>
@@ -241,7 +278,7 @@ else
                             }
                             else
                             {
-                                <span class="badge badge-slate">Unpaid</span>
+                                <span class="badge badge-slate font-medium">Cash On Delivery (Unpaid)</span>
                             }
                         </div>
                     </div>
@@ -249,7 +286,7 @@ else
                     <!-- Payment Details Grid -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 py-1">
                         <div>
-                            <span class="text-[11px] text-slate-400 block mb-0.5">Claimed bKash TrxID</span>
+                            <span class="text-[11px] text-slate-400 block mb-0.5">Claimed TrxID</span>
                             @if (!string.IsNullOrEmpty(order.TransactionId))
                             {
                                 <strong class="font-mono text-xs text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 inline-block font-bold">
@@ -293,12 +330,13 @@ else
 
                     <!-- Action Buttons -->
                     <div class="pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
-                        <div class="text-slate-500 text-xs">
+                        <div class="text-slate-600 text-xs">
                             Order Total: <strong class="text-slate-900 font-bold text-sm">৳@order.Total.ToString("N0")</strong>
                             @if (order.PaidAmount > 0)
                             {
                                 <span class="ml-1 text-emerald-700 font-semibold">(Paid: ৳@order.PaidAmount.ToString("N0"))</span>
                             }
+                            <span class="ml-2 font-bold text-amber-700">COD Due: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</span>
                         </div>
 
                         <div class="flex items-center gap-2">
@@ -306,45 +344,37 @@ else
                             {
                                 @if (order.PaidAmount == 0)
                                 {
-                                    <button type="button" @onclick="VerifyPayment" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5">
+                                    <button type="button" @onclick="VerifyPayment" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
                                         <Icon Name="check" Class="size-3.5" />
                                         <span>Verify Payment</span>
                                     </button>
 
-                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5">
-                                        <Icon Name="close" Class="size-3" />
+                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                                        <Icon Name="close" Class="size-3.5" />
                                         <span>Payment Not Received (Cancel Order)</span>
                                     </button>
                                 }
                                 else
                                 {
-                                    <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl">
+                                    <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
                                         Mark as Unverified
                                     </button>
 
-                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1">
+                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
                                         <Icon Name="close" Class="size-3" />
                                         <span>Cancel Order</span>
                                     </button>
                                 }
                             }
-                            else if (order.Status == OrderStatus.Cancelled)
-                            {
-                                <span class="text-xs text-rose-600 font-semibold italic">Order is cancelled &amp; inventory released.</span>
-                            }
                         </div>
                     </div>
                 </div>
 
-                @if (Input is null)
-                {
-                    <p class="text-xs text-slate-400">Loading form…</p>
-                }
-                else
+                <!-- Courier Dispatch & Status Form -->
+                @if (Input is not null)
                 {
                     <EditForm Model="Input" OnValidSubmit="Save" class="space-y-4">
                         <DataAnnotationsValidator />
-                        <ValidationSummary />
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
@@ -358,50 +388,58 @@ else
                             </div>
 
                             <div>
-                                <label class="field-label font-bold text-slate-800">Courier Service</label>
-                                <InputSelect @bind-Value="Input.CourierName" class="field" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                                <label class="field-label font-bold text-slate-800">Courier Delivery Partner</label>
+                                <InputSelect @bind-Value="Input.CourierName" @bind-Value:after="OnCourierChanged" class="field font-medium" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
                                     <option value="">Select courier provider...</option>
-                                    <option value="Steadfast Courier">Steadfast Courier</option>
-                                    <option value="Pathao Courier">Pathao Courier</option>
-                                    <option value="RedX">RedX Delivery</option>
-                                    <option value="Sundarban Courier">Sundarban Courier</option>
-                                    <option value="Paperfly">Paperfly</option>
-                                    <option value="Showroom Pickup">Showroom Pickup (Khulna)</option>
-                                    <option value="Other">Other / Self-Delivery</option>
+                                    @foreach (var c in CourierLogisticsService.AvailableCouriers)
+                                    {
+                                        <option value="@c.Name">@c.Name</option>
+                                    }
                                 </InputSelect>
                             </div>
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <label class="field-label">Courier Consignment / Tracking Code</label>
-                                <InputText @bind-Value="Input.CourierTrackingId" placeholder="e.g. STEADFAST-109281" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
+                                <label class="field-label font-semibold text-slate-700">Consignment / Tracking Code</label>
+                                <InputText @bind-Value="Input.CourierTrackingId" @bind-Value:after="OnTrackingCodeChanged" placeholder="e.g. ST-88291039" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
                             </div>
 
                             <div>
-                                <label class="field-label">Courier Tracking URL</label>
-                                <InputText @bind-Value="Input.CourierTrackingUrl" placeholder="https://steadfast.com.bd/t/..." class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="field-label !mb-0 font-semibold text-slate-700">Courier Tracking URL</label>
+                                    @if (!string.IsNullOrWhiteSpace(Input.CourierTrackingUrl))
+                                    {
+                                        <a href="@Input.CourierTrackingUrl" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-[11px] font-bold">
+                                            Track Live ↗
+                                        </a>
+                                    }
+                                </div>
+                                <InputText @bind-Value="Input.CourierTrackingUrl" placeholder="Auto-generated live link..." class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
                             </div>
                         </div>
 
                         <div>
-                            <label class="field-label">Internal Fulfillment &amp; Audit Notes</label>
-                            <InputTextArea @bind-Value="Input.AdminNotes" placeholder="Add packaging notes, customer requests, or special handling instructions..." rows="2" class="field text-xs" />
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="field-label !mb-0 font-semibold text-slate-700">Internal Order Fulfillment Notes</label>
+                                @if (!string.IsNullOrWhiteSpace(Input.CourierTrackingId))
+                                {
+                                    <button type="button" @onclick="CopySmsSnippet" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
+                                        <span>📋 Copy Customer SMS</span>
+                                    </button>
+                                }
+                            </div>
+                            <InputTextArea @bind-Value="Input.AdminNotes" placeholder="Add packaging notes, IMEI numbers, customer requests, or special handling..." rows="2" class="field text-xs" />
                         </div>
 
                         <div class="pt-2">
-                            <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                            <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2 cursor-pointer" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
                                 <Icon Name="check" Class="size-4" />
                                 <span>Save Changes &amp; Update Order</span>
                             </button>
                         </div>
                     </EditForm>
                 }
-
-                <div class="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 space-y-1">
-                    <p>• Setting status to <strong>Delivered</strong> collects Cash on Delivery, records sales revenue, and finalizes inventory reduction.</p>
-                    <p>• Setting status to <strong>Cancelled</strong> releases all reserved stock back to active inventory.</p>
-                </div>
             </div>
         </div>
     </div>
@@ -409,7 +447,7 @@ else
     <!-- Order Items Table -->
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-7">
         <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="font-bold text-slate-900 text-base">Ordered Products</h2>
+            <h2 class="font-bold text-slate-900 text-base">Ordered Products &amp; Specs</h2>
             <span class="text-xs text-slate-400 font-medium">@order.Items.Count line items</span>
         </div>
         <div class="table-scroll">
@@ -430,10 +468,10 @@ else
                             <td class="font-semibold text-slate-900">
                                 @i.ProductName
                             </td>
-                            <td class="text-xs text-slate-500">
+                            <td class="text-xs text-slate-500 font-mono">
                                 @i.VariantName
                             </td>
-                            <td class="text-center font-medium text-slate-800">
+                            <td class="text-center font-bold text-slate-800">
                                 @i.Quantity
                             </td>
                             <td class="text-right text-slate-700 tabular-nums">
@@ -452,6 +490,15 @@ else
                             ৳@order.Items.Sum(i => i.LineTotal).ToString("N0")
                         </td>
                     </tr>
+                    @if (order.DiscountAmount > 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-right text-xs font-semibold text-emerald-700">Coupon Discount (@(order.CouponCode ?? "Promo"))</td>
+                            <td class="text-right font-bold text-emerald-700 tabular-nums">
+                                -৳@order.DiscountAmount.ToString("N0")
+                            </td>
+                        </tr>
+                    }
                     <tr>
                         <td colspan="4" class="text-right text-xs text-slate-500">Delivery Fee (@(order.DeliveryCharge == 80 ? "Khulna City" : "Outside Khulna"))</td>
                         <td class="text-right font-medium text-slate-800 tabular-nums">
@@ -468,6 +515,137 @@ else
             </table>
         </div>
     </div>
+
+    <!-- Order Timeline / Activity Log -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs mb-7">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div class="flex items-center gap-2">
+                <span class="flex size-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+                    <Icon Name="history" Class="size-3.5" />
+                </span>
+                <h3 class="font-bold text-slate-900 text-sm">Order Activity &amp; Audit Trail</h3>
+            </div>
+            <span class="text-xs text-slate-400">@order.TimelineEvents.Count recorded events</span>
+        </div>
+
+        <div class="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            @foreach (var ev in order.TimelineEvents.OrderByDescending(e => e.CreatedAt))
+            {
+                <div class="relative flex items-start justify-between gap-4">
+                    <span class="absolute -left-6 top-1 flex size-4 items-center justify-center rounded-full bg-white ring-4 ring-white">
+                        <span class="size-2 rounded-full @(ev.BadgeColor == "emerald" ? "bg-emerald-500" : (ev.BadgeColor == "rose" ? "bg-rose-500" : (ev.BadgeColor == "amber" ? "bg-amber-500" : "bg-blue-500")))"></span>
+                    </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-slate-900">@ev.Title</span>
+                            <span class="text-[10px] text-slate-400">by @(ev.Actor ?? "Staff")</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(ev.Description))
+                        {
+                            <p class="text-xs text-slate-600 mt-0.5">@ev.Description</p>
+                        }
+                    </div>
+                    <span class="text-[11px] font-mono text-slate-400 shrink-0">
+                        @ev.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM, hh:mm tt")
+                    </span>
+                </div>
+            }
+
+            @if (order.TimelineEvents.Count == 0)
+            {
+                <p class="text-xs text-slate-400 italic">No timeline events recorded yet.</p>
+            }
+        </div>
+    </div>
+}
+
+<!-- Thermal Invoice / Packing Slip Modal -->
+@if (_showPrintModal && order is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
+        <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <img src="/jas-logo.png" alt="JAS International" class="size-8 rounded-lg" />
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">JAS International · Packing Slip</h3>
+                        <p class="text-[10px] text-slate-400">Order #@order.Id · Helpline: 01711465078</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @onclick="TriggerPrint" class="btn-primary !px-3 !py-1 text-xs">🖨️ Print Now</button>
+                    <button type="button" @onclick="() => _showPrintModal = false" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+                </div>
+            </div>
+
+            <!-- Packing Slip Printable Content -->
+            <div id="printable-slip" class="text-xs text-slate-800 space-y-3 font-sans p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                <div class="flex justify-between items-start border-b border-slate-200 pb-2">
+                    <div>
+                        <p class="font-bold text-slate-900">JAS International</p>
+                        <p class="text-[11px] text-slate-500">Khulna, Bangladesh</p>
+                        <p class="text-[11px] text-slate-500">Phone: 01711465078</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-slate-900">Invoice / Consignment</p>
+                        <p class="font-mono font-bold text-blue-700">Order #@order.Id</p>
+                        <p class="text-[10px] text-slate-400">@order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</p>
+                    </div>
+                </div>
+
+                <!-- Customer Details -->
+                <div class="bg-white p-3 rounded-lg border border-slate-200">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Deliver To:</p>
+                    <p class="font-bold text-slate-900">@order.DeliveryAddress?.CustomerName</p>
+                    <p class="text-slate-700 font-mono font-bold">@order.DeliveryAddress?.PhoneNumber</p>
+                    <p class="text-slate-600">@order.DeliveryAddress?.FullAddress</p>
+                    <p class="text-slate-600">@order.DeliveryAddress?.City, @order.DeliveryAddress?.District</p>
+                </div>
+
+                <!-- Items Table -->
+                <table class="w-full text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-300 text-slate-600 text-left">
+                            <th class="py-1">Item Description</th>
+                            <th class="py-1 text-center">Qty</th>
+                            <th class="py-1 text-right">Price</th>
+                            <th class="py-1 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in order.Items)
+                        {
+                            <tr class="border-b border-slate-200">
+                                <td class="py-1.5 font-medium">@item.ProductName <span class="text-slate-400 font-mono">(@item.VariantName)</span></td>
+                                <td class="py-1.5 text-center font-bold">@item.Quantity</td>
+                                <td class="py-1.5 text-right font-mono">৳@item.UnitPrice.ToString("N0")</td>
+                                <td class="py-1.5 text-right font-mono font-bold">৳@item.LineTotal.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <!-- Financial Breakdown -->
+                <div class="flex justify-between items-center bg-slate-100 p-2.5 rounded-lg text-xs font-semibold">
+                    <div>
+                        <p class="text-slate-600">Payment Status: <span class="font-bold text-slate-900">@(order.PaidAmount > 0 ? "Advance Verified" : "Cash on Delivery")</span></p>
+                        @if (!string.IsNullOrEmpty(order.CourierName))
+                        {
+                            <p class="text-slate-600">Courier: <span class="font-bold text-slate-900">@order.CourierName</span></p>
+                        }
+                    </div>
+                    <div class="text-right">
+                        <p class="text-slate-500">Order Total: ৳@order.Total.ToString("N0")</p>
+                        <p class="text-sm font-extrabold text-rose-700">C.O.D. TO COLLECT: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</p>
+                    </div>
+                </div>
+
+                <div class="pt-2 text-[10px] text-slate-400 text-center">
+                    Thank you for choosing JAS International! For warranty &amp; service, contact 01711465078.
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
 @code
@@ -479,10 +657,19 @@ else
     private string? error;
     private string? alertMessage;
     private string alertType = "emerald";
+    private bool _showPrintModal = false;
 
     protected override async Task OnInitializedAsync()
     {
         await ReloadOrderAsync();
+    }
+
+    private string GetWhatsAppUrl(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return "#";
+        var clean = new string(phone.Where(char.IsDigit).ToArray());
+        if (clean.StartsWith("0")) clean = "88" + clean;
+        return $"https://wa.me/{clean}?text={Uri.EscapeDataString($"Hello from JAS International regarding Order #{Id}!")}";
     }
 
     private IEnumerable<OrderStatus> AllowedStatuses()
@@ -510,6 +697,57 @@ else
         }
     }
 
+    private void OnCourierChanged()
+    {
+        if (Input is null) return;
+        if (!string.IsNullOrWhiteSpace(Input.CourierTrackingId))
+        {
+            Input.CourierTrackingUrl = Courier.GetTrackingUrl(Input.CourierName, Input.CourierTrackingId);
+        }
+    }
+
+    private void OnTrackingCodeChanged()
+    {
+        if (Input is null) return;
+        Input.CourierTrackingUrl = Courier.GetTrackingUrl(Input.CourierName, Input.CourierTrackingId);
+    }
+
+    private async Task CopySmsSnippet()
+    {
+        if (order == null || Input == null) return;
+        var sms = Courier.BuildCustomerSmsText(
+            order.DeliveryAddress?.CustomerName ?? "Customer",
+            order.Id,
+            Input.CourierName,
+            Input.CourierTrackingId,
+            Input.CourierTrackingUrl
+        );
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", sms);
+            alertType = "emerald";
+            alertMessage = "Customer dispatch SMS copied to clipboard!";
+        }
+        catch
+        {
+            alertType = "blue";
+            alertMessage = $"SMS: {sms}";
+        }
+    }
+
+    private async Task TriggerPrint()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("window.print");
+        }
+        catch
+        {
+            // Ignore print cancellation or client disconnection
+        }
+    }
+
     private async Task Save()
     {
         try
@@ -520,11 +758,7 @@ else
             await Session.RunAsync(s => s.ChangeOrderAsync(Input));
             await ReloadOrderAsync();
             alertType = "emerald";
-            alertMessage = $"Order #{Id} details and status ({order?.Status}) updated successfully!";
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            alertMessage = $"Order #{Id} fulfillment details and status ({order?.Status}) updated successfully!";
         }
         catch (Exception ex)
         {
@@ -540,7 +774,7 @@ else
             await Shop.VerifyPaymentAsync(Id);
             await ReloadOrderAsync();
             alertType = "emerald";
-            alertMessage = "Payment verified successfully! Customer has been notified.";
+            alertMessage = "Payment verified successfully! Customer notified.";
         }
         catch (Exception ex)
         {
@@ -589,6 +823,7 @@ else
             .Include(o => o.Items)
             .Include(o => o.Payments)
             .Include(o => o.User)
+            .Include(o => o.TimelineEvents)
             .AsSplitQuery()
             .SingleOrDefaultAsync(o => o.Id == Id);
 
@@ -601,6 +836,8 @@ else
                 CourierName = order.CourierName,
                 CourierTrackingId = order.CourierTrackingId,
                 CourierTrackingUrl = order.CourierTrackingUrl,
+                ConsignmentId = order.ConsignmentId,
+                CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
                 AdminNotes = order.AdminNotes
             };
         }

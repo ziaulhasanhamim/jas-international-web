@@ -22,6 +22,7 @@ builder.Services.AddScoped<AccountMailService>();
 builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddSingleton<CourierLogisticsService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents().AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
 builder.Services.AddCascadingAuthenticationState();

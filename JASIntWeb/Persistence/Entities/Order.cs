@@ -32,8 +32,11 @@ public class Order : AuditableEntity
     public string? CourierTrackingId { get; set; }
     public string? CourierTrackingUrl { get; set; }
     public string? AdminNotes { get; set; }
+    public string? ConsignmentId { get; set; }
+    public decimal CodAmountToCollect { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
+    public ICollection<OrderTimelineEvent> TimelineEvents { get; set; } = [];
 }
 
 public class OrderItem : AuditableEntity

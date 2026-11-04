@@ -111,6 +111,8 @@ public sealed class OrderEditForm
     public string? CourierName { get; set; }
     public string? CourierTrackingId { get; set; }
     public string? CourierTrackingUrl { get; set; }
+    public string? ConsignmentId { get; set; }
+    public decimal CodAmountToCollect { get; set; }
     public string? AdminNotes { get; set; }
 }
 

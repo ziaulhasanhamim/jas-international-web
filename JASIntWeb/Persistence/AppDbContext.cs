@@ -32,6 +32,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<DeliverySettings> DeliverySettings => Set<DeliverySettings>();
     public DbSet<HomepageSection> HomepageSections => Set<HomepageSection>();
+    public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+    public DbSet<OrderTimelineEvent> OrderTimelineEvents => Set<OrderTimelineEvent>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -65,6 +67,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Entity<OrderItem>(e =>
             {
                 e.HasIndex(x => x.OrderId);
+            });
+        builder.Entity<OrderTimelineEvent>(e =>
+            {
+                e.HasIndex(x => new { x.OrderId, x.CreatedAt });
             });
     }
 
@@ -153,6 +159,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                         x.ProductId,
                         x.SortOrder
                     });
+            });
+        builder.Entity<ProductReview>(e =>
+            {
+                e.HasIndex(x => new { x.ProductId, x.IsApproved });
+                e.HasIndex(x => x.CreatedAt);
             });
     }
 

@@ -661,6 +661,12 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Property<Guid>("CheckoutToken")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("CodAmountToCollect")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ConsignmentId")
+                        .HasColumnType("text");
+
                     b.Property<string>("CouponCode")
                         .HasColumnType("text");
 
@@ -805,6 +811,49 @@ namespace JASIntWeb.Persistence.Migrations
                     b.ToTable("OrderItems");
                 });
 
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.OrderTimelineEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Actor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BadgeColor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "CreatedAt");
+
+                    b.ToTable("OrderTimelineEvents");
+                });
+
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.Payment", b =>
                 {
                     b.Property<int>("Id")
@@ -895,6 +944,12 @@ namespace JASIntWeb.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("MetaDescription")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MetaTitle")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -919,6 +974,9 @@ namespace JASIntWeb.Persistence.Migrations
 
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("WarrantyInfo")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -1049,6 +1107,61 @@ namespace JASIntWeb.Persistence.Migrations
                     b.HasIndex("ProductId", "SortOrder");
 
                     b.ToTable("ProductImages");
+                });
+
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CustomerEmail")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StaffReply")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("ProductId", "IsApproved");
+
+                    b.ToTable("ProductReviews");
                 });
 
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductVariant", b =>
@@ -1491,6 +1604,17 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Navigation("ProductVariant");
                 });
 
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.OrderTimelineEvent", b =>
+                {
+                    b.HasOne("JASIntWeb.Persistence.Entities.Order", "Order")
+                        .WithMany("TimelineEvents")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.Payment", b =>
                 {
                     b.HasOne("JASIntWeb.Persistence.Entities.Order", "Order")
@@ -1567,6 +1691,17 @@ namespace JASIntWeb.Persistence.Migrations
                 {
                     b.HasOne("JASIntWeb.Persistence.Entities.Product", "Product")
                         .WithMany("ProductImages")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductReview", b =>
+                {
+                    b.HasOne("JASIntWeb.Persistence.Entities.Product", "Product")
+                        .WithMany("Reviews")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1686,6 +1821,8 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
+
+                    b.Navigation("TimelineEvents");
                 });
 
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.Product", b =>
@@ -1695,6 +1832,8 @@ namespace JASIntWeb.Persistence.Migrations
                     b.Navigation("ProductImages");
 
                     b.Navigation("ProductVariants");
+
+                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductAttributeDefinition", b =>

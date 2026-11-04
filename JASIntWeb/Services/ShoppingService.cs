@@ -374,6 +374,14 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
                 ExternalReference = request.TransactionId
             });
         db.Orders.Add(order);
+        db.OrderTimelineEvents.Add(new OrderTimelineEvent
+        {
+            Order = order,
+            Title = "Order Placed",
+            Description = $"Order placed for ৳{order.Total:N0} via {request.PaymentMethod}. Awaiting review & fulfillment.",
+            Actor = "Customer",
+            BadgeColor = "blue"
+        });
         if (cart is not null)
         {
             cart.Status = CartStatus.Converted;
@@ -493,6 +501,15 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         // Keep order.Status as Pending! Admin must explicitly confirm the order.
         order.Status = OrderStatus.Pending;
 
+        db.OrderTimelineEvents.Add(new OrderTimelineEvent
+        {
+            OrderId = order.Id,
+            Title = "Payment Verified",
+            Description = $"Verified payment of ৳{amount:N0} (TrxID: {order.TransactionId ?? "N/A"}).",
+            Actor = "Admin / Cashier",
+            BadgeColor = "emerald"
+        });
+
         var bkashPayment = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash);
         if (bkashPayment != null)
         {
@@ -546,6 +563,15 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
             p.Status = PaymentStatus.Pending;
         }
 
+        db.OrderTimelineEvents.Add(new OrderTimelineEvent
+        {
+            OrderId = order.Id,
+            Title = "Payment Marked Unverified",
+            Description = "Payment status was reset to unverified by admin.",
+            Actor = "Admin",
+            BadgeColor = "amber"
+        });
+
         await db.SaveChangesAsync();
         return order;
     }
@@ -584,6 +610,15 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         order.PaidAmount = 0m;
         order.Status = OrderStatus.Cancelled;
         order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.OrderTimelineEvents.Add(new OrderTimelineEvent
+        {
+            OrderId = order.Id,
+            Title = "Order Cancelled (Payment Not Received)",
+            Description = reason ?? "Payment was rejected and reserved inventory released back to stock.",
+            Actor = "Admin Staff",
+            BadgeColor = "rose"
+        });
 
         foreach (var p in order.Payments)
         {

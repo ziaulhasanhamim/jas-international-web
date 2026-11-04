@@ -495,6 +495,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         order.CourierName = input.CourierName;
         order.CourierTrackingId = input.CourierTrackingId;
         order.CourierTrackingUrl = input.CourierTrackingUrl;
+        order.ConsignmentId = input.ConsignmentId;
+        order.CodAmountToCollect = input.CodAmountToCollect;
         order.AdminNotes = input.AdminNotes;
 
         var statusChanged = status != order.Status;
@@ -548,6 +550,17 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
             {
                 order.DeliveredAt = order.UpdatedAt;
             }
+
+            db.OrderTimelineEvents.Add(new OrderTimelineEvent
+            {
+                OrderId = order.Id,
+                Title = $"Status Updated: {status}",
+                Description = !string.IsNullOrWhiteSpace(order.CourierName)
+                    ? $"Fulfilled via {order.CourierName} (Tracking: {order.CourierTrackingId ?? "None"})."
+                    : "Order status updated by admin.",
+                Actor = "Admin Staff",
+                BadgeColor = status == OrderStatus.Delivered ? "emerald" : (status == OrderStatus.Cancelled ? "rose" : "blue")
+            });
         }
         else
         {

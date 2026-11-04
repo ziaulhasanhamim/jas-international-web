@@ -1,4 +1,5 @@
 @page "/admin/analytics"
+@using System.Text
 @inject SalesMetricsService Metrics
 @inject AppDbContext Db
 
@@ -7,12 +8,17 @@
 
 @if (summary is not null && selected is not null && soldItems is not null)
 {
-    <nav class="sales-periods" aria-label="Sales reporting period">
-        @foreach (var option in summary.Periods)
-        {
-            <a href="@($"/admin/analytics?period={option.Period.Key}")" aria-current="@(option.Period.Key == selected.Period.Key ? "page" : null)">@option.Period.Label</a>
-        }
-    </nav>
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <nav class="sales-periods !mb-0" aria-label="Sales reporting period">
+            @foreach (var option in summary.Periods)
+            {
+                <a href="@($"/admin/analytics?period={option.Period.Key}")" aria-current="@(option.Period.Key == selected.Period.Key ? "page" : null)">@option.Period.Label</a>
+            }
+        </nav>
+        <a href="@GetCsvDataUrl()" download="jas_sales_report_@(selected.Period.Key).csv" class="btn-secondary !px-3.5 !py-1.5 text-xs inline-flex items-center gap-1.5 shadow-2xs font-semibold">
+            <span>📥 Export Sales Report (CSV)</span>
+        </a>
+    </div>
     <div class="sales-context"><h2>@selected.Period.Label</h2><p>@selected.Period.DateLabel</p></div>
     <div class="dashboard-metrics sales-metrics">
         <div class="metric-card metric-highlight"><span>Product sales</span><strong>৳@selected.Totals.Sales.ToString("N2")</strong><small>Delivery fees excluded</small></div>
@@ -249,4 +255,19 @@
     }
 
     private string ItemPage(int page) => $"/admin/analytics?period={selected!.Period.Key}&q={Uri.EscapeDataString(Query ?? "")}&sort={Sort}&page={page}";
+
+    private string GetCsvDataUrl()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Product,Variant,Units Sold,Sales (BDT),Gross Profit (BDT),Gross Margin (%)");
+        if (soldItems != null)
+        {
+            foreach (var item in soldItems.Items)
+            {
+                sb.AppendLine($"\"{item.Product.Replace("\"", "\"\"")}\",\"{item.Variant.Replace("\"", "\"\"")}\",{item.Units},{item.Sales:F2},{item.Profit:F2},{item.Margin:F1}");
+            }
+        }
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        return $"data:text/csv;charset=utf-8;base64,{Convert.ToBase64String(bytes)}";
+    }
 }
