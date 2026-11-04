@@ -6,7 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <UserSecretsId>7a8ca663-c345-401b-bd3a-6f17609edbc3</UserSecretsId>
+    <DefaultItemExcludes>$(DefaultItemExcludes);wwwroot/uploads/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Prevent dotnet watch from crashing on runtime uploaded images -->
+    <Watch Remove="wwwroot/uploads/**" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\JASIntWeb.Client\JASIntWeb.Client.csproj" />

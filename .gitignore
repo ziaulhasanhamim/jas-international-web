@@ -484,3 +484,7 @@ $RECYCLE.BIN/
 # Visual Studio Code
 .vscode/
 test.http
+
+# Runtime user uploads
+**/wwwroot/uploads/**
+!**/wwwroot/uploads/.gitkeep

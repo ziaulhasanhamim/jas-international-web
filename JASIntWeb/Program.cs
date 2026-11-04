@@ -170,6 +170,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<CartRequestMiddleware>();
 app.UseAntiforgery();
+
+var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+var uploadsDir = Path.Combine(webRoot, "uploads");
+Directory.CreateDirectory(uploadsDir);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads"
+});
 app.UseStaticFiles();
 app.MapStaticAssets();
 
