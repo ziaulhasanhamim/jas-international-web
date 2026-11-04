@@ -42,13 +42,13 @@ else
             <ValidationSummary />
             <div class="admin-form-grid">
                 <label class="shop-label">
-                    Product name
-                    <InputText @bind-Value="Input!.Name" class="shop-input" />
+                    Product name *
+                    <InputText @bind-Value="Input!.Name" class="shop-input" data-slug-source="#product-slug" placeholder="e.g. JBL PartyBox 520 Wireless Speaker" />
                 </label>
                 <label class="shop-label">
-                    URL slug
-                    <InputText @bind-Value="Input!.Slug" class="shop-input" />
-                    <small>For example: samsung-galaxy-a56</small>
+                    URL slug (auto-generated if empty)
+                    <InputText id="product-slug" @bind-Value="Input!.Slug" class="shop-input" placeholder="e.g. jbl-partybox-520-wireless-speaker" />
+                    <small>Customer-facing URL path: /products/[slug]</small>
                 </label>
             </div>
             <div class="admin-form-grid">
@@ -136,17 +136,69 @@ else
                     <textarea name="Input.Details" id="input-details-html" class="w-full min-h-[380px] p-4 text-sm font-sans focus:outline-none border-0 text-slate-800 leading-relaxed">@Input!.Details</textarea>
                 </div>
             </div>
+            <!-- Pricing, Inventory & Identification -->
+            <div class="mt-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <div class="mb-3">
+                    <h3 class="text-sm font-bold text-slate-900">Pricing, Inventory &amp; Stock Identification</h3>
+                    <p class="text-xs text-slate-500">Set base selling price and stock. For standard products without variant options, this immediately fulfills catalog and cart readiness.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="shop-label">
+                        Base Selling Price (৳)
+                        <InputNumber @bind-Value="Input!.BasePrice" class="shop-input" placeholder="e.g. 24999" />
+                        <small>Customer purchase price on the storefront.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Regular / Compare-At Price (৳)
+                        <InputNumber @bind-Value="Input!.CompareAtPrice" class="shop-input" placeholder="e.g. 28999" />
+                        <small>Higher original price (shows SAVE ৳ X discount badge).</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Cost / Buying Price (৳)
+                        <InputNumber @bind-Value="Input!.CostPrice" class="shop-input" placeholder="e.g. 21000" />
+                        <small>Supplier cost for profit &amp; margin calculation.</small>
+                    </label>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="shop-label">
+                        Initial Stock Quantity
+                        <InputNumber @bind-Value="Input!.InitialStock" class="shop-input" placeholder="e.g. 25" />
+                        <small>Available warehouse units on hand.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Inventory SKU (Stock Keeping Unit)
+                        <InputText @bind-Value="Input!.Sku" class="shop-input font-mono" placeholder="Leave empty for auto-SKU" />
+                        <small>Internal code for orders &amp; invoices.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Barcode (EAN-8 / Scannable)
+                        <InputText @bind-Value="Input!.Barcode" class="shop-input font-mono" placeholder="Leave empty for auto EAN-8" />
+                        <small>Hardware laser scanner barcode.</small>
+                    </label>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100">
+                    <label class="flex items-center gap-3 text-sm font-medium text-slate-800 cursor-pointer">
+                        <InputCheckbox @bind-Value="Input!.HasVariants" class="size-4 rounded text-blue-600 focus:ring-blue-500" />
+                        <span>This product has multiple variants (e.g. colors, storage capacity, sizes)</span>
+                    </label>
+                    @if (Input!.HasVariants)
+                    {
+                        <p class="text-xs text-blue-600 mt-1 pl-7">You will be redirected to the Variants tab to configure options and generate the variant matrix.</p>
+                    }
+                </div>
+            </div>
+
             <!-- Merchandising & Storefront Badges -->
             <div class="mt-6 border-t border-slate-200/80 pt-6">
                 <h3 class="text-sm font-bold text-slate-900 mb-3">Merchandising &amp; Badges</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label class="shop-label">
-                        Regular / Compare-At Price (৳)
-                        <InputNumber @bind-Value="Input!.CompareAtPrice" class="shop-input" placeholder="e.g. 40999" />
-                        <small>If set higher than the selling price, the storefront displays an orange "SAVE ৳ X" pill and strikethrough price.</small>
-                    </label>
-                </div>
-                <div class="mt-3 space-y-2">
+                <div class="space-y-2">
                     <label class="check-label">
                         <input type="checkbox" name="Input.IsFeatured" checked="@(Input!.IsFeatured)" value="true" />
                         <input type="hidden" name="Input.IsFeatured" value="false" />
@@ -234,16 +286,31 @@ else
         {
             Input = new()
             {
-                Hidden = false
+                Hidden = false,
+                InitialStock = 10,
+                HasVariants = false
             };
             return;
         }
-        var p = await Db.Products.AsNoTracking().Include(p => p.ProductImages).SingleOrDefaultAsync(p => p.Id == Id);
+        var p = await Db.Products.AsNoTracking()
+            .Include(p => p.ProductImages)
+            .Include(p => p.ProductVariants)
+            .SingleOrDefaultAsync(p => p.Id == Id);
         if (p is null)
         {
             notFound = true;
             return;
         }
+
+        var defVariant = p.ProductVariants.FirstOrDefault(v => v.IsDefault && !v.IsDeleted) 
+                      ?? p.ProductVariants.FirstOrDefault(v => !v.IsDeleted);
+        int currentStock = 0;
+        if (defVariant != null)
+        {
+            var inv = await Db.InventoryItems.AsNoTracking().FirstOrDefaultAsync(i => i.ProductVariantId == defVariant.Id);
+            currentStock = inv?.QuantityOnHand ?? 0;
+        }
+
         Input = new()
         {
             Id = p.Id,
@@ -258,7 +325,13 @@ else
             Hidden = p.IsDeleted,
             IsFeatured = p.IsFeatured,
             IsNewArrival = p.IsNewArrival,
-            CompareAtPrice = p.CompareAtPrice
+            CompareAtPrice = p.CompareAtPrice,
+            BasePrice = defVariant?.SellingPrice,
+            CostPrice = defVariant?.CostPrice,
+            InitialStock = currentStock,
+            Sku = defVariant?.SKU,
+            Barcode = defVariant?.Barcode,
+            HasVariants = p.ProductVariants.Count(v => !v.IsDeleted) > 1
         };
     }
 
@@ -270,7 +343,14 @@ else
         {
             Input!.Id = Id;
             var id = await Session.RunAsync((s, _) => s.SaveProductAsync(Input));
-            Nav.NavigateTo($"/admin/products/{id}/attributes");
+            if (Input.HasVariants)
+            {
+                Nav.NavigateTo($"/admin/products/{id}/variants");
+            }
+            else
+            {
+                Nav.NavigateTo("/admin/products");
+            }
         }
         catch (ShopException ex)
         {

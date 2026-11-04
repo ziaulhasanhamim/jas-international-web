@@ -1,7 +1,6 @@
 @page "/order/{Id:int}"
 @page "/order/{Token:guid}"
-@rendermode InteractiveServer
-@implements IDisposable
+@attribute [StreamRendering]
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
@@ -37,7 +36,7 @@
         var isInTransit = order.Status == OrderStatus.InTransit;
         var isProcessing = order.Status == OrderStatus.Processing;
 
-        <div class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div id="live-order-tracker" data-order-id="@order.Id" data-current-status="@order.Status" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
             <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isDelivered ? "from-emerald-600 via-teal-600 to-emerald-700" : (isInTransit ? "from-purple-600 via-indigo-600 to-blue-700" : "from-blue-600 via-indigo-600 to-blue-700"))) p-8 text-white text-center">
                 <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isDelivered ? "text-emerald-600" : (isInTransit ? "text-purple-600" : "text-blue-600"))) mx-auto mb-4 shadow-md">
@@ -393,81 +392,10 @@
 
     private Order? order;
     private bool isLoading = true;
-    private CancellationTokenSource? cts;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadOrderAsync();
-    }
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender && order != null && order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Cancelled)
-        {
-            cts = new CancellationTokenSource();
-            _ = MonitorOrderStatusAsync(cts.Token);
-        }
-    }
-
-    private async Task MonitorOrderStatusAsync(CancellationToken ct)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.5));
-        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
-        {
-            try
-            {
-                await using var scope = ScopeFactory.CreateAsyncScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-                var latest = await db.Orders.AsNoTracking()
-                    .Where(o => o.Id == order!.Id)
-                    .Select(o => new
-                    {
-                        o.Status,
-                        o.DeliveredAt,
-                        o.CourierName,
-                        o.CourierTrackingId,
-                        o.CourierTrackingUrl,
-                        o.PaidAmount
-                    })
-                    .FirstOrDefaultAsync(ct);
-
-                if (latest != null)
-                {
-                    bool changed = order!.Status != latest.Status
-                        || order.DeliveredAt != latest.DeliveredAt
-                        || order.CourierName != latest.CourierName
-                        || order.CourierTrackingId != latest.CourierTrackingId
-                        || order.CourierTrackingUrl != latest.CourierTrackingUrl
-                        || order.PaidAmount != latest.PaidAmount;
-
-                    if (changed)
-                    {
-                        order.Status = latest.Status;
-                        order.DeliveredAt = latest.DeliveredAt;
-                        order.CourierName = latest.CourierName;
-                        order.CourierTrackingId = latest.CourierTrackingId;
-                        order.CourierTrackingUrl = latest.CourierTrackingUrl;
-                        order.PaidAmount = latest.PaidAmount;
-
-                        await InvokeAsync(StateHasChanged);
-
-                        if (order.Status == OrderStatus.Delivered || order.Status == OrderStatus.Cancelled)
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch
-            {
-                // Silently retry next tick
-            }
-        }
     }
 
     private async Task LoadOrderAsync()
@@ -497,11 +425,5 @@
         {
             isLoading = false;
         }
-    }
-
-    public void Dispose()
-    {
-        cts?.Cancel();
-        cts?.Dispose();
     }
 }

@@ -1,21 +1,15 @@
-@rendermode InteractiveServer
 @inject NavigationManager Navigation
 
 <p role="status">
     Updating your session…
     <a href="@Destination" data-enhance-nav="false">Continue</a>
 </p>
+<script>
+    window.location.replace("@Destination");
+</script>
 
 @code
 {
     [Parameter]
     public string Destination { get; set; } = "/";
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender)
-        {
-            Navigation.NavigateTo(Destination, forceLoad: true, replace: true);
-        }
-    }
 }

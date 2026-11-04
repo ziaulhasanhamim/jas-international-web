@@ -4,18 +4,18 @@ namespace JASIntWeb.Client.Dtos;
 public sealed class ProductEditForm
 {
     public int Id { get; set; }
-    [Required, StringLength(200)]
+    [Required(ErrorMessage = "Product name is required"), StringLength(200)]
     public string Name { get; set; } = "";
-    [Required, StringLength(120)]
-    public string Slug { get; set; } = "";
-    [Range(1, int.MaxValue)]
+    [StringLength(120)]
+    public string? Slug { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Please select a category")]
     public int CategoryId { get; set; }
     public int? BrandId { get; set; }
     [StringLength(2000)]
     public string Description { get; set; } = "";
-    [Required, StringLength(100000)]
+    [Required(ErrorMessage = "Product description details are required"), StringLength(100000)]
     public string Details { get; set; } = "";
-    [Required, StringLength(5000)]
+    [Required(ErrorMessage = "Main product picture is required"), StringLength(5000)]
     public string Image { get; set; } = "";
     [StringLength(50000)]
     public string Images { get; set; } = "";
@@ -23,6 +23,19 @@ public sealed class ProductEditForm
     public bool IsFeatured { get; set; }
     public bool IsNewArrival { get; set; } = true;
     public decimal? CompareAtPrice { get; set; }
+
+    // Quick Simple Product Fields (for effortless single-screen creation)
+    [Range(0, 10000000)]
+    public decimal? BasePrice { get; set; }
+    [Range(0, 10000000)]
+    public decimal? CostPrice { get; set; }
+    [Range(0, 100000)]
+    public int? InitialStock { get; set; }
+    [StringLength(100)]
+    public string? Sku { get; set; }
+    [StringLength(100)]
+    public string? Barcode { get; set; }
+    public bool HasVariants { get; set; }
 }
 
 public sealed class VariantEditForm
@@ -51,10 +64,10 @@ public sealed class VariantChoiceForm
 public sealed class CategoryEditForm
 {
     public int Id { get; set; }
-    [Required, StringLength(200)]
+    [Required(ErrorMessage = "Category name is required"), StringLength(200)]
     public string Name { get; set; } = "";
-    [Required, StringLength(120)]
-    public string Slug { get; set; } = "";
+    [StringLength(120)]
+    public string? Slug { get; set; } = "";
     [StringLength(2000)]
     public string Icon { get; set; } = "";
     public int? ParentId { get; set; }
@@ -113,6 +126,25 @@ public sealed class OrderEditForm
     public string? CourierTrackingUrl { get; set; }
     public string? ConsignmentId { get; set; }
     public decimal CodAmountToCollect { get; set; }
+    public string? AdminNotes { get; set; }
+}
+
+public sealed class ChangeStatusForm
+{
+    [Required]
+    public string Status { get; set; } = "Pending";
+}
+
+public sealed class UpdateTrackingForm
+{
+    public string? CourierName { get; set; }
+    public string? CourierTrackingId { get; set; }
+    public string? CourierTrackingUrl { get; set; }
+    public string? ConsignmentId { get; set; }
+}
+
+public sealed class SaveNotesForm
+{
     public string? AdminNotes { get; set; }
 }
 
@@ -229,10 +261,10 @@ public sealed record AdminBrandRow(int Id, string Name, string Slug, string? Des
 public sealed class BrandEditForm
 {
     public int Id { get; set; }
-    [Required, StringLength(100)]
+    [Required(ErrorMessage = "Brand name is required"), StringLength(100)]
     public string Name { get; set; } = "";
-    [Required, StringLength(120)]
-    public string Slug { get; set; } = "";
+    [StringLength(120)]
+    public string? Slug { get; set; } = "";
     [StringLength(2000)]
     public string? Description { get; set; }
     [StringLength(2000)]

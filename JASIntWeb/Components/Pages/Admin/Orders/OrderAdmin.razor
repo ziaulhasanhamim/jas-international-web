@@ -1,12 +1,11 @@
 @page "/admin/orders/{Id:int}"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject IServiceScopeFactory ScopeFactory
 @inject AdminSession Session
 @inject ShoppingService Shop
 @inject CourierLogisticsService Courier
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <PageTitle>Order #@Id · JAS Admin Hub</PageTitle>
 
@@ -49,10 +48,96 @@
     <div class="flex flex-wrap items-center gap-2">
         @if (order is not null)
         {
-            <button type="button" @onclick="() => _showPrintModal = true" class="btn-secondary text-xs inline-flex items-center gap-1.5 shadow-2xs">
-                <Icon Name="receipt" Class="size-4 text-slate-600" />
-                <span>Print Packing Slip / Invoice</span>
-            </button>
+            <details class="relative inline-block">
+                <summary class="btn-secondary text-xs inline-flex items-center gap-1.5 shadow-2xs list-none [&::-webkit-details-marker]:hidden cursor-pointer">
+                    <Icon Name="receipt" Class="size-4 text-slate-600" />
+                    <span>Print Packing Slip / Invoice</span>
+                </summary>
+                <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs" onclick="if (event.target === this) this.closest('details').removeAttribute('open')">
+                    <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-left">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center gap-2">
+                                <img src="/jas-logo.png" alt="JAS International" class="size-8 rounded-lg" />
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-900">JAS International · Packing Slip</h3>
+                                    <p class="text-[10px] text-slate-400">Order #@order.Id · Helpline: 01711465078</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="window.print()" class="btn-primary !px-3 !py-1 text-xs cursor-pointer">🖨️ Print Now</button>
+                                <button type="button" onclick="this.closest('details').removeAttribute('open')" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer" aria-label="Close">✕</button>
+                            </div>
+                        </div>
+
+                        <!-- Packing Slip Printable Content -->
+                        <div id="printable-slip" class="text-xs text-slate-800 space-y-3 font-sans p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                            <div class="flex justify-between items-start border-b border-slate-200 pb-2">
+                                <div>
+                                    <p class="font-bold text-slate-900">JAS International</p>
+                                    <p class="text-[11px] text-slate-500">Khulna, Bangladesh</p>
+                                    <p class="text-[11px] text-slate-500">Phone: 01711465078</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-slate-900">Invoice / Consignment</p>
+                                    <p class="font-mono font-bold text-blue-700">Order #@order.Id</p>
+                                    <p class="text-[10px] text-slate-400">@order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</p>
+                                </div>
+                            </div>
+
+                            <!-- Customer Details -->
+                            <div class="bg-white p-3 rounded-lg border border-slate-200">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Deliver To:</p>
+                                <p class="font-bold text-slate-900">@order.DeliveryAddress?.CustomerName</p>
+                                <p class="text-slate-700 font-mono font-bold">@order.DeliveryAddress?.PhoneNumber</p>
+                                <p class="text-slate-600">@order.DeliveryAddress?.FullAddress</p>
+                                <p class="text-slate-600">@order.DeliveryAddress?.City, @order.DeliveryAddress?.District</p>
+                            </div>
+
+                            <!-- Items Table -->
+                            <table class="w-full text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-300 text-slate-600 text-left">
+                                        <th class="py-1">Item Description</th>
+                                        <th class="py-1 text-center">Qty</th>
+                                        <th class="py-1 text-right">Price</th>
+                                        <th class="py-1 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in order.Items)
+                                    {
+                                        <tr class="border-b border-slate-200">
+                                            <td class="py-1.5 font-medium">@item.ProductName <span class="text-slate-400 font-mono">(@item.VariantName)</span></td>
+                                            <td class="py-1.5 text-center font-bold">@item.Quantity</td>
+                                            <td class="py-1.5 text-right font-mono">৳@item.UnitPrice.ToString("N0")</td>
+                                            <td class="py-1.5 text-right font-mono font-bold">৳@item.LineTotal.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+
+                            <!-- Financial Breakdown -->
+                            <div class="flex justify-between items-center bg-slate-100 p-2.5 rounded-lg text-xs font-semibold">
+                                <div>
+                                    <p class="text-slate-600">Payment Status: <span class="font-bold text-slate-900">@(order.PaidAmount > 0 ? "Advance Verified" : "Cash on Delivery")</span></p>
+                                    @if (!string.IsNullOrEmpty(order.CourierName))
+                                    {
+                                        <p class="text-slate-600">Courier: <span class="font-bold text-slate-900">@order.CourierName</span></p>
+                                    }
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-slate-500">Order Total: ৳@order.Total.ToString("N0")</p>
+                                    <p class="text-sm font-extrabold text-rose-700">C.O.D. TO COLLECT: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</p>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 text-[10px] text-slate-400 text-center">
+                                Thank you for choosing JAS International! For warranty &amp; service, contact 01711465078.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
             @if (!string.IsNullOrWhiteSpace(order.DeliveryAddress?.PhoneNumber))
             {
                 <a href="@GetWhatsAppUrl(order.DeliveryAddress.PhoneNumber)" target="_blank" rel="noopener" class="btn-secondary !text-emerald-700 !bg-emerald-50 hover:!bg-emerald-100 !border-emerald-200 text-xs inline-flex items-center gap-1.5 shadow-2xs">
@@ -83,7 +168,7 @@ else
                 <Icon Name="close" Class="size-4 text-rose-600 shrink-0" />
                 <span>@error</span>
             </div>
-            <button type="button" @onclick="() => error = null" class="text-rose-500 hover:text-rose-700 font-bold">✕</button>
+            <button type="button" onclick="this.closest('div').remove()" class="text-rose-500 hover:text-rose-700 font-bold cursor-pointer">✕</button>
         </div>
     }
 
@@ -105,7 +190,7 @@ else
                 }
                 <span>@alertMessage</span>
             </div>
-            <button type="button" @onclick="() => alertMessage = null" class="text-slate-400 hover:text-slate-600 font-bold ml-2">✕</button>
+            <button type="button" onclick="this.closest('div').remove()" class="text-slate-400 hover:text-slate-600 font-bold ml-2 cursor-pointer">✕</button>
         </div>
     }
 
@@ -249,7 +334,7 @@ else
                     <span class="text-xs text-slate-400">Order Token: <code class="font-mono text-slate-600 font-bold">@order.PublicToken.ToString()[..8]...</code></span>
                 </div>
 
-                <!-- Payment Verification Panel -->
+                <!-- Payment Verification Panel (Forms b, c, d) -->
                 <div class="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 text-xs space-y-3 mb-6">
                     <div class="flex items-center justify-between pb-2.5 border-b border-slate-200/70">
                         <div class="flex items-center gap-2">
@@ -344,102 +429,144 @@ else
                             {
                                 @if (order.PaidAmount == 0)
                                 {
-                                    <button type="button" @onclick="VerifyPayment" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
-                                        <Icon Name="check" Class="size-3.5" />
-                                        <span>Verify Payment</span>
-                                    </button>
+                                    <form method="post" @formname="verify-payment" @onsubmit="VerifyPaymentAsync" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white text-xs font-bold py-1.5 px-3 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+                                            <Icon Name="check" Class="size-3.5" />
+                                            <span>Verify Payment</span>
+                                        </button>
+                                    </form>
 
-                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
-                                        <Icon Name="close" Class="size-3.5" />
-                                        <span>Payment Not Received (Cancel Order)</span>
-                                    </button>
+                                    <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-bold py-1.5 px-3 rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                                            <Icon Name="close" Class="size-3.5" />
+                                            <span>Payment Not Received (Cancel Order)</span>
+                                        </button>
+                                    </form>
                                 }
                                 else
                                 {
-                                    <button type="button" @onclick="UnverifyPayment" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
-                                        Mark as Unverified
-                                    </button>
+                                    <form method="post" @formname="unverify-payment" @onsubmit="UnverifyPaymentAsync" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn-secondary !text-slate-700 !bg-white hover:!bg-slate-100 !border-slate-300 text-xs font-medium py-1.5 px-3 rounded-xl cursor-pointer">
+                                            Mark as Unverified
+                                        </button>
+                                    </form>
 
-                                    <button type="button" @onclick="RejectPaymentAndCancel" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
-                                        <Icon Name="close" Class="size-3" />
-                                        <span>Cancel Order</span>
-                                    </button>
+                                    <form method="post" @formname="reject-payment" @onsubmit="RejectPaymentAndCancelAsync" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <button type="submit" class="btn-secondary !text-rose-700 !bg-white hover:!bg-rose-50 !border-rose-300 text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1 cursor-pointer">
+                                            <Icon Name="close" Class="size-3" />
+                                            <span>Cancel Order</span>
+                                        </button>
+                                    </form>
                                 }
                             }
                         </div>
                     </div>
                 </div>
 
-                <!-- Courier Dispatch & Status Form -->
-                @if (Input is not null)
-                {
-                    <EditForm Model="Input" OnValidSubmit="Save" class="space-y-4">
-                        <DataAnnotationsValidator />
+                <!-- Form a: Change Status Form -->
+                <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                    <AntiforgeryToken />
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                        <label class="field-label font-bold text-slate-800 !mb-0">Fulfillment Lifecycle Status</label>
+                        <span class="text-[11px] text-slate-500">Current: <span class="font-bold text-slate-800">@order.Status</span></span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <select name="Status" class="field font-semibold text-slate-900 flex-1" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                            @foreach (var status in AllowedStatuses().Distinct())
+                            {
+                                <option value="@status" selected="@(status == order.Status)">@status</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn-primary text-xs px-4 py-2 inline-flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                            <Icon Name="check" Class="size-3.5" />
+                            <span>Update Status</span>
+                        </button>
+                    </div>
+                </form>
 
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="field-label font-bold text-slate-800">Order Status</label>
-                                <InputSelect @bind-Value="Input.Status" class="field font-semibold text-slate-900" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
-                                    @foreach (var status in AllowedStatuses().Distinct())
-                                    {
-                                        <option value="@status">@status</option>
-                                    }
-                                </InputSelect>
-                            </div>
-
-                            <div>
-                                <label class="field-label font-bold text-slate-800">Courier Delivery Partner</label>
-                                <InputSelect @bind-Value="Input.CourierName" @bind-Value:after="OnCourierChanged" class="field font-medium" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
-                                    <option value="">Select courier provider...</option>
-                                    @foreach (var c in CourierLogisticsService.AvailableCouriers)
-                                    {
-                                        <option value="@c.Name">@c.Name</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label class="field-label font-semibold text-slate-700">Consignment / Tracking Code</label>
-                                <InputText @bind-Value="Input.CourierTrackingId" @bind-Value:after="OnTrackingCodeChanged" placeholder="e.g. ST-88291039" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
-                            </div>
-
-                            <div>
-                                <div class="flex items-center justify-between mb-1">
-                                    <label class="field-label !mb-0 font-semibold text-slate-700">Courier Tracking URL</label>
-                                    @if (!string.IsNullOrWhiteSpace(Input.CourierTrackingUrl))
-                                    {
-                                        <a href="@Input.CourierTrackingUrl" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-[11px] font-bold">
-                                            Track Live ↗
-                                        </a>
-                                    }
-                                </div>
-                                <InputText @bind-Value="Input.CourierTrackingUrl" placeholder="Auto-generated live link..." class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
-                            </div>
+                <!-- Form e: Update Courier & Tracking Form -->
+                <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                    <AntiforgeryToken />
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                        <label class="field-label font-bold text-slate-800 !mb-0">Courier Logistics &amp; Consignment</label>
+                        @if (!string.IsNullOrWhiteSpace(order.CourierTrackingUrl))
+                        {
+                            <a href="@order.CourierTrackingUrl" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-[11px] font-bold">
+                                Track Live ↗
+                            </a>
+                        }
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="field-label font-semibold text-slate-700">Courier Delivery Partner</label>
+                            <select name="CourierName" class="field font-medium text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                                <option value="">Select courier provider...</option>
+                                @foreach (var c in CourierLogisticsService.AvailableCouriers)
+                                {
+                                    <option value="@c.Name" selected="@(c.Name == order.CourierName)">@c.Name</option>
+                                }
+                            </select>
                         </div>
 
                         <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="field-label !mb-0 font-semibold text-slate-700">Internal Order Fulfillment Notes</label>
-                                @if (!string.IsNullOrWhiteSpace(Input.CourierTrackingId))
-                                {
-                                    <button type="button" @onclick="CopySmsSnippet" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
-                                        <span>📋 Copy Customer SMS</span>
-                                    </button>
-                                }
-                            </div>
-                            <InputTextArea @bind-Value="Input.AdminNotes" placeholder="Add packaging notes, IMEI numbers, customer requests, or special handling..." rows="2" class="field text-xs" />
+                            <label class="field-label font-semibold text-slate-700">Consignment / Tracking Code</label>
+                            <input name="CourierTrackingId" value="@order.CourierTrackingId" placeholder="e.g. ST-88291039" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="field-label font-semibold text-slate-700">Consignment ID / Booking Ref</label>
+                            <input name="ConsignmentId" value="@order.ConsignmentId" placeholder="e.g. 1928471" class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
                         </div>
 
-                        <div class="pt-2">
-                            <button type="submit" class="btn-primary w-full flex items-center justify-center gap-2 cursor-pointer" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
-                                <Icon Name="check" Class="size-4" />
-                                <span>Save Changes &amp; Update Order</span>
-                            </button>
+                        <div>
+                            <label class="field-label font-semibold text-slate-700">Courier Tracking URL (auto-generated if empty)</label>
+                            <input name="CourierTrackingUrl" value="@order.CourierTrackingUrl" placeholder="Auto-generated if empty..." class="field font-mono text-xs" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)" />
                         </div>
-                    </EditForm>
-                }
+                    </div>
+
+                    <div class="pt-1">
+                        <button type="submit" class="btn-primary w-full flex items-center justify-center gap-1.5 cursor-pointer shadow-xs text-xs py-2" disabled="@(order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)">
+                            <Icon Name="check" Class="size-3.5" />
+                            <span>Save Courier &amp; Tracking Details</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Form f: Internal Fulfillment Notes Form -->
+                <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
+                    <AntiforgeryToken />
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                        <label class="field-label font-bold text-slate-800 !mb-0">Internal Fulfillment &amp; Packaging Notes</label>
+                        @if (!string.IsNullOrWhiteSpace(order.CourierTrackingId))
+                        {
+                            var smsSnippet = Courier.BuildCustomerSmsText(
+                                order.DeliveryAddress?.CustomerName ?? "Customer",
+                                order.Id,
+                                order.CourierName,
+                                order.CourierTrackingId,
+                                order.CourierTrackingUrl
+                            );
+                            <button type="button" onclick="navigator.clipboard.writeText('@(smsSnippet.Replace("'", "\\'"))'); alert('Copied to clipboard!');" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
+                                <span>📋 Copy Customer SMS</span>
+                            </button>
+                        }
+                    </div>
+                    <div>
+                        <textarea name="AdminNotes" rows="2" placeholder="Add packaging notes, IMEI numbers, customer requests, or special handling..." class="field text-xs">@order.AdminNotes</textarea>
+                    </div>
+                    <div class="pt-1">
+                        <button type="submit" class="btn-primary w-full flex items-center justify-center gap-1.5 cursor-pointer shadow-xs text-xs py-2">
+                            <Icon Name="check" Class="size-3.5" />
+                            <span>Save Notes</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -559,105 +686,24 @@ else
     </div>
 }
 
-<!-- Thermal Invoice / Packing Slip Modal -->
-@if (_showPrintModal && order is not null)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
-        <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div class="flex items-center gap-2">
-                    <img src="/jas-logo.png" alt="JAS International" class="size-8 rounded-lg" />
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">JAS International · Packing Slip</h3>
-                        <p class="text-[10px] text-slate-400">Order #@order.Id · Helpline: 01711465078</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" @onclick="TriggerPrint" class="btn-primary !px-3 !py-1 text-xs">🖨️ Print Now</button>
-                    <button type="button" @onclick="() => _showPrintModal = false" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
-                </div>
-            </div>
-
-            <!-- Packing Slip Printable Content -->
-            <div id="printable-slip" class="text-xs text-slate-800 space-y-3 font-sans p-4 border border-slate-200 rounded-xl bg-slate-50/50">
-                <div class="flex justify-between items-start border-b border-slate-200 pb-2">
-                    <div>
-                        <p class="font-bold text-slate-900">JAS International</p>
-                        <p class="text-[11px] text-slate-500">Khulna, Bangladesh</p>
-                        <p class="text-[11px] text-slate-500">Phone: 01711465078</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="font-bold text-slate-900">Invoice / Consignment</p>
-                        <p class="font-mono font-bold text-blue-700">Order #@order.Id</p>
-                        <p class="text-[10px] text-slate-400">@order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</p>
-                    </div>
-                </div>
-
-                <!-- Customer Details -->
-                <div class="bg-white p-3 rounded-lg border border-slate-200">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Deliver To:</p>
-                    <p class="font-bold text-slate-900">@order.DeliveryAddress?.CustomerName</p>
-                    <p class="text-slate-700 font-mono font-bold">@order.DeliveryAddress?.PhoneNumber</p>
-                    <p class="text-slate-600">@order.DeliveryAddress?.FullAddress</p>
-                    <p class="text-slate-600">@order.DeliveryAddress?.City, @order.DeliveryAddress?.District</p>
-                </div>
-
-                <!-- Items Table -->
-                <table class="w-full text-xs border-collapse">
-                    <thead>
-                        <tr class="border-b border-slate-300 text-slate-600 text-left">
-                            <th class="py-1">Item Description</th>
-                            <th class="py-1 text-center">Qty</th>
-                            <th class="py-1 text-right">Price</th>
-                            <th class="py-1 text-right">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in order.Items)
-                        {
-                            <tr class="border-b border-slate-200">
-                                <td class="py-1.5 font-medium">@item.ProductName <span class="text-slate-400 font-mono">(@item.VariantName)</span></td>
-                                <td class="py-1.5 text-center font-bold">@item.Quantity</td>
-                                <td class="py-1.5 text-right font-mono">৳@item.UnitPrice.ToString("N0")</td>
-                                <td class="py-1.5 text-right font-mono font-bold">৳@item.LineTotal.ToString("N0")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-
-                <!-- Financial Breakdown -->
-                <div class="flex justify-between items-center bg-slate-100 p-2.5 rounded-lg text-xs font-semibold">
-                    <div>
-                        <p class="text-slate-600">Payment Status: <span class="font-bold text-slate-900">@(order.PaidAmount > 0 ? "Advance Verified" : "Cash on Delivery")</span></p>
-                        @if (!string.IsNullOrEmpty(order.CourierName))
-                        {
-                            <p class="text-slate-600">Courier: <span class="font-bold text-slate-900">@order.CourierName</span></p>
-                        }
-                    </div>
-                    <div class="text-right">
-                        <p class="text-slate-500">Order Total: ৳@order.Total.ToString("N0")</p>
-                        <p class="text-sm font-extrabold text-rose-700">C.O.D. TO COLLECT: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</p>
-                    </div>
-                </div>
-
-                <div class="pt-2 text-[10px] text-slate-400 text-center">
-                    Thank you for choosing JAS International! For warranty &amp; service, contact 01711465078.
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
 @code
 {
     [Parameter]
     public int Id { get; set; }
-    private OrderEditForm? Input { get; set; }
+
+    [SupplyParameterFromForm(FormName = "change-status")]
+    private ChangeStatusForm? StatusForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "update-tracking")]
+    private UpdateTrackingForm? TrackingForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "save-notes")]
+    private SaveNotesForm? NotesForm { get; set; }
+
     private Order? order;
     private string? error;
     private string? alertMessage;
     private string alertType = "emerald";
-    private bool _showPrintModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -697,82 +743,41 @@ else
         }
     }
 
-    private void OnCourierChanged()
+    private async Task ChangeStatusAsync()
     {
-        if (Input is null) return;
-        if (!string.IsNullOrWhiteSpace(Input.CourierTrackingId))
-        {
-            Input.CourierTrackingUrl = Courier.GetTrackingUrl(Input.CourierName, Input.CourierTrackingId);
-        }
-    }
-
-    private void OnTrackingCodeChanged()
-    {
-        if (Input is null) return;
-        Input.CourierTrackingUrl = Courier.GetTrackingUrl(Input.CourierName, Input.CourierTrackingId);
-    }
-
-    private async Task CopySmsSnippet()
-    {
-        if (order == null || Input == null) return;
-        var sms = Courier.BuildCustomerSmsText(
-            order.DeliveryAddress?.CustomerName ?? "Customer",
-            order.Id,
-            Input.CourierName,
-            Input.CourierTrackingId,
-            Input.CourierTrackingUrl
-        );
-
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", sms);
-            alertType = "emerald";
-            alertMessage = "Customer dispatch SMS copied to clipboard!";
-        }
-        catch
-        {
-            alertType = "blue";
-            alertMessage = $"SMS: {sms}";
-        }
-    }
-
-    private async Task TriggerPrint()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("window.print");
-        }
-        catch
-        {
-            // Ignore print cancellation or client disconnection
-        }
-    }
-
-    private async Task Save()
-    {
+        if (order is null || StatusForm is null || string.IsNullOrWhiteSpace(StatusForm.Status)) return;
         try
         {
             error = null;
-            if (Input == null) return;
-            Input.Id = Id;
-            await Session.RunAsync(s => s.ChangeOrderAsync(Input));
-            await ReloadOrderAsync();
+            var editForm = new OrderEditForm
+            {
+                Id = Id,
+                Status = StatusForm.Status,
+                CourierName = order.CourierName,
+                CourierTrackingId = order.CourierTrackingId,
+                CourierTrackingUrl = order.CourierTrackingUrl,
+                ConsignmentId = order.ConsignmentId,
+                CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
+                AdminNotes = order.AdminNotes
+            };
+
+            await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
             alertType = "emerald";
-            alertMessage = $"Order #{Id} fulfillment details and status ({order?.Status}) updated successfully!";
+            alertMessage = $"Order #{Id} status changed to {StatusForm.Status} successfully!";
         }
         catch (Exception ex)
         {
             error = ex.Message;
         }
+        await ReloadOrderAsync(forceRefreshForms: true);
     }
 
-    private async Task VerifyPayment()
+    private async Task VerifyPaymentAsync()
     {
         try
         {
             error = null;
             await Shop.VerifyPaymentAsync(Id);
-            await ReloadOrderAsync();
             alertType = "emerald";
             alertMessage = "Payment verified successfully! Customer notified.";
         }
@@ -780,15 +785,15 @@ else
         {
             error = ex.Message;
         }
+        await ReloadOrderAsync(forceRefreshForms: true);
     }
 
-    private async Task UnverifyPayment()
+    private async Task UnverifyPaymentAsync()
     {
         try
         {
             error = null;
             await Shop.UnverifyPaymentAsync(Id);
-            await ReloadOrderAsync();
             alertType = "amber";
             alertMessage = "Payment marked as unverified.";
         }
@@ -796,15 +801,15 @@ else
         {
             error = ex.Message;
         }
+        await ReloadOrderAsync(forceRefreshForms: true);
     }
 
-    private async Task RejectPaymentAndCancel()
+    private async Task RejectPaymentAndCancelAsync()
     {
         try
         {
             error = null;
             await Shop.RejectPaymentAndCancelOrderAsync(Id, "Payment not received");
-            await ReloadOrderAsync();
             alertType = "rose";
             alertMessage = "Payment marked as not received. Order has been cancelled and reserved inventory released.";
         }
@@ -812,9 +817,83 @@ else
         {
             error = ex.Message;
         }
+        await ReloadOrderAsync(forceRefreshForms: true);
     }
 
-    private async Task ReloadOrderAsync()
+    private async Task UpdateTrackingAsync()
+    {
+        if (order is null) return;
+        try
+        {
+            error = null;
+            var courierName = TrackingForm?.CourierName?.Trim();
+            var trackingId = TrackingForm?.CourierTrackingId?.Trim();
+            var trackingUrl = TrackingForm?.CourierTrackingUrl?.Trim();
+            var consignmentId = TrackingForm?.ConsignmentId?.Trim();
+
+            if (string.IsNullOrWhiteSpace(trackingUrl) && !string.IsNullOrWhiteSpace(trackingId))
+            {
+                trackingUrl = Courier.GetTrackingUrl(courierName, trackingId);
+            }
+
+            if (string.IsNullOrWhiteSpace(consignmentId) && !string.IsNullOrWhiteSpace(trackingId))
+            {
+                consignmentId = trackingId;
+            }
+
+            var editForm = new OrderEditForm
+            {
+                Id = Id,
+                Status = order.Status.ToString(),
+                CourierName = courierName,
+                CourierTrackingId = trackingId,
+                CourierTrackingUrl = trackingUrl,
+                ConsignmentId = consignmentId ?? order.ConsignmentId,
+                CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
+                AdminNotes = order.AdminNotes
+            };
+
+            await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
+            alertType = "emerald";
+            alertMessage = $"Courier & tracking details updated for Order #{Id}!";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        await ReloadOrderAsync(forceRefreshForms: true);
+    }
+
+    private async Task SaveNotesAsync()
+    {
+        if (order is null) return;
+        try
+        {
+            error = null;
+            var editForm = new OrderEditForm
+            {
+                Id = Id,
+                Status = order.Status.ToString(),
+                CourierName = order.CourierName,
+                CourierTrackingId = order.CourierTrackingId,
+                CourierTrackingUrl = order.CourierTrackingUrl,
+                ConsignmentId = order.ConsignmentId,
+                CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
+                AdminNotes = NotesForm?.AdminNotes?.Trim()
+            };
+
+            await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
+            alertType = "emerald";
+            alertMessage = $"Fulfillment notes for Order #{Id} saved successfully!";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        await ReloadOrderAsync(forceRefreshForms: true);
+    }
+
+    private async Task ReloadOrderAsync(bool forceRefreshForms = false)
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
         var freshDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -829,17 +908,32 @@ else
 
         if (order != null)
         {
-            Input = new OrderEditForm
+            if (forceRefreshForms || StatusForm == null)
             {
-                Id = order.Id,
-                Status = order.Status.ToString(),
-                CourierName = order.CourierName,
-                CourierTrackingId = order.CourierTrackingId,
-                CourierTrackingUrl = order.CourierTrackingUrl,
-                ConsignmentId = order.ConsignmentId,
-                CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
-                AdminNotes = order.AdminNotes
-            };
+                StatusForm = new ChangeStatusForm
+                {
+                    Status = order.Status.ToString()
+                };
+            }
+
+            if (forceRefreshForms || TrackingForm == null)
+            {
+                TrackingForm = new UpdateTrackingForm
+                {
+                    CourierName = order.CourierName,
+                    CourierTrackingId = order.CourierTrackingId,
+                    CourierTrackingUrl = order.CourierTrackingUrl,
+                    ConsignmentId = order.ConsignmentId
+                };
+            }
+
+            if (forceRefreshForms || NotesForm == null)
+            {
+                NotesForm = new SaveNotesForm
+                {
+                    AdminNotes = order.AdminNotes
+                };
+            }
         }
     }
 }

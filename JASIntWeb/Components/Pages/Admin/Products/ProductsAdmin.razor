@@ -1,5 +1,5 @@
 @page "/admin/products"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -38,53 +38,50 @@
 <!-- Filters Bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            @onclick='() => SetFilter("all")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        <a
+            href="@FilterUrl("all", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Products (@_totalAll)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("published")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "published" ? "bg-emerald-600 text-white shadow-xs" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100")"
+        </a>
+        <a
+            href="@FilterUrl("published", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "published" ? "bg-emerald-600 text-white shadow-xs" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "published" ? "bg-white" : "bg-emerald-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "published" ? "bg-white" : "bg-emerald-600")"></span>
             Published Live (@_totalPublished)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("archived")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "archived" ? "bg-rose-600 text-white shadow-xs" : "bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100")"
+        </a>
+        <a
+            href="@FilterUrl("archived", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "archived" ? "bg-rose-600 text-white shadow-xs" : "bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "archived" ? "bg-white" : "bg-rose-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "archived" ? "bg-white" : "bg-rose-600")"></span>
             Archived / Hidden (@_totalArchived)
-        </button>
+        </a>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2.5">
-        <select @bind="_selectedCategoryId" @bind:after="OnCategoryChanged" class="field !py-1.5 text-xs w-auto min-w-[150px]">
-            <option value="0">All Categories</option>
+    <form method="get" data-enhance class="flex flex-wrap items-center gap-2.5">
+        <input type="hidden" name="status" value="@Filter" />
+        <select name="category" onchange="this.form.submit()" class="field !py-1.5 text-xs w-auto min-w-[150px]">
+            <option value="0" selected="@(CategoryId == 0)">All Categories</option>
             @foreach (var c in _categories)
             {
-                <option value="@c.Id">@c.Name</option>
+                <option value="@c.Id" selected="@(CategoryId == c.Id)">@c.Name</option>
             }
         </select>
 
         <div class="relative w-64">
             <input
-                @bind="_searchTerm"
-                @bind:event="oninput"
-                @bind:after="OnSearchChanged"
+                name="q"
+                value="@Query"
                 class="field pr-9 !py-1.5 text-xs"
                 placeholder="Search name, slug, SKU..."
             />
-            <span class="absolute right-3 top-2.5 text-slate-400">
+            <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
                 <Icon Name="search" Class="size-3.5" />
-            </span>
+            </button>
         </div>
-    </div>
+    </form>
 </div>
 
 <!-- Products Table -->
@@ -131,23 +128,32 @@
                             </span>
                         </td>
                         <td class="text-center">
-                            <button
-                                type="button"
-                                @onclick="() => TogglePublish(p)"
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.Hidden ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100")"
-                                title="Click to @(p.Hidden ? "publish this product to storefront" : "archive this product")"
-                            >
-                                <span class="size-1.5 rounded-full @(p.Hidden ? "bg-rose-500" : "bg-emerald-500")"></span>
-                                <span>@(p.Hidden ? "Archived" : "Published")</span>
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                <button
+                                    type="submit"
+                                    name="ToggleAction"
+                                    value="toggle"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.Hidden ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100")"
+                                    title="Click to @(p.Hidden ? "publish this product to storefront" : "archive this product")"
+                                >
+                                    <span class="size-1.5 rounded-full @(p.Hidden ? "bg-rose-500" : "bg-emerald-500")"></span>
+                                    <span>@(p.Hidden ? "Archived" : "Published")</span>
+                                </button>
+                            </form>
                         </td>
                         <td class="text-right whitespace-nowrap space-x-2">
                             @if (p.Hidden)
                             {
-                                <button type="button" @onclick="() => TogglePublish(p)" class="btn-primary !px-2.5 !py-1 text-xs !bg-emerald-600 hover:!bg-emerald-700 inline-flex items-center gap-1" title="Publish product to storefront immediately">
-                                    <Icon Name="check" Class="size-3" />
-                                    Publish
-                                </button>
+                                <form method="post" data-enhance class="inline">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                    <button type="submit" name="ToggleAction" value="toggle" class="btn-primary !px-2.5 !py-1 text-xs !bg-emerald-600 hover:!bg-emerald-700 inline-flex items-center gap-1 cursor-pointer" title="Publish product to storefront immediately">
+                                        <Icon Name="check" Class="size-3" />
+                                        Publish
+                                    </button>
+                                </form>
                             }
                             <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                                 Edit
@@ -170,7 +176,7 @@
         <div class="empty-state py-12">
             <Icon Name="box" Class="size-10 text-slate-300" />
             <p>No products match your search or filter.</p>
-            @if (_filter == "archived")
+            @if (Filter == "archived")
             {
                 <span class="text-xs text-slate-400 mt-1">Archived products are hidden from the storefront.</span>
             }
@@ -181,11 +187,17 @@
 @if (_totalPages > 1)
 {
     <div class="mt-4 flex items-center justify-between text-xs text-slate-600 px-2">
-        <span>Showing @((_page - 1) * PageSize + 1)–@(Math.Min(_page * PageSize, _totalFiltered)) of @_totalFiltered products</span>
+        <span>Showing @((Page - 1) * PageSize + 1)–@(Math.Min(Page * PageSize, _totalFiltered)) of @_totalFiltered products</span>
         <div class="flex items-center gap-1">
-            <button type="button" disabled="@(_page <= 1)" @onclick="() => GoToPage(_page - 1)" class="btn-secondary !px-2.5 !py-1 text-xs disabled:opacity-40">Previous</button>
-            <span class="px-2 font-semibold">@_page / @_totalPages</span>
-            <button type="button" disabled="@(_page >= _totalPages)" @onclick="() => GoToPage(_page + 1)" class="btn-secondary !px-2.5 !py-1 text-xs disabled:opacity-40">Next</button>
+            @if (Page > 1)
+            {
+                <a href="@FilterUrl(Filter, Page - 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Previous</a>
+            }
+            <span class="px-2 font-semibold">@Page / @_totalPages</span>
+            @if (Page < _totalPages)
+            {
+                <a href="@FilterUrl(Filter, Page + 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Next</a>
+            }
         </div>
     </div>
 }
@@ -193,12 +205,26 @@
 @code
 {
     private const int PageSize = 25;
-    private int _page = 1;
-    private string _filter = "all";
-    private string _searchTerm = "";
-    private int _selectedCategoryId = 0;
-    private string? _toast;
 
+    [SupplyParameterFromQuery(Name = "status")]
+    public string Filter { get; set; } = "all";
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public int CategoryId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
+    [SupplyParameterFromForm]
+    public int ToggleProductId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? ToggleAction { get; set; }
+
+    private string? _toast;
     private int _totalAll;
     private int _totalPublished;
     private int _totalArchived;
@@ -210,6 +236,16 @@
 
     private sealed record CategoryItem(int Id, string Name);
 
+    private string FilterUrl(string filter, int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(filter) && filter != "all") parts.Add($"status={Uri.EscapeDataString(filter)}");
+        if (CategoryId > 0) parts.Add($"category={CategoryId}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        if (page > 1) parts.Add($"page={page}");
+        return parts.Count > 0 ? $"/admin/products?{string.Join("&", parts)}" : "/admin/products";
+    }
+
     protected override async Task OnInitializedAsync()
     {
         _categories = await Db.Categories.AsNoTracking()
@@ -217,6 +253,21 @@
             .OrderBy(c => c.Name)
             .Select(c => new CategoryItem(c.Id, c.Name))
             .ToListAsync();
+
+        if (ToggleProductId > 0 && ToggleAction == "toggle")
+        {
+            var product = await Db.Products.FindAsync(ToggleProductId);
+            if (product != null)
+            {
+                product.IsDeleted = !product.IsDeleted;
+                product.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+
+                _toast = product.IsDeleted
+                    ? $"Archived \"{product.Name}\" — it is now hidden from the storefront."
+                    : $"Published \"{product.Name}\" — it is now live on the storefront!";
+            }
+        }
 
         await LoadCountsAsync();
         await LoadProductsAsync();
@@ -229,52 +280,27 @@
         _totalArchived = await Db.Products.CountAsync(p => p.IsDeleted);
     }
 
-    private async Task SetFilter(string filter)
-    {
-        _filter = filter;
-        _page = 1;
-        await LoadProductsAsync();
-    }
-
-    private async Task OnSearchChanged()
-    {
-        _page = 1;
-        await LoadProductsAsync();
-    }
-
-    private async Task OnCategoryChanged()
-    {
-        _page = 1;
-        await LoadProductsAsync();
-    }
-
-    private async Task GoToPage(int page)
-    {
-        _page = page;
-        await LoadProductsAsync();
-    }
-
     private async Task LoadProductsAsync()
     {
         var q = Db.Products.AsNoTracking();
 
-        if (_filter == "published")
+        if (Filter == "published")
         {
             q = q.Where(p => !p.IsDeleted);
         }
-        else if (_filter == "archived")
+        else if (Filter == "archived")
         {
             q = q.Where(p => p.IsDeleted);
         }
 
-        if (_selectedCategoryId > 0)
+        if (CategoryId > 0)
         {
-            q = q.Where(p => p.CategoryId == _selectedCategoryId);
+            q = q.Where(p => p.CategoryId == CategoryId);
         }
 
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        if (!string.IsNullOrWhiteSpace(Query))
         {
-            var term = _searchTerm.Trim().ToLower();
+            var term = Query.Trim().ToLower();
             q = q.Where(p => p.Name.ToLower().Contains(term) ||
                              p.Slug.ToLower().Contains(term) ||
                              p.ProductVariants.Any(v => v.SKU.ToLower().Contains(term)));
@@ -282,11 +308,11 @@
 
         _totalFiltered = await q.CountAsync();
         _totalPages = Math.Max(1, (int)Math.Ceiling(_totalFiltered / (double)PageSize));
-        _page = Math.Clamp(_page, 1, _totalPages);
+        Page = Math.Clamp(Page, 1, _totalPages);
 
         _products = await q.OrderBy(p => p.Name)
             .ThenBy(p => p.Id)
-            .Skip((_page - 1) * PageSize)
+            .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(p => new AdminProductRow(
                 p.Id,
@@ -298,22 +324,5 @@
                 p.MainImageUrl
             ))
             .ToListAsync();
-    }
-
-    private async Task TogglePublish(AdminProductRow p)
-    {
-        var product = await Db.Products.FindAsync(p.Id);
-        if (product == null) return;
-
-        product.IsDeleted = !product.IsDeleted;
-        product.UpdatedAt = DateTimeOffset.UtcNow;
-        await Db.SaveChangesAsync();
-
-        _toast = product.IsDeleted
-            ? $"Archived \"{product.Name}\" — it is now hidden from the storefront."
-            : $"Published \"{product.Name}\" — it is now live on the storefront!";
-
-        await LoadCountsAsync();
-        await LoadProductsAsync();
     }
 }

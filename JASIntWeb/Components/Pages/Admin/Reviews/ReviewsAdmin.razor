@@ -1,5 +1,5 @@
 @page "/admin/reviews"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -31,43 +31,40 @@
 <!-- Filters Bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            @onclick='() => SetFilter("all")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        <a
+            href="@FilterUrl("all")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Reviews (@_totalAll)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("approved")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "approved" ? "bg-emerald-600 text-white shadow-xs" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100")"
+        </a>
+        <a
+            href="@FilterUrl("approved")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "approved" ? "bg-emerald-600 text-white shadow-xs" : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "approved" ? "bg-white" : "bg-emerald-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "approved" ? "bg-white" : "bg-emerald-600")"></span>
             Approved Live (@_totalApproved)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("pending")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "pending" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")"
+        </a>
+        <a
+            href="@FilterUrl("pending")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "pending" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "pending" ? "bg-white" : "bg-amber-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "pending" ? "bg-white" : "bg-amber-600")"></span>
             Pending Moderation (@_totalPending)
-        </button>
+        </a>
     </div>
 
-    <div class="relative w-64">
+    <form method="get" data-enhance class="relative w-64">
+        <input type="hidden" name="status" value="@Filter" />
         <input
-            @bind="_searchTerm"
-            @bind:event="oninput"
-            @bind:after="OnSearchChanged"
+            name="q"
+            value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Search reviews or customers..."
         />
-        <span class="absolute right-3 top-2.5 text-slate-400">
+        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
-        </span>
-    </div>
+        </button>
+    </form>
 </div>
 
 <!-- Reviews Stream -->
@@ -116,20 +113,33 @@
                 </div>
 
                 <div class="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
-                    <button
-                        type="button"
-                        @onclick="() => ToggleApproval(r)"
-                        class="btn-secondary !px-3 !py-1.5 text-xs font-bold @(r.IsApproved ? "!text-rose-600 hover:!bg-rose-50" : "!text-emerald-700 hover:!bg-emerald-50")"
-                    >
-                        @(r.IsApproved ? "Hide / Unpublish" : "✓ Approve & Publish")
-                    </button>
-                    <button
-                        type="button"
-                        @onclick="() => OpenReplyModal(r)"
-                        class="btn-secondary !px-3 !py-1.5 text-xs font-medium text-slate-700"
-                    >
-                        @(string.IsNullOrEmpty(r.StaffReply) ? "Reply to Review" : "Edit Reply")
-                    </button>
+                    <form method="post" data-enhance class="inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReviewId" value="@r.Id" />
+                        <button
+                            type="submit"
+                            name="ReviewAction"
+                            value="toggle"
+                            class="btn-secondary !px-3 !py-1.5 text-xs font-bold cursor-pointer @(r.IsApproved ? "!text-rose-600 hover:!bg-rose-50" : "!text-emerald-700 hover:!bg-emerald-50")"
+                        >
+                            @(r.IsApproved ? "Hide / Unpublish" : "✓ Approve & Publish")
+                        </button>
+                    </form>
+
+                    <details class="text-xs">
+                        <summary class="btn-secondary !px-3 !py-1.5 text-xs font-medium text-slate-700 cursor-pointer">
+                            @(string.IsNullOrEmpty(r.StaffReply) ? "Reply to Review" : "Edit Reply")
+                        </summary>
+                        <form method="post" data-enhance class="mt-2 space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReviewId" value="@r.Id" />
+                            <input type="hidden" name="ReviewAction" value="reply" />
+                            <textarea name="StaffReply" rows="3" class="field text-xs w-full" placeholder="Thank you for your feedback! Our support team is here...">@r.StaffReply</textarea>
+                            <div class="flex justify-end gap-2">
+                                <button type="submit" class="btn-primary !px-3 !py-1 text-xs">Save Response</button>
+                            </div>
+                        </form>
+                    </details>
                 </div>
             </div>
         </div>
@@ -144,38 +154,28 @@
     }
 </div>
 
-@if (_replyingReviewId.HasValue)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
-        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="text-base font-bold text-slate-900">Official Response to Customer Review</h3>
-                <button type="button" @onclick="CloseReplyModal" class="text-slate-400 hover:text-slate-600">✕</button>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Your Public Storefront Response</label>
-                <textarea @bind="_replyText" rows="4" class="field text-xs" placeholder="Thank you for your feedback! Our support team is here..."></textarea>
-            </div>
-            <div class="flex items-center justify-end gap-2 pt-2">
-                <button type="button" @onclick="CloseReplyModal" class="btn-secondary text-xs">Cancel</button>
-                <button type="button" @onclick="SaveReply" class="btn-primary text-xs">Save Response</button>
-            </div>
-        </div>
-    </div>
-}
-
 @code
 {
-    private string _filter = "all";
-    private string _searchTerm = "";
+    [SupplyParameterFromQuery(Name = "status")]
+    public string Filter { get; set; } = "all";
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromForm]
+    public int ReviewId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? ReviewAction { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? StaffReply { get; set; }
+
     private string? _toast;
     private int _totalAll;
     private int _totalApproved;
     private int _totalPending;
     private List<ReviewRow> _reviews = [];
-
-    private int? _replyingReviewId;
-    private string _replyText = "";
 
     private sealed record ReviewRow(
         int Id,
@@ -191,8 +191,38 @@
         DateTimeOffset CreatedAt
     );
 
+    private string FilterUrl(string status)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status) && status != "all") parts.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        return parts.Count > 0 ? $"/admin/reviews?{string.Join("&", parts)}" : "/admin/reviews";
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        if (ReviewId > 0 && !string.IsNullOrEmpty(ReviewAction))
+        {
+            var rev = await Db.ProductReviews.FindAsync(ReviewId);
+            if (rev != null)
+            {
+                if (ReviewAction == "toggle")
+                {
+                    rev.IsApproved = !rev.IsApproved;
+                    rev.UpdatedAt = DateTimeOffset.UtcNow;
+                    await Db.SaveChangesAsync();
+                    _toast = rev.IsApproved ? "Review approved and published to storefront." : "Review hidden from storefront.";
+                }
+                else if (ReviewAction == "reply")
+                {
+                    rev.StaffReply = string.IsNullOrWhiteSpace(StaffReply) ? null : StaffReply.Trim();
+                    rev.UpdatedAt = DateTimeOffset.UtcNow;
+                    await Db.SaveChangesAsync();
+                    _toast = "Saved official response to customer review.";
+                }
+            }
+        }
+
         await LoadCountsAsync();
         await LoadReviewsAsync();
     }
@@ -204,33 +234,22 @@
         _totalPending = await Db.ProductReviews.CountAsync(r => !r.IsApproved);
     }
 
-    private async Task SetFilter(string filter)
-    {
-        _filter = filter;
-        await LoadReviewsAsync();
-    }
-
-    private async Task OnSearchChanged()
-    {
-        await LoadReviewsAsync();
-    }
-
     private async Task LoadReviewsAsync()
     {
         var q = Db.ProductReviews.AsNoTracking().Include(r => r.Product).AsQueryable();
 
-        if (_filter == "approved")
+        if (Filter == "approved")
         {
             q = q.Where(r => r.IsApproved);
         }
-        else if (_filter == "pending")
+        else if (Filter == "pending")
         {
             q = q.Where(r => !r.IsApproved);
         }
 
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        if (!string.IsNullOrWhiteSpace(Query))
         {
-            var term = _searchTerm.Trim().ToLower();
+            var term = Query.Trim().ToLower();
             q = q.Where(r => r.CustomerName.ToLower().Contains(term) ||
                              r.Comment.ToLower().Contains(term) ||
                              (r.Product != null && r.Product.Name.ToLower().Contains(term)));
@@ -251,48 +270,5 @@
                 r.CreatedAt
             ))
             .ToListAsync();
-    }
-
-    private async Task ToggleApproval(ReviewRow r)
-    {
-        var rev = await Db.ProductReviews.FindAsync(r.Id);
-        if (rev == null) return;
-
-        rev.IsApproved = !rev.IsApproved;
-        rev.UpdatedAt = DateTimeOffset.UtcNow;
-        await Db.SaveChangesAsync();
-
-        _toast = rev.IsApproved ? "Review approved and published to storefront." : "Review hidden from storefront.";
-        await LoadCountsAsync();
-        await LoadReviewsAsync();
-    }
-
-    private void OpenReplyModal(ReviewRow r)
-    {
-        _replyingReviewId = r.Id;
-        _replyText = r.StaffReply ?? "";
-    }
-
-    private void CloseReplyModal()
-    {
-        _replyingReviewId = null;
-        _replyText = "";
-    }
-
-    private async Task SaveReply()
-    {
-        if (!_replyingReviewId.HasValue) return;
-
-        var rev = await Db.ProductReviews.FindAsync(_replyingReviewId.Value);
-        if (rev != null)
-        {
-            rev.StaffReply = string.IsNullOrWhiteSpace(_replyText) ? null : _replyText.Trim();
-            rev.UpdatedAt = DateTimeOffset.UtcNow;
-            await Db.SaveChangesAsync();
-            _toast = "Saved official response to customer review.";
-        }
-
-        CloseReplyModal();
-        await LoadReviewsAsync();
     }
 }

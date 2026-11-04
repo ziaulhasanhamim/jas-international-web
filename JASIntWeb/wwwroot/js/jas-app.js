@@ -452,10 +452,101 @@
         }
     }
 
+    function initAutoSlugGenerator() {
+        document.querySelectorAll("[data-slug-source]").forEach(function (sourceEl) {
+            const targetSelector = sourceEl.getAttribute("data-slug-source");
+            const targetEl = document.querySelector(targetSelector);
+            if (!targetEl) return;
+
+            if (targetEl.value && targetEl.value.trim().length > 0) {
+                targetEl.dataset.manual = "true";
+            }
+
+            targetEl.addEventListener("input", function () {
+                if (targetEl.value.trim().length > 0) {
+                    targetEl.dataset.manual = "true";
+                } else {
+                    delete targetEl.dataset.manual;
+                }
+            });
+
+            sourceEl.addEventListener("input", function () {
+                if (targetEl.dataset.manual === "true") return;
+                const slug = sourceEl.value
+                    .toLowerCase()
+                    .trim()
+                    .replace(/&/g, "and")
+                    .replace(/\+/g, "-plus-")
+                    .replace(/@/g, "-at-")
+                    .replace(/[^a-z0-9\s-]/g, "")
+                    .replace(/[\s-]+/g, "-")
+                    .replace(/^-+|-+$/g, "");
+                targetEl.value = slug;
+                targetEl.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+        });
+    }
+
     function initAdminExtensions() {
         initProductEditorMedia();
         initProductEditorWysiwyg();
+        initAutoSlugGenerator();
         initPaymentVerificationStream();
+        initLiveOrderTracker();
+    }
+
+    let orderTrackerSse = null;
+    let orderTrackerTimer = null;
+
+    function cleanupOrderTracker() {
+        if (orderTrackerSse) {
+            orderTrackerSse.close();
+            orderTrackerSse = null;
+        }
+        if (orderTrackerTimer) {
+            clearInterval(orderTrackerTimer);
+            orderTrackerTimer = null;
+        }
+    }
+
+    function initLiveOrderTracker() {
+        const trackerEl = document.getElementById("live-order-tracker");
+        if (!trackerEl) {
+            cleanupOrderTracker();
+            return;
+        }
+
+        const orderId = trackerEl.getAttribute("data-order-id");
+        const currentStatus = trackerEl.getAttribute("data-current-status");
+        if (!orderId || !currentStatus) return;
+
+        cleanupOrderTracker();
+
+        try {
+            orderTrackerSse = new EventSource("/api/orders/" + encodeURIComponent(orderId) + "/sse");
+            orderTrackerSse.onmessage = function (e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data && data.status && data.status !== currentStatus) {
+                        cleanupOrderTracker();
+                        window.location.reload();
+                    }
+                } catch (err) {}
+            };
+        } catch (err) {}
+
+        orderTrackerTimer = setInterval(async () => {
+            try {
+                const res = await fetch("/api/orders/" + encodeURIComponent(orderId) + "/status");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.status && data.status !== currentStatus) {
+                        cleanupOrderTracker();
+                        window.location.reload();
+                    }
+                }
+            } catch (err) {}
+        }, 2000);
     }
 
     let paymentSse = null;
@@ -534,10 +625,15 @@
         el.scrollBy({ left: delta, behavior: "smooth" });
     };
 
+    function cleanupAllSubscriptions() {
+        cleanupPaymentVerification();
+        cleanupOrderTracker();
+    }
+
     if (window.Blazor) {
-        window.Blazor.addEventListener("enhancednavigationstart", cleanupPaymentVerification);
+        window.Blazor.addEventListener("enhancednavigationstart", cleanupAllSubscriptions);
         window.Blazor.addEventListener("enhancednavigationend", initAdminExtensions);
     }
     document.addEventListener("DOMContentLoaded", initAdminExtensions);
-    window.addEventListener("beforeunload", cleanupPaymentVerification);
+    window.addEventListener("beforeunload", cleanupAllSubscriptions);
 })();

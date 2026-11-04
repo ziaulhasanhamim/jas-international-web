@@ -1,5 +1,5 @@
 @page "/admin/inventory"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -31,43 +31,40 @@
 <!-- Filters Bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            @onclick='() => SetFilter("all")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        <a
+            href="@FilterUrl("all", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Stock Items (@_totalAll)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("low")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "low" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")"
+        </a>
+        <a
+            href="@FilterUrl("low", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "low" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "low" ? "bg-white" : "bg-amber-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "low" ? "bg-white" : "bg-amber-600")"></span>
             ⚠️ Low Stock (≤ 5 units) (@_totalLow)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("out")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(_filter == "out" ? "bg-rose-600 text-white shadow-xs" : "bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100")"
+        </a>
+        <a
+            href="@FilterUrl("out", 1)"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "out" ? "bg-rose-600 text-white shadow-xs" : "bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100")"
         >
-            <span class="size-1.5 rounded-full @(_filter == "out" ? "bg-white" : "bg-rose-600")"></span>
+            <span class="size-1.5 rounded-full @(Filter == "out" ? "bg-white" : "bg-rose-600")"></span>
             🔴 Out of Stock (@_totalOut)
-        </button>
+        </a>
     </div>
 
-    <div class="relative w-64">
+    <form method="get" data-enhance class="relative w-64">
+        <input type="hidden" name="status" value="@Filter" />
         <input
-            @bind="_searchTerm"
-            @bind:event="oninput"
-            @bind:after="OnSearchChanged"
+            name="q"
+            value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Search product name or SKU..."
         />
-        <span class="absolute right-3 top-2.5 text-slate-400">
+        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
-        </span>
-    </div>
+        </button>
+    </form>
 </div>
 
 <!-- Inventory Table -->
@@ -108,9 +105,28 @@
                             ৳@row.Price.ToString("N0")
                         </td>
                         <td class="text-right whitespace-nowrap space-x-2">
-                            <button type="button" @onclick="() => OpenRestockModal(row)" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
-                                <span>+ Quick Restock</span>
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="RestockVariantId" value="@row.Id" />
+                                <input type="hidden" name="RestockAction" value="add10" />
+                                <button type="submit" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
+                                    <span>+10 Restock</span>
+                                </button>
+                            </form>
+
+                            <details class="inline-block relative text-left">
+                                <summary class="btn-secondary !px-2.5 !py-1 text-xs cursor-pointer">Set Qty</summary>
+                                <form method="post" data-enhance class="absolute right-0 mt-1 z-30 p-3 bg-white rounded-xl shadow-xl border border-slate-200 space-y-2 w-56 text-left">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="RestockVariantId" value="@row.Id" />
+                                    <input type="hidden" name="RestockAction" value="custom" />
+                                    <label class="block font-bold text-slate-800 text-[11px]">New On-Hand Qty:</label>
+                                    <input type="number" name="RestockQuantity" value="@row.OnHand" min="0" class="field !py-1 text-xs font-bold" />
+                                    <input type="text" name="RestockNote" placeholder="Reason..." class="field !py-1 text-xs" />
+                                    <button type="submit" class="btn-primary !py-1 !px-3 text-xs w-full">Update</button>
+                                </form>
+                            </details>
+
                             <a href="/admin/products/@row.ProductId/variants/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                                 Edit Variant
                             </a>
@@ -133,52 +149,17 @@
 @if (_totalPages > 1)
 {
     <div class="mt-4 flex items-center justify-between text-xs text-slate-600 px-2">
-        <span>Showing @((_page - 1) * PageSize + 1)–@(Math.Min(_page * PageSize, _totalFiltered)) of @_totalFiltered items</span>
+        <span>Showing @((Page - 1) * PageSize + 1)–@(Math.Min(Page * PageSize, _totalFiltered)) of @_totalFiltered items</span>
         <div class="flex items-center gap-1">
-            <button type="button" disabled="@(_page <= 1)" @onclick="() => GoToPage(_page - 1)" class="btn-secondary !px-2.5 !py-1 text-xs disabled:opacity-40">Previous</button>
-            <span class="px-2 font-semibold">@_page / @_totalPages</span>
-            <button type="button" disabled="@(_page >= _totalPages)" @onclick="() => GoToPage(_page + 1)" class="btn-secondary !px-2.5 !py-1 text-xs disabled:opacity-40">Next</button>
-        </div>
-    </div>
-}
-
-<!-- Quick Restock Flyout / Modal -->
-@if (_selectedRow is not null)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                    <h3 class="text-base font-bold text-slate-900">Restock Product Inventory</h3>
-                    <p class="text-xs text-slate-500 font-mono">SKU: @_selectedRow.Sku</p>
-                </div>
-                <button type="button" @onclick="CloseRestockModal" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
-            </div>
-
-            <div class="rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs space-y-1">
-                <p class="font-bold text-slate-800">@_selectedRow.ProductName</p>
-                <div class="flex justify-between text-slate-600 pt-1">
-                    <span>Current On-Hand: <strong>@_selectedRow.OnHand</strong></span>
-                    <span>Reserved for Orders: <strong>@_selectedRow.Reserved</strong></span>
-                    <span>Available: <strong>@(_selectedRow.OnHand - _selectedRow.Reserved)</strong></span>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-slate-800 mb-1">New Total On-Hand Quantity</label>
-                <input type="number" @bind="_restockQuantity" min="0" max="100000" class="field text-sm font-bold" />
-                <p class="text-[11px] text-slate-500 mt-1">Enter total units currently in physical warehouse.</p>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Stock Adjustment Reason / Note</label>
-                <input type="text" @bind="_restockNote" placeholder="e.g. Shipment received from Official Brand Distributor..." class="field text-xs" />
-            </div>
-
-            <div class="flex items-center justify-end gap-2 pt-2">
-                <button type="button" @onclick="CloseRestockModal" class="btn-secondary text-xs">Cancel</button>
-                <button type="button" @onclick="SaveRestock" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700">Save Stock Level</button>
-            </div>
+            @if (Page > 1)
+            {
+                <a href="@FilterUrl(Filter, Page - 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Previous</a>
+            }
+            <span class="px-2 font-semibold">@Page / @_totalPages</span>
+            @if (Page < _totalPages)
+            {
+                <a href="@FilterUrl(Filter, Page + 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Next</a>
+            }
         </div>
     </div>
 }
@@ -186,11 +167,29 @@
 @code
 {
     private const int PageSize = 25;
-    private int _page = 1;
-    private string _filter = "all";
-    private string _searchTerm = "";
-    private string? _toast;
 
+    [SupplyParameterFromQuery(Name = "status")]
+    public string Filter { get; set; } = "all";
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
+    [SupplyParameterFromForm]
+    public int RestockVariantId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? RestockAction { get; set; }
+
+    [SupplyParameterFromForm]
+    public int RestockQuantity { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? RestockNote { get; set; }
+
+    private string? _toast;
     private int _totalAll;
     private int _totalLow;
     private int _totalOut;
@@ -198,12 +197,41 @@
     private int _totalPages = 1;
 
     private List<AdminVariantRow> _rows = [];
-    private AdminVariantRow? _selectedRow;
-    private int _restockQuantity;
-    private string _restockNote = "Restock from distributor";
+
+    private string FilterUrl(string filter, int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(filter) && filter != "all") parts.Add($"status={Uri.EscapeDataString(filter)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        if (page > 1) parts.Add($"page={page}");
+        return parts.Count > 0 ? $"/admin/inventory?{string.Join("&", parts)}" : "/admin/inventory";
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        if (RestockVariantId > 0 && !string.IsNullOrEmpty(RestockAction))
+        {
+            var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == RestockVariantId);
+            if (inv != null)
+            {
+                var newQty = RestockAction == "add10" ? inv.QuantityOnHand + 10 : RestockQuantity;
+                var diff = newQty - inv.QuantityOnHand;
+                inv.QuantityOnHand = newQty;
+
+                Db.InventoryTransactions.Add(new()
+                {
+                    ProductVariantId = RestockVariantId,
+                    QuantityChange = diff,
+                    Type = InventoryTransactionType.Adjustment,
+                    ReferenceType = "AdminRestock",
+                    Note = string.IsNullOrWhiteSpace(RestockNote) ? "Restock via Admin Hub" : RestockNote.Trim()
+                });
+
+                await Db.SaveChangesAsync();
+                _toast = $"Stock updated to {newQty} units.";
+            }
+        }
+
         await LoadCountsAsync();
         await LoadRowsAsync();
     }
@@ -215,52 +243,33 @@
         _totalOut = await Db.InventoryItems.CountAsync(i => !i.ProductVariant!.IsDeleted && i.QuantityOnHand - i.QuantityReserved <= 0);
     }
 
-    private async Task SetFilter(string filter)
-    {
-        _filter = filter;
-        _page = 1;
-        await LoadRowsAsync();
-    }
-
-    private async Task OnSearchChanged()
-    {
-        _page = 1;
-        await LoadRowsAsync();
-    }
-
-    private async Task GoToPage(int page)
-    {
-        _page = page;
-        await LoadRowsAsync();
-    }
-
     private async Task LoadRowsAsync()
     {
         var q = Db.InventoryItems.AsNoTracking().Where(i => !i.ProductVariant!.IsDeleted);
 
-        if (_filter == "low")
+        if (Filter == "low")
         {
             q = q.Where(i => i.QuantityOnHand - i.QuantityReserved <= 5 && i.QuantityOnHand - i.QuantityReserved > 0);
         }
-        else if (_filter == "out")
+        else if (Filter == "out")
         {
             q = q.Where(i => i.QuantityOnHand - i.QuantityReserved <= 0);
         }
 
-        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        if (!string.IsNullOrWhiteSpace(Query))
         {
-            var term = _searchTerm.Trim().ToLower();
+            var term = Query.Trim().ToLower();
             q = q.Where(i => i.ProductVariant!.SKU.ToLower().Contains(term) ||
                              i.ProductVariant.Product!.Name.ToLower().Contains(term));
         }
 
         _totalFiltered = await q.CountAsync();
         _totalPages = Math.Max(1, (int)Math.Ceiling(_totalFiltered / (double)PageSize));
-        _page = Math.Clamp(_page, 1, _totalPages);
+        Page = Math.Clamp(Page, 1, _totalPages);
 
         _rows = await q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
             .ThenBy(i => i.Id)
-            .Skip((_page - 1) * PageSize)
+            .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(i => new AdminVariantRow(
                 i.ProductVariantId,
@@ -275,45 +284,5 @@
                 i.ProductVariant.IsDefault
             ))
             .ToListAsync();
-    }
-
-    private void OpenRestockModal(AdminVariantRow row)
-    {
-        _selectedRow = row;
-        _restockQuantity = row.OnHand;
-        _restockNote = "Restock shipment received";
-    }
-
-    private void CloseRestockModal()
-    {
-        _selectedRow = null;
-    }
-
-    private async Task SaveRestock()
-    {
-        if (_selectedRow == null) return;
-
-        var inv = await Db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == _selectedRow.Id);
-        if (inv != null)
-        {
-            var diff = _restockQuantity - inv.QuantityOnHand;
-            inv.QuantityOnHand = _restockQuantity;
-
-            Db.InventoryTransactions.Add(new()
-            {
-                ProductVariantId = _selectedRow.Id,
-                QuantityChange = diff,
-                Type = InventoryTransactionType.Adjustment,
-                ReferenceType = "AdminRestock",
-                Note = string.IsNullOrWhiteSpace(_restockNote) ? "Manual restock via Admin Hub" : _restockNote.Trim()
-            });
-
-            await Db.SaveChangesAsync();
-            _toast = $"Stock for \"{_selectedRow.ProductName}\" updated to {_restockQuantity} units.";
-        }
-
-        CloseRestockModal();
-        await LoadCountsAsync();
-        await LoadRowsAsync();
     }
 }

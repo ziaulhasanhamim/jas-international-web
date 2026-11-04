@@ -74,3 +74,32 @@ public sealed class CheckoutPageForm
     public string Intent { get; set; } = "review";
     public decimal? ReviewedTotal { get; set; }
 }
+
+public sealed class ReviewFormModel
+{
+    [Range(1, 5)]
+    public int Rating { get; set; } = 5;
+
+    [Required]
+    public string Name { get; set; } = "";
+
+    public string? CustomerName
+    {
+        get => Name;
+        set => Name = value ?? "";
+    }
+
+    [EmailAddress]
+    public string? Email { get; set; }
+
+    public string? CustomerEmail
+    {
+        get => Email;
+        set => Email = value;
+    }
+
+    public string? Title { get; set; }
+
+    [Required]
+    public string Comment { get; set; } = "";
+}

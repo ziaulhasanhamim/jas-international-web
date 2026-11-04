@@ -68,7 +68,19 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         : (await db.Products.Include(p => p.ProductImages)
             .SingleOrDefaultAsync(p => p.Id == input.Id)) ?? throw new ShopException("Product not found. Return to the product list.");
         p.Name = input.Name.Trim();
-        p.Slug = Code(input.Slug);
+
+        // Auto-generate or normalize product slug
+        var baseSlug = string.IsNullOrWhiteSpace(input.Slug)
+            ? SlugAndSkuGenerator.GenerateSlug(p.Name)
+            : SlugAndSkuGenerator.GenerateSlug(input.Slug);
+        var productSlug = baseSlug;
+        var slugCounter = 2;
+        while (await db.Products.AnyAsync(x => x.Slug == productSlug && x.Id != p.Id))
+        {
+            productSlug = $"{baseSlug}-{slugCounter++}";
+        }
+        p.Slug = productSlug;
+
         p.Description = input.Description?.Trim();
         p.Details = input.Details.Trim();
         p.MainImageUrl = Url(input.Image);
@@ -93,10 +105,6 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         if (!await db.Categories.AnyAsync(c => c.Id == p.CategoryId && !c.IsDeleted && (c.ParentCategory == null || !c.ParentCategory.IsDeleted)))
         {
             throw new ShopException("Select a visible category.");
-        }
-        if (await db.Products.AnyAsync(x => x.Slug == p.Slug && x.Id != p.Id))
-        {
-            throw new ShopException("This product slug already exists.");
         }
         var images = (input.Images ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct()
@@ -125,6 +133,76 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
                 });
         }
         await db.SaveChangesAsync();
+
+        // Effortless single-screen product creation:
+        // Automatically create or update default variant when base price is provided
+        if (input.BasePrice.HasValue && input.BasePrice.Value > 0)
+        {
+            var defaultVariant = await db.ProductVariants.Include(v => v.Options)
+                .FirstOrDefaultAsync(v => v.ProductId == p.Id && !v.IsDeleted && (v.IsDefault || v.Options.Count == 0));
+
+            string? brandName = null;
+            if (p.BrandId.HasValue)
+            {
+                brandName = await db.Brands.Where(b => b.Id == p.BrandId.Value).Select(b => b.Name).FirstOrDefaultAsync();
+            }
+
+            var baseSku = !string.IsNullOrWhiteSpace(input.Sku)
+                ? input.Sku.Trim().ToUpperInvariant()
+                : SlugAndSkuGenerator.GenerateSku(p.Name, brandName);
+
+            var sku = baseSku;
+            var skuCounter = 2;
+            while (await db.ProductVariants.AnyAsync(x => x.SKU == sku && (defaultVariant == null || x.Id != defaultVariant.Id)))
+            {
+                sku = $"{baseSku}-{skuCounter++}";
+            }
+
+            var barcode = !string.IsNullOrWhiteSpace(input.Barcode)
+                ? input.Barcode.Trim()
+                : SlugAndSkuGenerator.GenerateEan8Barcode(p.Id);
+
+            var baseBarcode = barcode;
+            var bCounter = p.Id + 1000;
+            while (await db.ProductVariants.AnyAsync(x => x.Barcode == barcode && (defaultVariant == null || x.Id != defaultVariant.Id)))
+            {
+                barcode = SlugAndSkuGenerator.GenerateEan8Barcode(bCounter++);
+            }
+
+            if (defaultVariant == null)
+            {
+                defaultVariant = new ProductVariant
+                {
+                    ProductId = p.Id,
+                    SKU = sku,
+                    Barcode = barcode,
+                    SellingPrice = input.BasePrice.Value,
+                    CostPrice = input.CostPrice ?? (input.BasePrice.Value * 0.8m),
+                    IsActive = true,
+                    IsDefault = true,
+                    OptionSignature = ""
+                };
+                db.ProductVariants.Add(defaultVariant);
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(input.Sku)) defaultVariant.SKU = sku;
+                if (!string.IsNullOrWhiteSpace(input.Barcode)) defaultVariant.Barcode = barcode;
+                defaultVariant.SellingPrice = input.BasePrice.Value;
+                if (input.CostPrice.HasValue) defaultVariant.CostPrice = input.CostPrice.Value;
+                defaultVariant.IsActive = true;
+                defaultVariant.IsDefault = true;
+                await db.SaveChangesAsync();
+            }
+
+            if (input.InitialStock.HasValue && input.InitialStock.Value >= 0)
+            {
+                await SetStockCoreAsync(defaultVariant.Id, input.InitialStock.Value, "Product creation initial stock");
+                await db.SaveChangesAsync();
+            }
+        }
+
         return p.Id;
     }
 
@@ -596,15 +674,22 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         : (await db.Categories.SingleOrDefaultAsync(c => c.Id == input.Id)) ?? throw new ShopException("Category not found.");
         c.Name = input.Name.Trim();
-        c.Slug = Code(input.Slug);
+
+        var baseCategorySlug = string.IsNullOrWhiteSpace(input.Slug)
+            ? SlugAndSkuGenerator.GenerateSlug(c.Name)
+            : SlugAndSkuGenerator.GenerateSlug(input.Slug);
+        var catSlug = baseCategorySlug;
+        var categories = await db.Categories.AsNoTracking().ToListAsync();
+        var catCounter = 2;
+        while (categories.Any(x => x.Slug == catSlug && x.Id != c.Id))
+        {
+            catSlug = $"{baseCategorySlug}-{catCounter++}";
+        }
+        c.Slug = catSlug;
+
         c.Icon = input.Icon?.Trim();
         c.IsDeleted = input.Hidden;
         c.ParentCategoryId = input.ParentId;
-        var categories = await db.Categories.AsNoTracking().ToListAsync();
-        if (categories.Any(x => x.Slug == c.Slug && x.Id != c.Id))
-        {
-            throw new ShopException("This category slug already exists.");
-        }
         if (c.ParentCategoryId.HasValue)
         {
             if (c.ParentCategoryId == c.Id || !categories.Any(x => x.Id == c.ParentCategoryId && !x.ParentCategoryId.HasValue && !x.IsDeleted))
@@ -652,7 +737,18 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         : (await db.Brands.SingleOrDefaultAsync(x => x.Id == input.Id)) ?? throw new ShopException("Brand not found.");
         b.Name = input.Name.Trim();
-        b.Slug = Code(input.Slug);
+
+        var baseBrandSlug = string.IsNullOrWhiteSpace(input.Slug)
+            ? SlugAndSkuGenerator.GenerateSlug(b.Name)
+            : SlugAndSkuGenerator.GenerateSlug(input.Slug);
+        var brandSlug = baseBrandSlug;
+        var brandCounter = 2;
+        while (await db.Brands.AnyAsync(x => x.Slug == brandSlug && x.Id != b.Id))
+        {
+            brandSlug = $"{baseBrandSlug}-{brandCounter++}";
+        }
+        b.Slug = brandSlug;
+
         b.Description = input.Description?.Trim();
         b.LogoUrl = string.IsNullOrWhiteSpace(input.LogoUrl) ? null : Url(input.LogoUrl);
         b.IsFeatured = input.IsFeatured;

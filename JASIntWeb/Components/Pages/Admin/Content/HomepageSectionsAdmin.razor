@@ -1,5 +1,5 @@
 @page "/admin/homepage-sections"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
 
@@ -19,10 +19,6 @@
             <Icon Name="eye" Class="size-3.5" />
             <span>View Storefront</span>
         </a>
-        <button type="button" @onclick="OpenCreate" class="btn-primary shadow-xs">
-            <Icon Name="plus" Class="size-4" />
-            <span>Add Section</span>
-        </button>
     </div>
 </div>
 
@@ -33,9 +29,7 @@
             <Icon Name="check" Class="size-4 text-emerald-600" />
             @_toast
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
-            <Icon Name="close" Class="size-3.5" />
-        </button>
+        <a href="/admin/homepage-sections" class="text-emerald-600 hover:text-emerald-950 font-bold">✕</a>
     </div>
 }
 
@@ -45,7 +39,7 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th class="w-16 text-center">Order</th>
+                    <th class="w-20 text-center">Order</th>
                     <th>Section Title &amp; Eyebrow</th>
                     <th>Target Category</th>
                     <th class="text-center">Items</th>
@@ -61,12 +55,20 @@
                             <div class="flex items-center justify-center gap-1 font-mono font-bold text-slate-700">
                                 <span>#@s.SortOrder</span>
                                 <div class="flex flex-col">
-                                    <button type="button" @onclick="() => MoveOrder(s, -1)" class="p-0.5 text-slate-400 hover:text-slate-800" title="Move Up">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>
-                                    </button>
-                                    <button type="button" @onclick="() => MoveOrder(s, 1)" class="p-0.5 text-slate-400 hover:text-slate-800" title="Move Down">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>
-                                    </button>
+                                    <form method="post" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <input type="hidden" name="SectionId" value="@s.Id" />
+                                        <button type="submit" name="Action" value="up" class="p-0.5 text-slate-400 hover:text-slate-800 cursor-pointer" title="Move Up">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>
+                                        </button>
+                                    </form>
+                                    <form method="post" data-enhance class="inline">
+                                        <AntiforgeryToken />
+                                        <input type="hidden" name="SectionId" value="@s.Id" />
+                                        <button type="submit" name="Action" value="down" class="p-0.5 text-slate-400 hover:text-slate-800 cursor-pointer" title="Move Down">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </td>
@@ -93,23 +95,32 @@
                             </span>
                         </td>
                         <td class="text-center">
-                            <button
-                                type="button"
-                                @onclick="() => ToggleActive(s)"
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition @(s.IsActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200")"
-                            >
-                                <span class="size-1.5 rounded-full @(s.IsActive ? "bg-emerald-500" : "bg-slate-400")"></span>
-                                @(s.IsActive ? "Active" : "Disabled")
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="SectionId" value="@s.Id" />
+                                <button
+                                    type="submit"
+                                    name="Action"
+                                    value="toggle"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(s.IsActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200")"
+                                >
+                                    <span class="size-1.5 rounded-full @(s.IsActive ? "bg-emerald-500" : "bg-slate-400")"></span>
+                                    @(s.IsActive ? "Active" : "Disabled")
+                                </button>
+                            </form>
                         </td>
                         <td class="text-right">
                             <div class="inline-flex items-center gap-2">
-                                <button type="button" @onclick="() => EditSection(s)" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                <a href="/admin/homepage-sections?edit=@s.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
                                     Edit
-                                </button>
-                                <button type="button" @onclick="() => DeleteSection(s)" class="btn-danger !px-2 !py-1 text-xs" title="Delete section">
-                                    <Icon Name="trash" Class="size-3.5" />
-                                </button>
+                                </a>
+                                <form method="post" data-enhance class="inline">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="SectionId" value="@s.Id" />
+                                    <button type="submit" name="Action" value="delete" class="btn-danger !px-2 !py-1 text-xs cursor-pointer" title="Delete section">
+                                        <Icon Name="trash" Class="size-3.5" />
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -127,98 +138,183 @@
     }
 </div>
 
-<!-- Editor Modal / Drawer -->
-@if (_editorOpen)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4 animate-in fade-in">
-        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
-                <h3 class="text-lg font-bold text-slate-900">
-                    @(_model.Id == 0 ? "Add Homepage Category Section" : "Edit Section")
-                </h3>
-                <button type="button" @onclick="() => _editorOpen = false" class="text-slate-400 hover:text-slate-600">
-                    <Icon Name="close" Class="size-5" />
-                </button>
+<!-- Section Configuration Form -->
+<div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs mb-8">
+    <div class="border-b border-slate-100 pb-3 mb-4">
+        <h3 class="text-base font-bold text-slate-900">
+            @(EditId > 0 ? "Edit Homepage Category Section" : "Add New Homepage Category Section")
+        </h3>
+        <p class="text-xs text-slate-500">Configure section title, category filter, and display limit.</p>
+    </div>
+
+    <form method="post" data-enhance class="space-y-4">
+        <AntiforgeryToken />
+        <input type="hidden" name="Action" value="save" />
+        <input type="hidden" name="FormId" value="@(editSection?.Id ?? 0)" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="shop-label mb-1">Section Title *</label>
+                <input name="FormTitle" value="@(editSection?.Title ?? "")" required class="shop-input" placeholder="e.g. Sound Surround, Flagship Phones" />
+                <small class="text-slate-400 text-[11px]">The prominent heading shown above the carousel slider.</small>
             </div>
 
-            <div class="space-y-4">
-                <div>
-                    <label class="shop-label mb-1">
-                        Section Title
-                    </label>
-                    <input @bind="_model.Title" class="shop-input" placeholder="e.g. Sound Surround, Flagship Phones" />
-                    <small class="text-slate-400 text-[11px]">The prominent heading shown above the carousel slider.</small>
-                </div>
-
-                <div>
-                    <label class="shop-label mb-1">
-                        Eyebrow Label (optional)
-                    </label>
-                    <input @bind="_model.Eyebrow" class="shop-input" placeholder="e.g. Hear More, Just Landed, Wearable Tech" />
-                    <small class="text-slate-400 text-[11px]">Small uppercase tag displayed right above the title.</small>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="shop-label mb-1">
-                            Category Filter
-                        </label>
-                        <select @bind="_model.CategorySlug" class="shop-input">
-                            <option value="">All Categories (Latest)</option>
-                            @foreach (var c in _categories)
-                            {
-                                <option value="@c.Slug">@c.Name (@c.Slug)</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="shop-label mb-1">
-                            Products to Display
-                        </label>
-                        <input type="number" @bind="_model.ItemLimit" min="2" max="24" class="shop-input" />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="shop-label mb-1">
-                            Sort Order
-                        </label>
-                        <input type="number" @bind="_model.SortOrder" class="shop-input" />
-                    </div>
-
-                    <div class="flex items-center pt-6">
-                        <label class="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
-                            <input type="checkbox" @bind="_model.IsActive" class="size-4 rounded text-blue-600" />
-                            <span>Section is Active</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
-                <button type="button" @onclick="() => _editorOpen = false" class="shop-button-secondary !py-2">
-                    Cancel
-                </button>
-                <button type="button" @onclick="SaveSection" class="shop-button !py-2">
-                    Save Section
-                </button>
+            <div>
+                <label class="shop-label mb-1">Eyebrow Label (optional)</label>
+                <input name="FormEyebrow" value="@(editSection?.Eyebrow ?? "")" class="shop-input" placeholder="e.g. Hear More, Just Landed, Wearable Tech" />
+                <small class="text-slate-400 text-[11px]">Small uppercase badge displayed right above the title.</small>
             </div>
         </div>
-    </div>
-}
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+                <label class="shop-label mb-1">Category Filter</label>
+                <select name="FormCategorySlug" class="shop-input">
+                    <option value="">All Categories (Latest)</option>
+                    @foreach (var c in _categories)
+                    {
+                        <option value="@c.Slug" selected="@(editSection?.CategorySlug == c.Slug)">@c.Name (@c.Slug)</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="shop-label mb-1">Products to Display</label>
+                <input type="number" name="FormItemLimit" value="@(editSection?.ItemLimit ?? 8)" min="2" max="24" class="shop-input" />
+            </div>
+
+            <div>
+                <label class="shop-label mb-1">Display Sort Order</label>
+                <input type="number" name="FormSortOrder" value="@(editSection?.SortOrder ?? ((_sections.MaxBy(s => s.SortOrder)?.SortOrder ?? 0) + 10))" class="shop-input" />
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            @if (EditId > 0)
+            {
+                <a href="/admin/homepage-sections" class="btn-secondary text-xs">Cancel Editing</a>
+            }
+            <button type="submit" class="btn-primary text-xs">
+                <span>@(EditId > 0 ? "Save Changes" : "Create Section")</span>
+            </button>
+        </div>
+    </form>
+</div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "edit")]
+    public int EditId { get; set; }
+
+    [SupplyParameterFromForm]
+    public int SectionId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? Action { get; set; }
+
+    [SupplyParameterFromForm]
+    public int FormId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? FormTitle { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? FormEyebrow { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? FormCategorySlug { get; set; }
+
+    [SupplyParameterFromForm]
+    public int FormItemLimit { get; set; }
+
+    [SupplyParameterFromForm]
+    public int FormSortOrder { get; set; }
+
     private List<HomepageSection> _sections = [];
     private List<Category> _categories = [];
-    private bool _editorOpen;
-    private HomepageSection _model = new();
+    private HomepageSection? editSection;
     private string? _toast;
 
     protected override async Task OnInitializedAsync()
     {
+        if (!string.IsNullOrEmpty(Action))
+        {
+            if (Action == "save" && !string.IsNullOrWhiteSpace(FormTitle))
+            {
+                var viewHref = string.IsNullOrWhiteSpace(FormCategorySlug) ? "/products" : $"/category/{FormCategorySlug}";
+                if (FormId == 0)
+                {
+                    Db.HomepageSections.Add(new HomepageSection
+                    {
+                        Title = FormTitle.Trim(),
+                        Eyebrow = FormEyebrow?.Trim(),
+                        CategorySlug = FormCategorySlug,
+                        ViewAllHref = viewHref,
+                        ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit,
+                        SortOrder = FormSortOrder,
+                        IsActive = true
+                    });
+                    _toast = "Created new homepage section.";
+                }
+                else
+                {
+                    var existing = await Db.HomepageSections.FindAsync(FormId);
+                    if (existing != null)
+                    {
+                        existing.Title = FormTitle.Trim();
+                        existing.Eyebrow = FormEyebrow?.Trim();
+                        existing.CategorySlug = FormCategorySlug;
+                        existing.ViewAllHref = viewHref;
+                        existing.ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit;
+                        existing.SortOrder = FormSortOrder;
+                        _toast = "Updated homepage section.";
+                    }
+                }
+                await Db.SaveChangesAsync();
+            }
+            else if (Action == "toggle" && SectionId > 0)
+            {
+                var item = await Db.HomepageSections.FindAsync(SectionId);
+                if (item != null)
+                {
+                    item.IsActive = !item.IsActive;
+                    await Db.SaveChangesAsync();
+                }
+            }
+            else if (Action == "up" && SectionId > 0)
+            {
+                var item = await Db.HomepageSections.FindAsync(SectionId);
+                if (item != null)
+                {
+                    item.SortOrder -= 10;
+                    await Db.SaveChangesAsync();
+                }
+            }
+            else if (Action == "down" && SectionId > 0)
+            {
+                var item = await Db.HomepageSections.FindAsync(SectionId);
+                if (item != null)
+                {
+                    item.SortOrder += 10;
+                    await Db.SaveChangesAsync();
+                }
+            }
+            else if (Action == "delete" && SectionId > 0)
+            {
+                var item = await Db.HomepageSections.FindAsync(SectionId);
+                if (item != null)
+                {
+                    Db.HomepageSections.Remove(item);
+                    await Db.SaveChangesAsync();
+                    _toast = "Deleted section.";
+                }
+            }
+        }
+
         await LoadData();
+        if (EditId > 0)
+        {
+            editSection = _sections.FirstOrDefault(s => s.Id == EditId);
+        }
     }
 
     private async Task LoadData()
@@ -231,107 +327,5 @@
             .Where(c => !c.IsDeleted)
             .OrderBy(c => c.Name)
             .ToListAsync();
-    }
-
-    private void OpenCreate()
-    {
-        _model = new HomepageSection
-        {
-            Title = "New Product Section",
-            Eyebrow = "Featured",
-            SortOrder = (_sections.MaxBy(s => s.SortOrder)?.SortOrder ?? 0) + 10,
-            IsActive = true,
-            ItemLimit = 8
-        };
-        _editorOpen = true;
-    }
-
-    private void EditSection(HomepageSection section)
-    {
-        _model = new HomepageSection
-        {
-            Id = section.Id,
-            Title = section.Title,
-            Eyebrow = section.Eyebrow,
-            CategorySlug = section.CategorySlug,
-            ViewAllHref = section.ViewAllHref,
-            SortOrder = section.SortOrder,
-            IsActive = section.IsActive,
-            ItemLimit = section.ItemLimit
-        };
-        _editorOpen = true;
-    }
-
-    private async Task SaveSection()
-    {
-        if (string.IsNullOrWhiteSpace(_model.Title))
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_model.ViewAllHref) || _model.ViewAllHref == "/products")
-        {
-            _model.ViewAllHref = string.IsNullOrWhiteSpace(_model.CategorySlug)
-                ? "/products"
-                : $"/category/{_model.CategorySlug}";
-        }
-
-        if (_model.Id == 0)
-        {
-            Db.HomepageSections.Add(_model);
-        }
-        else
-        {
-            var existing = await Db.HomepageSections.FindAsync(_model.Id);
-            if (existing != null)
-            {
-                existing.Title = _model.Title;
-                existing.Eyebrow = _model.Eyebrow;
-                existing.CategorySlug = _model.CategorySlug;
-                existing.ViewAllHref = _model.ViewAllHref;
-                existing.SortOrder = _model.SortOrder;
-                existing.IsActive = _model.IsActive;
-                existing.ItemLimit = _model.ItemLimit;
-            }
-        }
-        await Db.SaveChangesAsync();
-
-        _editorOpen = false;
-        _toast = "Section saved successfully.";
-        await LoadData();
-    }
-
-    private async Task ToggleActive(HomepageSection section)
-    {
-        var item = await Db.HomepageSections.FindAsync(section.Id);
-        if (item != null)
-        {
-            item.IsActive = !item.IsActive;
-            await Db.SaveChangesAsync();
-        }
-        await LoadData();
-    }
-
-    private async Task MoveOrder(HomepageSection section, int delta)
-    {
-        var item = await Db.HomepageSections.FindAsync(section.Id);
-        if (item != null)
-        {
-            item.SortOrder += delta * 10;
-            await Db.SaveChangesAsync();
-        }
-        await LoadData();
-    }
-
-    private async Task DeleteSection(HomepageSection section)
-    {
-        var item = await Db.HomepageSections.FindAsync(section.Id);
-        if (item != null)
-        {
-            Db.HomepageSections.Remove(item);
-            await Db.SaveChangesAsync();
-        }
-        _toast = "Section removed from homepage.";
-        await LoadData();
     }
 }

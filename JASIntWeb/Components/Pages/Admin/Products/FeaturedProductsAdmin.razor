@@ -1,5 +1,5 @@
 @page "/admin/featured-products"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
 
@@ -38,41 +38,39 @@
 <!-- Filters Bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            @onclick='() => SetTab("all")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        <a
+            href="@FilterUrl("all")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Active Products
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetTab("featured")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        </a>
+        <a
+            href="@FilterUrl("featured")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             ⭐ Featured Only (@_products.Count(p => p.IsFeatured))
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetTab("new")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_activeTab == "new" ? "bg-rose-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        </a>
+        <a
+            href="@FilterUrl("new")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "new" ? "bg-rose-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             🏷️ New Arrivals (@_products.Count(p => p.IsNewArrival))
-        </button>
+        </a>
     </div>
 
     <!-- Search Input -->
-    <div class="relative w-64">
+    <form method="get" data-enhance class="relative w-64">
+        <input type="hidden" name="tab" value="@Tab" />
         <input
-            @bind="_searchTerm"
-            @bind:event="oninput"
+            name="q"
+            value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Filter by product name..."
         />
-        <span class="absolute right-3 top-2 text-slate-400">
+        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
-        </span>
-    </div>
+        </button>
+    </form>
 </div>
 
 <!-- Products Table -->
@@ -133,22 +131,32 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            <button
-                                type="button"
-                                @onclick="() => ToggleFeatured(p)"
-                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                            >
-                                <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                <button
+                                    type="submit"
+                                    name="ToggleField"
+                                    value="featured"
+                                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                >
+                                    <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
+                                </button>
+                            </form>
                         </td>
                         <td class="text-center">
-                            <button
-                                type="button"
-                                @onclick="() => ToggleNewArrival(p)"
-                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                            >
-                                <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ToggleProductId" value="@p.Id" />
+                                <button
+                                    type="submit"
+                                    name="ToggleField"
+                                    value="newarrival"
+                                    class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                >
+                                    <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
+                                </button>
+                            </form>
                         </td>
                         <td class="text-right">
                             <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -171,6 +179,18 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string Tab { get; set; } = "all";
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromForm]
+    public int ToggleProductId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? ToggleField { get; set; }
+
     private sealed record FeaturedProductItem(
         int Id,
         string Name,
@@ -185,12 +205,31 @@
     );
 
     private List<FeaturedProductItem> _products = [];
-    private string _activeTab = "all";
-    private string _searchTerm = "";
     private string? _toast;
+
+    private string FilterUrl(string tab)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(tab) && tab != "all") parts.Add($"tab={Uri.EscapeDataString(tab)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        return parts.Count > 0 ? $"/admin/featured-products?{string.Join("&", parts)}" : "/admin/featured-products";
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        if (ToggleProductId > 0 && !string.IsNullOrEmpty(ToggleField))
+        {
+            var p = await Db.Products.FindAsync(ToggleProductId);
+            if (p != null)
+            {
+                if (ToggleField == "featured") p.IsFeatured = !p.IsFeatured;
+                else if (ToggleField == "newarrival") p.IsNewArrival = !p.IsNewArrival;
+                p.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+                _toast = $"Updated status for {p.Name}.";
+            }
+        }
+
         await LoadProducts();
     }
 
@@ -225,50 +264,22 @@
         }).ToList();
     }
 
-    private void SetTab(string tab) => _activeTab = tab;
-
     private List<FeaturedProductItem> FilteredProducts
     {
         get
         {
             var q = _products.AsEnumerable();
-            if (_activeTab == "featured") q = q.Where(p => p.IsFeatured);
-            else if (_activeTab == "new") q = q.Where(p => p.IsNewArrival);
+            if (Tab == "featured") q = q.Where(p => p.IsFeatured);
+            else if (Tab == "new") q = q.Where(p => p.IsNewArrival);
 
-            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            if (!string.IsNullOrWhiteSpace(Query))
             {
-                var term = _searchTerm.Trim().ToLowerInvariant();
+                var term = Query.Trim().ToLowerInvariant();
                 q = q.Where(p => p.Name.ToLowerInvariant().Contains(term)
                     || (p.BrandName != null && p.BrandName.ToLowerInvariant().Contains(term))
                     || p.CategoryName.ToLowerInvariant().Contains(term));
             }
             return q.ToList();
         }
-    }
-
-    private async Task ToggleFeatured(FeaturedProductItem item)
-    {
-        var p = await Db.Products.FindAsync(item.Id);
-        if (p != null)
-        {
-            p.IsFeatured = !p.IsFeatured;
-            p.UpdatedAt = DateTimeOffset.UtcNow;
-            await Db.SaveChangesAsync();
-        }
-        _toast = $"Updated featured status for {item.Name}.";
-        await LoadProducts();
-    }
-
-    private async Task ToggleNewArrival(FeaturedProductItem item)
-    {
-        var p = await Db.Products.FindAsync(item.Id);
-        if (p != null)
-        {
-            p.IsNewArrival = !p.IsNewArrival;
-            p.UpdatedAt = DateTimeOffset.UtcNow;
-            await Db.SaveChangesAsync();
-        }
-        _toast = $"Updated new arrival status for {item.Name}.";
-        await LoadProducts();
     }
 }

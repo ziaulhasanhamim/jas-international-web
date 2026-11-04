@@ -1,5 +1,5 @@
 @page "/admin/brands"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
 @inject CatalogService Catalog
@@ -40,33 +40,32 @@
 <!-- Filters Bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            @onclick='() => SetFilter("all")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        <a
+            href="@FilterUrl("all")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Brands (@totalAll)
-        </button>
-        <button
-            type="button"
-            @onclick='() => SetFilter("featured")'
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(_filter == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        </a>
+        <a
+            href="@FilterUrl("featured")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             ⭐ Featured on Homepage (@totalFeatured)
-        </button>
+        </a>
     </div>
 
-    <div class="relative w-64">
+    <form method="get" data-enhance class="relative w-64">
+        <input type="hidden" name="status" value="@Filter" />
         <input
-            @bind="_searchTerm"
-            @bind:event="oninput"
+            name="q"
+            value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Search brands..."
         />
-        <span class="absolute right-3 top-2 text-slate-400">
+        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
-        </span>
-    </div>
+        </button>
+    </form>
 </div>
 
 <!-- Brands Table -->
@@ -113,15 +112,20 @@
                             /@b.Slug
                         </td>
                         <td class="text-center">
-                            <button
-                                type="button"
-                                @onclick="() => ToggleFeatured(b)"
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                title="Click to toggle homepage visibility"
-                            >
-                                <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
-                                @(b.IsFeatured ? "⭐ Featured" : "Hidden")
-                            </button>
+                            <form method="post" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ToggleBrandId" value="@b.Id" />
+                                <button
+                                    type="submit"
+                                    name="ToggleAction"
+                                    value="featured"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                    title="Click to toggle homepage visibility"
+                                >
+                                    <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                                    @(b.IsFeatured ? "⭐ Featured" : "Hidden")
+                                </button>
+                            </form>
                         </td>
                         <td class="text-xs font-medium text-slate-700">
                             @b.SortOrder
@@ -157,15 +161,46 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "status")]
+    public string Filter { get; set; } = "all";
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
+    [SupplyParameterFromForm]
+    public int ToggleBrandId { get; set; }
+
+    [SupplyParameterFromForm]
+    public string? ToggleAction { get; set; }
+
     private List<AdminBrandRow> _allBrands = [];
-    private string _filter = "all";
-    private string _searchTerm = "";
     private string? _toast;
     private int totalAll;
     private int totalFeatured;
 
+    private string FilterUrl(string status)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status) && status != "all") parts.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        return parts.Count > 0 ? $"/admin/brands?{string.Join("&", parts)}" : "/admin/brands";
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        if (ToggleBrandId > 0 && ToggleAction == "featured")
+        {
+            var brand = await Db.Brands.FindAsync(ToggleBrandId);
+            if (brand != null)
+            {
+                brand.IsFeatured = !brand.IsFeatured;
+                brand.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+                Catalog.InvalidateBrandsCache();
+                _toast = $"Updated homepage visibility for {brand.Name}.";
+            }
+        }
+
         await LoadBrands();
     }
 
@@ -192,35 +227,19 @@
         totalFeatured = list.Count(b => b.IsFeatured);
     }
 
-    private void SetFilter(string filter) => _filter = filter;
-
     private List<AdminBrandRow> DisplayedBrands
     {
         get
         {
             var q = _allBrands.AsEnumerable();
-            if (_filter == "featured") q = q.Where(b => b.IsFeatured);
+            if (Filter == "featured") q = q.Where(b => b.IsFeatured);
 
-            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            if (!string.IsNullOrWhiteSpace(Query))
             {
-                var term = _searchTerm.Trim().ToLowerInvariant();
+                var term = Query.Trim().ToLowerInvariant();
                 q = q.Where(b => b.Name.ToLowerInvariant().Contains(term) || b.Slug.ToLowerInvariant().Contains(term));
             }
             return q.ToList();
         }
-    }
-
-    private async Task ToggleFeatured(AdminBrandRow b)
-    {
-        var brand = await Db.Brands.FindAsync(b.Id);
-        if (brand != null)
-        {
-            brand.IsFeatured = !brand.IsFeatured;
-            brand.UpdatedAt = DateTimeOffset.UtcNow;
-            await Db.SaveChangesAsync();
-        }
-        Catalog.InvalidateBrandsCache();
-        _toast = $"Updated homepage visibility for {b.Name}.";
-        await LoadBrands();
     }
 }

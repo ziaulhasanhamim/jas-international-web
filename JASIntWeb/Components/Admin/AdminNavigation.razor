@@ -8,13 +8,10 @@
         Sales &amp; Analytics
     </NavLink>
 
-    <SidebarGroup Title="Orders & Commerce" IconName="cart" Prefix="/admin/orders">
-        <NavLink href="/admin/orders" Match="NavLinkMatch.All">All Orders</NavLink>
-        <NavLink href="/admin/orders?payment=unconfirmed">Needs Payment Verification</NavLink>
-        <NavLink href="/admin/orders?status=Pending">Pending Review</NavLink>
-        <NavLink href="/admin/orders?status=Confirmed">Confirmed</NavLink>
-        <NavLink href="/admin/orders?status=Shipped">In Delivery</NavLink>
-    </SidebarGroup>
+    <NavLink href="/admin/orders" class="nav-link">
+        <Icon Name="cart" Class="size-4" />
+        Orders
+    </NavLink>
 
     <SidebarGroup Title="Products & Catalog" IconName="box" Prefix="/admin/products" AlternatePrefix="/admin/inventory">
         <NavLink href="/admin/products" Match="NavLinkMatch.All">All Products</NavLink>

@@ -1,5 +1,5 @@
 @page "/product/{Slug}"
-@rendermode InteractiveServer
+@attribute [StreamRendering]
 @inject JASIntWeb.Services.CatalogService Catalog
 @inject AppDbContext Db
 @inject NavigationManager Nav
@@ -73,6 +73,7 @@ else
             <div>
                 <div class="relative aspect-square overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs flex items-center justify-center">
                     <img
+                        id="main-product-img"
                         src="@image"
                         alt="@product.Name"
                         fetchpriority="high"
@@ -99,15 +100,17 @@ else
                         @for (var i = 0; i < product.Images.Count; i++)
                         {
                             var index = i;
-                            var isSelected = image == product.Images[index];
+                            var imgUrl = product.Images[index];
+                            var isSelected = image == imgUrl;
                             <button
                                 type="button"
-                                @onclick="() => image = product.Images[index]"
+                                onclick="document.getElementById('main-product-img').src = this.dataset.src; document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('border-blue-600', 'ring-2', 'ring-blue-500/20')); this.classList.add('border-blue-600', 'ring-2', 'ring-blue-500/20');"
+                                data-src="@imgUrl"
                                 aria-label="View image @(index + 1)"
-                                class="size-20 shrink-0 rounded-2xl border-2 @(isSelected ? "border-blue-600 shadow-xs ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-300") bg-white p-1.5 transition overflow-hidden cursor-pointer"
+                                class="thumb-btn size-20 shrink-0 rounded-2xl border-2 @(isSelected ? "border-blue-600 shadow-xs ring-2 ring-blue-500/20" : "border-slate-200 hover:border-slate-300") bg-white p-1.5 transition overflow-hidden cursor-pointer"
                             >
                                 <img
-                                    src="@product.Images[index]"
+                                    src="@imgUrl"
                                     alt="@product.Name view @(index + 1)"
                                     loading="lazy"
                                     decoding="async"
@@ -155,25 +158,26 @@ else
                             @foreach (var option in definition.Values)
                             {
                                 var active = choices.GetValueOrDefault(definition.Code) == option.Code;
-                                <button
-                                    type="button"
-                                    @onclick="() => SelectOption(definition.Code, option.Code)"
+                                <a
+                                    href="@ProductOptions.OptionUrl(product, choices, definition.Code, option.Code)"
+                                    data-enhance
                                     aria-current="@(active ? "true" : "false")"
                                     class="rounded-xl border px-3.5 py-2 text-xs font-semibold transition select-none cursor-pointer @(active ? "border-blue-600 bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/20" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50")"
                                 >
                                     @option.Value
-                                </button>
+                                </a>
                             }
                             @if (!definition.IsRequired)
                             {
-                                <button
-                                    type="button"
-                                    @onclick='() => SelectOption(definition.Code, "")'
-                                    aria-current="@(!choices.ContainsKey(definition.Code) ? "true" : "false")"
-                                    class="rounded-xl border px-3.5 py-2 text-xs font-medium transition select-none cursor-pointer @(!choices.ContainsKey(definition.Code) ? "border-blue-600 bg-blue-600 text-white shadow-xs" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300")"
+                                var notApplicableActive = !choices.ContainsKey(definition.Code);
+                                <a
+                                    href="@ProductOptions.OptionUrl(product, choices, definition.Code, "")"
+                                    data-enhance
+                                    aria-current="@(notApplicableActive ? "true" : "false")"
+                                    class="rounded-xl border px-3.5 py-2 text-xs font-medium transition select-none cursor-pointer @(notApplicableActive ? "border-blue-600 bg-blue-600 text-white shadow-xs" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300")"
                                 >
                                     Not applicable
-                                </button>
+                                </a>
                             }
                         </div>
                     </div>
@@ -273,7 +277,7 @@ else
                             </span>
                         </div>
                     </div>
-                    <button type="button" @onclick="() => showReviewModal = true" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <button type="button" onclick="document.getElementById('write-review-modal').classList.remove('hidden')" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
                         <span>✍️ Write a Review</span>
                     </button>
                 </div>
@@ -282,7 +286,7 @@ else
                 {
                     <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 font-semibold flex items-center justify-between">
                         <span>✓ @reviewSuccessMessage</span>
-                        <button type="button" @onclick="() => reviewSuccessMessage = null" class="text-emerald-600 hover:text-emerald-950 font-bold">✕</button>
+                        <button type="button" onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-950 font-bold p-1 cursor-pointer">✕</button>
                     </div>
                 }
 
@@ -332,54 +336,57 @@ else
         </section>
 
         <!-- Write Review Modal -->
-        @if (showReviewModal)
-        {
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
-                <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h3 class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
-                        <button type="button" @onclick="() => showReviewModal = false" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+        <div id="write-review-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn hidden">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
+                    <button type="button" onclick="document.getElementById('write-review-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer">✕</button>
+                </div>
+                <form method="post" @formname="submit-review" @onsubmit="SubmitReview" data-enhance class="space-y-3">
+                    <AntiforgeryToken />
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Your Rating</label>
+                        <div class="flex items-center gap-2">
+                            <input type="hidden" id="review-rating-input" name="ReviewForm.Rating" value="@(ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)" />
+                            @for (int star = 1; star <= 5; star++)
+                            {
+                                var s = star;
+                                <button
+                                    type="button"
+                                    onclick="document.getElementById('review-rating-input').value = '@s'; document.getElementById('review-rating-text').textContent = '@s / 5 Stars'; document.querySelectorAll('.star-btn').forEach((b, idx) => { b.className = (idx < @s ? 'star-btn text-xl text-amber-400 hover:scale-110 transition cursor-pointer' : 'star-btn text-xl text-slate-200 hover:scale-110 transition cursor-pointer'); });"
+                                    class="star-btn text-xl @(s <= (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5) ? "text-amber-400" : "text-slate-200") hover:scale-110 transition cursor-pointer"
+                                >
+                                    ★
+                                </button>
+                            }
+                            <span id="review-rating-text" class="text-xs text-slate-500 ml-2 font-medium">@(ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5) / 5 Stars</span>
+                        </div>
                     </div>
-                    <div class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Your Rating</label>
-                            <div class="flex items-center gap-2">
-                                @for (int star = 1; star <= 5; star++)
-                                {
-                                    var s = star;
-                                    <button type="button" @onclick="() => reviewRating = s" class="text-xl @(s <= reviewRating ? "text-amber-400" : "text-slate-200") hover:scale-110 transition cursor-pointer">
-                                        ★
-                                    </button>
-                                }
-                                <span class="text-xs text-slate-500 ml-2 font-medium">@reviewRating / 5 Stars</span>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
-                                <input type="text" @bind="reviewName" placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                                <input type="email" @bind="reviewEmail" placeholder="tanvir@example.com" class="field text-xs" />
-                            </div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
+                            <input type="text" name="ReviewForm.Name" value="@ReviewForm?.Name" required placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Headline / Review Title</label>
-                            <input type="text" @bind="reviewTitle" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                            <input type="email" name="ReviewForm.Email" value="@ReviewForm?.Email" placeholder="tanvir@example.com" class="field text-xs" />
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Your Detailed Experience *</label>
-                            <textarea @bind="reviewComment" rows="3" placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs"></textarea>
-                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Headline / Review Title</label>
+                        <input type="text" name="ReviewForm.Title" value="@ReviewForm?.Title" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Your Detailed Experience *</label>
+                        <textarea name="ReviewForm.Comment" rows="3" required placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs">@ReviewForm?.Comment</textarea>
                     </div>
                     <div class="flex items-center justify-end gap-2 pt-2">
-                        <button type="button" @onclick="() => showReviewModal = false" class="btn-secondary text-xs">Cancel</button>
-                        <button type="button" @onclick="SubmitReview" class="btn-primary text-xs !bg-blue-600 hover:!bg-blue-700">Submit Review</button>
+                        <button type="button" onclick="document.getElementById('write-review-modal').classList.add('hidden')" class="btn-secondary text-xs cursor-pointer">Cancel</button>
+                        <button type="submit" class="btn-primary text-xs !bg-blue-600 hover:!bg-blue-700 cursor-pointer">Submit Review</button>
                     </div>
-                </div>
+                </form>
             </div>
-        }
+        </div>
 
         <!-- Related Products Section (Gadget & Gear style slider) -->
         @if (relatedProducts.Count > 0)
@@ -416,11 +423,16 @@ else
     public string Slug { get; set; } = "";
     [SupplyParameterFromQuery(Name = "image")]
     public int? ImageIndex { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review")]
+    public ReviewFormModel? ReviewForm { get; set; }
+
     private ProductDetailsDto? product;
     private ProductVariantDto? selected;
     private Dictionary<string, string> choices = [];
     private string image = "";
     private List<ProductSummaryDto> relatedProducts = [];
+    private List<ProductReview> reviews = [];
+    private string? reviewSuccessMessage;
 
     private ProductSummaryDto CurrentSummary => new(
         product!.Id,
@@ -458,55 +470,42 @@ else
         var related = await Catalog.LatestAsync(product.CategorySlug, 8);
         relatedProducts = related.Where(p => p.Id != product.Id).ToList();
 
+        await LoadReviewsAsync();
+    }
+
+    private async Task LoadReviewsAsync()
+    {
+        if (product is null) return;
         reviews = await Db.ProductReviews.AsNoTracking()
             .Where(r => r.ProductId == product.Id && r.IsApproved)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
     }
 
-    private List<ProductReview> reviews = [];
-    private bool showReviewModal = false;
-    private string reviewName = "";
-    private string reviewEmail = "";
-    private int reviewRating = 5;
-    private string reviewTitle = "";
-    private string reviewComment = "";
-    private string? reviewSuccessMessage;
-
-    private void SelectOption(string definitionCode, string optionCode)
-    {
-        if (product == null) return;
-        if (string.IsNullOrEmpty(optionCode))
-        {
-            choices.Remove(definitionCode);
-        }
-        else
-        {
-            choices[definitionCode] = optionCode;
-        }
-        selected = ProductOptions.Match(product, choices);
-    }
-
     private async Task SubmitReview()
     {
-        if (product == null || string.IsNullOrWhiteSpace(reviewName) || string.IsNullOrWhiteSpace(reviewComment)) return;
+        if (product == null) return;
+        ReviewForm ??= new();
+        var name = ReviewForm.Name?.Trim() ?? "";
+        var comment = ReviewForm.Comment?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(comment)) return;
 
         var review = new ProductReview
         {
             ProductId = product.Id,
-            CustomerName = reviewName.Trim(),
-            CustomerEmail = string.IsNullOrWhiteSpace(reviewEmail) ? null : reviewEmail.Trim(),
-            Rating = Math.Clamp(reviewRating, 1, 5),
-            Title = string.IsNullOrWhiteSpace(reviewTitle) ? "Customer Review" : reviewTitle.Trim(),
-            Comment = reviewComment.Trim(),
+            CustomerName = name,
+            CustomerEmail = string.IsNullOrWhiteSpace(ReviewForm.Email) ? null : ReviewForm.Email.Trim(),
+            Rating = Math.Clamp(ReviewForm.Rating, 1, 5),
+            Title = string.IsNullOrWhiteSpace(ReviewForm.Title) ? "Customer Review" : ReviewForm.Title.Trim(),
+            Comment = comment,
             IsApproved = true
         };
 
         Db.ProductReviews.Add(review);
         await Db.SaveChangesAsync();
 
-        showReviewModal = false;
         reviewSuccessMessage = "Thank you! Your verified review has been published.";
-        reviews.Insert(0, review);
+        await LoadReviewsAsync();
+        ReviewForm = new();
     }
 }
