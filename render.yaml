@@ -27,3 +27,13 @@ services:
         value: ziaulhasan174@gmail.com
       - key: Mail__DisplayName
         value: JAS International
+      - key: Storage__BucketName
+        value: jas-storefront-media
+      - key: AWS_REGION
+        value: ap-southeast-1
+      - key: AWS_ENDPOINT_URL_S3
+        value: https://br-summer-grass-b3x8t2xt.storage.c-4.ap-southeast-1.aws.neon.tech
+      - key: AWS_ACCESS_KEY_ID
+        value: nak_live_d7100c3a55c34cb8b6ec06d288fd051c
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false

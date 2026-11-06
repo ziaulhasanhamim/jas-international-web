@@ -90,21 +90,21 @@
         </div>
     }
 
-    <!-- Main Floating Trigger Button (Orange bubble matching Gadget & Gear screenshot) -->
+    <!-- Main Floating Trigger Button (Orange bubble matching Gadget & Gear style) -->
     <button
         type="button"
         @onclick="Toggle"
-        class="flex size-14 items-center justify-center rounded-full bg-[#f97316] text-white shadow-xl shadow-orange-500/30 hover:bg-[#ea580c] hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all duration-200 ring-4 ring-orange-400/20"
+        class="flex size-12 sm:size-14 items-center justify-center rounded-full bg-[#f97316] text-white shadow-xl shadow-orange-500/30 hover:bg-[#ea580c] hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all duration-200 ring-4 ring-orange-400/20"
         aria-label="Open customer support"
     >
         @if (_isOpen)
         {
-            <Icon Name="close" Class="size-6 text-white" />
+            <Icon Name="close" Class="size-5 sm:size-6 text-white" />
         }
         else
         {
             <!-- Speech bubble icon exactly like the screenshot -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="size-7 text-white fill-white" viewBox="0 0 24 24">
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-6 sm:size-7 text-white fill-white" viewBox="0 0 24 24">
                 <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
             </svg>
         }

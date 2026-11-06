@@ -210,9 +210,47 @@ public static class JsonTestDataSeeder
                 new() { Name = "Sony", Slug = "sony", IsFeatured = true, SortOrder = 6 },
                 new() { Name = "OnePlus", Slug = "oneplus", IsFeatured = true, SortOrder = 7 },
                 new() { Name = "Baseus", Slug = "baseus", IsFeatured = true, SortOrder = 8 },
-                new() { Name = "JBL", Slug = "jbl", IsFeatured = true, SortOrder = 9 }
+                new() { Name = "JBL", Slug = "jbl", IsFeatured = true, SortOrder = 9 },
+                new() { Name = "Amazfit", Slug = "amazfit", IsFeatured = true, SortOrder = 10 },
+                new() { Name = "Kieslect", Slug = "kieslect", IsFeatured = true, SortOrder = 11 },
+                new() { Name = "Kospet", Slug = "kospet", IsFeatured = true, SortOrder = 12 },
+                new() { Name = "Haylou", Slug = "haylou", IsFeatured = true, SortOrder = 13 },
+                new() { Name = "Imiki", Slug = "imiki", IsFeatured = true, SortOrder = 14 },
+                new() { Name = "QCY", Slug = "qcy", IsFeatured = true, SortOrder = 15 },
+                new() { Name = "oraimo", Slug = "oraimo", IsFeatured = true, SortOrder = 16 },
+                new() { Name = "DJI", Slug = "dji", IsFeatured = true, SortOrder = 17 },
+                new() { Name = "Hollyland", Slug = "hollyland", IsFeatured = true, SortOrder = 18 },
+                new() { Name = "Boya", Slug = "boya", IsFeatured = true, SortOrder = 19 },
+                new() { Name = "Xundd", Slug = "xundd", IsFeatured = false, SortOrder = 20 },
+                new() { Name = "Memo", Slug = "memo", IsFeatured = false, SortOrder = 21 }
             };
             db.Brands.AddRange(initialBrands);
+            await db.SaveChangesAsync(ct);
+        }
+        else
+        {
+            var gadgetBrands = new List<Brand>
+            {
+                new() { Name = "Amazfit", Slug = "amazfit", IsFeatured = true, SortOrder = 10 },
+                new() { Name = "Kieslect", Slug = "kieslect", IsFeatured = true, SortOrder = 11 },
+                new() { Name = "Kospet", Slug = "kospet", IsFeatured = true, SortOrder = 12 },
+                new() { Name = "Haylou", Slug = "haylou", IsFeatured = true, SortOrder = 13 },
+                new() { Name = "Imiki", Slug = "imiki", IsFeatured = true, SortOrder = 14 },
+                new() { Name = "QCY", Slug = "qcy", IsFeatured = true, SortOrder = 15 },
+                new() { Name = "oraimo", Slug = "oraimo", IsFeatured = true, SortOrder = 16 },
+                new() { Name = "DJI", Slug = "dji", IsFeatured = true, SortOrder = 17 },
+                new() { Name = "Hollyland", Slug = "hollyland", IsFeatured = true, SortOrder = 18 },
+                new() { Name = "Boya", Slug = "boya", IsFeatured = true, SortOrder = 19 },
+                new() { Name = "Xundd", Slug = "xundd", IsFeatured = false, SortOrder = 20 },
+                new() { Name = "Memo", Slug = "memo", IsFeatured = false, SortOrder = 21 }
+            };
+            foreach (var gb in gadgetBrands)
+            {
+                if (!await db.Brands.AnyAsync(b => b.Slug == gb.Slug, ct))
+                {
+                    db.Brands.Add(gb);
+                }
+            }
             await db.SaveChangesAsync(ct);
         }
 
@@ -255,6 +293,30 @@ public static class JsonTestDataSeeder
                     matched = brands.FirstOrDefault(b => b.Slug == "baseus");
                 else if (lower.Contains("jbl"))
                     matched = brands.FirstOrDefault(b => b.Slug == "jbl");
+                else if (lower.Contains("amazfit"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "amazfit");
+                else if (lower.Contains("kieslect"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "kieslect");
+                else if (lower.Contains("kospet"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "kospet");
+                else if (lower.Contains("haylou"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "haylou");
+                else if (lower.Contains("imiki"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "imiki");
+                else if (lower.Contains("qcy"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "qcy");
+                else if (lower.Contains("oraimo"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "oraimo");
+                else if (lower.Contains("dji"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "dji");
+                else if (lower.Contains("hollyland"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "hollyland");
+                else if (lower.Contains("boya"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "boya");
+                else if (lower.Contains("xund"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "xundd");
+                else if (lower.Contains("memo"))
+                    matched = brands.FirstOrDefault(b => b.Slug == "memo");
 
                 if (matched is not null)
                 {
@@ -331,37 +393,37 @@ public static class JsonTestDataSeeder
             db.HomepageSections.AddRange(
                 new HomepageSection
                 {
-                    Title = "Sound Surround",
-                    Eyebrow = "HEAR MORE",
-                    CategorySlug = "audio",
-                    ViewAllHref = "/category/audio",
+                    Title = "Smart Watches & Bands",
+                    Eyebrow = "AMOLED & CALLING",
+                    CategorySlug = "smartwatches",
+                    ViewAllHref = "/category/smartwatches",
                     SortOrder = 1,
                     IsActive = true,
                     ItemLimit = 8
                 },
                 new HomepageSection
                 {
-                    Title = "New Arrivals",
-                    Eyebrow = "JUST LANDED",
-                    CategorySlug = null,
-                    ViewAllHref = "/products?sort=newest",
+                    Title = "Wireless Earbuds & Audio",
+                    Eyebrow = "STUDIO ACOUSTICS",
+                    CategorySlug = "audio-earbuds",
+                    ViewAllHref = "/category/audio-earbuds",
                     SortOrder = 2,
                     IsActive = true,
                     ItemLimit = 8
                 },
                 new HomepageSection
                 {
-                    Title = "Smart Watches & Bands",
-                    Eyebrow = "STAY CONNECTED",
-                    CategorySlug = "wearables",
-                    ViewAllHref = "/category/wearables",
+                    Title = "Power Banks & Chargers",
+                    Eyebrow = "DAILY ESSENTIALS",
+                    CategorySlug = "power-charging",
+                    ViewAllHref = "/category/power-charging",
                     SortOrder = 3,
                     IsActive = true,
                     ItemLimit = 8
                 },
                 new HomepageSection
                 {
-                    Title = "Wireless Speakers",
+                    Title = "Bluetooth Speakers",
                     Eyebrow = "TURN IT UP",
                     CategorySlug = "speakers",
                     ViewAllHref = "/category/speakers",
@@ -371,11 +433,21 @@ public static class JsonTestDataSeeder
                 },
                 new HomepageSection
                 {
-                    Title = "Power & Fast Chargers",
-                    Eyebrow = "DAILY ESSENTIALS",
-                    CategorySlug = "power-charging",
-                    ViewAllHref = "/category/power-charging",
+                    Title = "Gaming Coolers & Stands",
+                    Eyebrow = "PEAK PERFORMANCE",
+                    CategorySlug = "coolers-stands",
+                    ViewAllHref = "/category/coolers-stands",
                     SortOrder = 5,
+                    IsActive = true,
+                    ItemLimit = 8
+                },
+                new HomepageSection
+                {
+                    Title = "Creator Gear & Microphones",
+                    Eyebrow = "STUDIO & STREAMING",
+                    CategorySlug = "creator-gear",
+                    ViewAllHref = "/category/creator-gear",
+                    SortOrder = 6,
                     IsActive = true,
                     ItemLimit = 8
                 }
@@ -388,11 +460,11 @@ public static class JsonTestDataSeeder
             db.CuratedPromoCards.AddRange(
                 new CuratedPromoCard
                 {
-                    Eyebrow = "FLAGSHIP ECOSYSTEM",
-                    Title = "Apple Intelligence",
-                    Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
-                    LinkUrl = "/category/phones",
-                    LinkText = "Explore Devices",
+                    Eyebrow = "SMART WEARABLES",
+                    Title = "Flagship Smartwatches",
+                    Subtitle = "Amazfit, Kieslect & Kospet rugged outdoor & AMOLED watches.",
+                    LinkUrl = "/category/smartwatches",
+                    LinkText = "Explore Watches",
                     Theme = "navy",
                     SortOrder = 1,
                     IsActive = true
@@ -400,9 +472,9 @@ public static class JsonTestDataSeeder
                 new CuratedPromoCard
                 {
                     Eyebrow = "PURE ACOUSTICS",
-                    Title = "Studio ANC Sound",
-                    Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
-                    LinkUrl = "/category/headphones",
+                    Title = "Studio ANC Earbuds",
+                    Subtitle = "Soundcore Liberty 4 Pro, OnePlus Buds & QCY wireless audio.",
+                    LinkUrl = "/category/audio-earbuds",
                     LinkText = "Hear the Difference",
                     Theme = "amber",
                     SortOrder = 2,
@@ -410,9 +482,9 @@ public static class JsonTestDataSeeder
                 },
                 new CuratedPromoCard
                 {
-                    Eyebrow = "HIGH EFFICIENCY",
-                    Title = "GaN Fast Charge",
-                    Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
+                    Eyebrow = "FAST CHARGE ECOSYSTEM",
+                    Title = "GaN Fast Charge & Power",
+                    Subtitle = "Anker Zolo 30W, Baseus 65W & high-capacity 27600mAh power banks.",
                     LinkUrl = "/category/power-charging",
                     LinkText = "Power Up Fast",
                     Theme = "indigo",
@@ -440,7 +512,7 @@ public static class JsonTestDataSeeder
 
         // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery
         var hasPlaceholders = await db.Products.AnyAsync(p => p.MainImageUrl != null && p.MainImageUrl.Contains("placehold.co"), ct);
-        var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title != null && (s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday")), ct);
+        var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title != null && (s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday") || s.Title.Contains("iPhone") || s.Title.Contains("Galaxy S25")), ct);
         if (hasPlaceholders || hasOldSlides)
         {
             var seedPath = Path.Combine(AppContext.BaseDirectory, "data", "JasTestSeedData.json");

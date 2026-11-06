@@ -281,11 +281,11 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IM
                     new CuratedPromoCard
                     {
                         Id = 1,
-                        Eyebrow = "FLAGSHIP ECOSYSTEM",
-                        Title = "Apple Intelligence",
-                        Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
-                        LinkUrl = "/category/phones",
-                        LinkText = "Explore Devices",
+                        Eyebrow = "SMART WEARABLES",
+                        Title = "Flagship Smartwatches",
+                        Subtitle = "Amazfit, Kieslect & Kospet rugged outdoor & AMOLED watches.",
+                        LinkUrl = "/category/smartwatches",
+                        LinkText = "Explore Watches",
                         Theme = "navy",
                         SortOrder = 1,
                         IsActive = true
@@ -294,9 +294,9 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IM
                     {
                         Id = 2,
                         Eyebrow = "PURE ACOUSTICS",
-                        Title = "Studio ANC Sound",
-                        Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
-                        LinkUrl = "/category/headphones",
+                        Title = "Studio ANC Earbuds",
+                        Subtitle = "Soundcore Liberty 4 Pro, OnePlus Buds & QCY wireless audio.",
+                        LinkUrl = "/category/audio-earbuds",
                         LinkText = "Hear the Difference",
                         Theme = "amber",
                         SortOrder = 2,
@@ -305,9 +305,9 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IM
                     new CuratedPromoCard
                     {
                         Id = 3,
-                        Eyebrow = "HIGH EFFICIENCY",
-                        Title = "GaN Fast Charge",
-                        Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
+                        Eyebrow = "FAST CHARGE ECOSYSTEM",
+                        Title = "GaN Fast Charge & Power",
+                        Subtitle = "Anker Zolo 30W, Baseus 65W & high-capacity 27600mAh power banks.",
                         LinkUrl = "/category/power-charging",
                         LinkText = "Power Up Fast",
                         Theme = "indigo",

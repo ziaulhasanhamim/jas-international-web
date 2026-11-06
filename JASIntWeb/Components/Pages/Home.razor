@@ -4,7 +4,7 @@
 <PageTitle>JAS International — Gadgets &amp; Premium Tech Accessories (Since 2005)</PageTitle>
 
 <HeadContent>
-    <meta name="description" content="JAS International is Khulna's premier gadget boutique offering authentic smartphones, audio gear, smartwatches, laptops, and accessories with nationwide cash on delivery since 2005." />
+    <meta name="description" content="JAS International is Khulna's premier gadget boutique offering authentic smartwatches, wireless audio, fast chargers, power banks, and tech accessories with nationwide delivery since 2005." />
     <meta property="og:title" content="JAS International — Premium Gadgets &amp; Tech Accessories (Since 2005)" />
     <meta property="og:description" content="Shop 100% genuine tech gadgets from Apple, Samsung, Google Pixel, Anker, Sony, and more. Physical showroom in Khulna with nationwide delivery." />
     <meta property="og:image" content="/jas-logo.png" />
@@ -78,7 +78,7 @@
                                 Experience Gadgets In Person At Our Khulna Showroom
                             </h2>
                             <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                                Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
+                                Visit our physical boutique store to test audio gear, smartwatches, fast chargers, and accessories before you purchase. Full after-sales warranty support on site.
                             </p>
                         </div>
                         <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
@@ -120,7 +120,7 @@
                         Experience Gadgets In Person At Our Khulna Showroom
                     </h2>
                     <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                        Visit our physical boutique store to test audio gear, smartwatches, smartphones, and accessories before you purchase. Full after-sales warranty support on site.
+                        Visit our physical boutique store to test audio gear, smartwatches, fast chargers, and accessories before you purchase. Full after-sales warranty support on site.
                     </p>
                 </div>
                 <div class="flex flex-col sm:flex-row items-center gap-3 shrink-0">
@@ -134,9 +134,9 @@
             </div>
         </section>
 
-        <ProductSection Title="Audio &amp; Earbuds" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/headphones" />
-        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/wearables" />
-        <ProductSection Title="Wireless Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
+        <ProductSection Title="Wireless Earbuds &amp; Audio" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/audio-earbuds" />
+        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/smartwatches" />
+        <ProductSection Title="Bluetooth Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
     }
 
     <!-- Featured Brands Section (Contained cleanly inside max-w-7xl with elegant cards) -->
@@ -207,8 +207,8 @@
         if (customSections.Count == 0)
         {
             var newArrivalsTask = Catalog.LatestAsync(null);
-            var audioTask = Catalog.LatestAsync("headphones");
-            var watchesTask = Catalog.LatestAsync("wearables");
+            var audioTask = Catalog.LatestAsync("audio-earbuds");
+            var watchesTask = Catalog.LatestAsync("smartwatches");
             var speakersTask = Catalog.LatestAsync("speakers");
 
             await Task.WhenAll(newArrivalsTask, audioTask, watchesTask, speakersTask);

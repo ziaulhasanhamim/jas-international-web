@@ -488,3 +488,6 @@ test.http
 # Runtime user uploads
 **/wwwroot/uploads/**
 !**/wwwroot/uploads/.gitkeep
+.env*
+.neon
+

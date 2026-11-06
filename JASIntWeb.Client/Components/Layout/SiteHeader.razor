@@ -27,7 +27,7 @@
                 type="search"
                 @bind="searchQuery"
                 @bind:event="oninput"
-                placeholder="Search gadgets, smartphones, laptops, audio..."
+                placeholder="Search smartwatches, earbuds, chargers, gadgets..."
                 class="w-full rounded-full border border-slate-200/90 bg-slate-50/90 px-4 py-2.5 pl-10 pr-24 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100"
             />
             <span class="absolute left-3.5 top-3 text-slate-400">
@@ -127,7 +127,7 @@
                 type="search"
                 @bind="searchQuery"
                 @bind:event="oninput"
-                placeholder="Search gadgets, smartphones, laptops..."
+                placeholder="Search smartwatches, earbuds, chargers..."
                 class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 pl-9 pr-14 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <span class="absolute left-3 top-2.5 text-slate-400">
@@ -144,11 +144,13 @@
         <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 overflow-x-auto text-xs font-medium text-slate-600 scrollbar-none touch-pan-x [-webkit-overflow-scrolling:touch]">
             <div class="flex items-center gap-6 whitespace-nowrap">
                 <a href="/products" class="hover:text-blue-600 transition font-semibold text-slate-900">All Gadgets</a>
-                <a href="/category/phones" class="hover:text-blue-600 transition">Smartphones</a>
-                <a href="/category/laptops" class="hover:text-blue-600 transition">Laptops</a>
-                <a href="/category/headphones" class="hover:text-blue-600 transition">Audio &amp; Earbuds</a>
-                <a href="/category/wearables" class="hover:text-blue-600 transition">Smart Watches</a>
-                <a href="/category/speakers" class="hover:text-blue-600 transition">Bluetooth Speakers</a>
+                <a href="/category/smartwatches" class="hover:text-blue-600 transition">Smart Watches</a>
+                <a href="/category/audio-earbuds" class="hover:text-blue-600 transition">Audio &amp; Earbuds</a>
+                <a href="/category/power-charging" class="hover:text-blue-600 transition">Power &amp; Chargers</a>
+                <a href="/category/cables-adapters" class="hover:text-blue-600 transition">Cables &amp; Adapters</a>
+                <a href="/category/speakers" class="hover:text-blue-600 transition">Speakers</a>
+                <a href="/category/cases-protection" class="hover:text-blue-600 transition">Protection</a>
+                <a href="/category/creator-gear" class="hover:text-blue-600 transition">Creator Gear</a>
                 <a href="/products?sort=newest" class="text-blue-600 font-semibold hover:underline">New Arrivals</a>
             </div>
             <div class="hidden sm:flex items-center gap-3 shrink-0 text-slate-400">

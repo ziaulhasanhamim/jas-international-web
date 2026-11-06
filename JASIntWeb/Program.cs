@@ -29,6 +29,7 @@ builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddSingleton<CourierLogisticsService>();
+builder.Services.AddSingleton<IStorageService, NeonStorageService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
@@ -219,7 +220,7 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseStaticFiles();
 app.MapStaticAssets();
 
-app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IWebHostEnvironment env) =>
+app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IStorageService storage) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Form content required" });
@@ -228,9 +229,6 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IWe
     var files = form.Files;
     if (files.Count == 0)
         return Results.BadRequest(new { error = "No files uploaded" });
-
-    var uploadFolder = Path.Combine(env.WebRootPath, "uploads", "products");
-    Directory.CreateDirectory(uploadFolder);
 
     string[] allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif"];
     var urls = new List<string>();
@@ -241,13 +239,9 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IWe
         var ext = Path.GetExtension(file.FileName);
         if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
 
-        var filename = $"prod-{DateTime.UtcNow.Ticks}-{Guid.NewGuid().ToString("N")[..8]}{ext.ToLowerInvariant()}";
-        var filePath = Path.Combine(uploadFolder, filename);
-
-        await using var stream = new FileStream(filePath, FileMode.Create);
-        await file.CopyToAsync(stream);
-
-        urls.Add($"/uploads/products/{filename}");
+        await using var stream = file.OpenReadStream();
+        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+        urls.Add(url);
     }
 
     return Results.Ok(new { urls });
