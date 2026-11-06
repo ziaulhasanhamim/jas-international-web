@@ -9,15 +9,6 @@ internal static class HostingConfiguration
 {
     public static void AddStoreHosting(this WebApplicationBuilder builder)
     {
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-            {
-                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-                options.ForwardLimit = 1;
-                foreach (var proxy in builder.Configuration.GetSection("Hosting:KnownProxies").Get<string[]>() ?? [])
-                {
-                    options.KnownProxies.Add(IPAddress.Parse(proxy));
-                }
-            });
         var keys = builder.Services.AddDataProtection().SetApplicationName("JASInternational");
         var keyPath = builder.Configuration["Hosting:DataProtectionPath"];
         if (!string.IsNullOrWhiteSpace(keyPath))

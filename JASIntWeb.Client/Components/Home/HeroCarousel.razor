@@ -93,9 +93,12 @@
     public List<CarouselSlideDto> Slides { get; set; } = [];
     private List<CarouselSlideDto> _slides => Slides;
 
-    protected override void OnInitialized()
+    protected override void OnAfterRender(bool firstRender)
     {
-        StartTimer();
+        if (firstRender && _slides.Count > 1)
+        {
+            StartTimer();
+        }
     }
 
     private void StartTimer()
@@ -115,15 +118,27 @@
                     {
                         if (!_paused && _slides.Count > 1)
                         {
-                            await InvokeAsync(() =>
+                            try
                             {
-                                _index = (_index + 1) % _slides.Count;
-                                StateHasChanged();
-                            });
+                                await InvokeAsync(() =>
+                                {
+                                    _index = (_index + 1) % _slides.Count;
+                                    StateHasChanged();
+                                });
+                            }
+                            catch
+                            {
+                                // Circuit closed or component disposed - safely exit timer loop
+                                break;
+                            }
                         }
                     }
                 }
                 catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch
                 {
                     break;
                 }
@@ -156,8 +171,14 @@
 
     public ValueTask DisposeAsync()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
+        try
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+        }
+        catch
+        {
+        }
         return ValueTask.CompletedTask;
     }
 }

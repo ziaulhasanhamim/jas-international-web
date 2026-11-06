@@ -7,9 +7,18 @@
     aria-live="assertive"
     data-nosnippet
 >
-    <div class="reconnect-card">
-        <h2>Connection interrupted</h2>
-        <p>Reconnecting to the store. If the connection does not return, reload this page.</p>
-        <a href="@Nav.Uri" data-enhance-nav="false" class="shop-button">Reload page</a>
+    <div class="reconnect-connecting">
+        <div class="reconnect-pill">
+            <span class="reconnect-spinner"></span>
+            <span>Reconnecting to JAS International…</span>
+        </div>
+    </div>
+    <div class="reconnect-failed-view">
+        <div class="reconnect-card">
+            <div class="reconnect-icon">⚡</div>
+            <h2>Connection interrupted</h2>
+            <p>Could not restore live connection to the store. Please reload the page to continue.</p>
+            <a href="@Nav.Uri" data-enhance-nav="false" class="reconnect-button">Reload page</a>
+        </div>
     </div>
 </div>

@@ -29,7 +29,20 @@ builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddSingleton<CourierLogisticsService>();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents().AddInteractiveWebAssemblyComponents()
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents(options =>
+    {
+        options.DetailedErrors = true;
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(5);
+    })
+    .AddHubOptions(options =>
+    {
+        options.MaximumReceiveMessageSize = 1024 * 1024;
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+        options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+        options.EnableDetailedErrors = true;
+    })
+    .AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
 builder.Services.AddCascadingAuthenticationState();
 var authBuilder = builder.Services.AddAuthentication(o =>
@@ -108,11 +121,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+    options.ForwardLimit = null;
 });
 
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
 var app = builder.Build();
 app.UseForwardedHeaders();
+app.UseWebSockets();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

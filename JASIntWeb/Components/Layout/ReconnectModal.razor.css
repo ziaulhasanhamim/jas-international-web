@@ -1,5 +1,135 @@
-#components-reconnect-modal { display: none; position: fixed; inset: 0; z-index: 10000; background: #0f172acc; align-items: center; justify-content: center; padding: 1.5rem; }
-#components-reconnect-modal.components-reconnect-show, #components-reconnect-modal.components-reconnect-failed, #components-reconnect-modal.components-reconnect-rejected { display: flex; }
-.reconnect-card { background: white; color: #0f172a; max-width: 28rem; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 30px 80px #0005; }
-.reconnect-card h2 { font-size: 1.3rem; font-weight: 700; }
-.reconnect-card p { margin: 1rem 0 1.5rem; }
+#components-reconnect-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    pointer-events: none;
+}
+
+#components-reconnect-modal .reconnect-connecting {
+    display: none;
+}
+
+#components-reconnect-modal .reconnect-failed-view {
+    display: none;
+}
+
+/* While reconnecting: Delay 1.5s so brief/sub-second handshakes are completely silent & invisible */
+#components-reconnect-modal.components-reconnect-show {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 1rem;
+    opacity: 0;
+    animation: reconnectFadeIn 0.3s ease 1.5s forwards;
+}
+
+#components-reconnect-modal.components-reconnect-show .reconnect-connecting {
+    display: block;
+    pointer-events: auto;
+}
+
+/* When reconnection failed or rejected: Show recovery modal immediately */
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    opacity: 1;
+    pointer-events: auto;
+    padding: 1.5rem;
+}
+
+#components-reconnect-modal.components-reconnect-failed .reconnect-connecting,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-connecting {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-failed .reconnect-failed-view,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-failed-view {
+    display: block;
+    width: 100%;
+    max-width: 28rem;
+}
+
+@keyframes reconnectFadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+.reconnect-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 0.6rem 1.25rem;
+    border-radius: 9999px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reconnect-spinner {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #38bdf8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.reconnect-card {
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 1.5rem;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e2e8f0;
+}
+
+.reconnect-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.reconnect-card h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+}
+
+.reconnect-card p {
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+}
+
+.reconnect-button {
+    display: inline-block;
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.625rem 1.75rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.reconnect-button:hover {
+    background: #1d4ed8;
+}
