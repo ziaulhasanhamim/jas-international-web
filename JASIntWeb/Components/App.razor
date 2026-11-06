@@ -23,8 +23,13 @@
         <HeadOutlet />
     </head>
     <body>
+        <!-- High-Visibility Dual Navigation Indicator (Vibrant Top Bar + Floating Mobile Capsule) -->
         <div id="navigation-progress" class="navigation-progress" hidden>
             <div class="navigation-progress-bar"></div>
+        </div>
+        <div id="navigation-capsule" class="navigation-capsule" hidden>
+            <span class="navigation-capsule-spinner"></span>
+            <span class="navigation-capsule-text">Loading…</span>
         </div>
         <Routes />
         <ReconnectModal />

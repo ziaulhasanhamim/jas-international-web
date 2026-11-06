@@ -68,3 +68,77 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #60
 .sales-section{margin-bottom:1.5rem}.sales-periods{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.5rem}.sales-periods a{padding:.55rem .85rem;border:1px solid #dce4f1;border-radius:.55rem;background:#fff;color:#52627c;font-size:.8rem}.sales-periods a:hover,.sales-periods a[aria-current=page]{background:#eff5ff;border-color:#93b8fa;color:#1d4ed8}.sales-periods a[aria-current=page]{font-weight:650}.sales-context{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}.sales-context h2{font-size:1.2rem;font-weight:650;color:#20314d}.sales-context p{font-size:.8rem;color:#718099}.sales-metrics .metric-card strong{font-size:clamp(1.2rem,2vw,1.8rem);overflow-wrap:anywhere}.sales-note{margin:1.25rem 0 1.5rem;color:#64748b;font-size:.78rem;line-height:1.7}.sales-note p+p{margin-top:.5rem}.sales-estimate{padding:.8rem 1rem;border-left:3px solid #d6a443;background:#fff9eb;color:#80611b}.admin-shell .sales-loss{color:#b42338!important}.sales-table td:not(:first-child),.sales-table th:not(:first-child){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sales-table .sales-selected{background:#eff5ff}.sales-table tfoot{border-top:2px solid #dce4f1;font-weight:650}.sales-table tfoot td{background:#f8faff}.sales-filter-label{display:flex;flex-direction:column;gap:.4rem;font-size:.73rem;color:#64748b}.sales-records{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.sales-record{border:1px solid #e2e7f0;border-radius:.7rem;padding:1.1rem}.sales-record>span{display:block;font-size:.7rem;color:#718099;margin-bottom:.6rem}.sales-record>strong{display:block;font-size:1rem;color:#20314d}.sales-record p{margin:.4rem 0;color:#1d4ed8;font-size:1.2rem;font-weight:650;overflow-wrap:anywhere}.sales-record small{display:block;font-size:.7rem;line-height:1.6;color:#8390a8}.sales-trend{position:relative}.sales-chart{display:block;width:100%;height:auto;max-height:280px}.sales-chart-zero{stroke:#cbd5e1;stroke-dasharray:4 4;stroke-width:1}.sales-chart-sales,.sales-chart-profit{fill:none;stroke-width:2;vector-effect:non-scaling-stroke}.sales-chart-sales{stroke:#2563eb}.sales-chart-profit{stroke:#0f766e;stroke-dasharray:5 3}.sales-chart-sales-dot{fill:#2563eb}.sales-chart-profit-dot{fill:#0f766e}.sales-legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.7rem;color:#64748b}.sales-legend span:before{content:"";display:inline-block;width:18px;margin-right:.35rem;border-top:2px solid #2563eb;vertical-align:middle}.sales-legend span+span:before{border-color:#0f766e;border-top-style:dashed}.sales-chart-scale,.sales-chart-dates{display:flex;justify-content:space-between;gap:.5rem;font-size:.65rem;color:#8390a8}.sales-chart-scale{margin-bottom:.4rem}.sales-trend-details{margin-top:1.25rem;border-top:1px solid #e2e7f0;padding-top:1rem}.sales-trend-details>summary{cursor:pointer;font-size:.8rem;color:#2563eb}.sales-trend-details .shop-table{margin-top:1rem}
 @media(max-width:1000px){.sales-records{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.sales-records{grid-template-columns:1fr}.sales-periods a{flex-grow:1;text-align:center}.sales-section .admin-section-heading{align-items:flex-start;flex-direction:column}.sales-filter-label,.sales-section .admin-toolbar .shop-input{width:100%}.sales-section .admin-toolbar{align-items:stretch}.sales-chart-dates span:nth-child(2){display:none}}
 .sales-chart-plot{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:stretch}.sales-chart-plot .sales-chart-scale{flex-direction:column;justify-content:space-between;padding:1rem .5rem 1rem 0;text-align:right;margin:0}.sales-chart-dates{margin-left:80px}@media(max-width:640px){.sales-chart-plot{grid-template-columns:65px minmax(0,1fr)}.sales-chart-dates{margin-left:65px}.sales-chart-scale{font-size:.6rem}}
+
+/* High-Visibility Navigation Progress Bar (YouTube/Twitter style with neon glow) */
+.navigation-progress {
+    pointer-events: none;
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 99999;
+    height: 4px;
+    background: transparent;
+    transition: opacity 180ms ease;
+}
+
+.navigation-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #38bdf8, #818cf8, #2563eb);
+    background-size: 200% 100%;
+    animation: navShimmer 1.5s infinite linear;
+    box-shadow: 0 0 14px rgba(37, 99, 235, 0.95), 0 0 6px rgba(56, 189, 248, 0.9);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 180ms ease-out;
+}
+
+@keyframes navShimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* Floating Capsule Indicator (Native iOS/Android App & Modern PWA Standard) */
+.navigation-capsule {
+    pointer-events: none;
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 3.8rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    z-index: 99999;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 1rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.45), 0 4px 10px -2px rgba(15, 23, 42, 0.3);
+    opacity: 0;
+    transition: opacity 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.navigation-capsule.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.navigation-capsule-spinner {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #38bdf8;
+    border-radius: 50%;
+    animation: capsuleSpin 0.65s infinite linear;
+}
+
+@keyframes capsuleSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

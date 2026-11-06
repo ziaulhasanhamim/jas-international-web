@@ -5,9 +5,12 @@
     let tick = null;
     let fade = null;
     let frame = null;
+    let capsuleTimer = null;
 
     const indicator = () => document.getElementById("navigation-progress");
     const bar = () => indicator()?.querySelector(".navigation-progress-bar");
+    const capsule = () => document.getElementById("navigation-capsule");
+
     const paint = () => {
         const fill = bar();
         if (fill) fill.style.transform = `scaleX(${progress})`;
@@ -15,6 +18,7 @@
     const stopTimers = () => {
         clearInterval(tick);
         clearTimeout(fade);
+        clearTimeout(capsuleTimer);
         cancelAnimationFrame(frame);
     };
 
@@ -22,6 +26,7 @@
         stopTimers();
         const track = indicator();
         const fill = bar();
+        const cap = capsule();
         if (!track || !fill) return;
         if (!active) {
             progress = 0;
@@ -33,13 +38,21 @@
         track.style.opacity = "1";
         frame = requestAnimationFrame(() => {
             fill.style.transition = "";
-            progress = Math.max(progress, 0.12);
+            progress = Math.max(progress, 0.15);
             paint();
             tick = setInterval(() => {
                 progress = Math.min(0.94, progress + (1 - progress) * 0.1);
                 paint();
-            }, 350);
+            }, 300);
         });
+
+        // Floating Mobile Capsule: Shows after 90ms if navigation is in progress
+        capsuleTimer = setTimeout(() => {
+            if (active && cap) {
+                cap.hidden = false;
+                requestAnimationFrame(() => cap.classList.add("is-visible"));
+            }
+        }, 90);
     };
 
     const restoreForm = () => {
@@ -67,6 +80,15 @@
         if (fill) fill.style.transition = "";
         paint();
         restoreForm();
+
+        const cap = capsule();
+        if (cap) {
+            cap.classList.remove("is-visible");
+            setTimeout(() => {
+                if (!active) cap.hidden = true;
+            }, 200);
+        }
+
         fade = setTimeout(() => {
             const track = indicator();
             if (track) track.style.opacity = "0";
