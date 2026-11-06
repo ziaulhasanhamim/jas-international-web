@@ -461,7 +461,6 @@
                 }
             });
         }
-    }
 
     function initAutoSlugGenerator() {
         document.querySelectorAll("[data-slug-source]").forEach(function (sourceEl) {
@@ -513,7 +512,9 @@
             let currentIndex = 0;
             let timer = null;
             let touchStartX = 0;
+            let touchStartY = 0;
             let touchEndX = 0;
+            let touchEndY = 0;
 
             function showSlide(index) {
                 currentIndex = (index + slides.length) % slides.length;
@@ -577,6 +578,7 @@
             carousel.addEventListener("touchstart", e => {
                 if (e.changedTouches && e.changedTouches[0]) {
                     touchStartX = e.changedTouches[0].screenX;
+                    touchStartY = e.changedTouches[0].screenY;
                 }
                 stopTimer();
             }, { passive: true });
@@ -584,9 +586,11 @@
             carousel.addEventListener("touchend", e => {
                 if (e.changedTouches && e.changedTouches[0]) {
                     touchEndX = e.changedTouches[0].screenX;
-                    const diff = touchEndX - touchStartX;
-                    if (Math.abs(diff) > 40) {
-                        if (diff < 0) {
+                    touchEndY = e.changedTouches[0].screenY;
+                    const diffX = touchEndX - touchStartX;
+                    const diffY = touchEndY - touchStartY;
+                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+                        if (diffX < 0) {
                             showSlide(currentIndex + 1);
                         } else {
                             showSlide(currentIndex - 1);
