@@ -3,7 +3,9 @@ using JASIntWeb.Components;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Endpoints;
 using JASIntWeb.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +48,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, JASIntWeb.Components.Account.IdentityRevalidatingAuthenticationStateProvider>();
 var authBuilder = builder.Services.AddAuthentication(o =>
     {
         o.DefaultScheme = IdentityConstants.ApplicationScheme;
@@ -393,6 +396,22 @@ app.MapGet("/api/orders/{id:int}/payment-status", async (int id, AppDbContext db
         paidAmount = order.PaidAmount,
         trxId = order.TransactionId
     });
+});
+
+app.MapPost("/account/logout", async (
+    SignInManager<User> signInManager,
+    UserManager<User> userManager,
+    HttpContext http,
+    [FromForm] string? returnUrl) =>
+{
+    var user = await userManager.GetUserAsync(http.User);
+    if (user is not null)
+    {
+        await userManager.UpdateSecurityStampAsync(user);
+    }
+    await signInManager.SignOutAsync();
+    var target = string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith('/') || returnUrl.StartsWith("//") ? "/" : returnUrl;
+    return Results.LocalRedirect(target);
 });
 
 app.MapGet("/account/external-login", (string provider, string? returnUrl, SignInManager<User> signInManager) =>

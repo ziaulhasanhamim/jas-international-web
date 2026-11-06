@@ -1,5 +1,6 @@
 @page "/account"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [ExcludeFromInteractiveRouting]
 @inject AppDbContext Db
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
@@ -28,10 +29,14 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <a href="/account/logout" class="btn-secondary !px-4 !py-2 text-xs">
-                    <Icon Name="logout" Class="size-3.5" />
-                    Sign Out
-                </a>
+                <form action="/account/logout" method="post" data-enhance="false" class="inline">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <button type="submit" class="btn-secondary !px-4 !py-2 text-xs cursor-pointer">
+                        <Icon Name="logout" Class="size-3.5" />
+                        Sign Out
+                    </button>
+                </form>
             </div>
         </div>
 

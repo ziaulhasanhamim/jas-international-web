@@ -1,4 +1,5 @@
 @page "/account/login"
+@attribute [ExcludeFromInteractiveRouting]
 @inject UserManager<User> Users
 @inject SignInManager<User> SignIn
 @inject EmailVerificationService Verification
@@ -39,7 +40,7 @@
                 }
                 else
                 {
-                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="login" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                    <EditForm Model="Input" OnValidSubmit="Submit" FormName="login" method="post" data-submit-indication="true" class="space-y-4">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
