@@ -192,17 +192,31 @@
 
     protected override async Task OnInitializedAsync()
     {
-        slides = await Catalog.SlidesAsync();
-        featuredBrands = await Catalog.FeaturedBrandsAsync(10);
-        categories = await Catalog.HomeCategoriesAsync();
-        customSections = await Catalog.GetHomepageSectionsAsync();
+        var slidesTask = Catalog.SlidesAsync();
+        var featuredBrandsTask = Catalog.FeaturedBrandsAsync(10);
+        var categoriesTask = Catalog.HomeCategoriesAsync();
+        var customSectionsTask = Catalog.GetHomepageSectionsAsync();
+
+        await Task.WhenAll(slidesTask, featuredBrandsTask, categoriesTask, customSectionsTask);
+
+        slides = await slidesTask;
+        featuredBrands = await featuredBrandsTask;
+        categories = await categoriesTask;
+        customSections = await customSectionsTask;
 
         if (customSections.Count == 0)
         {
-            newArrivals = await Catalog.LatestAsync(null);
-            audio = await Catalog.LatestAsync("headphones");
-            watches = await Catalog.LatestAsync("wearables");
-            speakers = await Catalog.LatestAsync("speakers");
+            var newArrivalsTask = Catalog.LatestAsync(null);
+            var audioTask = Catalog.LatestAsync("headphones");
+            var watchesTask = Catalog.LatestAsync("wearables");
+            var speakersTask = Catalog.LatestAsync("speakers");
+
+            await Task.WhenAll(newArrivalsTask, audioTask, watchesTask, speakersTask);
+
+            newArrivals = await newArrivalsTask;
+            audio = await audioTask;
+            watches = await watchesTask;
+            speakers = await speakersTask;
         }
     }
 }

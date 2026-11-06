@@ -1,25 +1,22 @@
-@rendermode InteractiveAuto
-@implements IAsyncDisposable
-
 @if (Slides.Count > 0)
 {
-    <!-- Contained, modern hero carousel matching Gadget & Gear layout -->
+    <!-- Contained, modern hero carousel matching Gadget & Gear layout (Fast SSR + Touch-Enabled Data Controller) -->
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
         <section
+            data-carousel
             class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 border border-slate-200/70 shadow-xs group select-none aspect-[16/8] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[200px] max-h-[460px] w-full"
             aria-roledescription="carousel"
             aria-label="Featured promotions"
-            @onmouseenter="Pause"
-            @onmouseleave="Resume"
         >
             <!-- Slide Stage -->
             <div class="relative h-full w-full overflow-hidden">
-                @for (var i = 0; i < _slides.Count; i++)
+                @for (var i = 0; i < Slides.Count; i++)
                 {
-                    var slide = _slides[i];
-                    var active = i == _index;
+                    var slide = Slides[i];
+                    var active = i == 0;
                     var targetUrl = string.IsNullOrWhiteSpace(slide.LinkUrl) ? "/products" : slide.LinkUrl;
                     <div
+                        data-carousel-slide
                         class="absolute inset-0 transition-opacity duration-700 ease-in-out
                             @(active ? "opacity-100 z-10" : "pointer-events-none opacity-0 z-0")"
                         role="group"
@@ -44,9 +41,9 @@
             <!-- Vertically Centered Subtle Navigation Arrows (Glassmorphic, appear on hover) -->
             <button
                 type="button"
+                data-carousel-prev
                 class="absolute left-3.5 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-white/80 hover:bg-white text-slate-800 shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 cursor-pointer active:scale-95"
                 aria-label="Previous slide"
-                @onclick="Prev"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -54,9 +51,9 @@
             </button>
             <button
                 type="button"
+                data-carousel-next
                 class="absolute right-3.5 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-white/80 hover:bg-white text-slate-800 shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 cursor-pointer active:scale-95"
                 aria-label="Next slide"
-                @onclick="Next"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4 sm:size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
@@ -65,16 +62,16 @@
 
             <!-- Minimal Pagination Dots (Centered at bottom, Gadget & Gear style) -->
             <div class="absolute inset-x-0 bottom-3.5 z-20 flex items-center justify-center gap-1.5 sm:gap-2 pointer-events-auto" role="tablist" aria-label="Slides">
-                @for (var idx = 0; idx < _slides.Count; idx++)
+                @for (var idx = 0; idx < Slides.Count; idx++)
                 {
                     var slideIdx = idx;
                     <button
                         type="button"
+                        data-carousel-dot
                         class="h-2 rounded-full transition-all duration-300 cursor-pointer
-                               @(_index == slideIdx ? "w-6 sm:w-7 bg-slate-900 shadow-xs" : "w-2 bg-slate-400/60 hover:bg-slate-700")"
+                               @(slideIdx == 0 ? "w-6 sm:w-7 bg-slate-900 shadow-xs" : "w-2 bg-slate-400/60 hover:bg-slate-700")"
                         aria-label="Go to slide @(idx + 1)"
-                        aria-selected="@(_index == idx)"
-                        @onclick="() => GoTo(slideIdx)"
+                        aria-selected="@(slideIdx == 0)"
                     >
                     </button>
                 }
@@ -85,100 +82,6 @@
 
 @code
 {
-    private int _index;
-    private CancellationTokenSource? _cts;
-    private bool _paused;
-
     [Parameter]
     public List<CarouselSlideDto> Slides { get; set; } = [];
-    private List<CarouselSlideDto> _slides => Slides;
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender && _slides.Count > 1)
-        {
-            StartTimer();
-        }
-    }
-
-    private void StartTimer()
-    {
-        _cts?.Cancel();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            using var periodic = new PeriodicTimer(TimeSpan.FromSeconds(5));
-            while (!token.IsCancellationRequested)
-            {
-                try
-                {
-                    if (await periodic.WaitForNextTickAsync(token))
-                    {
-                        if (!_paused && _slides.Count > 1)
-                        {
-                            try
-                            {
-                                await InvokeAsync(() =>
-                                {
-                                    _index = (_index + 1) % _slides.Count;
-                                    StateHasChanged();
-                                });
-                            }
-                            catch
-                            {
-                                // Circuit closed or component disposed - safely exit timer loop
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch
-                {
-                    break;
-                }
-            }
-        }, token);
-    }
-
-    private void Next()
-    {
-        if (_slides.Count == 0) return;
-        _index = (_index + 1) % _slides.Count;
-    }
-
-    private void Prev()
-    {
-        if (_slides.Count == 0) return;
-        _index = (_index - 1 + _slides.Count) % _slides.Count;
-    }
-
-    private void GoTo(int index)
-    {
-        if (index >= 0 && index < _slides.Count)
-        {
-            _index = index;
-        }
-    }
-
-    private void Pause() => _paused = true;
-    private void Resume() => _paused = false;
-
-    public ValueTask DisposeAsync()
-    {
-        try
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-        }
-        catch
-        {
-        }
-        return ValueTask.CompletedTask;
-    }
 }

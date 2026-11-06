@@ -1,4 +1,5 @@
 :root{--brand:#2563eb;--brand-deep:#1d4ed8;--brand-soft:#eff6ff;--brand-border:#dbeafe;--panel-shadow:0 8px 28px -18px #1e40af55}
+html,body{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;overscroll-behavior-y:none;overflow-x:hidden;max-width:100vw;width:100%}
 body{background:radial-gradient(ellipse at 10% 0%,#dbeafe80,transparent 45%),linear-gradient(180deg,#f8fbff,#f4f7fd 60%)}
 .shop-container{max-width:1280px;margin:0 auto;padding:2rem 1.25rem}
 .shop-panel{background:linear-gradient(145deg,#fff,#fbfdff);border:1px solid #dce5f4;border-radius:1.2rem;padding:1.5rem;box-shadow:var(--panel-shadow)}

@@ -10,6 +10,8 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IM
     public const string SlidesCacheKey = "catalog:slides";
     public const string BrandsCacheKey = "catalog:brands";
     public const string FeaturedBrandsCacheKey = "catalog:featured-brands";
+    public const string HomepageSectionsCacheKey = "catalog:homepage-sections";
+    public const string CuratedPromoCardsCacheKey = "catalog:curated-promo-cards";
     private static readonly TimeSpan NavigationLifetime = TimeSpan.FromSeconds(60);
 
     public async Task<List<BrandLinkDto>> BrandsAsync() =>
@@ -225,88 +227,102 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IM
             .ToListAsync();
     }
 
-    public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync()
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var sections = await db.HomepageSections.AsNoTracking()
-            .Where(s => s.IsActive)
-            .OrderBy(s => s.SortOrder)
-            .ToListAsync();
-
-        var result = new List<HomepageSectionDto>();
-        foreach (var s in sections)
+    public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync() =>
+        (await cache.GetOrCreateAsync(HomepageSectionsCacheKey, async entry =>
         {
-            var products = await LatestAsync(s.CategorySlug, s.ItemLimit);
-            if (products.Count > 0)
+            entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var sections = await db.HomepageSections.AsNoTracking()
+                .Where(s => s.IsActive)
+                .OrderBy(s => s.SortOrder)
+                .ToListAsync();
+
+            var result = new List<HomepageSectionDto>();
+            foreach (var s in sections)
             {
-                result.Add(new HomepageSectionDto(
-                    s.Id,
-                    s.Title,
-                    s.Eyebrow,
-                    s.CategorySlug,
-                    s.ViewAllHref,
-                    s.SortOrder,
-                    s.IsActive,
-                    s.ItemLimit,
-                    products
-                ));
+                var products = await LatestAsync(s.CategorySlug, s.ItemLimit);
+                if (products.Count > 0)
+                {
+                    result.Add(new HomepageSectionDto(
+                        s.Id,
+                        s.Title,
+                        s.Eyebrow,
+                        s.CategorySlug,
+                        s.ViewAllHref,
+                        s.SortOrder,
+                        s.IsActive,
+                        s.ItemLimit,
+                        products
+                    ));
+                }
             }
-        }
-        return result;
+            return result;
+        }))!;
+
+    public void InvalidateHomepageSectionsCache()
+    {
+        cache.Remove(HomepageSectionsCacheKey);
     }
 
-    public async Task<List<CuratedPromoCard>> GetCuratedPromoCardsAsync()
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var cards = await db.CuratedPromoCards.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
-            .ToListAsync();
-
-        if (cards.Count == 0)
+    public async Task<List<CuratedPromoCard>> GetCuratedPromoCardsAsync() =>
+        (await cache.GetOrCreateAsync(CuratedPromoCardsCacheKey, async entry =>
         {
-            return
-            [
-                new CuratedPromoCard
-                {
-                    Id = 1,
-                    Eyebrow = "FLAGSHIP ECOSYSTEM",
-                    Title = "Apple Intelligence",
-                    Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
-                    LinkUrl = "/category/phones",
-                    LinkText = "Explore Devices",
-                    Theme = "navy",
-                    SortOrder = 1,
-                    IsActive = true
-                },
-                new CuratedPromoCard
-                {
-                    Id = 2,
-                    Eyebrow = "PURE ACOUSTICS",
-                    Title = "Studio ANC Sound",
-                    Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
-                    LinkUrl = "/category/headphones",
-                    LinkText = "Hear the Difference",
-                    Theme = "amber",
-                    SortOrder = 2,
-                    IsActive = true
-                },
-                new CuratedPromoCard
-                {
-                    Id = 3,
-                    Eyebrow = "HIGH EFFICIENCY",
-                    Title = "GaN Fast Charge",
-                    Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
-                    LinkUrl = "/category/power-charging",
-                    LinkText = "Power Up Fast",
-                    Theme = "indigo",
-                    SortOrder = 3,
-                    IsActive = true
-                }
-            ];
-        }
+            entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var cards = await db.CuratedPromoCards.AsNoTracking()
+                .Where(c => c.IsActive)
+                .OrderBy(c => c.SortOrder)
+                .ToListAsync();
 
-        return cards;
+            if (cards.Count == 0)
+            {
+                return
+                [
+                    new CuratedPromoCard
+                    {
+                        Id = 1,
+                        Eyebrow = "FLAGSHIP ECOSYSTEM",
+                        Title = "Apple Intelligence",
+                        Subtitle = "iPhone 16 Series, Watch Ultra 2, and AirPods 4 with ANC.",
+                        LinkUrl = "/category/phones",
+                        LinkText = "Explore Devices",
+                        Theme = "navy",
+                        SortOrder = 1,
+                        IsActive = true
+                    },
+                    new CuratedPromoCard
+                    {
+                        Id = 2,
+                        Eyebrow = "PURE ACOUSTICS",
+                        Title = "Studio ANC Sound",
+                        Subtitle = "Sony WH-1000XM5, Marshall, and Harman Kardon acoustics.",
+                        LinkUrl = "/category/headphones",
+                        LinkText = "Hear the Difference",
+                        Theme = "amber",
+                        SortOrder = 2,
+                        IsActive = true
+                    },
+                    new CuratedPromoCard
+                    {
+                        Id = 3,
+                        Eyebrow = "HIGH EFFICIENCY",
+                        Title = "GaN Fast Charge",
+                        Subtitle = "Anker GaNPrime 140W, Baseus Qi2 magnetic power banks.",
+                        LinkUrl = "/category/power-charging",
+                        LinkText = "Power Up Fast",
+                        Theme = "indigo",
+                        SortOrder = 3,
+                        IsActive = true
+                    }
+                ];
+            }
+
+            return cards;
+        }))!;
+
+    public void InvalidatePromoCardsCache()
+    {
+        cache.Remove(CuratedPromoCardsCacheKey);
     }
 
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
