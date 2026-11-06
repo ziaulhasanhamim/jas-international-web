@@ -84,13 +84,14 @@ Only delivered orders count as sales, on their delivery date. The report include
 
 Gross profit is product sales minus the purchase cost of sold units. Delivery fees are reported separately; delivery costs, taxes and operating expenses are excluded. New orders save each variant's purchase cost at checkout so later price changes cannot rewrite their profit. The `SalesMetrics` migration estimates older order costs from variant purchase costs at migration time, marks those costs as estimates and restores delivery dates from the order's last update (or creation date). Affected profit totals and records are labelled in the report. These estimates remain fixed after migration.
 
-Run the metrics regression checks without a database:
+Run automated unit and integration tests:
 
 ```bash
-dotnet run --project JASIntWeb.MetricsChecks
+dotnet run --project tests/JASIntWeb.Tests.Unit
+dotnet run --project tests/JASIntWeb.Tests.Integration
 ```
 
-The checks cover reporting boundaries, gross profit, historical records and PostgreSQL query translation. Verify migration execution and checkout/delivery flows against a local PostgreSQL database as well.
+The tests cover domain rules, cart behavior, order fulfillment, coupon calculations, and reporting boundaries.
 
 ## Email and hosting
 

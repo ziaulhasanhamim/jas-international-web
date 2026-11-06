@@ -6,6 +6,12 @@ using JASIntWeb.Services;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
+
+var portEnv = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(portEnv))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{portEnv}");
+}
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<WishlistService>();
 builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
@@ -33,8 +39,10 @@ var authBuilder = builder.Services.AddAuthentication(o =>
     });
 authBuilder.AddIdentityCookies();
 
-var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
-var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"]
+    ?? builder.Configuration["GOOGLE_CLIENT_ID"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]
+    ?? builder.Configuration["GOOGLE_CLIENT_SECRET"];
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
     authBuilder.AddGoogle(options =>
@@ -92,8 +100,17 @@ builder.Services.AddIdentityCore<User>(o =>
 builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.FromMinutes(15));
 builder.Services.AddAuthorizationBuilder().AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
 builder.Services.AddAntiforgery(o => o.HeaderName = "X-CSRF-TOKEN");
-builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(builder.Configuration["DB_URL"] ?? builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Set DB_URL or ConnectionStrings:DefaultConnection to your PostgreSQL connection string.")));
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
 var app = builder.Build();
 app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment())
@@ -101,7 +118,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
-if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
+if (app.Environment.IsDevelopment() 
+    || builder.Configuration.GetValue<bool>("Database:ApplyMigrations", false)
+    || builder.Configuration.GetValue<bool>("APPLY_MIGRATIONS", false))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
@@ -460,3 +479,53 @@ app.MapStoreEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(JASIntWeb.Client._Imports).Assembly);
 app.Run();
+
+static string ResolvePostgresConnectionString(IConfiguration config)
+{
+    var raw = config["DATABASE_URL"]
+        ?? config["DB_URL"]
+        ?? config.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Set DATABASE_URL, DB_URL, or ConnectionStrings:DefaultConnection to your PostgreSQL connection string.");
+
+    if (raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) || raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        try
+        {
+            var uri = new Uri(raw);
+            var userInfo = uri.UserInfo.Split(':');
+            var user = Uri.UnescapeDataString(userInfo[0]);
+            var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+            var host = uri.Host;
+            var port = uri.Port > 0 ? uri.Port : 5432;
+            var database = uri.AbsolutePath.TrimStart('/');
+
+            var npgsqlBuilder = new Npgsql.NpgsqlConnectionStringBuilder
+            {
+                Host = host,
+                Port = port,
+                Database = database,
+                Username = user,
+                Password = password,
+                SslMode = Npgsql.SslMode.Require,
+                Pooling = true
+            };
+
+            if (!string.IsNullOrEmpty(uri.Query))
+            {
+                var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+                if (query.TryGetValue("channel_binding", out var cbVal) && Enum.TryParse<Npgsql.ChannelBinding>(cbVal, true, out var cb))
+                {
+                    npgsqlBuilder.ChannelBinding = cb;
+                }
+            }
+
+            return npgsqlBuilder.ConnectionString;
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+
+    return raw;
+}

@@ -22,9 +22,9 @@ public sealed class AccountMailService(
     {
         get
         {
-            var p = config["Mail:Provider"]?.Trim();
+            var p = (config["Mail:Provider"] ?? config["MAIL_PROVIDER"])?.Trim();
             if (!string.IsNullOrWhiteSpace(p)) return p;
-            if (!string.IsNullOrWhiteSpace(config["Mail:Brevo:ApiKey"])) return "Brevo";
+            if (!string.IsNullOrWhiteSpace(BrevoApiKey)) return "Brevo";
             return "Smtp";
         }
     }
@@ -47,12 +47,12 @@ public sealed class AccountMailService(
     }
 
     public string? FromEmail => IsBrevo
-        ? (config["Mail:Brevo:From"] ?? config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"])
-        : (config["Mail:From"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"]);
+        ? (config["Mail:Brevo:From"] ?? config["BREVO_FROM"] ?? config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"])
+        : (config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"]);
 
     public string DisplayName => IsBrevo
-        ? (config["Mail:Brevo:DisplayName"] ?? config["Mail:DisplayName"] ?? "JAS International")
-        : (config["Mail:DisplayName"] ?? "JAS International");
+        ? (config["Mail:Brevo:DisplayName"] ?? config["BREVO_DISPLAY_NAME"] ?? config["Mail:DisplayName"] ?? config["MAIL_DISPLAY_NAME"] ?? "JAS International")
+        : (config["Mail:DisplayName"] ?? config["MAIL_DISPLAY_NAME"] ?? "JAS International");
 
     public string ReplyToEmail => IsBrevo
         ? (config["Mail:Brevo:ReplyTo:Email"] ?? config["Mail:Brevo:ReplyTo"] ?? config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "")
@@ -63,17 +63,17 @@ public sealed class AccountMailService(
         : (config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName);
 
     // SMTP Configuration (supports structured Mail:Smtp:* or flat Mail:*)
-    private string? SmtpHost => config["Mail:Smtp:Host"] ?? config["Mail:Host"];
-    private int SmtpPort => config.GetValue<int>("Mail:Smtp:Port", config.GetValue<int>("Mail:Port", 587));
-    private string? SmtpUsername => config["Mail:Smtp:Username"] ?? config["Mail:Username"];
-    private string? SmtpPassword => (config["Mail:Smtp:Password"] ?? config["Mail:Password"])?.Replace(" ", "");
+    private string? SmtpHost => config["Mail:Smtp:Host"] ?? config["Mail:Host"] ?? config["SMTP_HOST"];
+    private int SmtpPort => config.GetValue<int>("Mail:Smtp:Port", config.GetValue<int>("Mail:Port", config.GetValue<int>("SMTP_PORT", 587)));
+    private string? SmtpUsername => config["Mail:Smtp:Username"] ?? config["Mail:Username"] ?? config["SMTP_USERNAME"];
+    private string? SmtpPassword => (config["Mail:Smtp:Password"] ?? config["Mail:Password"] ?? config["SMTP_PASSWORD"])?.Replace(" ", "");
     private bool SmtpEnableSsl => config.GetValue<bool>("Mail:Smtp:EnableSsl", config.GetValue<bool>("Mail:EnableSsl", true));
 
     // Brevo Configuration
-    private string? BrevoApiKey => config["Mail:Brevo:ApiKey"];
-    private string? BrevoSmtpKey => config["Mail:Brevo:SmtpKey"];
+    private string? BrevoApiKey => config["Mail:Brevo:ApiKey"] ?? config["BREVO_API_KEY"];
+    private string? BrevoSmtpKey => config["Mail:Brevo:SmtpKey"] ?? config["BREVO_SMTP_KEY"];
     private bool BrevoUseApi => config.GetValue<bool>("Mail:Brevo:UseApi", true);
-    private string? BrevoSmtpUsername => config["Mail:Brevo:Username"] ?? config["Mail:Brevo:SmtpLogin"] ?? config["Mail:Username"] ?? FromEmail;
+    private string? BrevoSmtpUsername => config["Mail:Brevo:Username"] ?? config["Mail:Brevo:SmtpLogin"] ?? config["BREVO_USERNAME"] ?? config["Mail:Username"] ?? FromEmail;
 
     private MailAddress GetFromAddress() => new(FromEmail!, DisplayName);
 

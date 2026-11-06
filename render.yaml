@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: jasinternation
+    runtime: docker
+    dockerfilePath: Dockerfile
+    region: singapore
+    plan: starter
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Database__ApplyMigrations
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: Authentication__Google__ClientId
+        sync: false
+      - key: Authentication__Google__ClientSecret
+        sync: false
+      - key: Mail__Provider
+        value: Brevo
+      - key: Mail__Brevo__ApiKey
+        sync: false
+      - key: Mail__From
+        value: ziaulhasan174@gmail.com
+      - key: Mail__DisplayName
+        value: JAS International
