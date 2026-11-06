@@ -1,8 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NpgsqlTypes;
 namespace JASIntWeb.Services;
 
-public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
+public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, IMemoryCache cache)
 {
     public const string CategoriesCacheKey = "catalog:categories";
     public const string HomeCategoriesCacheKey = "catalog:home-categories";
@@ -15,6 +16,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     (await cache.GetOrCreateAsync(BrandsCacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                await using var db = await dbFactory.CreateDbContextAsync();
                 return await db.Brands.AsNoTracking().Where(b => !b.IsDeleted)
                 .OrderBy(b => b.SortOrder)
                 .ThenBy(b => b.Name)
@@ -26,6 +28,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     (await cache.GetOrCreateAsync($"{FeaturedBrandsCacheKey}_{limit}", async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                await using var db = await dbFactory.CreateDbContextAsync();
                 return await db.Brands.AsNoTracking().Where(b => !b.IsDeleted && b.IsFeatured)
                 .OrderBy(b => b.SortOrder)
                 .ThenBy(b => b.Name)
@@ -47,6 +50,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     (await cache.GetOrCreateAsync(CategoriesCacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                await using var db = await dbFactory.CreateDbContextAsync();
                 return await db.Categories.AsNoTracking().Where(c => !c.IsDeleted
                     &&
                     (c.ParentCategoryId == null || !c.ParentCategory!.IsDeleted))
@@ -60,6 +64,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     (await cache.GetOrCreateAsync(HomeCategoriesCacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                await using var db = await dbFactory.CreateDbContextAsync();
                 return await db.CategoryPlacements.AsNoTracking().Where(cp => cp.IsActive
                     &&
                     cp.PlacementType == CategoryPlacementType.HomepageFeatured
@@ -76,6 +81,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     (await cache.GetOrCreateAsync(SlidesCacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = NavigationLifetime;
+                await using var db = await dbFactory.CreateDbContextAsync();
                 return await db.CarouselSlides.AsNoTracking().Where(s => s.IsActive)
                 .OrderBy(s => s.SortOrder)
                 .ThenBy(s => s.Id)
@@ -86,6 +92,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
 
     public async Task<ProductDetailsDto?> DetailsAsync(string slug)
     {
+        await using var db = await dbFactory.CreateDbContextAsync();
         // Bounded projections for product, active variants and configured product attributes.
         var p = await db.Products.AsNoTracking().Where(x => x.Slug == slug && !x.IsDeleted
             &&
@@ -159,7 +166,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
             .ToList(), breadcrumbs, p.BrandName, p.BrandSlug);
     }
 
-    private IQueryable<Product> VisibleProducts() => db.Products.AsNoTracking().Where(p => !p.IsDeleted
+    private static IQueryable<Product> VisibleProducts(AppDbContext db) => db.Products.AsNoTracking().Where(p => !p.IsDeleted
         &&
         !p.Category!.IsDeleted
         && (p.Category.ParentCategoryId == null || !p.Category.ParentCategory!.IsDeleted)
@@ -187,11 +194,12 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
         }
         return query.Where(p => ids.Contains(p.CategoryId));
     }
-    // Homepage sections don't need COUNT queries. Prices and stock remain live, never cached.
 
+    // Homepage sections don't need COUNT queries. Prices and stock remain live, never cached.
     public async Task<List<ProductSummaryDto>> LatestAsync(string? category, int take = 4)
     {
-        var q = await InCategoryAsync(VisibleProducts(), category);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var q = await InCategoryAsync(VisibleProducts(db), category);
         return await q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id).Take(Math.Clamp(take, 1, 24))
             .Select(p => new ProductSummaryDto(p.Id, p.Name, p.Slug,
                 p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault)
@@ -219,6 +227,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
 
     public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync()
     {
+        await using var db = await dbFactory.CreateDbContextAsync();
         var sections = await db.HomepageSections.AsNoTracking()
             .Where(s => s.IsActive)
             .OrderBy(s => s.SortOrder)
@@ -248,6 +257,7 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
 
     public async Task<List<CuratedPromoCard>> GetCuratedPromoCardsAsync()
     {
+        await using var db = await dbFactory.CreateDbContextAsync();
         var cards = await db.CuratedPromoCards.AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
@@ -302,8 +312,9 @@ public sealed class CatalogService(AppDbContext db, IMemoryCache cache)
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
         string? sort, decimal? min, decimal? max, int page, int pageSize = 18, string? brand = null)
     {
+        await using var db = await dbFactory.CreateDbContextAsync();
         pageSize = Math.Clamp(pageSize, 1, 48);
-        var q = await InCategoryAsync(VisibleProducts(), category);
+        var q = await InCategoryAsync(VisibleProducts(db), category);
         if (!string.IsNullOrWhiteSpace(brand))
         {
             q = q.Where(p => p.Brand != null && p.Brand.Slug == brand);

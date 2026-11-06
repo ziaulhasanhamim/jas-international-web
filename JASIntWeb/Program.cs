@@ -124,7 +124,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardLimit = null;
 });
 
-builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
+builder.Services.AddDbContextFactory<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
+builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
