@@ -1,18 +1,47 @@
 @inject NavigationManager Nav
 
-<nav class="admin-pagination" aria-label="Pagination">
-    <span>@Total records · Page @Page of @Math.Max(1, (int)Math.Ceiling(Total / (double)Size))</span>
+@{
+    var totalPages = Math.Max(1, (int)Math.Ceiling(Total / (double)Size));
+    var startRecord = Total == 0 ? 0 : ((Page - 1) * Size) + 1;
+    var endRecord = Math.Min(Total, Page * Size);
+}
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4 text-xs text-slate-500 font-sans border-t border-slate-200/80">
     <div>
+        <span>Showing <strong class="font-semibold text-slate-800">@startRecord</strong> to <strong class="font-semibold text-slate-800">@endRecord</strong> of <strong class="font-semibold text-slate-800">@Total</strong> records</span>
+    </div>
+    <div class="flex items-center gap-1.5 self-end sm:self-auto">
         @if (Page > 1)
         {
-            <a class="shop-button-secondary" href="@Nav.GetUriWithQueryParameter("page", Page - 1)">Previous</a>
+            <a href="@Nav.GetUriWithQueryParameter("page", Page - 1)" class="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1 shadow-2xs">
+                <span>← Previous</span>
+            </a>
         }
-        @if (Page * Size < Total)
+        else
         {
-            <a class="shop-button-secondary" href="@Nav.GetUriWithQueryParameter("page", Page + 1)">Next</a>
+            <span class="btn-secondary text-xs px-3 py-1.5 opacity-40 cursor-not-allowed select-none">
+                <span>← Previous</span>
+            </span>
+        }
+
+        <span class="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 rounded-lg">
+            Page @Page of @totalPages
+        </span>
+
+        @if (Page < totalPages)
+        {
+            <a href="@Nav.GetUriWithQueryParameter("page", Page + 1)" class="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1 shadow-2xs">
+                <span>Next →</span>
+            </a>
+        }
+        else
+        {
+            <span class="btn-secondary text-xs px-3 py-1.5 opacity-40 cursor-not-allowed select-none">
+                <span>Next →</span>
+            </span>
         }
     </div>
-</nav>
+</div>
 
 @code
 {

@@ -1,0 +1,23 @@
+name: Production Keepalive Ping
+
+on:
+  schedule:
+    # Runs every 10 minutes to prevent Render Free tier spin-down and keep Neon DB warm
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Production Health Endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping jasinternational.com.bd/health
+        run: |
+          echo "Pinging https://jasinternational.com.bd/health..."
+          response=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 45 https://jasinternational.com.bd/health || true)
+          echo "HTTP response status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Non-200 response, attempting retry..."
+            curl -sS -o /dev/null -w "%{http_code}" --max-time 45 https://jasinternation.onrender.com/health || true
+          fi

@@ -1,0 +1,330 @@
+@page "/track-order"
+@attribute [StreamRendering]
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Track Your Order · JAS International</PageTitle>
+
+<div class="shop-container py-8 sm:py-12 max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-8 sm:mb-10">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 mb-3">
+            <span>📦</span> Real-Time Courier &amp; Order Tracking
+        </span>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">Track Your Shipment</h1>
+        <p class="text-slate-500 text-sm mt-2 max-w-md mx-auto">
+            Enter your Order ID and the phone number used at checkout to check instant delivery updates.
+        </p>
+    </div>
+
+    <!-- Search Form -->
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm mb-8">
+        <form method="get" action="/track-order" class="grid gap-4 sm:grid-cols-5 items-end">
+            <div class="sm:col-span-2">
+                <label for="order-id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Order ID #
+                </label>
+                <input 
+                    type="number" 
+                    id="order-id" 
+                    name="id" 
+                    value="@OrderId" 
+                    required 
+                    placeholder="e.g. 104" 
+                    class="field font-mono font-bold text-base" 
+                />
+            </div>
+
+            <div class="sm:col-span-2">
+                <label for="phone-no" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Contact Phone Number
+                </label>
+                <input 
+                    type="tel" 
+                    id="phone-no" 
+                    name="phone" 
+                    value="@PhoneNumber" 
+                    required 
+                    placeholder="e.g. 01711465078" 
+                    class="field font-mono text-base" 
+                />
+            </div>
+
+            <div class="sm:col-span-1">
+                <button type="submit" class="btn-primary w-full py-2.5 text-sm font-bold flex items-center justify-center gap-2 shadow-xs">
+                    <span>Track</span>
+                    <Icon Name="arrow" Class="size-4" />
+                </button>
+            </div>
+        </form>
+    </div>
+
+    @if (hasSearched)
+    {
+        @if (foundOrder is not null)
+        {
+            <!-- Order Tracking Summary -->
+            <div class="space-y-6">
+                <!-- Status Banner Card -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+                        <div>
+                            <span class="text-xs font-mono font-bold text-blue-600 uppercase tracking-wider">Order Reference</span>
+                            <h2 class="text-2xl font-bold text-slate-900 mt-0.5">Order #@foundOrder.Id</h2>
+                            <p class="text-xs text-slate-400 mt-1">
+                                Placed on @foundOrder.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dddd, dd MMMM yyyy · hh:mm tt")
+                            </p>
+                        </div>
+                        <div class="sm:text-right">
+                            @switch (foundOrder.Status)
+                            {
+                                case OrderStatus.Pending:
+                                    <span class="badge badge-amber text-sm px-3.5 py-1.5 font-bold">Pending Review</span>
+                                    break;
+                                case OrderStatus.Processing:
+                                    <span class="badge badge-blue text-sm px-3.5 py-1.5 font-bold">Processing &amp; Packing</span>
+                                    break;
+                                case OrderStatus.InTransit:
+                                    <span class="badge badge-purple text-sm px-3.5 py-1.5 font-bold">Dispatched / In Transit</span>
+                                    break;
+                                case OrderStatus.Delivered:
+                                    <span class="badge badge-emerald text-sm px-3.5 py-1.5 font-bold">Delivered</span>
+                                    break;
+                                case OrderStatus.Cancelled:
+                                    <span class="badge badge-rose text-sm px-3.5 py-1.5 font-bold">Order Cancelled</span>
+                                    break;
+                                default:
+                                    <span class="badge badge-slate text-sm px-3.5 py-1.5 font-bold">@foundOrder.Status</span>
+                                    break;
+                            }
+                            <p class="text-xs text-slate-500 font-medium mt-1.5">
+                                Total: <strong class="text-slate-900 font-mono">৳@foundOrder.Total.ToString("N0")</strong>
+                                @if (foundOrder.PaidAmount > 0)
+                                {
+                                    <span class="text-emerald-700 font-bold ml-1">(Advance Verified)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-slate-500 ml-1">(Cash on Delivery)</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Progress Stepper -->
+                    <div class="pt-6 sm:pt-8">
+                        <div class="grid grid-cols-4 gap-2 text-center text-xs font-semibold relative">
+                            <!-- Step 1: Placed -->
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="size-9 rounded-full flex items-center justify-center font-bold text-white shadow-xs @(GetStepColor(1))">
+                                    ✓
+                                </div>
+                                <span class="text-slate-800 font-bold">Order Placed</span>
+                            </div>
+
+                            <!-- Step 2: Processing -->
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="size-9 rounded-full flex items-center justify-center font-bold text-white shadow-xs @(GetStepColor(2))">
+                                    @(GetStepNumberOrCheck(2))
+                                </div>
+                                <span class="@(GetStepTextColor(2))">Packaging</span>
+                            </div>
+
+                            <!-- Step 3: In Transit -->
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="size-9 rounded-full flex items-center justify-center font-bold text-white shadow-xs @(GetStepColor(3))">
+                                    @(GetStepNumberOrCheck(3))
+                                </div>
+                                <span class="@(GetStepTextColor(3))">In Transit</span>
+                            </div>
+
+                            <!-- Step 4: Delivered -->
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="size-9 rounded-full flex items-center justify-center font-bold text-white shadow-xs @(GetStepColor(4))">
+                                    @(GetStepNumberOrCheck(4))
+                                </div>
+                                <span class="@(GetStepTextColor(4))">Delivered</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Courier Live Tracking Button -->
+                    @if (!string.IsNullOrWhiteSpace(foundOrder.CourierTrackingUrl))
+                    {
+                        <div class="mt-8 rounded-xl border border-blue-200 bg-blue-50/60 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🚚</span>
+                                <div>
+                                    <p class="text-xs font-bold text-blue-900">Shipped with @(foundOrder.CourierName ?? "Courier Partner")</p>
+                                    <p class="text-xs text-blue-700 font-mono">Consignment ID: @(foundOrder.CourierTrackingId ?? foundOrder.ConsignmentId ?? "Tracking Active")</p>
+                                </div>
+                            </div>
+                            <a href="@foundOrder.CourierTrackingUrl" target="_blank" rel="noopener noreferrer" class="btn-primary text-xs px-4 py-2 inline-flex items-center justify-center gap-1.5 shrink-0 shadow-xs">
+                                <span>Track on Courier Site</span>
+                                <span>↗</span>
+                            </a>
+                        </div>
+                    }
+                </div>
+
+                <!-- Order Details & Line Items -->
+                <div class="grid gap-6 sm:grid-cols-3">
+                    <!-- Delivery Destination -->
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:col-span-1">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Address</h3>
+                        <p class="text-sm font-bold text-slate-900">@foundOrder.DeliveryAddress?.CustomerName</p>
+                        <p class="text-xs font-mono font-semibold text-slate-700 mt-0.5">@foundOrder.DeliveryAddress?.PhoneNumber</p>
+                        <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+                            @foundOrder.DeliveryAddress?.FullAddress
+                        </p>
+                        <p class="text-xs font-medium text-slate-500 mt-1">
+                            @foundOrder.DeliveryAddress?.City, @foundOrder.DeliveryAddress?.District
+                        </p>
+                    </div>
+
+                    <!-- Ordered Items -->
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:col-span-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Ordered Gadgets &amp; Items</h3>
+                        <div class="divide-y divide-slate-100">
+                            @foreach (var item in foundOrder.Items)
+                            {
+                                <div class="py-2.5 flex items-center justify-between text-xs">
+                                    <div>
+                                        <p class="font-bold text-slate-900">@item.ProductName</p>
+                                        <p class="text-[11px] text-slate-400 font-mono">Variant: @item.VariantName · Qty: @item.Quantity</p>
+                                    </div>
+                                    <div class="text-right font-mono font-bold text-slate-900">
+                                        ৳@item.LineTotal.ToString("N0")
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Support & Help -->
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-600 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                        <span class="font-bold text-slate-800">Need assistance with your delivery?</span>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Our Khulna support team is ready to help via WhatsApp or call.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="mailto:info@jasinternational.com.bd" class="btn-secondary text-xs px-3.5 py-1.5 inline-flex items-center gap-1.5 shadow-2xs">
+                            <span>✉️ Email</span>
+                        </a>
+                        <a href="https://wa.me/8801711465078?text=@(Uri.EscapeDataString($"Hello JAS International, I have an inquiry regarding Order #{foundOrder.Id}"))" target="_blank" rel="noopener noreferrer" class="btn-secondary text-xs px-3.5 py-1.5 inline-flex items-center gap-1.5 shadow-2xs">
+                            <span>💬 WhatsApp Us</span>
+                        </a>
+                        <a href="tel:01711465078" class="btn-primary text-xs px-3.5 py-1.5 inline-flex items-center gap-1.5 shadow-xs">
+                            <span>📞 Call 01711465078</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Not Found State -->
+            <div class="rounded-2xl border border-rose-200 bg-rose-50/60 p-8 text-center shadow-sm">
+                <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-rose-100 text-rose-600 mb-3">
+                    <span class="text-xl">🔍</span>
+                </div>
+                <h3 class="text-base font-bold text-rose-950">No Order Found</h3>
+                <p class="text-xs text-rose-700 mt-1 max-w-sm mx-auto">
+                    We could not find an order matching ID <strong>#@OrderId</strong> with phone number ending in <strong>@PhoneNumber</strong>.
+                </p>
+                <p class="text-[11px] text-slate-400 mt-3">
+                    Please verify the number entered on your checkout receipt, or contact support at <a href="tel:01711465078" class="underline font-bold text-slate-700">01711465078</a> or <a href="mailto:info@jasinternational.com.bd" class="underline font-bold text-slate-700">info@jasinternational.com.bd</a>.
+                </p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "id")]
+    public int? OrderId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "phone")]
+    public string? PhoneNumber { get; set; }
+
+    private Order? foundOrder;
+    private bool hasSearched;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (OrderId.HasValue && OrderId.Value > 0 && !string.IsNullOrWhiteSpace(PhoneNumber))
+        {
+            hasSearched = true;
+            var cleanPhone = new string(PhoneNumber.Where(char.IsDigit).ToArray());
+            if (cleanPhone.Length > 8)
+            {
+                cleanPhone = cleanPhone[^8..]; // Match last 8 digits for flexible entry (e.g. 01711465078 or +8801711465078)
+            }
+
+            foundOrder = await Db.Orders.AsNoTracking()
+                .Include(o => o.DeliveryAddress)
+                .Include(o => o.Items)
+                .Include(o => o.TimelineEvents)
+                .SingleOrDefaultAsync(o => o.Id == OrderId.Value && 
+                    o.DeliveryAddress != null && 
+                    o.DeliveryAddress.PhoneNumber.Contains(cleanPhone));
+        }
+        else
+        {
+            hasSearched = false;
+            foundOrder = null;
+        }
+    }
+
+    private string GetStepColor(int step)
+    {
+        if (foundOrder == null) return "bg-slate-200 text-slate-400";
+        var currentStep = foundOrder.Status switch
+        {
+            OrderStatus.Pending => 1,
+            OrderStatus.Processing => 2,
+            OrderStatus.InTransit => 3,
+            OrderStatus.Delivered => 4,
+            OrderStatus.Cancelled => 0,
+            _ => 1
+        };
+
+        if (currentStep >= step) return "bg-blue-600 text-white";
+        return "bg-slate-100 text-slate-400 border border-slate-200";
+    }
+
+    private string GetStepTextColor(int step)
+    {
+        if (foundOrder == null) return "text-slate-400";
+        var currentStep = foundOrder.Status switch
+        {
+            OrderStatus.Pending => 1,
+            OrderStatus.Processing => 2,
+            OrderStatus.InTransit => 3,
+            OrderStatus.Delivered => 4,
+            OrderStatus.Cancelled => 0,
+            _ => 1
+        };
+
+        if (currentStep >= step) return "text-slate-900 font-bold";
+        return "text-slate-400 font-medium";
+    }
+
+    private string GetStepNumberOrCheck(int step)
+    {
+        if (foundOrder == null) return step.ToString();
+        var currentStep = foundOrder.Status switch
+        {
+            OrderStatus.Pending => 1,
+            OrderStatus.Processing => 2,
+            OrderStatus.InTransit => 3,
+            OrderStatus.Delivered => 4,
+            OrderStatus.Cancelled => 0,
+            _ => 1
+        };
+
+        if (currentStep > step) return "✓";
+        return step.ToString();
+    }
+}

@@ -47,16 +47,16 @@ public sealed class AccountMailService(
     }
 
     public string? FromEmail => IsBrevo
-        ? (config["Mail:Brevo:From"] ?? config["BREVO_FROM"] ?? config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"])
-        : (config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"]);
+        ? (config["Mail:Brevo:From"] ?? config["BREVO_FROM"] ?? config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"] ?? "info@jasinternational.com.bd")
+        : (config["Mail:From"] ?? config["MAIL_FROM"] ?? config["Mail:Smtp:Username"] ?? config["Mail:Username"] ?? "info@jasinternational.com.bd");
 
     public string DisplayName => IsBrevo
         ? (config["Mail:Brevo:DisplayName"] ?? config["BREVO_DISPLAY_NAME"] ?? config["Mail:DisplayName"] ?? config["MAIL_DISPLAY_NAME"] ?? "JAS International")
         : (config["Mail:DisplayName"] ?? config["MAIL_DISPLAY_NAME"] ?? "JAS International");
 
     public string ReplyToEmail => IsBrevo
-        ? (config["Mail:Brevo:ReplyTo:Email"] ?? config["Mail:Brevo:ReplyTo"] ?? config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "")
-        : (config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "");
+        ? (config["Mail:Brevo:ReplyTo:Email"] ?? config["Mail:Brevo:ReplyTo"] ?? config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "info@jasinternational.com.bd")
+        : (config["Mail:ReplyTo:Email"] ?? config["Mail:ReplyTo"] ?? FromEmail ?? "info@jasinternational.com.bd");
 
     public string ReplyToName => IsBrevo
         ? (config["Mail:Brevo:ReplyTo:DisplayName"] ?? config["Mail:Brevo:ReplyTo:Name"] ?? config["Mail:ReplyTo:DisplayName"] ?? config["Mail:ReplyTo:Name"] ?? DisplayName)
@@ -348,7 +348,7 @@ public sealed class AccountMailService(
             return false;
         }
 
-        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com";
+        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com.bd";
         var customerName = order.DeliveryAddress?.CustomerName ?? "Valued Customer";
         var subject = $"[JAS International] Order #{order.Id} Placed Successfully (Ref: {order.PaymentReferenceCode})";
 
@@ -395,7 +395,7 @@ public sealed class AccountMailService(
             return false;
         }
 
-        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com";
+        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com.bd";
         var customerName = order.DeliveryAddress?.CustomerName ?? "Valued Customer";
         var subject = $"[JAS International] Payment Verified for Order #{order.Id} (Ref: {order.PaymentReferenceCode})";
 
@@ -436,7 +436,7 @@ public sealed class AccountMailService(
             return false;
         }
 
-        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com";
+        var baseUrl = config["PublicBaseUrl"]?.TrimEnd('/') ?? "https://jasinternational.com.bd";
         var customerName = order.DeliveryAddress?.CustomerName ?? "Valued Customer";
 
         string headerGradient;
@@ -542,7 +542,7 @@ public sealed class AccountMailService(
         // Footer
         sb.Append("<div style='background:#f8fafc;padding:20px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;'>");
         sb.Append("<p style='margin:0 0 4px;'><strong>JAS International</strong> &bull; Authentic Tech Gadgets &bull; Official Warranty</p>");
-        sb.Append("<p style='margin:0;'>Khulna Showroom: Shopping Complex 3rd Floor &bull; Hotline: 01711465078</p>");
+        sb.Append("<p style='margin:0;'>Khulna Showroom: Shopping Complex 3rd Floor &bull; Hotline: 01711465078 &bull; Email: info@jasinternational.com.bd</p>");
         sb.Append("</div>");
         sb.Append("</div>");
     }

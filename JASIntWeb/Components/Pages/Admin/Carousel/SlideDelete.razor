@@ -20,7 +20,7 @@
             <strong>@name</strong>
             from the homepage carousel?
         </p>
-        <form method="post" @formname="delete-slide" @onsubmit="Delete" data-enhance class="form-actions">
+        <form method="post" @formname="delete-slide" @onsubmit="Delete" class="form-actions">
             <AntiforgeryToken />
             <button type="submit" class="danger-button">Delete slide</button>
             <a href="/admin/carousel" class="shop-button-secondary">Cancel</a>

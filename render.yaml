@@ -7,7 +7,7 @@ services:
     plan: free
     branch: main
     autoDeploy: true
-    healthCheckPath: /
+    healthCheckPath: /health
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -24,9 +24,11 @@ services:
       - key: Mail__Brevo__ApiKey
         sync: false
       - key: Mail__From
-        value: ziaulhasan174@gmail.com
+        value: info@jasinternational.com.bd
       - key: Mail__DisplayName
         value: JAS International
+      - key: PublicBaseUrl
+        value: https://jasinternational.com.bd
       - key: Storage__BucketName
         value: jas-storefront-media
       - key: AWS_REGION

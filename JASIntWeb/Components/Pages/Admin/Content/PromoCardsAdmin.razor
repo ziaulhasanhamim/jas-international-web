@@ -34,7 +34,7 @@
 }
 
 <!-- Table Action Form -->
-<form method="post" @formname="cards-table-action" data-enhance>
+<form method="post" @formname="cards-table-action">
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-8">
         <div class="table-scroll">
@@ -134,7 +134,7 @@
         }
     </div>
 
-    <form method="post" @formname="save-promo-card" data-enhance class="space-y-4">
+    <form method="post" @formname="save-promo-card" class="space-y-4">
         <AntiforgeryToken />
         <input type="hidden" name="FormId" value="@(editCard?.Id ?? 0)" />
 
@@ -281,7 +281,7 @@
     public string? Action { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-promo-card")]
-    public int FormId { get; set; }
+    public int? FormId { get; set; }
     [SupplyParameterFromForm(FormName = "save-promo-card")]
     public string? FormEyebrow { get; set; }
     [SupplyParameterFromForm(FormName = "save-promo-card")]

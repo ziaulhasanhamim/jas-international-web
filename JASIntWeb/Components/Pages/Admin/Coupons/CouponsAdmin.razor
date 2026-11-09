@@ -12,7 +12,7 @@
     ActionText="Create New Coupon"
 />
 
-<form method="post" @formname="coupons-table-action" data-enhance>
+<form method="post" @formname="coupons-table-action">
     <AntiforgeryToken />
     <div class="shop-panel">
         @if (coupons.Count == 0)

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.RateLimiting;
+using JASIntWeb.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,7 +10,10 @@ internal static class HostingConfiguration
 {
     public static void AddStoreHosting(this WebApplicationBuilder builder)
     {
-        var keys = builder.Services.AddDataProtection().SetApplicationName("JASInternational");
+        var keys = builder.Services.AddDataProtection()
+            .SetApplicationName("JASInternational")
+            .PersistKeysToDbContext<AppDbContext>();
+            
         var keyPath = builder.Configuration["Hosting:DataProtectionPath"];
         if (!string.IsNullOrWhiteSpace(keyPath))
         {

@@ -1,4 +1,5 @@
 using JASIntWeb.Persistence.Entities;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -6,8 +7,9 @@ using Category = JASIntWeb.Persistence.Entities.Category;
 namespace JASIntWeb.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-: IdentityDbContext<User, IdentityRole<int>, int>(options)
+: IdentityDbContext<User, IdentityRole<int>, int>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
     public DbSet<Brand> Brands { get; set; } = null!;

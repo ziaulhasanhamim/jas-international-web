@@ -76,7 +76,7 @@ else
                 <h2 class="text-base font-bold text-slate-900 mb-1">Profile &amp; Account Details</h2>
                 <p class="text-xs text-slate-500 mb-5">Update the user's primary email and full name.</p>
 
-                <EditForm Model="ProfileInput" OnValidSubmit="SaveProfile" FormName="edit-user-profile" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                <EditForm Model="ProfileInput" OnValidSubmit="SaveProfile" FormName="edit-user-profile" method="post" data-submit-indication="true" class="space-y-4">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
@@ -108,7 +108,7 @@ else
                 <h2 class="text-base font-bold text-slate-900 mb-1">Reset Password</h2>
                 <p class="text-xs text-slate-500 mb-5">Assign a new password directly to this user. Their existing sessions will be terminated.</p>
 
-                <EditForm Model="PasswordInput" OnValidSubmit="ResetPassword" FormName="admin-reset-password" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                <EditForm Model="PasswordInput" OnValidSubmit="ResetPassword" FormName="admin-reset-password" method="post" data-submit-indication="true" class="space-y-4">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="text-xs text-rose-600 mb-2" />
 
@@ -216,7 +216,7 @@ else
                 <h3 class="text-sm font-bold text-slate-900 mb-1">Role &amp; Permissions</h3>
                 <p class="text-xs text-slate-500 mb-4">Grant or revoke store administrator privileges.</p>
 
-                <EditForm Model="RoleInput" OnValidSubmit="SaveRole" FormName="change-role" method="post" Enhance data-submit-indication="true" class="space-y-4">
+                <EditForm Model="RoleInput" OnValidSubmit="SaveRole" FormName="change-role" method="post" data-submit-indication="true" class="space-y-4">
                     <input type="hidden" name="RoleInput.Id" value="@Id" />
 
                     <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
@@ -241,7 +241,7 @@ else
             <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
                 <h3 class="text-sm font-bold text-slate-900">Security &amp; Verification</h3>
 
-                <form method="post" @formname="user-security-action" data-enhance class="space-y-4">
+                <form method="post" @formname="user-security-action" class="space-y-4">
                     <AntiforgeryToken />
                     <!-- Email Verification Toggle -->
                     <div class="pt-2 border-t border-slate-100 flex items-center justify-between">

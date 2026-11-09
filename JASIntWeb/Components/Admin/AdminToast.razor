@@ -1,0 +1,83 @@
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.WebUtilities
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur-md transition-all duration-300 animate-in slide-in-from-bottom-4 @GetClasses()" role="alert">
+        <span class="flex size-7 shrink-0 items-center justify-center rounded-xl @GetIconBg()">
+            @if (alertType == "rose")
+            {
+                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            }
+            else if (alertType == "amber")
+            {
+                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            }
+            else
+            {
+                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            }
+        </span>
+        <div class="text-xs">
+            <span class="font-bold block leading-tight">@GetTitle()</span>
+            <span class="font-medium text-slate-600 block mt-0.5">@message</span>
+        </div>
+        <button type="button" onclick="this.closest('[role=alert]').remove()" class="ml-2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer text-sm font-bold" aria-label="Dismiss">
+            ✕
+        </button>
+    </div>
+}
+
+@code {
+    private string? message;
+    private string alertType = "emerald";
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("notice", out var n) && !string.IsNullOrWhiteSpace(n))
+        {
+            message = n.ToString();
+            if (query.TryGetValue("type", out var t) && !string.IsNullOrWhiteSpace(t))
+            {
+                alertType = t.ToString();
+            }
+        }
+        else if (query.TryGetValue("saved", out var s) && s == "true")
+        {
+            message = "Changes were saved successfully.";
+            alertType = "emerald";
+        }
+        else if (query.TryGetValue("error", out var e) && !string.IsNullOrWhiteSpace(e))
+        {
+            message = e.ToString();
+            alertType = "rose";
+        }
+    }
+
+    private string GetClasses() => alertType switch
+    {
+        "rose" => "border-rose-200 bg-rose-50/95 text-rose-950",
+        "amber" => "border-amber-200 bg-amber-50/95 text-amber-950",
+        "blue" => "border-blue-200 bg-blue-50/95 text-blue-950",
+        _ => "border-emerald-200 bg-emerald-50/95 text-emerald-950"
+    };
+
+    private string GetIconBg() => alertType switch
+    {
+        "rose" => "bg-rose-100 text-rose-700",
+        "amber" => "bg-amber-100 text-amber-700",
+        "blue" => "bg-blue-100 text-blue-700",
+        _ => "bg-emerald-100 text-emerald-700"
+    };
+
+    private string GetTitle() => alertType switch
+    {
+        "rose" => "Attention Required",
+        "amber" => "Notification",
+        "blue" => "Information",
+        _ => "Action Complete"
+    };
+}

@@ -68,7 +68,7 @@
 </div>
 
 <!-- Single container form for all review table quick actions (guarantees exactly 1 form instance) -->
-<form method="post" @formname="reviews-table-action" data-enhance>
+<form method="post" @formname="reviews-table-action">
     <AntiforgeryToken />
     <!-- Reviews Stream -->
     <div class="space-y-4">
@@ -168,7 +168,7 @@
                 <p class="text-slate-600 italic">"@_activeReplyReview.Comment"</p>
             </div>
 
-            <form method="post" @formname="review-reply-modal" data-enhance class="space-y-3">
+            <form method="post" @formname="review-reply-modal" class="space-y-3">
                 <AntiforgeryToken />
                 <input type="hidden" name="ModalReplyId" value="@_activeReplyReview.Id" />
                 <div>

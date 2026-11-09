@@ -1,15 +1,29 @@
-<div class="admin-page-heading">
+<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
     <div>
-        <p class="admin-eyebrow">JAS / MANAGEMENT</p>
-        <h1>@Title</h1>
-        @if (Description is not null)
+        <p class="text-[10px] font-bold tracking-[0.16em] uppercase text-blue-600 mb-1">@(Eyebrow ?? "JAS / OPERATIONS")</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Description))
         {
-            <p class="admin-description">@Description</p>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">@Description</p>
         }
     </div>
-    @if (ActionHref is not null)
+    @if (!string.IsNullOrWhiteSpace(ActionHref))
     {
-        <a href="@ActionHref" class="shop-button">@ActionText</a>
+        <div class="flex items-center gap-2.5 shrink-0">
+            @if (!string.IsNullOrWhiteSpace(SecondaryActionHref))
+            {
+                <a href="@SecondaryActionHref" class="btn-secondary text-xs px-3.5 py-2 inline-flex items-center gap-1.5 shadow-2xs">
+                    <span>@SecondaryActionText</span>
+                </a>
+            }
+            <a href="@ActionHref" class="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 shadow-xs">
+                @if (ActionText.Contains("Add") || ActionText.Contains("Create") || ActionText.Contains("New"))
+                {
+                    <span class="text-sm leading-none font-bold">+</span>
+                }
+                <span>@ActionText</span>
+            </a>
+        </div>
     }
 </div>
 
@@ -18,9 +32,15 @@
     [Parameter]
     public string Title { get; set; } = "";
     [Parameter]
+    public string? Eyebrow { get; set; }
+    [Parameter]
     public string? Description { get; set; }
     [Parameter]
     public string? ActionHref { get; set; }
     [Parameter]
     public string ActionText { get; set; } = "Add record";
+    [Parameter]
+    public string? SecondaryActionHref { get; set; }
+    [Parameter]
+    public string? SecondaryActionText { get; set; }
 }

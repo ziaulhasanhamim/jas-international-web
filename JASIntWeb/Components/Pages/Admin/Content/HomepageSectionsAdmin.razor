@@ -35,7 +35,7 @@
 }
 
 <!-- Single container form for all table actions (replaces duplicate nested forms) -->
-<form method="post" @formname="sections-table-action" data-enhance>
+<form method="post" @formname="sections-table-action">
     <AntiforgeryToken />
     <!-- Sections Table -->
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-8">
@@ -136,7 +136,7 @@
         <p class="text-xs text-slate-500">Configure section title, category filter, and display limit.</p>
     </div>
 
-    <form method="post" @formname="save-section" data-enhance class="space-y-4">
+    <form method="post" @formname="save-section" class="space-y-4">
         <AntiforgeryToken />
         <input type="hidden" name="SaveAction" value="save" />
         <input type="hidden" name="FormId" value="@(editSection?.Id ?? 0)" />
@@ -204,7 +204,7 @@
     public string? SaveAction { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
-    public int FormId { get; set; }
+    public int? FormId { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
     public string? FormTitle { get; set; }
@@ -216,10 +216,10 @@
     public string? FormCategorySlug { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
-    public int FormItemLimit { get; set; }
+    public int? FormItemLimit { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
-    public int FormSortOrder { get; set; }
+    public int? FormSortOrder { get; set; }
 
     private List<HomepageSection> _sections = [];
     private List<Category> _categories = [];
@@ -277,7 +277,7 @@
         {
             var viewHref = string.IsNullOrWhiteSpace(FormCategorySlug) ? "/products" : $"/category/{FormCategorySlug}";
             string noticeText;
-            if (FormId == 0)
+            if (FormId == null || FormId == 0)
             {
                 Db.HomepageSections.Add(new HomepageSection
                 {
@@ -285,23 +285,23 @@
                     Eyebrow = FormEyebrow?.Trim(),
                     CategorySlug = FormCategorySlug,
                     ViewAllHref = viewHref,
-                    ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit,
-                    SortOrder = FormSortOrder,
+                    ItemLimit = (FormItemLimit == null || FormItemLimit <= 0) ? 8 : FormItemLimit.Value,
+                    SortOrder = FormSortOrder ?? 0,
                     IsActive = true
                 });
                 noticeText = "Created new homepage section.";
             }
             else
             {
-                var existing = await Db.HomepageSections.FindAsync(FormId);
+                var existing = await Db.HomepageSections.FindAsync(FormId.Value);
                 if (existing != null)
                 {
                     existing.Title = FormTitle.Trim();
                     existing.Eyebrow = FormEyebrow?.Trim();
                     existing.CategorySlug = FormCategorySlug;
                     existing.ViewAllHref = viewHref;
-                    existing.ItemLimit = FormItemLimit <= 0 ? 8 : FormItemLimit;
-                    existing.SortOrder = FormSortOrder;
+                    existing.ItemLimit = (FormItemLimit == null || FormItemLimit <= 0) ? 8 : FormItemLimit.Value;
+                    existing.SortOrder = FormSortOrder ?? existing.SortOrder;
                 }
                 noticeText = "Updated homepage section.";
             }

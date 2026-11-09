@@ -75,7 +75,7 @@
                                 <div>
                                     <p class="font-bold text-slate-900">JAS International</p>
                                     <p class="text-[11px] text-slate-500">Khulna, Bangladesh</p>
-                                    <p class="text-[11px] text-slate-500">Phone: 01711465078</p>
+                                    <p class="text-[11px] text-slate-500">Phone: 01711465078 &bull; info@jasinternational.com.bd</p>
                                 </div>
                                 <div class="text-right">
                                     <p class="font-bold text-slate-900">Invoice / Consignment</p>
@@ -132,7 +132,7 @@
                             </div>
 
                             <div class="pt-2 text-[10px] text-slate-400 text-center">
-                                Thank you for choosing JAS International! For warranty &amp; service, contact 01711465078.
+                                Thank you for choosing JAS International! For warranty &amp; service, contact 01711465078 or info@jasinternational.com.bd.
                             </div>
                         </div>
                     </div>
@@ -424,7 +424,7 @@ else
                             <span class="ml-2 font-bold text-amber-700">COD Due: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</span>
                         </div>
 
-                        <form method="post" @formname="order-payment-action" data-enhance class="inline-flex items-center gap-2">
+                        <form method="post" @formname="order-payment-action" class="inline-flex items-center gap-2">
                             <AntiforgeryToken />
                             @if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Delivered)
                             {
@@ -455,7 +455,7 @@ else
                 </div>
 
                 <!-- Form a: Change Status Form -->
-                <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Fulfillment Lifecycle Status</label>
@@ -476,7 +476,7 @@ else
                 </form>
 
                 <!-- Form e: Update Courier & Tracking Form -->
-                <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Courier Logistics &amp; Consignment</label>
@@ -526,7 +526,7 @@ else
                 </form>
 
                 <!-- Form f: Internal Fulfillment Notes Form -->
-                <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
+                <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Internal Fulfillment &amp; Packaging Notes</label>
