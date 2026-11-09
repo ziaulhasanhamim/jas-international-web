@@ -1,6 +1,7 @@
 @page "/admin/products"
 @attribute [StreamRendering]
 @inject AppDbContext Db
+@inject CatalogService Catalog
 @inject NavigationManager Nav
 
 <PageTitle>Products Catalog · JAS Admin</PageTitle>
@@ -254,6 +255,7 @@
                 product.IsDeleted = !product.IsDeleted;
                 product.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
+                Catalog.InvalidateProductCache(product.Slug);
 
                 Nav.NavigateTo(FilterUrl(Filter, Page));
                 return;

@@ -1,6 +1,7 @@
 @page "/admin/promo-cards"
 @attribute [StreamRendering]
 @inject AppDbContext Db
+@inject CatalogService Catalog
 @inject NavigationManager Nav
 
 <PageTitle>Curated Promo Cards · JAS Admin</PageTitle>
@@ -319,6 +320,7 @@
                     {
                         item.IsActive = !item.IsActive;
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidatePromoCardsCache();
                         Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString(item.IsActive ? "Card enabled." : "Card disabled."));
                         return;
                     }
@@ -326,6 +328,7 @@
                     {
                         Db.CuratedPromoCards.Remove(item);
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidatePromoCardsCache();
                         Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString("Promo card deleted."));
                         return;
                     }
@@ -367,6 +370,7 @@
                 await Db.SaveChangesAsync();
             }
 
+            Catalog.InvalidatePromoCardsCache();
             Nav.NavigateTo("/admin/promo-cards?notice=" + Uri.EscapeDataString("Promo card saved successfully."));
             return;
         }

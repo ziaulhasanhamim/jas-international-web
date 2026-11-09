@@ -29,6 +29,8 @@ services:
         value: JAS International
       - key: PublicBaseUrl
         value: https://jasinternational.com.bd
+      - key: CLOUDINARY_URL
+        sync: false
       - key: Storage__BucketName
         value: jas-storefront-media
       - key: AWS_REGION

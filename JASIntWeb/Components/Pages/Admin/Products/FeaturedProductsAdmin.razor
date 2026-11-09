@@ -2,6 +2,7 @@
 @attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
+@inject CatalogService Catalog
 @inject NavigationManager Nav
 
 <PageTitle>Featured Products &amp; Merchandising · JAS Admin</PageTitle>
@@ -229,6 +230,7 @@
                     }
                     p.UpdatedAt = DateTimeOffset.UtcNow;
                     await Db.SaveChangesAsync();
+                    Catalog.InvalidateProductCache(p.Slug);
 
                     Nav.NavigateTo(FilterUrl(Tab));
                     return;

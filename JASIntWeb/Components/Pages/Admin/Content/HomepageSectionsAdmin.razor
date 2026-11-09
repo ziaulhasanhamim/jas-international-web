@@ -2,6 +2,7 @@
 @attribute [StreamRendering]
 @inject AppDbContext Db
 @inject AdminSession Session
+@inject CatalogService Catalog
 @inject NavigationManager Nav
 
 <PageTitle>Homepage Sections · JAS Admin</PageTitle>
@@ -246,6 +247,7 @@
                     {
                         item.IsActive = !item.IsActive;
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidateHomepageSectionsCache();
                         Nav.NavigateTo("/admin/homepage-sections?notice=" + Uri.EscapeDataString(item.IsActive ? "Section enabled." : "Section disabled."));
                         return;
                     }
@@ -253,6 +255,7 @@
                     {
                         item.SortOrder -= 10;
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidateHomepageSectionsCache();
                         Nav.NavigateTo("/admin/homepage-sections");
                         return;
                     }
@@ -260,6 +263,7 @@
                     {
                         item.SortOrder += 10;
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidateHomepageSectionsCache();
                         Nav.NavigateTo("/admin/homepage-sections");
                         return;
                     }
@@ -267,6 +271,7 @@
                     {
                         Db.HomepageSections.Remove(item);
                         await Db.SaveChangesAsync();
+                        Catalog.InvalidateHomepageSectionsCache();
                         Nav.NavigateTo("/admin/homepage-sections?notice=" + Uri.EscapeDataString("Deleted section."));
                         return;
                     }
@@ -306,6 +311,7 @@
                 noticeText = "Updated homepage section.";
             }
             await Db.SaveChangesAsync();
+            Catalog.InvalidateHomepageSectionsCache();
             Nav.NavigateTo("/admin/homepage-sections?notice=" + Uri.EscapeDataString(noticeText));
             return;
         }

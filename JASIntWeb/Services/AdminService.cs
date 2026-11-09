@@ -1,11 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 namespace JASIntWeb.Services;
 // Called through AdminSession, which authorizes every operation in a fresh service scope.
 
-public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemoryCache cache, AccountMailService mailService)
+public sealed class AdminService(AppDbContext db, UserManager<User> users, HybridCache cache, AccountMailService mailService)
 {
     private static void Validate(object input)
     {
@@ -203,6 +203,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
             }
         }
 
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
         return p.Id;
     }
 
@@ -307,6 +309,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         await SetStockCoreAsync(v.Id, input.Stock, "Variant editor stock count");
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
         return v.Id;
     }
 
@@ -352,6 +356,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         await SetStockCoreAsync(input.VariantId, input.Quantity, input.Reason.Trim());
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
     public async Task SaveProductAttributesAsync(ProductAttributesForm input)
@@ -449,6 +454,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
     public async Task<int> GenerateVariantsAsync(VariantGenerateForm input)
@@ -550,6 +556,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
         return count;
     }
 
@@ -721,8 +728,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         placement.IsActive = input.Featured && !input.Hidden;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        cache.Remove(CatalogService.CategoriesCacheKey);
-        cache.Remove(CatalogService.HomeCategoriesCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
     }
 
     public async Task SaveBrandAsync(BrandEditForm input)
@@ -765,8 +772,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        cache.Remove(CatalogService.BrandsCacheKey);
-        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagBrands);
     }
 
     public async Task ToggleBrandFeaturedAsync(int id)
@@ -775,8 +781,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         b.IsFeatured = !b.IsFeatured;
         b.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-        cache.Remove(CatalogService.BrandsCacheKey);
-        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagBrands);
     }
 
     public async Task DeleteBrandAsync(int id)
@@ -785,8 +790,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         b.IsDeleted = true;
         b.DeletedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-        cache.Remove(CatalogService.BrandsCacheKey);
-        cache.Remove(CatalogService.FeaturedBrandsCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagBrands);
     }
 
     public async Task<int> SaveAttributeAsync(AttributeEditForm input)
@@ -868,7 +872,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
             db.CarouselSlides.Add(s);
         }
         await db.SaveChangesAsync();
-        cache.Remove(CatalogService.SlidesCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagSlides);
     }
 
     public async Task DeleteSlideAsync(int id)
@@ -876,7 +880,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         var slide = (await db.CarouselSlides.SingleOrDefaultAsync(s => s.Id == id)) ?? throw new ShopException("Carousel slide not found.");
         db.CarouselSlides.Remove(slide);
         await db.SaveChangesAsync();
-        cache.Remove(CatalogService.SlidesCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagSlides);
     }
 
     public async Task ChangeRoleAsync(RoleEditForm input, int actorId)
@@ -976,8 +980,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, IMemo
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        cache.Remove(CatalogService.SlidesCacheKey);
-        cache.Remove(CatalogService.HomeCategoriesCacheKey);
+        await cache.RemoveByTagAsync(CatalogService.TagSlides);
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
     }
 
     public async Task<int> CreateUserByAdminAsync(AdminUserCreateForm input)

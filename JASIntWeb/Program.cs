@@ -20,6 +20,34 @@ builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddMemoryCache();
+#pragma warning disable EXTEXP0018
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(30),
+        LocalCacheExpiration = TimeSpan.FromMinutes(30)
+    };
+});
+#pragma warning restore EXTEXP0018
+
+builder.Services.AddOutputCache(options =>
+{
+    options.AddBasePolicy(b => b.With(c =>
+        c.HttpContext.Request.Path.StartsWithSegments("/about")
+        || c.HttpContext.Request.Path.StartsWithSegments("/faq")
+        || c.HttpContext.Request.Path.StartsWithSegments("/terms")
+        || c.HttpContext.Request.Path.StartsWithSegments("/privacy")
+        || c.HttpContext.Request.Path.StartsWithSegments("/warranty-returns"))
+        .Expire(TimeSpan.FromHours(24))
+        .Tag("static-content"));
+
+    options.AddPolicy("StaticPages", b =>
+        b.Expire(TimeSpan.FromHours(24)).Tag("static-content"));
+
+    options.AddPolicy("SitemapPolicy", b =>
+        b.Expire(TimeSpan.FromHours(12)).Tag("seo"));
+});
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
@@ -31,7 +59,28 @@ builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddSingleton<CourierLogisticsService>();
-builder.Services.AddSingleton<IStorageService, NeonStorageService>();
+builder.Services.AddSingleton<CloudinaryStorageService>();
+builder.Services.AddSingleton<NeonStorageService>();
+builder.Services.AddSingleton<IStorageService>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var cloudinaryUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"];
+    var cloudName = config["Cloudinary:CloudName"] ?? config["CLOUDINARY_CLOUD_NAME"];
+
+    // 1. Prioritize Cloudinary if credentials provided
+    if (!string.IsNullOrWhiteSpace(cloudinaryUrl) || !string.IsNullOrWhiteSpace(cloudName))
+    {
+        var cloudinary = sp.GetRequiredService<CloudinaryStorageService>();
+        if (cloudinary.IsConfigured) return cloudinary;
+    }
+
+    // 2. Secondary: Neon S3 Object Storage
+    var neon = sp.GetRequiredService<NeonStorageService>();
+    if (neon.IsConfigured) return neon;
+
+    // 3. Fallback: local disk storage
+    return sp.GetRequiredService<CloudinaryStorageService>();
+});
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
@@ -206,6 +255,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseRateLimiter();
+app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<CartRequestMiddleware>();

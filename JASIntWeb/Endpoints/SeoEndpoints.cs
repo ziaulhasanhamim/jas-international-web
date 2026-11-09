@@ -75,7 +75,7 @@ public static class SeoEndpoints
             sb.AppendLine("</urlset>");
 
             return Results.Content(sb.ToString(), "application/xml", Encoding.UTF8);
-        });
+        }).CacheOutput("SitemapPolicy");
 
         endpoints.MapGet("/robots.txt", (HttpContext context) =>
         {
@@ -93,7 +93,7 @@ public static class SeoEndpoints
             sb.AppendLine($"Sitemap: {baseUrl}/sitemap.xml");
 
             return Results.Content(sb.ToString(), "text/plain", Encoding.UTF8);
-        });
+        }).CacheOutput("SitemapPolicy");
 
         return endpoints;
     }
