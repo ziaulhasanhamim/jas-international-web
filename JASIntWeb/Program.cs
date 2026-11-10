@@ -48,7 +48,11 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy("HomePage", b =>
         b.Expire(TimeSpan.FromMinutes(10))
          .Tag("homepage")
-         .Tag("catalog"));
+         .Tag("catalog")
+         .With(c => c.HttpContext.User?.Identity?.IsAuthenticated != true)
+         .With(c => string.IsNullOrEmpty(c.HttpContext.Request.Headers.Authorization))
+         .With(c => !c.HttpContext.Request.Cookies.ContainsKey(".AspNetCore.Identity.Application")
+                 && !c.HttpContext.Request.Cookies.ContainsKey(".AspNetCore.Identity.External")));
 
     options.AddPolicy("SitemapPolicy", b =>
         b.Expire(TimeSpan.FromHours(12)).Tag("seo"));
@@ -239,9 +243,9 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseRateLimiter();
-app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseOutputCache();
 app.UseMiddleware<CartRequestMiddleware>();
 app.UseAntiforgery();
 
