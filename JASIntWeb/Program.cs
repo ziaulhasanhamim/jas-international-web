@@ -45,6 +45,11 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy("StaticPages", b =>
         b.Expire(TimeSpan.FromHours(24)).Tag("static-content"));
 
+    options.AddPolicy("HomePage", b =>
+        b.Expire(TimeSpan.FromMinutes(10))
+         .Tag("homepage")
+         .Tag("catalog"));
+
     options.AddPolicy("SitemapPolicy", b =>
         b.Expire(TimeSpan.FromHours(12)).Tag("seo"));
 });
@@ -59,28 +64,7 @@ builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddSingleton<CourierLogisticsService>();
-builder.Services.AddSingleton<CloudinaryStorageService>();
-builder.Services.AddSingleton<NeonStorageService>();
-builder.Services.AddSingleton<IStorageService>(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var cloudinaryUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"];
-    var cloudName = config["Cloudinary:CloudName"] ?? config["CLOUDINARY_CLOUD_NAME"];
-
-    // 1. Prioritize Cloudinary if credentials provided
-    if (!string.IsNullOrWhiteSpace(cloudinaryUrl) || !string.IsNullOrWhiteSpace(cloudName))
-    {
-        var cloudinary = sp.GetRequiredService<CloudinaryStorageService>();
-        if (cloudinary.IsConfigured) return cloudinary;
-    }
-
-    // 2. Secondary: Neon S3 Object Storage
-    var neon = sp.GetRequiredService<NeonStorageService>();
-    if (neon.IsConfigured) return neon;
-
-    // 3. Fallback: local disk storage
-    return sp.GetRequiredService<CloudinaryStorageService>();
-});
+builder.Services.AddSingleton<IStorageService, CloudinaryStorageService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {

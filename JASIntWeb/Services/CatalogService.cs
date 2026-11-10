@@ -1,9 +1,13 @@
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using NpgsqlTypes;
 namespace JASIntWeb.Services;
 
-public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, HybridCache cache)
+public sealed class CatalogService(
+    IDbContextFactory<AppDbContext> dbFactory,
+    HybridCache cache,
+    IOutputCacheStore? outputCache = null)
 {
     public const string TagCatalog = "catalog";
     public const string TagCategories = "categories";
@@ -71,8 +75,26 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
             options: LongLivedOptions,
             tags: [TagCatalog, TagBrands]);
 
-    public async Task InvalidateBrandsCacheAsync() =>
+    private async Task EvictHomePageOutputCacheAsync()
+    {
+        if (outputCache != null)
+        {
+            try
+            {
+                await outputCache.EvictByTagAsync("homepage", default);
+            }
+            catch
+            {
+                // In-memory/OutputCache eviction failure should not disrupt business operations
+            }
+        }
+    }
+
+    public async Task InvalidateBrandsCacheAsync()
+    {
         await cache.RemoveByTagAsync(TagBrands);
+        await EvictHomePageOutputCacheAsync();
+    }
 
     public void InvalidateBrandsCache() =>
         _ = InvalidateBrandsCacheAsync();
@@ -97,6 +119,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
     {
         await cache.RemoveByTagAsync(TagCategories);
         await cache.RemoveByTagAsync(TagSections);
+        await EvictHomePageOutputCacheAsync();
     }
 
     public void InvalidateCategoriesCache() =>
@@ -136,8 +159,11 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
             options: StandardOptions,
             tags: [TagCatalog, TagSlides]);
 
-    public async Task InvalidateSlidesCacheAsync() =>
+    public async Task InvalidateSlidesCacheAsync()
+    {
         await cache.RemoveByTagAsync(TagSlides);
+        await EvictHomePageOutputCacheAsync();
+    }
 
     public void InvalidateSlidesCache() =>
         _ = InvalidateSlidesCacheAsync();
@@ -241,6 +267,7 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
             await cache.RemoveByTagAsync(TagProducts);
         }
         await cache.RemoveByTagAsync(TagSections);
+        await EvictHomePageOutputCacheAsync();
     }
 
     public void InvalidateProductCache(string? slug = null) =>
@@ -340,8 +367,11 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
             options: StandardOptions,
             tags: [TagCatalog, TagSections]);
 
-    public async Task InvalidateHomepageSectionsCacheAsync() =>
+    public async Task InvalidateHomepageSectionsCacheAsync()
+    {
         await cache.RemoveByTagAsync(TagSections);
+        await EvictHomePageOutputCacheAsync();
+    }
 
     public void InvalidateHomepageSectionsCache() =>
         _ = InvalidateHomepageSectionsCacheAsync();
@@ -405,14 +435,20 @@ public sealed class CatalogService(IDbContextFactory<AppDbContext> dbFactory, Hy
             options: StandardOptions,
             tags: [TagCatalog, TagPromos]);
 
-    public async Task InvalidatePromoCardsCacheAsync() =>
+    public async Task InvalidatePromoCardsCacheAsync()
+    {
         await cache.RemoveByTagAsync(TagPromos);
+        await EvictHomePageOutputCacheAsync();
+    }
 
     public void InvalidatePromoCardsCache() =>
         _ = InvalidatePromoCardsCacheAsync();
 
-    public async Task InvalidateAllAsync() =>
+    public async Task InvalidateAllAsync()
+    {
         await cache.RemoveByTagAsync(TagCatalog);
+        await EvictHomePageOutputCacheAsync();
+    }
 
     public void InvalidateAll() =>
         _ = InvalidateAllAsync();
