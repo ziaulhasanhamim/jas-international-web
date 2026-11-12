@@ -1,10 +1,4 @@
-@rendermode InteractiveAuto
-@implements IDisposable
-@inject CartService Cart
-@inject WishlistService Wishlist
-@inject NavigationManager Nav
-
-<!-- Primary Brand Header -->
+<!-- Primary Brand Header (Pure Static SSR with Data-Attribute Micro-Interactions) -->
 <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs">
     <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-6 px-4 py-3 sm:px-6">
         <!-- Brand Logo with SINCE 2005 and Brand Name -->
@@ -20,25 +14,18 @@
             </div>
         </a>
 
-        <!-- Global Search Bar (Client-side Enhanced Navigation - No Full Page Reload) -->
-        <form @onsubmit="ExecuteSearch" class="hidden md:flex flex-1 max-w-md lg:max-w-xl relative">
+        <!-- Global Search Bar (Native Static SSR Enhanced Form) -->
+        <form method="get" action="/products" data-enhance class="hidden md:flex flex-1 max-w-md lg:max-w-xl relative">
             <input
                 id="site-search"
+                name="q"
                 type="search"
-                @bind="searchQuery"
-                @bind:event="oninput"
                 placeholder="Search smartwatches, earbuds, chargers, gadgets..."
                 class="w-full rounded-full border border-slate-200/90 bg-slate-50/90 px-4 py-2.5 pl-10 pr-24 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100"
             />
             <span class="absolute left-3.5 top-3 text-slate-400">
                 <Icon Name="search" Class="size-4" />
             </span>
-            @if (!string.IsNullOrWhiteSpace(searchQuery))
-            {
-                <button type="button" @onclick="() => searchQuery = string.Empty" class="absolute right-20 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 text-xs font-bold cursor-pointer">
-                    ✕
-                </button>
-            }
             <button type="submit" class="absolute right-1.5 top-1.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition cursor-pointer">
                 Search
             </button>
@@ -101,38 +88,30 @@
             <a href="/wishlist" class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition relative" aria-label="Wishlist">
                 <Icon Name="heart" Class="size-4 text-rose-500" />
                 <span>Wishlist</span>
-                @if (Wishlist.Count > 0)
-                {
-                    <span class="flex size-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
-                        @Wishlist.Count
-                    </span>
-                }
             </a>
 
-            <!-- Cart Trigger Button -->
-            <button
-                type="button"
-                @onclick="() => open = true"
+            <!-- Cart Trigger Button (Static SSR with data-jas-cart-count) -->
+            <a
+                href="/cart"
                 class="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-blue-600 px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition active:scale-95"
                 aria-label="Open shopping cart"
             >
                 <Icon Name="cart" Class="size-4" />
                 <span class="hidden xs:inline">Cart</span>
-                <span class="flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700">
-                    @Cart.ItemCount
+                <span data-jas-cart-count class="flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700">
+                    0
                 </span>
-            </button>
+            </a>
         </div>
     </div>
 
-    <!-- Mobile Quick Search Bar (Enhanced Client Navigation) -->
+    <!-- Mobile Quick Search Bar (Static SSR Enhanced Form) -->
     <div class="md:hidden px-4 pb-2.5 pt-0.5">
-        <form @onsubmit="ExecuteSearch" class="relative">
+        <form method="get" action="/products" data-enhance class="relative">
             <input
                 id="site-search-mobile"
+                name="q"
                 type="search"
-                @bind="searchQuery"
-                @bind:event="oninput"
                 placeholder="Search smartwatches, earbuds, chargers..."
                 class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 pl-9 pr-14 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
@@ -178,30 +157,21 @@
         <span class="tracking-tight">Shop</span>
     </NavLink>
 
-    <!-- Cart Button with live Badge -->
-    <button type="button" @onclick="() => open = true" class="flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-all duration-150 hover:text-blue-600 active:scale-95 cursor-pointer relative">
+    <!-- Cart Button with live Badge (Static SSR with data-jas-cart-count) -->
+    <a href="/cart" class="flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-all duration-150 hover:text-blue-600 active:scale-95 cursor-pointer relative" aria-label="Cart">
         <div class="relative">
             <Icon Name="cart" Class="size-5 text-slate-700" />
-            @if (Cart.ItemCount > 0)
-            {
-                <span class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white shadow-xs">
-                    @Cart.ItemCount
-                </span>
-            }
+            <span data-jas-cart-count class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white shadow-xs">
+                0
+            </span>
         </div>
         <span class="tracking-tight text-slate-700">Cart</span>
-    </button>
+    </a>
 
     <!-- Wishlist Button -->
     <NavLink href="/wishlist" class="flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-all duration-150 hover:text-rose-600 active:scale-95 [&.active]:text-rose-600 [&.active]:font-bold relative">
         <div class="relative">
             <Icon Name="heart" Class="size-5 text-slate-700" />
-            @if (Wishlist.Count > 0)
-            {
-                <span class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white shadow-xs">
-                    @Wishlist.Count
-                </span>
-            }
         </div>
         <span class="tracking-tight">Wishlist</span>
     </NavLink>
@@ -212,47 +182,3 @@
         <span class="tracking-tight">Account</span>
     </NavLink>
 </nav>
-
-<CartDrawer Open="open" OpenChanged="value => open = value" />
-
-@code
-{
-    private bool open;
-    private string searchQuery = "";
-
-    private void ExecuteSearch()
-    {
-        var term = searchQuery.Trim();
-        if (!string.IsNullOrWhiteSpace(term))
-        {
-            Nav.NavigateTo($"/products?q={Uri.EscapeDataString(term)}");
-        }
-        else
-        {
-            Nav.NavigateTo("/products");
-        }
-    }
-
-    protected override void OnInitialized()
-    {
-        Cart.OnChange += Changed;
-        Wishlist.OnChange += Changed;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool first)
-    {
-        if (first)
-        {
-            await Cart.InitializeAsync();
-            await Wishlist.EnsureLoadedAsync();
-        }
-    }
-
-    private void Changed() => _ = InvokeAsync(StateHasChanged);
-
-    public void Dispose()
-    {
-        Cart.OnChange -= Changed;
-        Wishlist.OnChange -= Changed;
-    }
-}

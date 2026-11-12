@@ -7,13 +7,14 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="TUnit" Version="1.76.28" />
     <PackageReference Include="TUnit.Assertions.Should" Version="1.76.28-beta" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>

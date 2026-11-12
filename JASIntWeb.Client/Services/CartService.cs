@@ -20,9 +20,9 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
 
     private async Task<LocalCartDto> ReadAsync()
     {
-        var json = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
         try
         {
+            var json = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
             var cart = json is null ? null : JsonSerializer.Deserialize<LocalCartDto>(json, Json);
             if (cart is null || cart.Token == Guid.Empty || cart.Items is null || cart.Items.Count > 100)
             {
@@ -31,20 +31,33 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             cart.Items = cart.Items.Where(i => i.VariantId > 0 && i.Quantity is > 0 and <= 99).ToList();
             return cart;
         }
-        catch (JsonException)
+        catch
         {
             return new();
         }
     }
 
-    private ValueTask WriteAsync(LocalCartDto cart) => js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(cart, Json));
+    private async ValueTask WriteAsync(LocalCartDto cart)
+    {
+        try
+        {
+            await js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(cart, Json));
+            await js.InvokeVoidAsync("eval", "window.JasCart && window.JasCart.updateBadges && window.JasCart.updateBadges()");
+        }
+        catch { }
+    }
 
     private async Task ClearIfTokenAsync(Guid token)
     {
         var current = await ReadAsync();
         if (current.Token == token)
         {
-            await js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+            try
+            {
+                await js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+                await js.InvokeVoidAsync("eval", "window.JasCart && window.JasCart.updateBadges && window.JasCart.updateBadges()");
+            }
+            catch { }
         }
     }
 
@@ -54,6 +67,11 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         IsAuthenticated = cart.IsAuthenticated;
         Error = null;
         loaded = true;
+        try
+        {
+            _ = js.InvokeVoidAsync("eval", "window.JasCart && window.JasCart.updateBadges && window.JasCart.updateBadges()");
+        }
+        catch { }
     }
 
     private async Task<LocalCartDto> IdentityAndMergeAsync()

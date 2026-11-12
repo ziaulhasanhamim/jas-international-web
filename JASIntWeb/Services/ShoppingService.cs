@@ -9,7 +9,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
     public static int? UserId(ClaimsPrincipal user) => int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 50), config.GetValue<decimal>("Delivery:OutsideKhulna", 150));
 
-    public async Task LockUserAsync(int userId) => await db.Database.ExecuteSqlInterpolatedAsync(
+    public async Task LockUserAsync(int userId) => await db.Database.ExecuteSqlAsync(
         $"SELECT \"Id\" FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE");
 
     private async Task<Cart> ActiveCartAsync(int userId)
@@ -212,7 +212,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         }
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
         // One request token cannot create two orders, including guest retries and concurrent requests.
-        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({request.RequestId.ToString()}, 0))");
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({request.RequestId.ToString()}, 0))");
         var existing = await db.Orders.AsNoTracking().SingleOrDefaultAsync(o => o.CheckoutToken == request.RequestId);
         if (existing is not null)
         {
@@ -274,7 +274,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         foreach (var item in summary.Items.OrderBy(i => i.VariantId))
         {
             // Lock inventory in a stable order. The available quantity is checked again after acquiring the lock.
-            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.VariantId} FOR UPDATE");
+            await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.VariantId} FOR UPDATE");
             var inventory = await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.VariantId);
             var variant = await db.ProductVariants.Include(v => v.Product).ThenInclude(p => p!.Category)
                 .ThenInclude(c => c!.ParentCategory)
@@ -599,7 +599,7 @@ public sealed class ShoppingService(AppDbContext db, IConfiguration config, Deli
         // Release reserved inventory back to stock
         foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
         {
-            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
+            await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
             var stock = await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId);
             if (stock != null && stock.QuantityReserved >= item.Quantity)
             {
