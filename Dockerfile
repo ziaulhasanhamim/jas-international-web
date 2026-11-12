@@ -14,7 +14,7 @@ COPY JASIntWeb.Client ./JASIntWeb.Client
 RUN npx @tailwindcss/cli -i ./JASIntWeb/wwwroot/css/input.css -o ./JASIntWeb/wwwroot/css/output.css --minify
 
 # Stage 2: .NET SDK build & publish
-FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-preview AS build
 WORKDIR /src
 
 # Restore project dependencies
@@ -32,7 +32,7 @@ COPY --from=tailwind-build /src/JASIntWeb/wwwroot/css/output.css ./JASIntWeb/www
 RUN dotnet publish "JASIntWeb/JASIntWeb.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 3: Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-preview AS final
 WORKDIR /app
 
 # Configure default container port

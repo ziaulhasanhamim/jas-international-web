@@ -52,7 +52,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
     }
 
-    private Task LockProductAsync(int id) => db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Products\" WHERE \"Id\" = {id} FOR UPDATE");
+    private Task LockProductAsync(int id) => db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Products\" WHERE \"Id\" = {id} FOR UPDATE");
 
     public async Task<int> SaveProductAsync(ProductEditForm input)
     {
@@ -221,7 +221,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         if (input.Id != 0)
         {
-            await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {input.Id} FOR UPDATE");
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {input.Id} FOR UPDATE");
         }
         var definitions = await db.ProductAttributeDefinitions.Where(a => a.ProductId == input.ProductId).ToListAsync();
         if (input.Choices.Count != definitions.Count
@@ -316,7 +316,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     private async Task SetStockCoreAsync(int variantId, int quantity, string reason)
     {
-        await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {variantId} FOR UPDATE");
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {variantId} FOR UPDATE");
         var inventory = await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == variantId);
         if (inventory is null)
         {
@@ -565,7 +565,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await using var tx = await db.Database.BeginTransactionAsync();
         Validate(input);
         var id = input.Id;
-        await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {id} FOR UPDATE");
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {id} FOR UPDATE");
         var order = (await db.Orders
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -603,7 +603,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             {
                 foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
                 {
-                    await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
+                    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
                     var stock = (await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId)) ?? throw new ShopException("Inventory is missing. Review stock before changing this order.");
                     if (stock.QuantityReserved < item.Quantity)
                     {
