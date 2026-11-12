@@ -125,20 +125,16 @@
                             }
                         </td>
                         <td>
-                            @if (o.Status == OrderStatus.Cancelled)
-                            {
-                                <span class="badge badge-rose">Order Cancelled</span>
-                            }
-                            else if (o.PaidAmount > 0)
+                            @if (o.PaidAmount > 0)
                             {
                                 <div class="space-y-1">
                                     <span class="badge badge-emerald">
                                         <Icon Name="check" Class="size-3" />
-                                        <span>Verified (৳@o.PaidAmount.ToString("N0"))</span>
+                                        Verified (৳@o.PaidAmount.ToString("N0"))
                                     </span>
                                     <div>
-                                        <button type="button" @onclick="() => QuickUnverify(o.Id)" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium">
-                                            Mark Unverified
+                                        <button type="button" @onclick="() => QuickUnverify(o.Id)" class="text-[11px] text-rose-600 hover:text-rose-800 underline font-medium">
+                                            ✕ Unverify
                                         </button>
                                     </div>
                                 </div>
@@ -157,14 +153,10 @@
                                     {
                                         <span class="badge badge-slate">Unpaid</span>
                                     }
-                                    <div class="flex items-center gap-1.5 pt-0.5">
-                                        <button type="button" @onclick="() => QuickVerify(o.Id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white !py-1 !px-2 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1">
+                                    <div>
+                                        <button type="button" @onclick="() => QuickVerify(o.Id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-700 !text-white !py-1 !px-2.5 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1">
                                             <Icon Name="check" Class="size-3" />
-                                            <span>Verify</span>
-                                        </button>
-                                        <button type="button" @onclick="() => QuickRejectAndCancel(o.Id)" class="btn-secondary !text-rose-700 hover:!bg-rose-50 !py-1 !px-2 text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1">
-                                            <Icon Name="close" Class="size-3" />
-                                            <span>Not Received</span>
+                                            <span>✓ Verify Payment</span>
                                         </button>
                                     </div>
                                 </div>
@@ -273,12 +265,6 @@
     private async Task QuickUnverify(int orderId)
     {
         await Shop.UnverifyPaymentAsync(orderId);
-        await LoadOrdersAsync();
-    }
-
-    private async Task QuickRejectAndCancel(int orderId)
-    {
-        await Shop.RejectPaymentAndCancelOrderAsync(orderId, "Payment not received");
         await LoadOrdersAsync();
     }
 }
