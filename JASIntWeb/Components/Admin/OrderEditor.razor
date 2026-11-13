@@ -1,54 +1,52 @@
-@rendermode InteractiveServer
 @inject JASIntWeb.Services.AdminSession Session
+@inject NavigationManager Nav
 
 <section class="order-editor">
     <div class="admin-section-heading">
         <div>
             <h3>@Title</h3>
-            <p>Drag rows to reorder. The arrow buttons also work with keyboard and touch.</p>
+            <p>Use the arrow buttons to adjust display order.</p>
         </div>
     </div>
-    <ol class="order-list">
-        @for (var i = 0; i < rows.Count; i++)
+    <form method="post" @formname="order-editor" data-enhance>
+        <AntiforgeryToken />
+        <input type="hidden" name="ActionKind" value="@Kind" />
+        <input type="hidden" name="ActionScopeId" value="@ScopeId" />
+        <ol class="order-list">
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var index = i;
+                var item = Items[i];
+                <li @key="item.Id">
+                    <span class="order-label">@item.Label</span>
+                    <button
+                        type="submit"
+                        name="MoveAction"
+                        value="@($"{item.Id}:-1")"
+                        disabled="@(index == 0)"
+                        aria-label="Move @item.Label up"
+                        class="p-1 rounded text-slate-600 hover:text-slate-950 hover:bg-slate-100 disabled:opacity-25"
+                    >
+                        ↑
+                    </button>
+                    <button
+                        type="submit"
+                        name="MoveAction"
+                        value="@($"{item.Id}:1")"
+                        disabled="@(index == Items.Count - 1)"
+                        aria-label="Move @item.Label down"
+                        class="p-1 rounded text-slate-600 hover:text-slate-950 hover:bg-slate-100 disabled:opacity-25"
+                    >
+                        ↓
+                    </button>
+                </li>
+            }
+        </ol>
+        @if (!string.IsNullOrEmpty(errorMessage))
         {
-            var index = i;
-            var item = rows[i];
-            <li
-                @key="item.Id"
-                draggable="true"
-                @ondragstart="() => dragged = item.Id"
-                @ondragover:preventDefault
-                @ondrop="() => Drop(item.Id)"
-                @ondragend="() => dragged = null"
-            >
-                <span class="drag-grip" aria-hidden="true">⠿</span>
-                <span class="order-label">@item.Label</span>
-                <button
-                    type="button"
-                    disabled="@(busy || index == 0)"
-                    aria-label="Move @item.Label up"
-                    @onclick="() => Move(index, -1)"
-                >
-                    ↑
-                </button>
-                <button
-                    type="button"
-                    disabled="@(busy || index == rows.Count - 1)"
-                    aria-label="Move @item.Label down"
-                    @onclick="() => Move(index, 1)"
-                >
-                    ↓
-                </button>
-            </li>
+            <div class="mt-2 text-xs text-rose-600">@errorMessage</div>
         }
-    </ol>
-    <div class="order-footer">
-        <button type="button" class="shop-button-secondary" disabled="@(!dirty || busy)" @onclick="Save">@(busy ? "Saving…" : "Save order")</button>
-        @if (message is not null)
-        {
-            <span role="status">@message</span>
-        }
-    </div>
+    </form>
 </section>
 
 @code
@@ -61,63 +59,45 @@
     public int ScopeId { get; set; }
     [Parameter]
     public List<OrderableItemDto> Items { get; set; } = [];
-    private List<OrderableItemDto> rows = [];
-    private int? dragged;
-    private bool busy, dirty;
-    private string? message;
 
-    protected override void OnParametersSet()
-    {
-        if (!dirty)
-        {
-            rows = Items.ToList();
-        }
-    }
+    [SupplyParameterFromForm(FormName = "order-editor")]
+    public string? ActionKind { get; set; }
 
-    private void Move(int index, int offset)
-    {
-        if (busy || index + offset < 0 || index + offset >= rows.Count)
-        {
-            return;
-        }
-        var item = rows[index];
-        rows.RemoveAt(index);
-        rows.Insert(index + offset, item);
-        dirty = true;
-        message = "Unsaved order";
-    }
+    [SupplyParameterFromForm(FormName = "order-editor")]
+    public int? ActionScopeId { get; set; }
 
-    private void Drop(int target)
-    {
-        if (busy || dragged is null || dragged == target)
-        {
-            return;
-        }
-        var from = rows.FindIndex(r => r.Id == dragged);
-        var to = rows.FindIndex(r => r.Id == target);
-        if (from >= 0 && to >= 0)
-        {
-            Move(from, to - from);
-        }
-        dragged = null;
-    }
+    [SupplyParameterFromForm(FormName = "order-editor")]
+    public string? MoveAction { get; set; }
 
-    private async Task Save()
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
     {
-        busy = true;
-        try
+        if (!string.IsNullOrEmpty(MoveAction)
+            && ActionKind == Kind.ToString()
+            && ActionScopeId == ScopeId)
         {
-            await Session.RunAsync(s => s.ReorderAsync(Kind, ScopeId, rows.Select(r => r.Id).ToList()));
-            dirty = false;
-            message = "Order saved.";
-        }
-        catch (JASIntWeb.Services.ShopException ex)
-        {
-            message = ex.Message;
-        }
-        finally
-        {
-            busy = false;
+            var parts = MoveAction.Split(':');
+            if (parts.Length == 2 && int.TryParse(parts[0], out var itemId) && int.TryParse(parts[1], out var offset))
+            {
+                var currentIndex = Items.FindIndex(r => r.Id == itemId);
+                var targetIndex = currentIndex + offset;
+                if (currentIndex >= 0 && targetIndex >= 0 && targetIndex < Items.Count)
+                {
+                    try
+                    {
+                        var item = Items[currentIndex];
+                        Items.RemoveAt(currentIndex);
+                        Items.Insert(targetIndex, item);
+                        await Session.RunAsync(s => s.ReorderAsync(Kind, ScopeId, Items.Select(r => r.Id).ToList()));
+                        Nav.NavigateTo(Nav.Uri);
+                    }
+                    catch (JASIntWeb.Services.ShopException ex)
+                    {
+                        errorMessage = ex.Message;
+                    }
+                }
+            }
         }
     }
 }

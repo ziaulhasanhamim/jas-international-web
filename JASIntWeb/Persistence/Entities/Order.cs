@@ -34,6 +34,16 @@ public class Order : AuditableEntity
     public string? AdminNotes { get; set; }
     public string? ConsignmentId { get; set; }
     public decimal CodAmountToCollect { get; set; }
+    public string? Fbclid { get; set; }
+    public string? Fbp { get; set; }
+    public string? Fbc { get; set; }
+    public string? UtmSource { get; set; }
+    public string? UtmMedium { get; set; }
+    public string? UtmCampaign { get; set; }
+    public string? UtmContent { get; set; }
+    public string? UtmTerm { get; set; }
+    public string? ClientIpAddress { get; set; }
+    public string? ClientUserAgent { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
     public ICollection<OrderTimelineEvent> TimelineEvents { get; set; } = [];

@@ -1,6 +1,7 @@
 @rendermode InteractiveAuto
 @inject CartService Cart
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="space-y-3">
     <div class="flex items-center gap-3">
@@ -90,7 +91,27 @@
     {
         busy = true;
         await Cart.AddAsync(VariantId, quantity);
-        message = Cart.Error ?? $"Added {quantity} unit{(quantity == 1 ? "" : "s")} to your cart.";
+        if (Cart.Error is null)
+        {
+            message = $"Added {quantity} unit{(quantity == 1 ? "" : "s")} to your cart.";
+            try
+            {
+                await JS.InvokeVoidAsync("window.jasTrackMeta", "AddToCart", new
+                {
+                    content_ids = new[] { VariantId.ToString() },
+                    content_type = "product",
+                    quantity = quantity
+                }, null);
+            }
+            catch
+            {
+                // Ignore JS interop failure in restricted mode
+            }
+        }
+        else
+        {
+            message = Cart.Error;
+        }
         busy = false;
     }
 

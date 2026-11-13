@@ -1,5 +1,6 @@
 @rendermode InteractiveAuto
 @inject CartService Cart
+@inject IJSRuntime JS
 
 <div class="quick-add">
     <button
@@ -40,7 +41,28 @@
         try
         {
             await Cart.AddAsync(VariantId.Value);
-            message = Cart.Error ?? "Added to cart.";
+            if (Cart.Error is null)
+            {
+                message = "Added to cart.";
+                try
+                {
+                    await JS.InvokeVoidAsync("window.jasTrackMeta", "AddToCart", new
+                    {
+                        content_ids = new[] { VariantId.Value.ToString() },
+                        content_type = "product",
+                        content_name = ProductName,
+                        quantity = 1
+                    }, null);
+                }
+                catch
+                {
+                    // Ignore JS interop failure
+                }
+            }
+            else
+            {
+                message = Cart.Error;
+            }
         }
         finally
         {

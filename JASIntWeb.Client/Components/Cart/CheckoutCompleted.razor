@@ -31,6 +31,13 @@
                 try
                 {
                     await JS.InvokeVoidAsync("jasRecordGuestOrder", OrderId, OrderPublicToken.ToString(), (double)Total);
+                    await JS.InvokeVoidAsync("window.jasTrackMeta", "Purchase", new
+                    {
+                        value = (double)Total,
+                        currency = "BDT",
+                        content_type = "product",
+                        order_id = OrderId.ToString()
+                    }, OrderPublicToken.ToString());
                 }
                 catch
                 {

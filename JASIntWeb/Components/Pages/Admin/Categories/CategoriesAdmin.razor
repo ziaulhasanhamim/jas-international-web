@@ -35,61 +35,37 @@
     </form>
 </div>
 
-<!-- Categories Table -->
+<!-- Categories QuickGrid -->
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Category Name</th>
-                    <th>URL Slug</th>
-                    <th>Parent Level</th>
-                    <th>Visibility</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var c in categories)
-                {
-                    <tr>
-                        <td>
-                            <strong class="text-slate-900 block font-semibold">@c.Name</strong>
-                        </td>
-                        <td class="font-mono text-xs text-slate-600">
-                            /@c.Slug
-                        </td>
-                        <td class="text-xs">
-                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
-                                @(c.ParentCategory?.Name ?? "Top level (Root)")
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge @(c.IsDeleted ? "badge-rose" : "badge-emerald")">
-                                @(c.IsDeleted ? "Hidden" : "Active")
-                            </span>
-                        </td>
-                        <td class="text-right">
-                            <a href="/admin/categories/@c.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Edit Category
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <QuickGrid Items="@categoriesQuery" Pagination="@pagination" class="data-table">
+            <TemplateColumn Title="Category Name" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.Name))">
+                <strong class="text-slate-900 block font-semibold">@context.Name</strong>
+            </TemplateColumn>
+            <TemplateColumn Title="URL Slug" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.Slug))">
+                <span class="font-mono text-xs text-slate-600">/@context.Slug</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Parent Level">
+                <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 text-xs">
+                    @(context.ParentCategory?.Name ?? "Top level (Root)")
+                </span>
+            </TemplateColumn>
+            <TemplateColumn Title="Visibility" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.IsDeleted))">
+                <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
+                    @(context.IsDeleted ? "Hidden" : "Active")
+                </span>
+            </TemplateColumn>
+            <TemplateColumn Title="Actions" Class="text-right">
+                <a href="/admin/categories/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                    Edit Category
+                </a>
+            </TemplateColumn>
+        </QuickGrid>
     </div>
-
-    @if (categories.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="box" Class="size-10 text-slate-300" />
-            <p>No categories found.</p>
-        </div>
-    }
 </div>
 
-<div class="mt-4">
-    <AdminPagination Total="total" Page="Page" />
+<div class="mt-4 flex items-center justify-between">
+    <Paginator State="@pagination" />
 </div>
 
 @if (featured.Count > 0)
@@ -103,22 +79,21 @@
 {
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
-    private List<Category> categories = [];
+
+    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private IQueryable<Category>? categoriesQuery;
     private List<OrderableItemDto> featured = [];
-    private int total;
 
     protected override async Task OnInitializedAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
         var q = Db.Categories.AsNoTracking().Include(c => c.ParentCategory).AsQueryable();
         if (!string.IsNullOrWhiteSpace(Query))
         {
-            q = q.Where(c => c.Name.ToLower().Contains(Query.ToLower()));
+            var filter = Query.Trim().ToLower();
+            q = q.Where(c => c.Name.ToLower().Contains(filter));
         }
-        total = await q.CountAsync();
-        categories = await q.OrderBy(c => c.Name).ThenBy(c => c.Id).Skip((Page - 1) * 25).Take(25).ToListAsync();
+        categoriesQuery = q;
+
         featured = await Db.CategoryPlacements.AsNoTracking()
             .Where(p => p.IsActive
             && p.PlacementType == CategoryPlacementType.HomepageFeatured

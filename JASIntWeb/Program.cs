@@ -2,7 +2,9 @@ using JASIntWeb.Client.Services;
 using JASIntWeb.Components;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Endpoints;
+using JASIntWeb.Middleware;
 using JASIntWeb.Services;
+using JASIntWeb.Services.Meta;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +19,7 @@ if (!string.IsNullOrEmpty(portEnv))
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<WishlistService>();
 builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
+builder.Services.AddQuickGridEntityFrameworkAdapter();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddMemoryCache();
@@ -58,6 +61,10 @@ builder.Services.AddOutputCache(options =>
         b.Expire(TimeSpan.FromHours(12)).Tag("seo"));
 });
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("MetaCAPI");
+builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<MetaAdsOptions>(builder.Configuration.GetSection(MetaAdsOptions.SectionName));
+builder.Services.AddScoped<IMetaConversionsApiService, MetaConversionsApiService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
 builder.Services.AddScoped<AdminService>();
@@ -246,6 +253,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseOutputCache();
+app.UseMiddleware<MetaAttributionMiddleware>();
 app.UseMiddleware<CartRequestMiddleware>();
 app.UseAntiforgery();
 

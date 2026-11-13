@@ -12,98 +12,80 @@
     ActionText="Create New Coupon"
 />
 
-<form method="post" @formname="coupons-table-action">
+<form method="post" @formname="coupons-table-action" data-enhance>
     <AntiforgeryToken />
     <div class="shop-panel">
-        @if (coupons.Count == 0)
-        {
-            <p class="admin-empty">No coupons created yet. Click "Create New Coupon" to offer promotions to your shoppers.</p>
-        }
-        else
-        {
-            <div class="admin-table-wrap">
-                <table class="shop-table">
-                    <thead>
-                        <tr>
-                            <th>Code</th>
-                            <th>Type &amp; Discount</th>
-                            <th>Min. Spend</th>
-                            <th>Max. Cap</th>
-                            <th>Usage</th>
-                            <th>Status</th>
-                            <th class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var c in coupons)
-                        {
-                            var isExpired = c.ExpiryDate.HasValue && c.ExpiryDate.Value < DateTimeOffset.UtcNow;
-                            <tr>
-                                <td>
-                                    <strong class="font-mono text-sm text-blue-600 font-bold">@c.Code</strong>
-                                    @if (!string.IsNullOrEmpty(c.Description))
-                                    {
-                                        <span class="cell-secondary">@c.Description</span>
-                                    }
-                                </td>
-                                <td>
-                                    @switch (c.DiscountType)
-                                    {
-                                        case CouponDiscountType.Percentage:
-                                            <span>@c.DiscountValue.ToString("N0")% Off</span>
-                                            break;
-                                        case CouponDiscountType.FixedAmount:
-                                            <span>৳@c.DiscountValue.ToString("N0") Flat Off</span>
-                                            break;
-                                        case CouponDiscountType.FreeDelivery:
-                                            <span class="text-emerald-600 font-semibold">Free Delivery</span>
-                                            break;
-                                    }
-                                </td>
-                                <td>
-                                    @(c.MinOrderAmount.HasValue ? $"৳{c.MinOrderAmount.Value:N0}" : "No minimum")
-                                </td>
-                                <td>
-                                    @(c.MaxDiscountAmount.HasValue ? $"৳{c.MaxDiscountAmount.Value:N0}" : "—")
-                                </td>
-                                <td>
-                                    <span>@c.TimesUsed @(c.UsageLimit.HasValue ? $"/ {c.UsageLimit.Value}" : "uses")</span>
-                                </td>
-                                <td>
-                                    @if (!c.IsActive)
-                                    {
-                                        <span class="badge badge-rose">Disabled</span>
-                                    }
-                                    else if (isExpired)
-                                    {
-                                        <span class="badge badge-amber">Expired</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge badge-emerald">Active</span>
-                                    }
-                                </td>
-                                <td class="text-right">
-                                    <a href="/admin/coupons/@c.Id/edit" class="text-blue-600 font-semibold text-xs hover:underline mr-3">Edit</a>
-                                    <button type="submit" name="ToggleCouponId" value="@c.Id" class="text-slate-500 hover:text-slate-900 text-xs cursor-pointer">
-                                        @(c.IsActive ? "Disable" : "Enable")
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+        <div class="admin-table-wrap">
+            <QuickGrid Items="@couponsQuery" Pagination="@pagination" class="shop-table">
+                <TemplateColumn Title="Code" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.Code))">
+                    <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
+                    @if (!string.IsNullOrEmpty(context.Description))
+                    {
+                        <span class="cell-secondary block">@context.Description</span>
+                    }
+                </TemplateColumn>
+                <TemplateColumn Title="Type &amp; Discount" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.DiscountValue))">
+                    @switch (context.DiscountType)
+                    {
+                        case CouponDiscountType.Percentage:
+                            <span>@context.DiscountValue.ToString("N0")% Off</span>
+                            break;
+                        case CouponDiscountType.FixedAmount:
+                            <span>৳@context.DiscountValue.ToString("N0") Flat Off</span>
+                            break;
+                        case CouponDiscountType.FreeDelivery:
+                            <span class="text-emerald-600 font-semibold">Free Delivery</span>
+                            break;
+                    }
+                </TemplateColumn>
+                <TemplateColumn Title="Min. Spend" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.MinOrderAmount ?? 0))">
+                    @(context.MinOrderAmount.HasValue ? $"৳{context.MinOrderAmount.Value:N0}" : "No minimum")
+                </TemplateColumn>
+                <TemplateColumn Title="Max. Cap" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.MaxDiscountAmount ?? 0))">
+                    @(context.MaxDiscountAmount.HasValue ? $"৳{context.MaxDiscountAmount.Value:N0}" : "—")
+                </TemplateColumn>
+                <TemplateColumn Title="Usage" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.TimesUsed))">
+                    <span>@context.TimesUsed @(context.UsageLimit.HasValue ? $"/ {context.UsageLimit.Value}" : "uses")</span>
+                </TemplateColumn>
+                <TemplateColumn Title="Status" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.IsActive))">
+                    @{
+                        var isExpired = context.ExpiryDate.HasValue && context.ExpiryDate.Value < DateTimeOffset.UtcNow;
+                    }
+                    @if (!context.IsActive)
+                    {
+                        <span class="badge badge-rose">Disabled</span>
+                    }
+                    else if (isExpired)
+                    {
+                        <span class="badge badge-amber">Expired</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-emerald">Active</span>
+                    }
+                </TemplateColumn>
+                <TemplateColumn Title="Actions" Class="text-right">
+                    <a href="/admin/coupons/@context.Id/edit" class="text-blue-600 font-semibold text-xs hover:underline mr-3">Edit</a>
+                    <button type="submit" name="ToggleCouponId" value="@context.Id" class="text-slate-500 hover:text-slate-900 text-xs cursor-pointer">
+                        @(context.IsActive ? "Disable" : "Enable")
+                    </button>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
     </div>
 </form>
+
+<div class="mt-4 flex items-center justify-between">
+    <Paginator State="@pagination" />
+</div>
 
 @code
 {
     [SupplyParameterFromForm(FormName = "coupons-table-action")]
     public int ToggleCouponId { get; set; }
 
-    private List<Coupon> coupons = [];
+    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private IQueryable<Coupon>? couponsQuery;
 
     protected override async Task OnInitializedAsync()
     {
@@ -119,11 +101,6 @@
             }
         }
 
-        await LoadCoupons();
-    }
-
-    private async Task LoadCoupons()
-    {
-        coupons = await Db.Coupons.AsNoTracking().OrderByDescending(c => c.CreatedAt).ToListAsync();
+        couponsQuery = Db.Coupons.AsNoTracking().OrderByDescending(c => c.CreatedAt).AsQueryable();
     }
 }

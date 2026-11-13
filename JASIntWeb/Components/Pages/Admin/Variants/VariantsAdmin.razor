@@ -20,54 +20,41 @@
     </form>
     <a href="/admin/products/@ProductId/variants/generate" class="shop-button-secondary">Generate combinations</a>
 </div>
+
 <div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Variant / SKU</th>
-                <th>Price</th>
-                <th>On hand</th>
-                <th>Reserved</th>
-                <th>Available</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var row in rows)
-            {
-                <tr>
-                    <td>
-                        <strong>@row.Label</strong>
-                        <small class="cell-secondary">@row.Sku</small>
-                    </td>
-                    <td>৳@row.Price.ToString("N0")</td>
-                    <td>@row.OnHand</td>
-                    <td>@row.Reserved</td>
-                    <td>
-                        <span class="status-badge @(row.OnHand - row.Reserved <= 5 ? "status-warning" : "")">@(row.OnHand - row.Reserved)</span>
-                    </td>
-                    <td>
-                        @(row.Active ? "Active" : "Inactive")
-                        @if (row.Default)
-                        {
-                            <span class="status-badge">Default</span>
-                        }
-                    </td>
-                    <td class="row-actions">
-                        <a href="/admin/products/@ProductId/variants/@row.Id/edit">Edit</a>
-                        <a href="/admin/inventory/@row.Id/edit">Adjust stock</a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    @if (rows.Count == 0)
+    @if (variantsQuery is not null)
     {
-        <p class="admin-empty">No variants yet. Configure product attributes, then add a variant or generate combinations.</p>
+        <QuickGrid Items="@variantsQuery" Pagination="@pagination" class="shop-table">
+            <TemplateColumn Title="Variant / SKU" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Label))">
+                <strong>@context.Label</strong>
+                <small class="cell-secondary">@context.Sku</small>
+            </TemplateColumn>
+            <TemplateColumn Title="Price" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Price))">
+                ৳@context.Price.ToString("N0")
+            </TemplateColumn>
+            <PropertyColumn Property="@(r => r.OnHand)" Title="On hand" Sortable="true" />
+            <PropertyColumn Property="@(r => r.Reserved)" Title="Reserved" Sortable="true" />
+            <TemplateColumn Title="Available" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.OnHand - r.Reserved))">
+                <span class="status-badge @(context.OnHand - context.Reserved <= 5 ? "status-warning" : "")">@(context.OnHand - context.Reserved)</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Status" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Active))">
+                @(context.Active ? "Active" : "Inactive")
+                @if (context.Default)
+                {
+                    <span class="status-badge">Default</span>
+                }
+            </TemplateColumn>
+            <TemplateColumn Title="Actions" Class="row-actions">
+                <a href="/admin/products/@ProductId/variants/@context.Id/edit">Edit</a>
+                <a href="/admin/inventory/@context.Id/edit">Adjust stock</a>
+            </TemplateColumn>
+        </QuickGrid>
     }
 </div>
-<AdminPagination Total="total" Page="Page" />
+
+<div class="mt-4 flex items-center justify-between">
+    <Paginator State="@pagination" />
+</div>
 
 @code
 {
@@ -75,28 +62,23 @@
     public int ProductId { get; set; }
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
     [SupplyParameterFromQuery(Name = "created")]
     public int Created { get; set; }
     private string? name;
-    private int total;
-    private List<AdminVariantRow> rows = [];
+    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private IQueryable<AdminVariantRow>? variantsQuery;
 
     protected override async Task OnInitializedAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
         name = await Db.Products.Where(p => p.Id == ProductId).Select(p => p.Name).SingleOrDefaultAsync();
         var q = Db.ProductVariants.AsNoTracking().Where(v => v.ProductId == ProductId && !v.IsDeleted);
         if (!string.IsNullOrWhiteSpace(Query))
         {
-            q = q.Where(v => v.SKU.ToLower().Contains(Query.ToLower()));
+            var filter = Query.Trim().ToLower();
+            q = q.Where(v => v.SKU.ToLower().Contains(filter));
         }
-        total = await q.CountAsync();
         var data = await q.OrderByDescending(v => v.IsDefault)
             .ThenBy(v => v.Id)
-            .Skip((Page - 1) * 25)
-            .Take(25)
             .Select(v => new
             {
                 v.Id,
@@ -115,7 +97,7 @@
                 .ToList()
             })
             .ToListAsync();
-        rows = data.Select(v => new AdminVariantRow(v.Id,
+        var rows = data.Select(v => new AdminVariantRow(v.Id,
                 ProductId,
                 name ?? "",
                 v.SKU,
@@ -126,5 +108,6 @@
                 v.IsActive,
                 v.IsDefault))
             .ToList();
+        variantsQuery = rows.AsQueryable();
     }
 }

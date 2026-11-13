@@ -30,9 +30,9 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <a href="@FilterUrl(Filter, Page)" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
-        </button>
+        </a>
     </div>
 }
 
@@ -214,6 +214,9 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
+    [SupplyParameterFromQuery(Name = "toast")]
+    public string? ToastNotice { get; set; }
+
     [SupplyParameterFromForm(FormName = "products-table-action")]
     public int ToggleProductId { get; set; }
 
@@ -257,10 +260,16 @@
                 await Db.SaveChangesAsync();
                 Catalog.InvalidateProductCache(product.Slug);
 
-                Nav.NavigateTo(FilterUrl(Filter, Page));
+                var targetUrl = FilterUrl(Filter, Page);
+                var sep = targetUrl.Contains('?') ? "&" : "?";
+                Nav.NavigateTo($"{targetUrl}{sep}toast={(product.IsDeleted ? "archived" : "restored")}");
                 return;
             }
         }
+
+        if (ToastNotice == "archived") _toast = "Product archived successfully.";
+        else if (ToastNotice == "restored") _toast = "Product restored to live catalog.";
+        else if (!string.IsNullOrWhiteSpace(ToastNotice)) _toast = ToastNotice;
 
         await LoadCountsAsync();
         await LoadProductsAsync();

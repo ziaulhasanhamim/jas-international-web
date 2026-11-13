@@ -1,0 +1,303 @@
+@page "/admin/settings/meta-ads"
+@attribute [Authorize(Roles = "Admin")]
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services.Meta
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject IMetaConversionsApiService MetaApi
+
+<PageTitle>Meta Ads &amp; Conversions API Settings · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="Meta Ads &amp; Tracking Configuration"
+    Description="Configure client-side Meta Pixel, server-side Conversions API (CAPI) with automatic deduplication, and Dynamic Product Ads (DPA) catalog feeds."
+/>
+
+@if (saved)
+{
+    <div class="mb-6 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-xs" role="status">
+        <Icon Name="check" Class="size-5 text-emerald-600 shrink-0" />
+        <span class="font-medium">Settings Saved!</span> Meta Pixel and Conversions API configuration has been updated.
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(testMessage))
+{
+    <div class="mb-6 flex items-center gap-3 rounded-xl border @(testSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800") p-4 text-sm shadow-xs" role="status">
+        <Icon Name="@(testSuccess ? "check" : "alert")" Class="@(testSuccess ? "size-5 text-emerald-600 shrink-0" : "size-5 text-rose-600 shrink-0")" />
+        <div>
+            <p class="font-bold">@(testSuccess ? "Test Event Sent Successfully!" : "Test Event Failed")</p>
+            <p class="text-xs mt-0.5 font-mono">@testMessage</p>
+        </div>
+    </div>
+}
+
+<!-- Status Overview Bar -->
+<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+        <span class="flex size-10 items-center justify-center rounded-xl @(isConfigured ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")">
+            <Icon Name="@(isConfigured ? "check" : "alert")" Class="size-5" />
+        </span>
+        <div>
+            <h2 class="text-sm font-bold text-slate-900">
+                Tracking Engine: @(isConfigured ? "Active & Ready" : "Partially Configured")
+            </h2>
+            <p class="text-xs text-slate-500">
+                Pixel ID: @(string.IsNullOrWhiteSpace(settings?.MetaPixelId) ? "Not Set" : settings.MetaPixelId) &bull;
+                Server CAPI: @(string.IsNullOrWhiteSpace(settings?.MetaAccessToken) ? "Missing Access Token" : "Connected (v19.0)") &bull;
+                Tracking Status: @(settings?.MetaTrackingEnabled == true ? "Enabled" : "Paused")
+            </p>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+        @if (isConfigured)
+        {
+            <span class="badge badge-emerald text-xs font-bold inline-flex items-center gap-1.5">
+                <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>CAPI Active</span>
+            </span>
+        }
+        else
+        {
+            <span class="badge badge-amber text-xs font-bold">Needs Setup</span>
+        }
+    </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-12 items-start">
+    <!-- Left Column: Settings & Test Event Form (lg:col-span-7) -->
+    <div class="lg:col-span-7 space-y-6">
+        @if (settings is null)
+        {
+            <p class="admin-help">Loading Meta Ads settings…</p>
+        }
+        else
+        {
+            <EditForm Model="settings" OnValidSubmit="SaveSettings" FormName="meta-ads-settings" method="post" data-submit-indication="true" class="shop-panel admin-form space-y-6">
+                <DataAnnotationsValidator />
+
+                <!-- 1. Meta Credentials -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center justify-between">
+                        <span>1. Meta Pixel &amp; Conversions API Credentials</span>
+                        <span class="text-xs font-normal text-slate-400">Facebook &amp; Instagram</span>
+                    </h3>
+
+                    <label class="check-label flex items-center gap-2 mb-5">
+                        <InputCheckbox @bind-Value="settings.MetaTrackingEnabled" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        <span class="font-bold text-slate-800">Enable Meta Ads Tracking (Pixel &amp; Server-Side CAPI)</span>
+                    </label>
+
+                    <div class="space-y-4">
+                        <label class="shop-label">
+                            Meta Pixel / Dataset ID
+                            <InputText @bind-Value="settings.MetaPixelId" class="shop-input font-mono" placeholder="e.g. 123456789012345" />
+                            <small>Find this in Meta Events Manager &gt; Data Sources &gt; Settings &gt; Dataset ID.</small>
+                        </label>
+
+                        <label class="shop-label">
+                            Conversions API (CAPI) Access Token
+                            <InputTextArea @bind-Value="settings.MetaAccessToken" rows="3" class="shop-input font-mono text-xs" placeholder="EAABw..." />
+                            <small>System user token or direct token from Meta Events Manager &gt; Settings &gt; Generate access token.</small>
+                        </label>
+
+                        <label class="shop-label">
+                            Test Event Code (Optional)
+                            <InputText @bind-Value="settings.MetaTestEventCode" class="shop-input font-mono" placeholder="e.g. TEST12345" />
+                            <small>Found in Meta Events Manager &gt; Test Events tab. Leave blank for live production ads.</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-actions flex items-center justify-between pt-4 border-t border-slate-100">
+                    <button type="submit" class="shop-button" data-pending-text="Saving settings...">
+                        <span class="form-submit-spinner" hidden></span>
+                        <span>Save Meta Settings</span>
+                    </button>
+                </div>
+            </EditForm>
+
+            <!-- Test Event Dispatch Form -->
+            <div class="shop-panel p-5 border border-slate-200/90 rounded-2xl bg-white shadow-xs space-y-4">
+                <div class="border-b border-slate-100 pb-3">
+                    <h3 class="text-sm font-bold text-slate-900">Send Test Event to Meta (CAPI Diagnostics)</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Dispatches a live test event to verify your Pixel ID, Access Token, and Test Event Code in Meta Events Manager.</p>
+                </div>
+
+                <form method="post" @formname="send-test-event" @onsubmit="DispatchTestEventAsync" class="flex flex-wrap items-center gap-3">
+                    <AntiforgeryToken />
+                    <button type="submit" class="btn-secondary text-xs px-4 py-2 inline-flex items-center gap-2 cursor-pointer shadow-2xs font-semibold">
+                        <Icon Name="check" Class="size-3.5 text-blue-600" />
+                        <span>Send Test Event Now</span>
+                    </button>
+                    <span class="text-xs text-slate-400">Check Meta Events Manager &gt; Test Events to view the payload.</span>
+                </form>
+            </div>
+        }
+    </div>
+
+    <!-- Right Column: Product Catalog Feeds & Architecture (lg:col-span-5) -->
+    <div class="lg:col-span-5 space-y-6">
+        <!-- Dynamic Product Catalog Feed Card -->
+        <div class="shop-panel p-5 border border-slate-200/90 rounded-2xl bg-white shadow-xs space-y-4">
+            <div class="border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="flex size-7 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                        <Icon Name="box" Class="size-4" />
+                    </span>
+                    <h3 class="text-sm font-bold text-slate-900">Meta Advantage+ Product Catalog</h3>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Use these URLs in Meta Commerce Manager to sync your inventory automatically for Facebook &amp; Instagram Shopping ads.</p>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="text-slate-600 font-bold block mb-1">1. XML / RSS Feed URL (Recommended)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="text" readonly value="@GetXmlFeedUrl()" class="field font-mono text-[11px] bg-slate-50 flex-1 select-all" id="xml-feed-input" />
+                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('xml-feed-input').value); alert('XML Feed URL copied to clipboard!');" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-slate-600 font-bold block mb-1">2. CSV Feed URL (Alternative)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input type="text" readonly value="@GetCsvFeedUrl()" class="field font-mono text-[11px] bg-slate-50 flex-1 select-all" id="csv-feed-input" />
+                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('csv-feed-input').value); alert('CSV Feed URL copied to clipboard!');" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-purple-100 bg-purple-50/50 p-3.5 text-xs text-slate-700 space-y-1.5">
+                <p class="font-bold text-purple-900">How to Connect to Meta Commerce Manager:</p>
+                <p>1. Open <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener" class="underline text-purple-800 font-bold">Meta Commerce Manager ↗</a>.</p>
+                <p>2. Select your Catalog &gt; <strong>Data Sources</strong> &gt; <strong>Data Feed</strong>.</p>
+                <p>3. Choose <strong>Scheduled feed</strong>, paste the XML URL above, and set sync frequency (e.g. Daily or Hourly).</p>
+                <p>4. All product variants, stock availability, and BDT prices will automatically sync!</p>
+            </div>
+        </div>
+
+        <!-- Tracking Architecture Card -->
+        <div class="shop-panel p-5 border border-slate-200/90 rounded-2xl bg-white shadow-xs space-y-3">
+            <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Tracking Features &amp; Hygiene</h3>
+            <ul class="text-xs text-slate-600 space-y-2.5">
+                <li class="flex items-start gap-2">
+                    <Icon Name="check" Class="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Conversions API (CAPI) Deduplication:</strong> Identical <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">event_id</code> is sent by both client browser and server to eliminate double-counting.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <Icon Name="check" Class="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>First-Party Attribution Cookies:</strong> Maintains <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">_fbc</code> and <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">_fbp</code> cookies directly on your domain for 90 days.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <Icon Name="check" Class="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Ad-Blocker Resilience:</strong> If an ad-blocker blocks the client-side Pixel, the server CAPI event continues to report verified purchases with SHA-256 hashed customer identifiers.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <Icon Name="check" Class="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Static SSR Enhanced Navigation:</strong> Intercepts route changes to track PageView events smoothly without full page reloads.</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+@code
+{
+    [SupplyParameterFromQuery(Name = "saved")]
+    public string? SavedQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "test")]
+    public string? TestQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "msg")]
+    public string? TestMsgQuery { get; set; }
+
+    [SupplyParameterFromForm(FormName = "meta-ads-settings")]
+    public DeliverySettings? SettingsInput { get; set; }
+
+    private DeliverySettings? settings;
+    private bool saved;
+    private bool testSuccess;
+    private string? testMessage;
+    private bool isConfigured;
+
+    protected override async Task OnInitializedAsync()
+    {
+        saved = SavedQuery == "1";
+        testSuccess = TestQuery == "ok";
+        testMessage = TestMsgQuery;
+
+        if (SettingsInput is not null)
+        {
+            settings = SettingsInput;
+            isConfigured = !string.IsNullOrWhiteSpace(settings.MetaPixelId) && !string.IsNullOrWhiteSpace(settings.MetaAccessToken);
+            return;
+        }
+
+        settings = await Db.DeliverySettings.FirstOrDefaultAsync();
+        if (settings is null)
+        {
+            settings = new DeliverySettings
+            {
+                HubDistrict = "Khulna",
+                HubCityFee = 50m,
+                OutsideFee = 150m,
+                MetaTrackingEnabled = true,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            Db.DeliverySettings.Add(settings);
+            await Db.SaveChangesAsync();
+        }
+
+        isConfigured = !string.IsNullOrWhiteSpace(settings.MetaPixelId) && !string.IsNullOrWhiteSpace(settings.MetaAccessToken);
+    }
+
+    private async Task SaveSettings()
+    {
+        var existing = await Db.DeliverySettings.FirstOrDefaultAsync();
+        if (existing is not null && settings is not null)
+        {
+            existing.MetaPixelId = string.IsNullOrWhiteSpace(settings.MetaPixelId) ? null : settings.MetaPixelId.Trim();
+            existing.MetaAccessToken = string.IsNullOrWhiteSpace(settings.MetaAccessToken) ? null : settings.MetaAccessToken.Trim();
+            existing.MetaTestEventCode = string.IsNullOrWhiteSpace(settings.MetaTestEventCode) ? null : settings.MetaTestEventCode.Trim();
+            existing.MetaTrackingEnabled = settings.MetaTrackingEnabled;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            Nav.NavigateTo("/admin/settings/meta-ads?saved=1");
+        }
+    }
+
+    private async Task DispatchTestEventAsync()
+    {
+        var current = await Db.DeliverySettings.FirstOrDefaultAsync();
+        if (current is null || string.IsNullOrWhiteSpace(current.MetaPixelId) || string.IsNullOrWhiteSpace(current.MetaAccessToken))
+        {
+            Nav.NavigateTo("/admin/settings/meta-ads?test=fail&msg=" + Uri.EscapeDataString("Please configure and save your Pixel ID and Access Token first."));
+            return;
+        }
+
+        var (success, msg) = await MetaApi.SendTestEventAsync(current.MetaPixelId, current.MetaAccessToken, current.MetaTestEventCode);
+        var status = success ? "ok" : "fail";
+        Nav.NavigateTo($"/admin/settings/meta-ads?test={status}&msg={Uri.EscapeDataString(msg)}");
+    }
+
+    private string GetXmlFeedUrl()
+    {
+        var uri = new Uri(Nav.BaseUri);
+        return $"{uri.Scheme}://{uri.Authority}/api/feeds/meta-products.xml";
+    }
+
+    private string GetCsvFeedUrl()
+    {
+        var uri = new Uri(Nav.BaseUri);
+        return $"{uri.Scheme}://{uri.Authority}/api/feeds/meta-products.csv";
+    }
+}

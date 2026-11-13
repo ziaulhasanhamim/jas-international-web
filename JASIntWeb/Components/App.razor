@@ -19,6 +19,7 @@
         <link rel="stylesheet" href="@Assets["JASIntWeb.styles.css"]" />
         <link rel="stylesheet" href="@Assets["css/output.css"]" />
         <link rel="stylesheet" href="@Assets["commerce.css"]" />
+        <MetaPixelTracking />
         <ImportMap />
         <HeadOutlet />
     </head>
@@ -34,6 +35,13 @@
         <Routes />
         <ReconnectModal />
         <script src="@Assets["_framework/blazor.web.js"]"></script>
+        <!-- Application Scripts (Modular Architecture) -->
+        <script src="@Assets["js/modules/navigation.js"]"></script>
+        <script src="@Assets["js/modules/device-orders.js"]"></script>
+        <script src="@Assets["js/modules/carousel.js"]"></script>
+        <script src="@Assets["js/modules/order-tracking.js"]"></script>
+        <script src="@Assets["js/modules/admin-editor.js"]"></script>
+        <script src="@Assets["js/modules/meta-tracking.js"]"></script>
         <script src="@Assets["js/jas-app.js"]"></script>
     </body>
 </html>

@@ -21,71 +21,41 @@
 <!-- Attributes Table -->
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Attribute Name</th>
-                    <th>Identifier Code</th>
-                    <th>Measurement Unit</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var a in attributes)
-                {
-                    <tr>
-                        <td>
-                            <strong class="text-slate-900 block font-semibold">@a.Name</strong>
-                        </td>
-                        <td class="font-mono text-xs text-slate-600">
-                            @a.Code
-                        </td>
-                        <td class="text-slate-600 text-xs">
-                            @(a.Unit ?? "—")
-                        </td>
-                        <td class="text-right whitespace-nowrap space-x-2">
-                            <a href="/admin/attributes/@a.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Edit
-                            </a>
-                            <a href="/admin/attributes/@a.Id/options" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Manage Options
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <QuickGrid Items="@attributesQuery" Pagination="@pagination" class="data-table">
+            <TemplateColumn Title="Attribute Name" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Name))">
+                <strong class="text-slate-900 block font-semibold">@context.Name</strong>
+            </TemplateColumn>
+            <TemplateColumn Title="Identifier Code" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Code))">
+                <span class="font-mono text-xs text-slate-600">@context.Code</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Measurement Unit" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Unit))">
+                <span class="text-slate-600 text-xs">@(context.Unit ?? "—")</span>
+            </TemplateColumn>
+            <TemplateColumn Title="Actions" Class="text-right whitespace-nowrap">
+                <div class="flex items-center justify-end gap-2">
+                    <a href="/admin/attributes/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Edit
+                    </a>
+                    <a href="/admin/attributes/@context.Id/options" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Manage Options
+                    </a>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
     </div>
-
-    @if (attributes.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="tag" Class="size-10 text-slate-300" />
-            <p>No attributes configured yet. Add Color, Storage, or Warranty.</p>
-        </div>
-    }
 </div>
 
-<div class="mt-4">
-    <AdminPagination Total="total" Page="Page" />
+<div class="mt-4 flex items-center justify-between">
+    <Paginator State="@pagination" />
 </div>
 
 @code
 {
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
-    private List<AttributeDefinition> attributes = [];
-    private int total;
+    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private IQueryable<AttributeDefinition>? attributesQuery;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        Page = Math.Clamp(Page, 1, 10000);
-        total = await Db.AttributeDefinitions.CountAsync();
-        attributes = await Db.AttributeDefinitions.AsNoTracking()
-            .OrderBy(a => a.Name)
-            .ThenBy(a => a.Id)
-            .Skip((Page - 1) * 25)
-            .Take(25)
-            .ToListAsync();
+        attributesQuery = Db.AttributeDefinitions.AsNoTracking().AsQueryable();
     }
 }

@@ -56,6 +56,12 @@
     }
     else
     {
+        <div data-meta-event="InitiateCheckout"
+             data-value="@total"
+             data-currency="BDT"
+             data-num-items="@Cart.Items.Sum(i => i.Quantity)"
+             hidden></div>
+
         <div class="grid gap-8 lg:grid-cols-12 items-start">
             <!-- Left Column: Delivery Information Form (lg:col-span-7) -->
             <section class="lg:col-span-7 space-y-6">
@@ -571,6 +577,27 @@
                 Items = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList(),
                 ExpectedTotal = total
             };
+
+            // Retrieve client-side Meta Ads attribution if available
+            try
+            {
+                var attr = await JS.InvokeAsync<MetaAttributionDto>("window.jasGetAttribution");
+                if (attr != null)
+                {
+                    checkoutRequest.Fbclid = attr.Fbclid;
+                    checkoutRequest.Fbp = attr.Fbp;
+                    checkoutRequest.Fbc = attr.Fbc;
+                    checkoutRequest.UtmSource = attr.UtmSource;
+                    checkoutRequest.UtmMedium = attr.UtmMedium;
+                    checkoutRequest.UtmCampaign = attr.UtmCampaign;
+                    checkoutRequest.UtmContent = attr.UtmContent;
+                    checkoutRequest.UtmTerm = attr.UtmTerm;
+                }
+            }
+            catch
+            {
+                // In SSR or restricted environments, server middleware provides attribution
+            }
 
             var result = await Shop.CheckoutAsync(userId, checkoutRequest);
             await Cart.CompleteCheckoutAsync(checkoutToken);

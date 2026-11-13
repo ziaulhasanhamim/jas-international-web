@@ -39,7 +39,26 @@ public sealed class CheckoutRequest
     public string PaymentMethod { get; set; } = "COD";
     public string? SenderPhoneNumber { get; set; }
     public string? TransactionId { get; set; }
+    public string? Fbclid { get; set; }
+    public string? Fbp { get; set; }
+    public string? Fbc { get; set; }
+    public string? UtmSource { get; set; }
+    public string? UtmMedium { get; set; }
+    public string? UtmCampaign { get; set; }
+    public string? UtmContent { get; set; }
+    public string? UtmTerm { get; set; }
 }
+
+public sealed record MetaAttributionDto(
+    string? Fbclid = null,
+    string? Fbp = null,
+    string? Fbc = null,
+    string? UtmSource = null,
+    string? UtmMedium = null,
+    string? UtmCampaign = null,
+    string? UtmContent = null,
+    string? UtmTerm = null
+);
 
 public sealed record CheckoutResult(int OrderId, Guid PublicToken, decimal Total, string? PaymentReferenceCode = null, decimal DeliveryCharge = 0, decimal DiscountAmount = 0);
 

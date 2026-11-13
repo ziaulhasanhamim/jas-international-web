@@ -9,52 +9,31 @@
 />
 <a href="/admin/attributes" class="admin-back-link">← Attribute library</a>
 <div class="shop-panel admin-table-wrap">
-    <table class="shop-table">
-        <thead>
-            <tr>
-                <th>Display value</th>
-                <th>Code</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var o in options)
-            {
-                <tr>
-                    <td>
-                        <strong>@o.Value</strong>
-                    </td>
-                    <td>@o.Code</td>
-                    <td>
-                        <a href="/admin/attributes/@AttributeId/options/@o.Id/edit">Edit value</a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    @if (options.Count == 0)
-    {
-        <p class="admin-empty">No values yet. Add one to make this attribute available to products.</p>
-    }
+    <QuickGrid Items="@optionsQuery" Pagination="@pagination" class="shop-table">
+        <TemplateColumn Title="Display value" Sortable="true" SortBy="@(GridSort<AttributeOption>.ByAscending(o => o.Value))">
+            <strong>@context.Value</strong>
+        </TemplateColumn>
+        <PropertyColumn Property="@(o => o.Code)" Title="Code" Sortable="true" />
+        <TemplateColumn Title="Actions">
+            <a href="/admin/attributes/@AttributeId/options/@context.Id/edit">Edit value</a>
+        </TemplateColumn>
+    </QuickGrid>
 </div>
-<AdminPagination Total="total" Page="Page" />
+<div class="mt-4 flex items-center justify-between">
+    <Paginator State="@pagination" />
+</div>
 
 @code
 {
     [Parameter]
     public int AttributeId { get; set; }
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
-    private List<AttributeOption> options = [];
+    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private IQueryable<AttributeOption>? optionsQuery;
     private string? name;
-    private int total;
 
     protected override async Task OnInitializedAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
         name = await Db.AttributeDefinitions.Where(a => a.Id == AttributeId).Select(a => a.Name).SingleOrDefaultAsync();
-        var q = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId);
-        total = await q.CountAsync();
-        options = await q.OrderBy(o => o.Value).ThenBy(o => o.Id).Skip((Page - 1) * 25).Take(25).ToListAsync();
+        optionsQuery = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId);
     }
 }

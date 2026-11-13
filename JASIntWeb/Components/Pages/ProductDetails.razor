@@ -81,6 +81,13 @@ else if (product is null)
 else
 {
     <PageTitle>@product.Name — JAS International</PageTitle>
+    <div data-meta-event="ViewContent"
+         data-content-id="@(selected?.Id.ToString() ?? product.Id.ToString())"
+         data-content-name="@product.Name"
+         data-content-category="@product.Category"
+         data-value="@(selected?.Price ?? 0)"
+         data-currency="BDT"
+         hidden></div>
     <HeadContent>
         <meta name="description" content="@(string.IsNullOrWhiteSpace(product.Description) ? $"{product.Name} available at JAS International. Authentic tech gadgets with official warranty and nationwide delivery." : product.Description)" />
         <meta property="og:title" content="@product.Name | JAS International" />

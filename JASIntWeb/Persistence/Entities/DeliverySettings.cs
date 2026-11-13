@@ -14,5 +14,9 @@ public class DeliverySettings : Entity
     public string? BanglaQrImageUrl { get; set; } = "/jas-logo.png";
     public string? PaymentInstructions { get; set; }
     public string? SmsWebhookSecret { get; set; } = "jas_sms_secret_2026";
+    public string? MetaPixelId { get; set; }
+    public string? MetaAccessToken { get; set; }
+    public string? MetaTestEventCode { get; set; }
+    public bool MetaTrackingEnabled { get; set; } = true;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
