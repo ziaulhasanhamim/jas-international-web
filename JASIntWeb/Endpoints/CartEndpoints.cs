@@ -92,6 +92,27 @@ public static class CartEndpoints
             return Results.Redirect(target, false, false);
         }).DisableAntiforgery();
 
+        endpoints.MapPost("/cart/update", async (
+            HttpContext context,
+            [FromForm] int variantId,
+            [FromForm] int quantity,
+            ShoppingService shop) =>
+        {
+            var (token, userId) = EnsureCartIdentity(context);
+            if (variantId > 0)
+            {
+                try
+                {
+                    await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, Math.Clamp(quantity, 0, 99)), add: false);
+                }
+                catch (ShopException ex)
+                {
+                    return Results.Redirect($"/cart?error={Uri.EscapeDataString(ex.Message)}", false, false);
+                }
+            }
+            return Results.Redirect("/cart", false, false);
+        }).DisableAntiforgery();
+
         return endpoints;
     }
 

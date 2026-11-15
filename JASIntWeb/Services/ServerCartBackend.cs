@@ -3,13 +3,15 @@ using JASIntWeb.Client.Dtos;
 using JASIntWeb.Endpoints;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.JSInterop;
 
 namespace JASIntWeb.Services;
 
 public sealed class ServerCartBackend(
     IServiceScopeFactory scopes,
     AuthenticationStateProvider auth,
-    IHttpContextAccessor httpContextAccessor) : ICartBackend
+    IHttpContextAccessor httpContextAccessor,
+    IJSRuntime js) : ICartBackend
 {
     private Guid? _circuitCartToken;
 
@@ -30,6 +32,23 @@ public sealed class ServerCartBackend(
             {
                 token = cookieToken;
                 _circuitCartToken = token;
+            }
+        }
+
+        if (!token.HasValue)
+        {
+            try
+            {
+                var cookieStr = await js.InvokeAsync<string?>("window.jasGetCartToken");
+                if (!string.IsNullOrWhiteSpace(cookieStr) && Guid.TryParse(cookieStr, out var jsToken) && jsToken != Guid.Empty)
+                {
+                    token = jsToken;
+                    _circuitCartToken = token;
+                }
+            }
+            catch
+            {
+                // In SSR or when JS is unavailable, ignore gracefully
             }
         }
 

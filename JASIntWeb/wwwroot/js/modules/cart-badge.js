@@ -90,6 +90,11 @@
         updateWishlistBadges();
     };
 
+    window.jasGetCartToken = function() {
+        const match = document.cookie.match(/(?:^|;\s*)jas_cart_id=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    };
+
     function init() {
         updateWishlistBadges();
         initWishlistButtons();

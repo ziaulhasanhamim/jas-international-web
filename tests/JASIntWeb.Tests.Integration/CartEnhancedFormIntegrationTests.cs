@@ -268,4 +268,110 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         await html.Should().Contain("name=\"quantity\"");
         await html.Should().Contain("data-wishlist-toggle");
     }
+
+    [Test]
+    public async Task AddToCart_ThenNavigateToCartPage_ShowsItemsImmediatelyOnSSR()
+    {
+        var noRedirectClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        // 1. Post to /cart/add
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "productId", "1" },
+            { "variantId", "1" },
+            { "quantity", "2" },
+            { "returnUrl", "/product/anker-737-power-bank" }
+        });
+        var addRes = await noRedirectClient.PostAsync("/cart/add", form);
+        await ((int)addRes.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
+
+        var cookies = addRes.Headers.GetValues("Set-Cookie").ToList();
+        var cartCookie = cookies.FirstOrDefault(c => c.Contains("jas_cart_id="));
+        await cartCookie.Should().NotBeNull();
+        var match = Regex.Match(cartCookie!, @"jas_cart_id=([a-fA-F0-9\-]+)");
+        await match.Success.Should().BeTrue();
+        var token = match.Groups[1].Value;
+
+        // 2. Direct Enhanced Navigation GET to /cart (with the cookie)
+        var client = Factory.CreateClient();
+        var cartRequest = new HttpRequestMessage(HttpMethod.Get, "/cart");
+        cartRequest.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var cartResponse = await client.SendAsync(cartRequest);
+
+        await ((int)cartResponse.StatusCode).Should().BeEqualTo(200);
+        var html = await cartResponse.Content.ReadAsStringAsync();
+
+        // 3. Verify items show up IMMEDIATELY without reload or client hydration
+        await html.Should().Contain("Anker 737 Power Bank");
+        await html.Should().Contain("Your Shopping Cart");
+        await html.Should().Contain("2 items");
+        await html.Should().Contain("action=\"/cart/update\"");
+        await html.Should().NotContain("Your cart is empty");
+        await html.Should().NotContain("Loading your cart…");
+    }
+
+    [Test]
+    public async Task Cart_UpdateQuantity_FormPost_UpdatesLineItemAndReflectsOnCartPage()
+    {
+        var noRedirectClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        // 1. Seed item in cart
+        var addForm = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "productId", "1" },
+            { "variantId", "1" },
+            { "quantity", "1" }
+        });
+        var addRes = await noRedirectClient.PostAsync("/cart/add", addForm);
+        var cookieHeader = addRes.Headers.GetValues("Set-Cookie").First(c => c.Contains("jas_cart_id="));
+        var token = Regex.Match(cookieHeader, @"jas_cart_id=([a-fA-F0-9\-]+)").Groups[1].Value;
+
+        // 2. Post update to quantity 5
+        var updateForm = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "variantId", "1" },
+            { "quantity", "5" }
+        });
+        var updateReq = new HttpRequestMessage(HttpMethod.Post, "/cart/update") { Content = updateForm };
+        updateReq.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var updateRes = await noRedirectClient.SendAsync(updateReq);
+
+        await ((int)updateRes.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
+        await updateRes.Headers.Location!.ToString().Should().BeEqualTo("/cart");
+
+        // 3. GET /cart and verify 5 items
+        var client = Factory.CreateClient();
+        var cartReq = new HttpRequestMessage(HttpMethod.Get, "/cart");
+        cartReq.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var cartRes = await client.SendAsync(cartReq);
+
+        var html = await cartRes.Content.ReadAsStringAsync();
+        await html.Should().Contain("5 items");
+        await html.Should().Contain("Anker 737 Power Bank");
+
+        // 4. Remove item (quantity = 0)
+        var removeForm = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "variantId", "1" },
+            { "quantity", "0" }
+        });
+        var removeReq = new HttpRequestMessage(HttpMethod.Post, "/cart/update") { Content = removeForm };
+        removeReq.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var removeRes = await noRedirectClient.SendAsync(removeReq);
+        await ((int)removeRes.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
+
+        // 5. GET /cart and verify empty
+        var emptyReq = new HttpRequestMessage(HttpMethod.Get, "/cart");
+        emptyReq.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var emptyRes = await client.SendAsync(emptyReq);
+
+        var emptyHtml = await emptyRes.Content.ReadAsStringAsync();
+        await emptyHtml.Should().Contain("Your cart is empty");
+    }
 }

@@ -147,21 +147,16 @@
     private bool ready;
     private int? pendingVariantId;
 
-    protected override void OnInitialized() => Cart.OnChange += Changed;
-
-    protected override async Task OnAfterRenderAsync(bool first)
+    protected override async Task OnInitializedAsync()
     {
-        if (first)
+        Cart.OnChange += Changed;
+        await Cart.RefreshAsync();
+        if (AddedVariantId.HasValue && AddedVariantId.Value > 0)
         {
-            await Cart.InitializeAsync();
-            if (AddedVariantId.HasValue && AddedVariantId.Value > 0)
-            {
-                await Cart.AddAsync(AddedVariantId.Value, 1);
-                Nav.NavigateTo("/cart", replace: true);
-            }
-            ready = true;
-            StateHasChanged();
+            await Cart.AddAsync(AddedVariantId.Value, 1);
+            Nav.NavigateTo("/cart", replace: true);
         }
+        ready = true;
     }
 
     private void Changed() => _ = InvokeAsync(StateHasChanged);

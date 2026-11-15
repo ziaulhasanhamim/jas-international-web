@@ -7,7 +7,6 @@ namespace JASIntWeb.Client.Services;
 public sealed class CartService(IJSRuntime js, ICartBackend backend)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
-    private bool loaded;
     public IReadOnlyList<CartItemDto> Items { get; private set; } = [];
     public bool IsAuthenticated { get; private set; }
     public string? Error { get; private set; }
@@ -40,7 +39,6 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         Items = cart.Items;
         IsAuthenticated = cart.IsAuthenticated;
         Error = null;
-        loaded = true;
     }
 
     private async ValueTask UpdateDomBadgeAsync()
@@ -54,12 +52,7 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         }
     }
 
-    public Task InitializeAsync() => RunAsync(async () =>
-    {
-        if (loaded) return;
-        var cart = await backend.GetAsync();
-        Apply(cart);
-    });
+    public Task InitializeAsync() => RefreshAsync();
 
     public Task RefreshAsync() => RunAsync(async () =>
     {

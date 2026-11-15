@@ -50,26 +50,18 @@ else
     private string? error;
     private List<CartLineRequest> lines = [];
 
-    protected override async Task OnAfterRenderAsync(bool first)
+    protected override async Task OnInitializedAsync()
     {
-        if (!first)
-        {
-            return;
-        }
         await Cart.RefreshAsync();
         if (Cart.Error is null)
         {
-            try
-            {
-                token = await Cart.CheckoutTokenAsync();
-                lines = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList();
-            }
-            catch (JSException)
-            {
-                error = "Browser storage is unavailable. Enable it to check out.";
-            }
+            token = await Cart.CheckoutTokenAsync();
+            lines = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList();
+        }
+        else
+        {
+            error = Cart.Error;
         }
         ready = true;
-        StateHasChanged();
     }
 }

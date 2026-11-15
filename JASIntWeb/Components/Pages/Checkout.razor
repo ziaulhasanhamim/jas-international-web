@@ -394,79 +394,77 @@
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
 
         Cart.OnChange += OnCartChanged;
+
+        try
+        {
+            await Cart.RefreshAsync();
+
+            // Pre-fill user address if authenticated
+            if (AuthStateTask != null)
+            {
+                var auth = await AuthStateTask;
+                var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
+                if (userId.HasValue)
+                {
+                    await using var scope = ScopeFactory.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var addr = await db.DeliveryAddresses.AsNoTracking().FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
+                    if (addr != null)
+                    {
+                        customerName = addr.CustomerName;
+                        phoneNumber = addr.PhoneNumber;
+                        if (!string.IsNullOrWhiteSpace(addr.Email)) email = addr.Email;
+                        streetAddress = addr.FullAddress;
+                        if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
+                        availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
+                        if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
+                        availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
+                        if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
+                    }
+                    var userName = auth?.User?.Identity?.Name;
+                    if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(userName) && userName.Contains('@'))
+                    {
+                        email = userName;
+                    }
+                }
+            }
+
+            // Auto-apply deep-linked coupon from URL
+            var uri = Nav.ToAbsoluteUri(Nav.Uri);
+            if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("coupon", out var couponParam) && !string.IsNullOrWhiteSpace(couponParam))
+            {
+                couponInput = couponParam.ToString().Trim().ToUpperInvariant();
+                await ApplyCoupon();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Checkout] Init warning: {ex.Message}");
+        }
+        finally
+        {
+            cartReady = true;
+            UpdateDeliveryAndTotal();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && string.IsNullOrWhiteSpace(couponInput))
         {
             try
             {
-                await Cart.InitializeAsync();
-
-                // Try pre-filling user address if authenticated
-                if (AuthStateTask != null)
+                var savedCoupon = await JS.InvokeAsync<string?>("localStorage.getItem", "jas_coupon");
+                if (!string.IsNullOrWhiteSpace(savedCoupon))
                 {
-                    var auth = await AuthStateTask;
-                    var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
-                    if (userId.HasValue)
-                    {
-                        await using var scope = ScopeFactory.CreateAsyncScope();
-                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        var addr = await db.DeliveryAddresses.AsNoTracking().FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
-                        if (addr != null)
-                        {
-                            customerName = addr.CustomerName;
-                            phoneNumber = addr.PhoneNumber;
-                            if (!string.IsNullOrWhiteSpace(addr.Email)) email = addr.Email;
-                            streetAddress = addr.FullAddress;
-                            if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
-                            availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
-                            if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
-                            availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
-                            if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
-                        }
-                        var userName = auth?.User?.Identity?.Name;
-                        if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(userName) && userName.Contains('@'))
-                        {
-                            email = userName;
-                        }
-                    }
-                }
-
-                // Auto-apply deep-linked coupon or saved coupon
-                var uri = Nav.ToAbsoluteUri(Nav.Uri);
-                if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("coupon", out var couponParam) && !string.IsNullOrWhiteSpace(couponParam))
-                {
-                    couponInput = couponParam.ToString().Trim().ToUpperInvariant();
+                    couponInput = savedCoupon.Trim().ToUpperInvariant();
                     await ApplyCoupon();
-                }
-                else
-                {
-                    try
-                    {
-                        var savedCoupon = await JS.InvokeAsync<string?>("localStorage.getItem", "jas_coupon");
-                        if (!string.IsNullOrWhiteSpace(savedCoupon))
-                        {
-                            couponInput = savedCoupon.Trim().ToUpperInvariant();
-                            await ApplyCoupon();
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore localStorage errors
-                    }
+                    StateHasChanged();
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[Checkout] Load address warning: {ex.Message}");
-            }
-            finally
-            {
-                cartReady = true;
-                UpdateDeliveryAndTotal();
-                StateHasChanged();
+                // Ignore localStorage errors
             }
         }
     }
