@@ -1,7 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using JASIntWeb.Persistence.Entities;
+using JASIntWeb.Services;
 using JASIntWeb.Services.Analytics;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JASIntWeb.Tests.Unit;
@@ -84,7 +86,7 @@ public class VisitorAnalyticsUnitTests
     }
 
     [Test]
-    public async Task VisitorAnalyticsQueue_EnqueuesSuccessfully()
+    public async Task VisitorAnalyticsQueue_EnqueuesAndDrainsSuccessfully()
     {
         var queue = new VisitorAnalyticsQueue(NullLogger<VisitorAnalyticsQueue>.Instance);
         var log = new VisitorLog
@@ -96,7 +98,28 @@ public class VisitorAnalyticsUnitTests
         };
 
         await queue.EnqueueAsync(log);
-        // Verify no exception thrown
-        await log.VisitorId.Should().BeEqualTo("test_vid");
+
+        var canRead = await queue.WaitToReadAsync();
+        await canRead.Should().BeTrue();
+
+        var readSuccess = queue.TryRead(out var readItem);
+        await readSuccess.Should().BeTrue();
+        await readItem!.VisitorId.Should().BeEqualTo("test_vid");
+    }
+
+    [Test]
+    public async Task DeliverySettingsService_InvalidateCache_ClearsCacheEntry()
+    {
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        const string key = "Jas_DeliverySettings_Cache";
+        cache.Set(key, new DeliverySettings { HubDistrict = "Khulna" });
+
+        var existsBefore = cache.TryGetValue(key, out _);
+        await existsBefore.Should().BeTrue();
+
+        DeliverySettingsService.InvalidateCache(cache);
+
+        var existsAfter = cache.TryGetValue(key, out _);
+        await existsAfter.Should().BeFalse();
     }
 }

@@ -1,20 +1,29 @@
 /**
- * JAS International - Visitor Analytics Tracking Module (ES2024+)
- * Industry-standard first-party visitor and session tracking with zero third-party dependencies,
- * full Blazor Static SSR enhanced navigation support, and resilient sendBeacon/keepalive transport.
+ * JAS International - Zero-Penalty Visitor Analytics Tracking Module (ES2024+)
+ * High-performance, zero main-thread blocking telemetry:
+ * - 100% asynchronous and idle-scheduled (requestIdleCallback)
+ * - In-memory cached visitor & session identities (zero repeated storage I/O)
+ * - Fetch Priority "low" & out-of-process sendBeacon transport
+ * - 100% bfcache (Back/Forward Cache) preserved via visibilitychange / pagehide
  */
 class VisitorAnalyticsController {
     static _vidKey = "jas_vid";
     static _sidKey = "jas_sid";
     static _sidTimeKey = "jas_sid_time";
+    static _sessionTimeoutMs = 30 * 60 * 1000; // 30 min inactivity timeout
+
+    // In-memory identity caches to avoid disk/localStorage reads during user navigation
+    static _cachedVid = null;
+    static _cachedSid = null;
+    static _cachedSidTime = 0;
     static _currentPath = "";
     static _startTime = Date.now();
-    static _sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes inactivity timeout
+    static _initialized = false;
 
     /**
-     * Safe storage reader with cookie fallback
+     * Fast in-memory / storage reader with cookie fallback
      */
-    static getItem(key) {
+    static _getItem(key) {
         try {
             return localStorage.getItem(key);
         } catch {
@@ -24,13 +33,13 @@ class VisitorAnalyticsController {
     }
 
     /**
-     * Safe storage writer with cookie fallback
+     * Storage writer
      */
-    static setItem(key, value, days = 365) {
+    static _setItem(key, value, days = 365) {
         try {
             localStorage.setItem(key, value);
         } catch {
-            // Ignore quota errors
+            // Storage quota or private browsing mode
         }
         let expires = "";
         if (days) {
@@ -42,55 +51,67 @@ class VisitorAnalyticsController {
     }
 
     /**
-     * Generates a unique identifier
+     * Generates a lightweight random identifier
      */
-    static generateId(prefix = "v") {
-        const rand = Math.random().toString(36).substring(2, 10);
+    static _generateId(prefix = "v") {
+        const rand = Math.random().toString(36).substring(2, 9);
         const time = Date.now().toString(36);
         return `${prefix}_${time}_${rand}`;
     }
 
     /**
-     * Retrieves or initializes persistent Visitor ID
+     * Resolves Visitor ID from memory cache or storage
      */
     static getVisitorId() {
-        let vid = this.getItem(this._vidKey);
+        if (this._cachedVid) return this._cachedVid;
+
+        let vid = this._getItem(this._vidKey);
         if (!vid) {
-            vid = this.generateId("vid");
-            this.setItem(this._vidKey, vid, 365);
+            vid = this._generateId("vid");
+            this._setItem(this._vidKey, vid, 365);
         }
+        this._cachedVid = vid;
         return vid;
     }
 
     /**
-     * Retrieves or initializes Session ID (resets after 30 min inactivity)
+     * Resolves Session ID from memory cache or storage
      */
     static getSessionId() {
         const now = Date.now();
+        if (this._cachedSid && (now - this._cachedSidTime < this._sessionTimeoutMs)) {
+            this._cachedSidTime = now;
+            return this._cachedSid;
+        }
+
         let sid = null;
         try {
             sid = sessionStorage.getItem(this._sidKey);
             const lastActive = parseInt(sessionStorage.getItem(this._sidTimeKey) || "0", 10);
             if (!sid || (now - lastActive > this._sessionTimeoutMs)) {
-                sid = this.generateId("sid");
+                sid = this._generateId("sid");
                 sessionStorage.setItem(this._sidKey, sid);
             }
             sessionStorage.setItem(this._sidTimeKey, now.toString());
         } catch {
-            sid = this.getItem(this._sidKey);
+            sid = this._getItem(this._sidKey);
             if (!sid) {
-                sid = this.generateId("sid");
-                this.setItem(this._sidKey, sid, 1);
+                sid = this._generateId("sid");
+                this._setItem(this._sidKey, sid, 1);
             }
         }
+
+        this._cachedSid = sid;
+        this._cachedSidTime = now;
         return sid;
     }
 
     /**
-     * Sends analytics payload to backend using fetch with keepalive or sendBeacon
+     * Non-blocking background transport:
+     * - Uses native sendBeacon with text/plain (zero Blob allocation, runs in browser background thread)
+     * - Fallback to fetch with priority: "low" and keepalive: true (never blocks UI or critical assets)
      */
     static send(payload) {
-        // Exclude admin pages from storefront visitor logs
         if (location.pathname.startsWith("/admin") || location.pathname.startsWith("/api")) {
             return;
         }
@@ -98,37 +119,42 @@ class VisitorAnalyticsController {
         const endpoint = "/api/analytics/collect";
         const json = JSON.stringify(payload);
 
+        // 1. sendBeacon transmits out-of-process without touching the main thread
         if (typeof navigator.sendBeacon === "function") {
             try {
-                const blob = new Blob([json], { type: "application/json" });
-                const success = navigator.sendBeacon(endpoint, blob);
-                if (success) return;
+                if (navigator.sendBeacon(endpoint, json)) {
+                    return;
+                }
             } catch {
                 // Fallback to fetch
             }
         }
 
+        // 2. Fetch with low priority ensures zero contention with images, css, or checkout requests
         if (typeof fetch === "function") {
-            fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: json,
-                keepalive: true
-            }).catch(() => {});
+            try {
+                fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain" },
+                    body: json,
+                    keepalive: true,
+                    priority: "low"
+                }).catch(() => {});
+            } catch {
+                // Silent fail
+            }
         }
     }
 
     /**
-     * Tracks a pageview
+     * Executes pageview collection in the browser's idle period
      */
-    static trackPageView() {
-        // Do not track admin portal
+    static _doTrackPageView() {
         if (location.pathname.startsWith("/admin") || location.pathname.startsWith("/api")) {
             return;
         }
 
         const now = Date.now();
-        const durationFromPrevious = Math.round((now - this._startTime) / 1000);
         this._startTime = now;
         this._currentPath = location.pathname;
 
@@ -142,21 +168,27 @@ class VisitorAnalyticsController {
             utm_source: urlParams.get("utm_source") || null,
             utm_medium: urlParams.get("utm_medium") || null,
             utm_campaign: urlParams.get("utm_campaign") || null,
-            fbclid: urlParams.get("fbclid") || localStorage.getItem("jas_fbclid") || null,
+            fbclid: urlParams.get("fbclid") || this._getItem("jas_fbclid") || null,
             duration: 0,
             is_unload: false
         };
 
-        // Use requestIdleCallback if available to ensure zero impact on first-paint and interactivity
+        this.send(payload);
+    }
+
+    /**
+     * Public pageview trigger scheduled safely during idle time
+     */
+    static trackPageView() {
         if (typeof window.requestIdleCallback === "function") {
-            window.requestIdleCallback(() => this.send(payload));
+            window.requestIdleCallback(() => this._doTrackPageView(), { timeout: 2000 });
         } else {
-            setTimeout(() => this.send(payload), 100);
+            setTimeout(() => this._doTrackPageView(), 50);
         }
     }
 
     /**
-     * Reports duration when leaving a page or navigating away
+     * Reports duration when tab or page is hidden/dismissed
      */
     static reportUnload() {
         if (!this._currentPath || this._currentPath.startsWith("/admin")) return;
@@ -176,9 +208,27 @@ class VisitorAnalyticsController {
     }
 
     /**
-     * Initializes analytics tracking
+     * Initializes analytics tracking with zero performance impact
      */
     static init() {
+        // Skip automated test scrapers
+        if (navigator.webdriver) return;
+
+        if (!this._initialized) {
+            this._initialized = true;
+
+            // Use visibilitychange and pagehide instead of beforeunload to preserve 100% bfcache (Back/Forward Cache)
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "hidden") {
+                    VisitorAnalyticsController.reportUnload();
+                }
+            }, { passive: true });
+
+            window.addEventListener("pagehide", () => {
+                VisitorAnalyticsController.reportUnload();
+            }, { passive: true });
+        }
+
         this.trackPageView();
     }
 }

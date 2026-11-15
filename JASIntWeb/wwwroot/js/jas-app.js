@@ -17,11 +17,10 @@ class AppOrchestrator {
     }
 
     /**
-     * Handles enhanced navigation start
+     * Handles enhanced navigation start (instant non-blocking feedback)
      */
     static onEnhancedNavigationStart() {
         const JAS = window.JAS;
-        JAS?.VisitorAnalytics?.reportUnload();
         JAS?.Navigation?.start();
         JAS?.OrderTracking?.cleanup();
     }
@@ -51,10 +50,9 @@ class AppOrchestrator {
     }
 
     /**
-     * Handles cleanup before window/tab unloads
+     * Handles cleanup on page dismissal (pagehide preserves bfcache)
      */
-    static onBeforeUnload() {
-        window.JAS?.VisitorAnalytics?.reportUnload();
+    static onPageHide() {
         window.JAS?.OrderTracking?.cleanup();
     }
 
@@ -82,7 +80,8 @@ class AppOrchestrator {
             this.onDomReady();
         }
 
-        window.addEventListener("beforeunload", this.onBeforeUnload, { passive: true });
+        // Use pagehide instead of beforeunload to guarantee bfcache (Back/Forward Cache) eligibility
+        window.addEventListener("pagehide", this.onPageHide, { passive: true });
     }
 }
 

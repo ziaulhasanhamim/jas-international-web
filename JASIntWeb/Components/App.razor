@@ -37,13 +37,13 @@
         <Routes />
         <ReconnectModal />
         <script src="@Assets["_framework/blazor.web.js"]"></script>
-        <!-- Application Scripts (Modular Architecture) -->
-        <script src="@Assets["js/modules/navigation.js"]"></script>
-        <script src="@Assets["js/modules/device-orders.js"]"></script>
-        <script src="@Assets["js/modules/carousel.js"]"></script>
-        <script src="@Assets["js/modules/order-tracking.js"]"></script>
-        <script src="@Assets["js/modules/meta-tracking.js"]"></script>
-        <script src="@Assets["js/modules/analytics.js"]"></script>
-        <script src="@Assets["js/jas-app.js"]"></script>
+        <!-- Application Scripts (Modular Architecture - Non-blocking Deferred Execution) -->
+        <script src="@Assets["js/modules/navigation.js"]" defer></script>
+        <script src="@Assets["js/modules/device-orders.js"]" defer></script>
+        <script src="@Assets["js/modules/carousel.js"]" defer></script>
+        <script src="@Assets["js/modules/order-tracking.js"]" defer></script>
+        <script src="@Assets["js/modules/meta-tracking.js"]" defer></script>
+        <script src="@Assets["js/modules/analytics.js"]" defer></script>
+        <script src="@Assets["js/jas-app.js"]" defer></script>
     </body>
 </html>

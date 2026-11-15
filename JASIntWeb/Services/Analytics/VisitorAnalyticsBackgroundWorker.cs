@@ -1,6 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace JASIntWeb.Services.Analytics;
 
@@ -24,22 +31,26 @@ public sealed class VisitorAnalyticsBackgroundWorker : BackgroundService
     {
         _logger.LogInformation("Visitor Analytics background ingestion worker started.");
         var batch = new List<VisitorLog>(50);
-        var flushInterval = TimeSpan.FromSeconds(2);
-        var lastFlush = DateTimeOffset.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                // Read from channel with cancellation support
-                await foreach (var log in _queue.ReadAllAsync(stoppingToken))
+                // Asynchronously wait until items are available in the channel
+                if (await _queue.WaitToReadAsync(stoppingToken))
                 {
-                    batch.Add(log);
+                    // Drain up to 50 items immediately without thread blocking
+                    while (batch.Count < 50 && _queue.TryRead(out var item))
+                    {
+                        if (item is not null)
+                        {
+                            batch.Add(item);
+                        }
+                    }
 
-                    if (batch.Count >= 50 || DateTimeOffset.UtcNow - lastFlush >= flushInterval)
+                    if (batch.Count > 0)
                     {
                         await FlushBatchAsync(batch, stoppingToken);
-                        lastFlush = DateTimeOffset.UtcNow;
                     }
                 }
             }

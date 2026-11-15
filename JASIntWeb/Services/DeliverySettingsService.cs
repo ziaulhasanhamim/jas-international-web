@@ -1,16 +1,34 @@
+using System;
+using System.Threading.Tasks;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace JASIntWeb.Services;
 
-public sealed class DeliverySettingsService(AppDbContext db)
+public sealed class DeliverySettingsService(AppDbContext db, IMemoryCache? cache = null)
 {
+    private const string CacheKey = "Jas_DeliverySettings_Cache";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+
+    public static void InvalidateCache(IMemoryCache? cache)
+    {
+        cache?.Remove(CacheKey);
+    }
+
     public DeliverySettings GetDeliverySettings()
     {
+        if (cache is not null && cache.TryGetValue(CacheKey, out DeliverySettings? cached) && cached is not null)
+        {
+            return cached;
+        }
+
         try
         {
-            return db.DeliverySettings.AsNoTracking().FirstOrDefault() ?? new DeliverySettings();
+            var settings = db.DeliverySettings.AsNoTracking().FirstOrDefault() ?? new DeliverySettings();
+            cache?.Set(CacheKey, settings, CacheDuration);
+            return settings;
         }
         catch
         {
@@ -20,6 +38,11 @@ public sealed class DeliverySettingsService(AppDbContext db)
 
     public async Task<DeliverySettings> GetSettingsAsync()
     {
+        if (cache is not null && cache.TryGetValue(CacheKey, out DeliverySettings? cached) && cached is not null)
+        {
+            return cached;
+        }
+
         var settings = await db.DeliverySettings.FirstOrDefaultAsync();
         if (settings == null)
         {
@@ -47,6 +70,8 @@ public sealed class DeliverySettingsService(AppDbContext db)
             settings.FreeDeliveryThreshold = null;
             await db.SaveChangesAsync();
         }
+
+        cache?.Set(CacheKey, settings, CacheDuration);
         return settings;
     }
 

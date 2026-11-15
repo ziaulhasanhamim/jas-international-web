@@ -7,6 +7,7 @@
 @inject AppDbContext Db
 @inject NavigationManager Nav
 @inject IMetaConversionsApiService MetaApi
+@inject Microsoft.Extensions.Caching.Memory.IMemoryCache Cache
 
 <PageTitle>Meta Ads &amp; Conversions API Settings · JAS Admin</PageTitle>
 
@@ -271,6 +272,7 @@
             existing.MetaTrackingEnabled = settings.MetaTrackingEnabled;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
+            DeliverySettingsService.InvalidateCache(Cache);
             Nav.NavigateTo("/admin/settings/meta-ads?saved=1");
         }
     }

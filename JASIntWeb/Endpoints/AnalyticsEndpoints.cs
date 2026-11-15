@@ -1,11 +1,12 @@
 using System;
+using System.IO;
 using System.Security.Claims;
+using System.Text.Json;
 using JASIntWeb.Persistence.Entities;
 using JASIntWeb.Services;
 using JASIntWeb.Services.Analytics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace JASIntWeb.Endpoints;
@@ -27,24 +28,63 @@ public sealed class AnalyticsPayload
 
 public static class AnalyticsEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static IEndpointRouteBuilder MapAnalyticsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/analytics");
 
         group.MapPost("/collect", async (
-            [FromBody] AnalyticsPayload payload,
             HttpContext context,
             IVisitorAnalyticsQueue queue) =>
         {
             var userAgent = context.Request.Headers.UserAgent.ToString();
 
-            // 1. Bot & Crawler Filter (Googlebot, Bing, Meta crawler, uptime bots, etc.)
+            // 1. Fast Bot & Crawler Filter (Googlebot, Bing, Meta crawler, uptime bots, etc.)
             if (UserAgentParser.IsBot(userAgent))
             {
                 return Results.NoContent();
             }
 
-            // 2. Ignore non-storefront paths if posted accidentally (e.g. admin or api)
+            // 2. Parse payload safely (supports both application/json and sendBeacon text/plain)
+            AnalyticsPayload? payload = null;
+            if (context.Request.HasJsonContentType())
+            {
+                try
+                {
+                    payload = await context.Request.ReadFromJsonAsync<AnalyticsPayload>(JsonOptions);
+                }
+                catch
+                {
+                    // Ignore malformed body
+                }
+            }
+            else
+            {
+                try
+                {
+                    using var reader = new StreamReader(context.Request.Body);
+                    var body = await reader.ReadToEndAsync();
+                    if (!string.IsNullOrWhiteSpace(body))
+                    {
+                        payload = JsonSerializer.Deserialize<AnalyticsPayload>(body, JsonOptions);
+                    }
+                }
+                catch
+                {
+                    // Ignore malformed body
+                }
+            }
+
+            if (payload is null)
+            {
+                return Results.NoContent();
+            }
+
+            // 3. Ignore non-storefront paths if posted accidentally (e.g. admin or api)
             var path = string.IsNullOrWhiteSpace(payload.Path) ? "/" : payload.Path.Trim();
             if (path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
@@ -52,11 +92,11 @@ public static class AnalyticsEndpoints
                 return Results.NoContent();
             }
 
-            // 3. Client IP & Anonymization
+            // 4. Client IP & Anonymization
             var rawIp = GetClientIp(context);
             var anonymizedIp = UserAgentParser.AnonymizeIp(rawIp);
 
-            // 4. Geo Headers (Cloudflare / Reverse Proxy)
+            // 5. Geo Headers (Cloudflare / Reverse Proxy)
             string? city = null;
             if (context.Request.Headers.TryGetValue("CF-IPCity", out var cfCity) && !string.IsNullOrWhiteSpace(cfCity))
             {
@@ -69,7 +109,7 @@ public static class AnalyticsEndpoints
                 country = cfCountry.ToString().Trim();
             }
 
-            // 5. Device & User Agent Parsing
+            // 6. Device & User Agent Parsing
             var (deviceType, browser, os) = UserAgentParser.Parse(userAgent);
             var referrerDomain = UserAgentParser.ExtractDomain(payload.Referrer);
 

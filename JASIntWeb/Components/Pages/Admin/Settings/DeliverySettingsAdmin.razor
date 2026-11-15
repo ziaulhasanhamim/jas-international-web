@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
 @inject NavigationManager Nav
+@inject Microsoft.Extensions.Caching.Memory.IMemoryCache Cache
 
 <PageTitle>Delivery &amp; MFS Payment Settings · JAS Admin</PageTitle>
 
@@ -176,6 +177,7 @@ else
             existing.BanglaQrImageUrl = settings.BanglaQrImageUrl;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
+            DeliverySettingsService.InvalidateCache(Cache);
             Nav.NavigateTo("/admin/settings/delivery?saved=1");
         }
     }
