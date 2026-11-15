@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 
 <div class="min-h-screen flex flex-col">
-    <SiteHeader />
+    <SiteHeader InitialCartCount="@initialCartCount" />
     <main class="flex-1 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">@Body</main>
     <FloatingSupportWidget />
     <CookieConsentBanner />
@@ -12,3 +12,20 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private int initialCartCount;
+
+    protected override void OnInitialized()
+    {
+        if (HttpContext != null &&
+            HttpContext.Request.Cookies.TryGetValue("jas_cart_count", out var cVal) &&
+            int.TryParse(cVal, out var count) && count >= 0)
+        {
+            initialCartCount = count;
+        }
+    }
+}

@@ -1,4 +1,6 @@
 @page "/admin/categories"
+@layout AdminLayout
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject AdminService Admin
 @inject CatalogService Catalog
@@ -10,7 +12,7 @@
     <div>
         <p class="eyebrow">CATALOG TAXONOMY</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Categories</h1>
-        <p class="text-sm text-slate-500 mt-1">Organize the catalog hierarchy into parent categories and subcategories.</p>
+        <p class="text-sm text-slate-500 mt-1">Organize the catalog hierarchy into parent categories and subcategories using database-powered QuickGrid.</p>
     </div>
 
     <div class="flex items-center gap-2.5">
@@ -90,122 +92,100 @@
     </form>
 </div>
 
-<!-- Categories Table -->
+<!-- Categories QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <form method="post" @formname="categories-table-action">
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Category Name</th>
-                        <th>URL Slug</th>
-                        <th>Hierarchy Level</th>
-                        <th>Products</th>
-                        <th class="text-center">Homepage Featured</th>
-                        <th>Status</th>
-                        <th class="text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var c in DisplayedCategories)
+            <QuickGrid Items="@categoriesQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Title="Category Name" Sortable="true" SortBy="@sortByName">
+                    <div class="flex items-center gap-2.5">
+                        @if (!string.IsNullOrWhiteSpace(context.Icon))
+                        {
+                            <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm">
+                                @context.Icon
+                            </span>
+                        }
+                        <strong class="text-slate-900 block font-semibold">@context.Name</strong>
+                    </div>
+                </TemplateColumn>
+
+                <PropertyColumn Property="@(c => c.Slug)" Title="URL Slug" Sortable="true" Class="font-mono text-xs text-slate-600" />
+
+                <TemplateColumn Title="Hierarchy Level">
+                    @if (string.IsNullOrEmpty(context.ParentCategoryName))
                     {
-                        <tr>
-                            <td>
-                                <div class="flex items-center gap-2.5">
-                                    @if (!string.IsNullOrWhiteSpace(c.Icon))
-                                    {
-                                        <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm">
-                                            @c.Icon
-                                        </span>
-                                    }
-                                    <strong class="text-slate-900 block font-semibold">@c.Name</strong>
-                                </div>
-                            </td>
-                            <td class="font-mono text-xs text-slate-600">
-                                /category/@c.Slug
-                            </td>
-                            <td>
-                                @if (string.IsNullOrEmpty(c.ParentCategoryName))
-                                {
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 text-xs">
-                                        Top level (Root)
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 text-xs">
-                                        ↳ Subcategory of @c.ParentCategoryName
-                                    </span>
-                                }
-                            </td>
-                            <td>
-                                <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                    @c.ProductCount items
-                                </span>
-                            </td>
-                            <td class="text-center">
-                                <button
-                                    type="submit"
-                                    name="ToggleFeaturedId"
-                                    value="@c.Id"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(c.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                    title="Click to toggle homepage featured status"
-                                >
-                                    <span class="size-1.5 rounded-full @(c.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
-                                    @(c.IsFeatured ? "⭐ Featured" : "Standard")
-                                </button>
-                            </td>
-                            <td>
-                                <span class="badge @(c.IsDeleted ? "badge-rose" : "badge-emerald")">
-                                    @(c.IsDeleted ? "Hidden" : "Active")
-                                </span>
-                            </td>
-                            <td class="text-right">
-                                <div class="flex items-center justify-end gap-1.5">
-                                    <a href="/admin/categories/@c.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                        Edit
-                                    </a>
-                                    @if (!c.IsDeleted)
-                                    {
-                                        <button
-                                            type="submit"
-                                            name="DeleteCategoryId"
-                                            value="@c.Id"
-                                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                            onclick="return confirm('Are you sure you want to hide this category from the store?')"
-                                            title="Hide/Archive this category"
-                                        >
-                                            Hide
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <button
-                                            type="submit"
-                                            name="ToggleVisibilityId"
-                                            value="@c.Id"
-                                            class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                            title="Restore this category to active catalog"
-                                        >
-                                            Restore
-                                        </button>
-                                    }
-                                </div>
-                            </td>
-                        </tr>
+                        <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 text-xs">
+                            Top level (Root)
+                        </span>
                     }
-                </tbody>
-            </table>
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 text-xs">
+                            ↳ Subcategory of @context.ParentCategoryName
+                        </span>
+                    }
+                </TemplateColumn>
+
+                <PropertyColumn Property="@(c => c.ProductCount)" Title="Products" Sortable="true" />
+
+                <TemplateColumn Title="Homepage Featured" Align="Align.Center">
+                    <button
+                        type="submit"
+                        name="ToggleFeaturedId"
+                        value="@context.Id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                        title="Click to toggle homepage featured status"
+                    >
+                        <span class="size-1.5 rounded-full @(context.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                        @(context.IsFeatured ? "⭐ Featured" : "Standard")
+                    </button>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByDeleted">
+                    <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
+                        @(context.IsDeleted ? "Hidden" : "Active")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Actions" Align="Align.End">
+                    <div class="flex items-center justify-end gap-1.5">
+                        <a href="/admin/categories/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                            Edit
+                        </a>
+                        @if (!context.IsDeleted)
+                        {
+                            <button
+                                type="submit"
+                                name="DeleteCategoryId"
+                                value="@context.Id"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                onclick="return confirm('Are you sure you want to hide this category from the store?')"
+                                title="Hide/Archive this category"
+                            >
+                                Hide
+                            </button>
+                        }
+                        else
+                        {
+                            <button
+                                type="submit"
+                                name="ToggleVisibilityId"
+                                value="@context.Id"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                title="Restore this category to active catalog"
+                            >
+                                Restore
+                            </button>
+                        }
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
         </div>
 
-        @if (DisplayedCategories.Count == 0)
-        {
-            <div class="empty-state py-12">
-                <Icon Name="box" Class="size-10 text-slate-300" />
-                <p>No categories found matching your criteria.</p>
-            </div>
-        }
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
     </div>
 </form>
 
@@ -237,15 +217,17 @@
         string Name,
         string Slug,
         string? Icon,
-        int? ParentCategoryId,
         string? ParentCategoryName,
         int ProductCount,
         bool IsFeatured,
-        int FeaturedSortOrder,
         bool IsDeleted
     );
 
-    private List<AdminCategoryRow> _allCategories = [];
+    private IQueryable<AdminCategoryRow>? categoriesQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 15 };
+    private GridSort<AdminCategoryRow> sortByName = GridSort<AdminCategoryRow>.ByAscending(c => c.Name);
+    private GridSort<AdminCategoryRow> sortByDeleted = GridSort<AdminCategoryRow>.ByAscending(c => c.IsDeleted);
+
     private List<OrderableItemDto> featured = [];
     private string? _toast;
     private string? _error;
@@ -300,73 +282,50 @@
 
     private async Task LoadDataAsync()
     {
-        var categories = await Db.Categories.AsNoTracking()
-            .Include(c => c.ParentCategory)
-            .OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
-            .ThenBy(c => c.ParentCategory != null ? c.ParentCategory.Name : "")
-            .ThenBy(c => c.Name)
-            .ToListAsync();
+        totalAll = await Db.Categories.CountAsync();
+        totalActive = await Db.Categories.CountAsync(c => !c.IsDeleted);
+        totalFeatured = await Db.CategoryPlacements.CountAsync(p => p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive && !p.Category!.IsDeleted);
+        totalHidden = await Db.Categories.CountAsync(c => c.IsDeleted);
 
-        var placements = await Db.CategoryPlacements.AsNoTracking()
-            .Where(p => p.PlacementType == CategoryPlacementType.HomepageFeatured)
-            .ToListAsync();
+        var q = Db.Categories.AsNoTracking();
 
-        var productCounts = await Db.Products.AsNoTracking()
-            .Where(p => !p.IsDeleted)
-            .GroupBy(p => p.CategoryId)
-            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.CategoryId, g => g.Count);
-
-        _allCategories = categories.Select(c =>
+        if (Filter == "active")
         {
-            var p = placements.FirstOrDefault(x => x.CategoryId == c.Id);
-            productCounts.TryGetValue(c.Id, out var pCount);
-            return new AdminCategoryRow(
+            q = q.Where(c => !c.IsDeleted);
+        }
+        else if (Filter == "featured")
+        {
+            q = q.Where(c => Db.CategoryPlacements.Any(p => p.CategoryId == c.Id && p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive));
+        }
+        else if (Filter == "hidden")
+        {
+            q = q.Where(c => c.IsDeleted);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            var term = Query.Trim().ToLower();
+            q = q.Where(c => c.Name.ToLower().Contains(term) || c.Slug.ToLower().Contains(term));
+        }
+
+        categoriesQuery = q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
+            .ThenBy(c => c.Name)
+            .Select(c => new AdminCategoryRow(
                 c.Id,
                 c.Name,
                 c.Slug,
                 c.Icon,
-                c.ParentCategoryId,
-                c.ParentCategory?.Name,
-                pCount,
-                p?.IsActive == true,
-                p?.SortOrder ?? 0,
+                c.ParentCategory != null ? c.ParentCategory.Name : null,
+                c.Products.Count(p => !p.IsDeleted),
+                Db.CategoryPlacements.Any(p => p.CategoryId == c.Id && p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive),
                 c.IsDeleted
-            );
-        }).ToList();
+            ));
 
-        totalAll = _allCategories.Count;
-        totalActive = _allCategories.Count(c => !c.IsDeleted);
-        totalFeatured = _allCategories.Count(c => c.IsFeatured && !c.IsDeleted);
-        totalHidden = _allCategories.Count(c => c.IsDeleted);
-
-        featured = placements
-            .Where(p => p.IsActive)
-            .Join(categories.Where(c => !c.IsDeleted),
-                p => p.CategoryId,
-                c => c.Id,
-                (p, c) => new { p.Id, c.Name, p.SortOrder })
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
-            .Select(x => new OrderableItemDto(x.Id, x.Name))
-            .ToList();
-    }
-
-    private List<AdminCategoryRow> DisplayedCategories
-    {
-        get
-        {
-            var q = _allCategories.AsEnumerable();
-            if (Filter == "active") q = q.Where(c => !c.IsDeleted);
-            else if (Filter == "featured") q = q.Where(c => c.IsFeatured && !c.IsDeleted);
-            else if (Filter == "hidden") q = q.Where(c => c.IsDeleted);
-
-            if (!string.IsNullOrWhiteSpace(Query))
-            {
-                var term = Query.Trim().ToLowerInvariant();
-                q = q.Where(c => c.Name.ToLowerInvariant().Contains(term) || c.Slug.ToLowerInvariant().Contains(term));
-            }
-            return q.ToList();
-        }
+        featured = await Db.CategoryPlacements.AsNoTracking()
+            .Where(p => p.IsActive && p.PlacementType == CategoryPlacementType.HomepageFeatured && !p.Category!.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Id)
+            .Select(p => new OrderableItemDto(p.Id, p.Category!.Name))
+            .ToListAsync();
     }
 }

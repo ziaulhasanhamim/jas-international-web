@@ -1,4 +1,6 @@
 @page "/admin/users"
+@layout AdminLayout
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -8,7 +10,7 @@
     <div>
         <p class="eyebrow">USER MANAGEMENT &amp; ACCESS</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">User Accounts</h1>
-        <p class="text-sm text-slate-500 mt-1">Manage customer profiles, administrator privileges, account lockouts, and email verification.</p>
+        <p class="text-sm text-slate-500 mt-1">Manage customer profiles, administrator privileges, account lockouts, and email verification with database QuickGrid.</p>
     </div>
 
     <div class="flex items-center gap-2.5">
@@ -114,171 +116,145 @@
     </form>
 </div>
 
-<!-- Users Table -->
+<!-- Users QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>User / Account</th>
-                    <th>System Role</th>
-                    <th>Email Status</th>
-                    <th>Account Status</th>
-                    <th>Orders &amp; Spend</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var u in users)
+        <QuickGrid Items="@usersQuery" Pagination="@pagination" class="data-table">
+            <TemplateColumn Title="User / Account" Sortable="true" SortBy="@sortByEmail">
+                <div class="flex items-center gap-3">
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">
+                        @(context.Email?.FirstOrDefault().ToString().ToUpperInvariant() ?? "U")
+                    </div>
+                    <div class="min-w-0">
+                        @if (!string.IsNullOrWhiteSpace(context.FullName))
+                        {
+                            <strong class="text-slate-900 block font-semibold text-xs">@context.FullName</strong>
+                        }
+                        <span class="text-xs text-slate-600 block">@context.Email</span>
+                        @if (!string.IsNullOrWhiteSpace(context.PhoneNumber))
+                        {
+                            <span class="text-2xs text-slate-400 font-mono block">@context.PhoneNumber</span>
+                        }
+                    </div>
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="System Role" Align="Align.Center">
+                @if (context.IsAdmin)
                 {
-                    var isAdmin = admins.Contains(u.Id);
-                    var isLocked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow;
-                    var name = userNames.GetValueOrDefault(u.Id);
-                    (int Count, decimal Total) orderStat = userOrderStats.GetValueOrDefault(u.Id);
-
-                    <tr class="hover:bg-slate-50/70 transition">
-                        <td>
-                            <div class="flex items-center gap-3">
-                                <div class="flex size-9 shrink-0 items-center justify-center rounded-xl @(isAdmin ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600") font-bold text-xs uppercase">
-                                    @(string.IsNullOrWhiteSpace(name) ? u.Email![..1] : name[..1])
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-1.5">
-                                        <strong class="text-slate-900 font-semibold block text-sm">
-                                            @(string.IsNullOrWhiteSpace(name) ? u.Email : name)
-                                        </strong>
-                                    </div>
-                                    <span class="text-xs text-slate-400 block font-mono">
-                                        @u.Email &bull; #@u.Id
-                                    </span>
-                                </div>
-                            </div>
-                        </td>
-
-                        <td>
-                            <span class="badge @(isAdmin ? "badge-purple" : "badge-slate")">
-                                <Icon Name="@(isAdmin ? "shield" : "user")" Class="size-3" />
-                                @(isAdmin ? "Administrator" : "Customer")
-                            </span>
-                        </td>
-
-                        <td>
-                            @if (u.EmailConfirmed)
-                            {
-                                <span class="badge badge-emerald">
-                                    <Icon Name="check" Class="size-3 text-emerald-600" />
-                                    Verified
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="badge badge-amber">
-                                    <Icon Name="clock" Class="size-3 text-amber-600" />
-                                    Unverified
-                                </span>
-                            }
-                        </td>
-
-                        <td>
-                            @if (isLocked)
-                            {
-                                <span class="badge badge-rose font-bold">
-                                    <Icon Name="alert" Class="size-3 text-rose-600" />
-                                    Locked Out
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="badge badge-emerald">
-                                    Active
-                                </span>
-                            }
-                        </td>
-
-                        <td>
-                            @if (orderStat.Count > 0)
-                            {
-                                <span class="text-xs font-semibold text-slate-800 block">
-                                    @orderStat.Count @(orderStat.Count == 1 ? "order" : "orders")
-                                </span>
-                                <span class="text-[11px] text-blue-600 font-bold">
-                                    ৳@orderStat.Total.ToString("N0")
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="text-xs text-slate-400">0 orders</span>
-                            }
-                        </td>
-
-                        <td class="text-right">
-                            <a href="/admin/users/@u.Id/edit" class="btn-secondary !px-3 !py-1 text-xs font-semibold shadow-2xs">
-                                Manage Account &rarr;
-                            </a>
-                        </td>
-                    </tr>
+                    <span class="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-600/20">
+                        <Icon Name="shield" Class="size-3" />
+                        Admin
+                    </span>
                 }
-            </tbody>
-        </table>
+                else
+                {
+                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        Customer
+                    </span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Email Status" Align="Align.Center">
+                @if (context.EmailConfirmed)
+                {
+                    <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                        Verified
+                    </span>
+                }
+                else
+                {
+                    <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <span class="size-1.5 rounded-full bg-amber-500"></span>
+                        Pending
+                    </span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Account Status" Align="Align.Center">
+                @if (context.IsLocked)
+                {
+                    <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                        <span class="size-1.5 rounded-full bg-rose-500"></span>
+                        Locked Out
+                    </span>
+                }
+                else
+                {
+                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        Active
+                    </span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Orders &amp; Spend">
+                <div class="text-xs">
+                    <span class="font-semibold text-slate-900 block">@context.OrderCount orders</span>
+                    <span class="text-slate-400 text-2xs block">৳@context.TotalSpent.ToString("N0") spent</span>
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Actions" Align="Align.End">
+                <a href="/admin/users/@context.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
+                    View &amp; Edit
+                </a>
+            </TemplateColumn>
+        </QuickGrid>
     </div>
 
-    @if (users.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="users" Class="size-10 text-slate-300" />
-            <p>No user accounts matched your search criteria.</p>
-        </div>
-    }
+    <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+        <Paginator State="@pagination" />
+    </div>
 </div>
 
-<div class="mt-4">
-    <AdminPagination Total="total" Page="Page" />
-</div>
-
-@code
-{
-    [SupplyParameterFromQuery(Name = "q")]
-    public string? Query { get; set; }
-
+@code {
     [SupplyParameterFromQuery(Name = "filter")]
     public string? Filter { get; set; }
 
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
 
-    private List<User> users = [];
-    private HashSet<int> admins = [];
-    private Dictionary<int, string> userNames = [];
-    private Dictionary<int, (int Count, decimal Total)> userOrderStats = [];
-    private int total;
+    public record AdminUserRow(
+        int Id,
+        string? Email,
+        string? PhoneNumber,
+        bool EmailConfirmed,
+        bool IsLocked,
+        bool IsAdmin,
+        string? FullName,
+        int OrderCount,
+        decimal TotalSpent
+    );
+
+    private IQueryable<AdminUserRow>? usersQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private GridSort<AdminUserRow> sortByEmail = GridSort<AdminUserRow>.ByAscending(u => u.Email);
 
     private int statsTotal;
     private int statsAdmins;
     private int statsVerified;
     private int statsWithOrders;
 
-    private string FilterUrl(string? f)
+    private string FilterUrl(string? filter)
     {
-        var qPart = string.IsNullOrWhiteSpace(Query) ? "" : $"&q={Uri.EscapeDataString(Query)}";
-        if (string.IsNullOrEmpty(f)) return $"/admin/users?page=1{qPart}";
-        return $"/admin/users?filter={f}&page=1{qPart}";
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(filter)) parts.Add($"filter={Uri.EscapeDataString(filter)}");
+        if (!string.IsNullOrEmpty(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        return parts.Count > 0 ? $"/admin/users?{string.Join("&", parts)}" : "/admin/users";
     }
 
     protected override async Task OnInitializedAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
-
-        // Fetch overall stats
         statsTotal = await Db.Users.CountAsync();
+        statsAdmins = await Db.UserRoles.CountAsync(r => Db.Roles.Any(role => role.Id == r.RoleId && role.Name == "Admin"));
         statsVerified = await Db.Users.CountAsync(u => u.EmailConfirmed);
         statsWithOrders = await Db.Orders.Where(o => o.UserId.HasValue).Select(o => o.UserId!.Value).Distinct().CountAsync();
 
         var adminRoleId = await Db.Roles.Where(r => r.Name == "Admin").Select(r => r.Id).FirstOrDefaultAsync();
-        statsAdmins = adminRoleId > 0 ? await Db.UserRoles.CountAsync(r => r.RoleId == adminRoleId) : 0;
 
         var q = Db.Users.AsNoTracking();
 
-        // Filter tab handling
         if (!string.IsNullOrWhiteSpace(Filter))
         {
             switch (Filter.ToLowerInvariant())
@@ -310,45 +286,27 @@
             }
         }
 
-        // Search text handling
         if (!string.IsNullOrWhiteSpace(Query))
         {
             var search = Query.Trim().ToLower();
-            var matchingUserIdsFromClaims = await Db.UserClaims
-                .Where(c => c.ClaimType == "name" && c.ClaimValue != null && c.ClaimValue.ToLower().Contains(search))
-                .Select(c => c.UserId)
-                .ToListAsync();
-
-            q = q.Where(u => u.Email!.ToLower().Contains(search)
-                          || matchingUserIdsFromClaims.Contains(u.Id));
+            q = q.Where(u => (u.Email != null && u.Email.ToLower().Contains(search))
+                          || (u.PhoneNumber != null && u.PhoneNumber.Contains(search))
+                          || Db.UserClaims.Any(c => c.UserId == u.Id && c.ClaimType == "name" && c.ClaimValue != null && c.ClaimValue.ToLower().Contains(search)));
         }
 
-        total = await q.CountAsync();
-        users = await q.OrderBy(u => u.Email).ThenBy(u => u.Id).Skip((Page - 1) * 20).Take(20).ToListAsync();
-
-        var ids = users.Select(u => u.Id).ToList();
-
-        if (ids.Count > 0)
-        {
-            // Load admin role memberships
-            admins = (await Db.UserRoles.Where(r => ids.Contains(r.UserId)
-                    && Db.Roles.Any(role => role.Id == r.RoleId && role.Name == "Admin"))
-                .Select(r => r.UserId)
-                .ToListAsync()).ToHashSet();
-
-            // Load name claims
-            userNames = await Db.UserClaims
-                .Where(c => ids.Contains(c.UserId) && c.ClaimType == "name" && c.ClaimValue != null)
-                .ToDictionaryAsync(c => c.UserId, c => c.ClaimValue!);
-
-            // Load order stats
-            var orders = await Db.Orders.AsNoTracking()
-                .Where(o => o.UserId.HasValue && ids.Contains(o.UserId.Value))
-                .GroupBy(o => o.UserId!.Value)
-                .Select(g => new { UserId = g.Key, Count = g.Count(), Total = g.Sum(x => x.Total) })
-                .ToListAsync();
-
-            userOrderStats = orders.ToDictionary(o => o.UserId, o => (o.Count, o.Total));
-        }
+        var utcNow = DateTimeOffset.UtcNow;
+        usersQuery = q.OrderBy(u => u.Email)
+            .ThenBy(u => u.Id)
+            .Select(u => new AdminUserRow(
+                u.Id,
+                u.Email,
+                u.PhoneNumber,
+                u.EmailConfirmed,
+                u.LockoutEnd.HasValue && u.LockoutEnd.Value > utcNow,
+                Db.UserRoles.Any(r => r.UserId == u.Id && Db.Roles.Any(role => role.Id == r.RoleId && role.Name == "Admin")),
+                Db.UserClaims.Where(c => c.UserId == u.Id && c.ClaimType == "name").Select(c => c.ClaimValue).FirstOrDefault(),
+                Db.Orders.Count(o => o.UserId == u.Id),
+                Db.Orders.Where(o => o.UserId == u.Id).Sum(o => (decimal?)o.Total) ?? 0m
+            ));
     }
 }

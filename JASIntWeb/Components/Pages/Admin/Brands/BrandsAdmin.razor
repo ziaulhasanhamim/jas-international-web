@@ -1,5 +1,6 @@
 @page "/admin/brands"
-@attribute [StreamRendering]
+@layout AdminLayout
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject AdminSession Session
 @inject CatalogService Catalog
@@ -12,7 +13,7 @@
         <p class="eyebrow">CATALOG BRANDS</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Brands &amp; Featured Strips</h1>
         <p class="text-sm text-slate-500 mt-1">
-            Manage gadget manufacturers, toggle which brands appear on the homepage featured brand strip, and configure logos.
+            Manage gadget manufacturers, toggle which brands appear on the homepage featured brand strip, and configure logos with database QuickGrid.
         </p>
     </div>
 
@@ -76,95 +77,70 @@
     </div>
 }
 
-<!-- Brands Table -->
+<!-- Brands QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <form method="post" @formname="brands-table-action">
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Brand Name</th>
-                    <th>Slug</th>
-                    <th class="text-center">Homepage Strip</th>
-                    <th>Sort Order</th>
-                    <th>Products</th>
-                    <th>Status</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var b in DisplayedBrands)
-                {
-                    <tr>
-                        <td>
-                            <div class="flex items-center gap-3">
-                                @if (!string.IsNullOrEmpty(b.LogoUrl))
-                                {
-                                    <PictureImage Src="@b.LogoUrl" Alt="@b.Name" Class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" Loading="lazy" Width="32" Height="32" />
-                                }
-                                else
-                                {
-                                    <span class="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
-                                        @b.Name[..Math.Min(2, b.Name.Length)].ToUpperInvariant()
-                                    </span>
-                                }
-                                <div>
-                                    <strong class="text-slate-900 block font-semibold">@b.Name</strong>
-                                    @if (!string.IsNullOrEmpty(b.Description))
-                                    {
-                                        <span class="text-xs text-slate-400 truncate max-w-xs block">@b.Description</span>
-                                    }
-                                </div>
-                            </div>
-                        </td>
-                        <td class="font-mono text-xs text-slate-600">
-                            /@b.Slug
-                        </td>
-                        <td class="text-center">
-                            <button
-                                type="submit"
-                                name="ToggleBrandId"
-                                value="@b.Id"
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(b.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                                title="Click to toggle homepage visibility"
-                            >
-                                <span class="size-1.5 rounded-full @(b.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
-                                @(b.IsFeatured ? "⭐ Featured" : "Hidden")
-                            </button>
-                        </td>
-                        <td class="text-xs font-medium text-slate-700">
-                            @b.SortOrder
-                        </td>
-                        <td>
-                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                @b.ProductCount items
+            <QuickGrid Items="@brandsQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Title="Brand Name" Sortable="true" SortBy="@sortByName">
+                    <div class="flex items-center gap-3">
+                        @if (!string.IsNullOrEmpty(context.LogoUrl))
+                        {
+                            <PictureImage Src="@context.LogoUrl" Alt="@context.Name" Class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" Loading="lazy" Width="32" Height="32" />
+                        }
+                        else
+                        {
+                            <span class="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
+                                @context.Name[..Math.Min(2, context.Name.Length)].ToUpperInvariant()
                             </span>
-                        </td>
-                        <td>
-                            <span class="badge @(b.Hidden ? "badge-rose" : "badge-emerald")">
-                                @(b.Hidden ? "Hidden" : "Active")
-                            </span>
-                        </td>
-                        <td class="text-right">
-                            <a href="/admin/brands/@b.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Edit Brand
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                        }
+                        <div>
+                            <strong class="text-slate-900 block font-semibold">@context.Name</strong>
+                            @if (!string.IsNullOrEmpty(context.Description))
+                            {
+                                <span class="text-xs text-slate-400 truncate max-w-xs block">@context.Description</span>
+                            }
+                        </div>
+                    </div>
+                </TemplateColumn>
 
-    @if (DisplayedBrands.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="box" Class="size-10 text-slate-300" />
-            <p>No brands found matching your criteria.</p>
+                <PropertyColumn Property="@(b => b.Slug)" Title="Slug" Sortable="true" Class="font-mono text-xs text-slate-600" />
+
+                <TemplateColumn Title="Homepage Strip" Align="Align.Center">
+                    <button
+                        type="submit"
+                        name="ToggleBrandId"
+                        value="@context.Id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                        title="Click to toggle homepage visibility"
+                    >
+                        <span class="size-1.5 rounded-full @(context.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                        @(context.IsFeatured ? "⭐ Featured" : "Standard")
+                    </button>
+                </TemplateColumn>
+
+                <PropertyColumn Property="@(b => b.SortOrder)" Title="Sort Order" Sortable="true" />
+                <PropertyColumn Property="@(b => b.ProductCount)" Title="Products" Sortable="true" />
+
+                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByDeleted">
+                    <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
+                        @(context.IsDeleted ? "Archived" : "Active")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Actions" Align="Align.End">
+                    <a href="/admin/brands/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Edit
+                    </a>
+                </TemplateColumn>
+            </QuickGrid>
         </div>
-    }
-</div>
+
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
+    </div>
 </form>
 
 @code {
@@ -177,7 +153,23 @@
     [SupplyParameterFromForm(FormName = "brands-table-action")]
     public int ToggleBrandId { get; set; }
 
-    private List<AdminBrandRow> _allBrands = [];
+    public record AdminBrandRow(
+        int Id,
+        string Name,
+        string Slug,
+        string? Description,
+        string? LogoUrl,
+        bool IsFeatured,
+        int SortOrder,
+        int ProductCount,
+        bool IsDeleted
+    );
+
+    private IQueryable<AdminBrandRow>? brandsQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 15 };
+    private GridSort<AdminBrandRow> sortByName = GridSort<AdminBrandRow>.ByAscending(b => b.Name);
+    private GridSort<AdminBrandRow> sortByDeleted = GridSort<AdminBrandRow>.ByAscending(b => b.IsDeleted);
+
     private string? _toast;
     private int totalAll;
     private int totalFeatured;
@@ -211,8 +203,23 @@
 
     private async Task LoadBrands()
     {
-        var list = await Db.Brands.AsNoTracking()
-            .OrderBy(b => b.SortOrder)
+        totalAll = await Db.Brands.CountAsync();
+        totalFeatured = await Db.Brands.CountAsync(b => b.IsFeatured);
+
+        var q = Db.Brands.AsNoTracking();
+
+        if (Filter == "featured")
+        {
+            q = q.Where(b => b.IsFeatured);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            var term = Query.Trim().ToLower();
+            q = q.Where(b => b.Name.ToLower().Contains(term) || b.Slug.ToLower().Contains(term));
+        }
+
+        brandsQuery = q.OrderBy(b => b.SortOrder)
             .ThenBy(b => b.Name)
             .Select(b => new AdminBrandRow(
                 b.Id,
@@ -224,27 +231,6 @@
                 b.SortOrder,
                 b.Products.Count(p => !p.IsDeleted),
                 b.IsDeleted
-            ))
-            .ToListAsync();
-
-        _allBrands = list;
-        totalAll = list.Count;
-        totalFeatured = list.Count(b => b.IsFeatured);
-    }
-
-    private List<AdminBrandRow> DisplayedBrands
-    {
-        get
-        {
-            var q = _allBrands.AsEnumerable();
-            if (Filter == "featured") q = q.Where(b => b.IsFeatured);
-
-            if (!string.IsNullOrWhiteSpace(Query))
-            {
-                var term = Query.Trim().ToLowerInvariant();
-                q = q.Where(b => b.Name.ToLowerInvariant().Contains(term) || b.Slug.ToLowerInvariant().Contains(term));
-            }
-            return q.ToList();
-        }
+            ));
     }
 }

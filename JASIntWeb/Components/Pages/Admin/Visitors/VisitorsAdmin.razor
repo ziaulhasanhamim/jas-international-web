@@ -156,22 +156,23 @@
                     <div class="space-y-3">
                         @foreach (var src in data.TopSources)
                         {
+                            var srcName = string.IsNullOrWhiteSpace(src.Source) ? "Direct" : src.Source;
                             <div>
                                 <div class="flex items-center justify-between text-xs mb-1">
                                     <span class="font-semibold text-slate-800 flex items-center gap-1.5">
-                                        @if (src.Source.Contains("facebook", StringComparison.OrdinalIgnoreCase))
+                                        @if (srcName.Contains("facebook", StringComparison.OrdinalIgnoreCase))
                                         {
                                             <span class="size-2 rounded-full bg-blue-500"></span>
                                         }
-                                        else if (src.Source.Contains("google", StringComparison.OrdinalIgnoreCase))
+                                        else if (srcName.Contains("google", StringComparison.OrdinalIgnoreCase))
                                         {
                                             <span class="size-2 rounded-full bg-red-500"></span>
                                         }
-                                        else if (src.Source.Contains("instagram", StringComparison.OrdinalIgnoreCase))
+                                        else if (srcName.Contains("instagram", StringComparison.OrdinalIgnoreCase))
                                         {
                                             <span class="size-2 rounded-full bg-pink-500"></span>
                                         }
-                                        else if (src.Source.Equals("Direct", StringComparison.OrdinalIgnoreCase))
+                                        else if (srcName.Equals("Direct", StringComparison.OrdinalIgnoreCase))
                                         {
                                             <span class="size-2 rounded-full bg-slate-400"></span>
                                         }
@@ -179,7 +180,7 @@
                                         {
                                             <span class="size-2 rounded-full bg-emerald-500"></span>
                                         }
-                                        @src.Source
+                                        @srcName
                                     </span>
                                     <div class="flex items-center gap-2 shrink-0">
                                         <span class="font-bold text-slate-900">@src.Pageviews.ToString("N0")</span>

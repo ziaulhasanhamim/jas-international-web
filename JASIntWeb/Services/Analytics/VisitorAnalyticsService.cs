@@ -116,7 +116,7 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
 
             // Top Sources / Referrers
             var topSourcesRaw = await query
-                .GroupBy(x => x.ReferrerDomain ?? "Direct")
+                .GroupBy(x => x.ReferrerDomain)
                 .Select(g => new
                 {
                     Source = g.Key,
@@ -128,7 +128,7 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
 
             var topSources = topSourcesRaw
                 .Select(s => new TrafficSourceMetric(
-                    s.Source,
+                    string.IsNullOrWhiteSpace(s.Source) ? "Direct" : s.Source,
                     0,
                     s.Pageviews,
                     totalPageviews > 0 ? Math.Round((double)s.Pageviews / totalPageviews * 100.0, 1) : 0.0))
@@ -136,43 +136,52 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
 
             // Devices
             var devicesRaw = await query
-                .GroupBy(x => x.DeviceType ?? "Desktop")
+                .GroupBy(x => x.DeviceType)
                 .Select(g => new { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .ToListAsync(ct);
 
             var devices = devicesRaw
-                .Select(d => new DeviceMetric(d.Name, d.Count, Math.Round((double)d.Count / totalPageviews * 100.0, 1)))
+                .Select(d => new DeviceMetric(
+                    string.IsNullOrWhiteSpace(d.Name) ? "Desktop" : d.Name,
+                    d.Count,
+                    Math.Round((double)d.Count / totalPageviews * 100.0, 1)))
                 .ToList();
 
             // Browsers
             var browsersRaw = await query
-                .GroupBy(x => x.Browser ?? "Other")
+                .GroupBy(x => x.Browser)
                 .Select(g => new { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(6)
                 .ToListAsync(ct);
 
             var browsers = browsersRaw
-                .Select(b => new DeviceMetric(b.Name, b.Count, Math.Round((double)b.Count / totalPageviews * 100.0, 1)))
+                .Select(b => new DeviceMetric(
+                    string.IsNullOrWhiteSpace(b.Name) ? "Other" : b.Name,
+                    b.Count,
+                    Math.Round((double)b.Count / totalPageviews * 100.0, 1)))
                 .ToList();
 
             // Operating Systems
             var osRaw = await query
-                .GroupBy(x => x.OperatingSystem ?? "Other")
+                .GroupBy(x => x.OperatingSystem)
                 .Select(g => new { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(6)
                 .ToListAsync(ct);
 
             var operatingSystems = osRaw
-                .Select(o => new DeviceMetric(o.Name, o.Count, Math.Round((double)o.Count / totalPageviews * 100.0, 1)))
+                .Select(o => new DeviceMetric(
+                    string.IsNullOrWhiteSpace(o.Name) ? "Other" : o.Name,
+                    o.Count,
+                    Math.Round((double)o.Count / totalPageviews * 100.0, 1)))
                 .ToList();
 
             // Top Locations (City/Country)
             var locationsRaw = await query
                 .Where(x => x.City != null || x.Country != null)
-                .GroupBy(x => new { City = x.City ?? "Unknown", Country = x.Country ?? "" })
+                .GroupBy(x => new { x.City, x.Country })
                 .Select(g => new { g.Key.City, g.Key.Country, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(10)
@@ -180,7 +189,7 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
 
             var topLocations = locationsRaw
                 .Select(l => new LocationMetric(
-                    string.IsNullOrEmpty(l.Country) ? l.City : $"{l.City}, {l.Country}",
+                    string.IsNullOrEmpty(l.Country) ? (l.City ?? "Unknown") : $"{l.City ?? "Unknown"}, {l.Country}",
                     l.Count,
                     Math.Round((double)l.Count / totalPageviews * 100.0, 1)))
                 .ToList();
@@ -188,7 +197,7 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
             // UTM Campaigns
             var campaignsRaw = await query
                 .Where(x => x.UtmCampaign != null)
-                .GroupBy(x => new { UtmCampaign = x.UtmCampaign!, UtmSource = x.UtmSource ?? "", UtmMedium = x.UtmMedium ?? "" })
+                .GroupBy(x => new { x.UtmCampaign, x.UtmSource, x.UtmMedium })
                 .Select(g => new
                 {
                     Campaign = g.Key.UtmCampaign,
@@ -201,7 +210,7 @@ public sealed class VisitorAnalyticsService : IVisitorAnalyticsService
                 .ToListAsync(ct);
 
             var topCampaigns = campaignsRaw
-                .Select(c => new CampaignMetric(c.Campaign, c.Source, c.Medium, 0, c.Pageviews))
+                .Select(c => new CampaignMetric(c.Campaign ?? "General", c.Source ?? "", c.Medium ?? "", 0, c.Pageviews))
                 .ToList();
 
             // Recent Activity

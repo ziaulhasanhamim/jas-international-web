@@ -24,12 +24,38 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         {
             var json = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
             var cart = json is null ? null : JsonSerializer.Deserialize<LocalCartDto>(json, Json);
-            if (cart is null || cart.Token == Guid.Empty || cart.Items is null || cart.Items.Count > 100)
+            if (cart != null && cart.Token != Guid.Empty && cart.Items != null && cart.Items.Count <= 100)
             {
-                return new();
+                cart.Items = cart.Items.Where(i => i.VariantId > 0 && i.Quantity is > 0 and <= 99).ToList();
+                if (cart.Items.Count > 0)
+                {
+                    return cart;
+                }
             }
-            cart.Items = cart.Items.Where(i => i.VariantId > 0 && i.Quantity is > 0 and <= 99).ToList();
-            return cart;
+
+            // Fallback: Check if guest cart cookie was set via SSR form submission
+            try
+            {
+                var cookieJson = await js.InvokeAsync<string?>("eval",
+                    "(function(){ const m = document.cookie.match(/(?:^|;\\s*)jas_guest_cart=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; })()");
+                if (!string.IsNullOrWhiteSpace(cookieJson))
+                {
+                    var guestItems = JsonSerializer.Deserialize<List<CartLineRequest>>(cookieJson, Json);
+                    if (guestItems != null && guestItems.Count > 0)
+                    {
+                        var newCart = new LocalCartDto
+                        {
+                            Token = Guid.NewGuid(),
+                            Items = guestItems.Where(i => i.VariantId > 0 && i.Quantity is > 0 and <= 99).ToList()
+                        };
+                        await WriteAsync(newCart);
+                        return newCart;
+                    }
+                }
+            }
+            catch {}
+
+            return new();
         }
         catch (Exception ex) when (ex is JSException or JsonException)
         {
@@ -57,7 +83,6 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             try
             {
                 await js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-                await js.InvokeVoidAsync("window.jasUpdateCartCount", 0);
             }
             catch (JSException)
             {

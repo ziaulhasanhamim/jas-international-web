@@ -1,5 +1,6 @@
 @page "/admin/inventory"
-@attribute [StreamRendering]
+@layout AdminLayout
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -9,7 +10,7 @@
     <div>
         <p class="eyebrow">STOCK &amp; WAREHOUSE OPERATIONS</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Inventory &amp; Stock Levels</h1>
-        <p class="text-sm text-slate-500 mt-1">Real-time stock tracking across warehouse, customer order reservations, and automated restock alerts.</p>
+        <p class="text-sm text-slate-500 mt-1">Real-time stock tracking across warehouse, customer order reservations, and automated restock alerts with database QuickGrid.</p>
     </div>
 </div>
 
@@ -22,9 +23,9 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <a href="@FilterUrl(Filter, Page)" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
-        </a>
+        </button>
     </div>
 }
 
@@ -32,20 +33,20 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
     <div class="flex flex-wrap items-center gap-2">
         <a
-            href="@FilterUrl("all", 1)"
+            href="@FilterUrl("all")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
             All Stock Items (@_totalAll)
         </a>
         <a
-            href="@FilterUrl("low", 1)"
+            href="@FilterUrl("low")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "low" ? "bg-amber-600 text-white shadow-xs" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")"
         >
             <span class="size-1.5 rounded-full @(Filter == "low" ? "bg-white" : "bg-amber-600")"></span>
             ⚠️ Low Stock (≤ 5 units) (@_totalLow)
         </a>
         <a
-            href="@FilterUrl("out", 1)"
+            href="@FilterUrl("out")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 @(Filter == "out" ? "bg-rose-600 text-white shadow-xs" : "bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100")"
         >
             <span class="size-1.5 rounded-full @(Filter == "out" ? "bg-white" : "bg-rose-600")"></span>
@@ -67,104 +68,94 @@
     </form>
 </div>
 
-<!-- Inventory Table -->
+<!-- Inventory QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <form method="post" @formname="inventory-table-action">
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Product &amp; Variant SKU</th>
-                    <th class="text-center">Physical On Hand</th>
-                    <th class="text-center">Reserved for Orders</th>
-                    <th class="text-center">Available to Sell</th>
-                    <th class="text-right">Selling Price</th>
-                    <th class="text-right">Quick Operations</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in _rows)
-                {
-                    var available = row.OnHand - row.Reserved;
-                    <tr class="hover:bg-slate-50/70 transition-colors">
-                        <td>
-                            <strong class="text-slate-900 block font-semibold">@row.ProductName</strong>
-                            <span class="font-mono text-xs text-slate-400">SKU: @row.Sku</span>
-                        </td>
-                        <td class="text-center font-bold text-slate-800 text-sm">
-                            @row.OnHand
-                        </td>
-                        <td class="text-center text-xs font-semibold text-amber-700">
-                            @(row.Reserved > 0 ? $"{row.Reserved} units" : "-")
-                        </td>
-                        <td class="text-center">
-                            <span class="badge @(available <= 0 ? "badge-rose font-bold" : available <= 5 ? "badge-amber font-bold" : "badge-emerald font-semibold")">
-                                @(available <= 0 ? "Out of Stock" : $"{available} units available")
-                            </span>
-                        </td>
-                        <td class="text-right font-bold text-slate-900 tabular-nums">
-                            ৳@row.Price.ToString("N0")
-                        </td>
-                        <td class="text-right whitespace-nowrap space-x-2">
-                            <button type="submit" name="QuickRestockId" value="@row.Id" class="btn-primary !px-2.5 !py-1 text-xs !bg-indigo-600 hover:!bg-indigo-700 inline-flex items-center gap-1 cursor-pointer">
-                                <span>+10 Restock</span>
-                            </button>
+            <QuickGrid Items="@inventoryQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Title="Product &amp; Variant SKU" Sortable="true" SortBy="@sortByProduct">
+                    <div>
+                        <strong class="text-slate-900 block font-semibold text-xs">@context.ProductName</strong>
+                        <span class="font-mono text-2xs text-slate-400">SKU: @context.Sku</span>
+                    </div>
+                </TemplateColumn>
 
-                            <a href="/admin/inventory/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Adjust Stock
-                            </a>
+                <PropertyColumn Property="@(i => i.OnHand)" Title="Physical On Hand" Sortable="true" Align="Align.Center" />
 
-                            <a href="/admin/products/@row.ProductId/variants/@row.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Edit Variant
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                <TemplateColumn Title="Reserved for Orders" Align="Align.Center">
+                    @if (context.Reserved > 0)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20">
+                            @context.Reserved units
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-slate-400 text-xs">—</span>
+                    }
+                </TemplateColumn>
 
-    @if (_rows.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="box" Class="size-10 text-slate-300" />
-            <p>No inventory items match your search or filter.</p>
+                <TemplateColumn Title="Available to Sell" Sortable="true" SortBy="@sortByAvailable" Align="Align.Center">
+                    @{
+                        var avail = context.OnHand - context.Reserved;
+                    }
+                    @if (avail <= 0)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-600/20">
+                            <span class="size-1.5 rounded-full bg-rose-500"></span>
+                            Out of Stock (0)
+                        </span>
+                    }
+                    else if (avail <= 5)
+                    {
+                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-600/20">
+                            <span class="size-1.5 rounded-full bg-amber-500"></span>
+                            Low Stock (@avail)
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
+                            <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                            @avail in stock
+                        </span>
+                    }
+                </TemplateColumn>
+
+                <PropertyColumn Property="@(i => i.Price)" Title="Selling Price" Format="N0" Sortable="true" Align="Align.End" />
+
+                <TemplateColumn Title="Quick Operations" Align="Align.End">
+                    <div class="flex items-center justify-end gap-1.5">
+                        <button
+                            type="submit"
+                            name="QuickRestockId"
+                            value="@context.VariantId"
+                            class="btn-secondary !px-2.5 !py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 cursor-pointer"
+                            title="Instantly add +10 units to physical stock"
+                        >
+                            +10 Restock
+                        </button>
+                        <a href="/admin/inventory/@context.VariantId/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                            Adjust
+                        </a>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
         </div>
-    }
-</div>
+
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
+    </div>
 </form>
 
-@if (_totalPages > 1)
-{
-    <div class="mt-4 flex items-center justify-between text-xs text-slate-600 px-2">
-        <span>Showing @((Page - 1) * PageSize + 1)–@(Math.Min(Page * PageSize, _totalFiltered)) of @_totalFiltered items</span>
-        <div class="flex items-center gap-1">
-            @if (Page > 1)
-            {
-                <a href="@FilterUrl(Filter, Page - 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Previous</a>
-            }
-            <span class="px-2 font-semibold">@Page / @_totalPages</span>
-            @if (Page < _totalPages)
-            {
-                <a href="@FilterUrl(Filter, Page + 1)" class="btn-secondary !px-2.5 !py-1 text-xs">Next</a>
-            }
-        </div>
-    </div>
-}
-
-@code
-{
-    private const int PageSize = 25;
-
+@code {
     [SupplyParameterFromQuery(Name = "status")]
     public string Filter { get; set; } = "all";
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
-
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
 
     [SupplyParameterFromQuery(Name = "toast")]
     public string? ToastNotice { get; set; }
@@ -172,21 +163,33 @@
     [SupplyParameterFromForm(FormName = "inventory-table-action")]
     public int QuickRestockId { get; set; }
 
+    public record AdminVariantRow(
+        int VariantId,
+        int ProductId,
+        string ProductName,
+        string Sku,
+        decimal Price,
+        int OnHand,
+        int Reserved,
+        bool IsActive,
+        bool IsDefault
+    );
+
+    private IQueryable<AdminVariantRow>? inventoryQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private GridSort<AdminVariantRow> sortByProduct = GridSort<AdminVariantRow>.ByAscending(i => i.ProductName);
+    private GridSort<AdminVariantRow> sortByAvailable = GridSort<AdminVariantRow>.ByAscending(i => i.OnHand - i.Reserved);
+
     private string? _toast;
     private int _totalAll;
     private int _totalLow;
     private int _totalOut;
-    private int _totalFiltered;
-    private int _totalPages = 1;
 
-    private List<AdminVariantRow> _rows = [];
-
-    private string FilterUrl(string filter, int page)
+    private string FilterUrl(string filter)
     {
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(filter) && filter != "all") parts.Add($"status={Uri.EscapeDataString(filter)}");
         if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
-        if (page > 1) parts.Add($"page={page}");
         return parts.Count > 0 ? $"/admin/inventory?{string.Join("&", parts)}" : "/admin/inventory";
     }
 
@@ -208,7 +211,7 @@
                 });
 
                 await Db.SaveChangesAsync();
-                var targetUrl = FilterUrl(Filter, Page);
+                var targetUrl = FilterUrl(Filter);
                 var sep = targetUrl.Contains('?') ? "&" : "?";
                 Nav.NavigateTo($"{targetUrl}{sep}toast=restocked");
                 return;
@@ -219,7 +222,7 @@
         else if (!string.IsNullOrWhiteSpace(ToastNotice)) _toast = ToastNotice;
 
         await LoadCountsAsync();
-        await LoadRowsAsync();
+        LoadRows();
     }
 
     private async Task LoadCountsAsync()
@@ -229,7 +232,7 @@
         _totalOut = await Db.InventoryItems.CountAsync(i => !i.ProductVariant!.IsDeleted && i.QuantityOnHand - i.QuantityReserved <= 0);
     }
 
-    private async Task LoadRowsAsync()
+    private void LoadRows()
     {
         var q = Db.InventoryItems.AsNoTracking().Where(i => !i.ProductVariant!.IsDeleted);
 
@@ -249,26 +252,18 @@
                              i.ProductVariant.Product!.Name.ToLower().Contains(term));
         }
 
-        _totalFiltered = await q.CountAsync();
-        _totalPages = Math.Max(1, (int)Math.Ceiling(_totalFiltered / (double)PageSize));
-        Page = Math.Clamp(Page, 1, _totalPages);
-
-        _rows = await q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
+        inventoryQuery = q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
             .ThenBy(i => i.Id)
-            .Skip((Page - 1) * PageSize)
-            .Take(PageSize)
             .Select(i => new AdminVariantRow(
                 i.ProductVariantId,
                 i.ProductVariant!.ProductId,
-                i.ProductVariant.Product!.Name,
+                i.ProductVariant.Product != null ? i.ProductVariant.Product.Name : "Product",
                 i.ProductVariant.SKU,
-                "",
                 i.ProductVariant.SellingPrice,
                 i.QuantityOnHand,
                 i.QuantityReserved,
                 i.ProductVariant.IsActive,
                 i.ProductVariant.IsDefault
-            ))
-            .ToListAsync();
+            ));
     }
 }

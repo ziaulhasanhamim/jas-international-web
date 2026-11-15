@@ -105,7 +105,7 @@
                 <Icon Name="cart" Class="size-4" />
                 <span class="hidden xs:inline">Cart</span>
                 <span data-cart-count class="flex size-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700">
-                    0
+                    @InitialCartCount
                 </span>
             </a>
         </div>
@@ -168,7 +168,7 @@
         <div class="relative">
             <Icon Name="cart" Class="size-5 text-slate-700" />
             <span data-cart-count class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white shadow-xs">
-                0
+                @InitialCartCount
             </span>
         </div>
         <span class="tracking-tight text-slate-700">Cart</span>
@@ -191,3 +191,8 @@
         <span class="tracking-tight">Account</span>
     </NavLink>
 </nav>
+
+@code {
+    [Parameter]
+    public int InitialCartCount { get; set; }
+}

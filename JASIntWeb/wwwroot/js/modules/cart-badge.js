@@ -4,6 +4,21 @@
 
     function getCartCount() {
         try {
+            // 1. Check jas_cart_count cookie
+            const m = document.cookie.match(/(?:^|;\s*)jas_cart_count=([^;]+)/);
+            if (m) {
+                const n = parseInt(m[1], 10);
+                if (!isNaN(n) && n >= 0) return n;
+            }
+
+            // 2. Check jas_cart_count in localStorage
+            const stored = localStorage.getItem('jas_cart_count');
+            if (stored) {
+                const n = parseInt(stored, 10);
+                if (!isNaN(n) && n >= 0) return n;
+            }
+
+            // 3. Fallback to jas.cart.v2 items sum
             const raw = localStorage.getItem('jas.cart.v2');
             if (!raw) return 0;
             const data = JSON.parse(raw);
@@ -97,15 +112,16 @@
 
     // Expose global updater so Blazor or other scripts can notify when cart changes
     window.jasUpdateCartCount = function(overrideCount) {
-        if (typeof overrideCount === 'number') {
-            const badges = document.querySelectorAll('[data-cart-count]');
-            badges.forEach(b => {
-                b.textContent = overrideCount;
-                b.setAttribute('data-cart-count', overrideCount);
-            });
-        } else {
-            updateBadges();
-        }
+        let count = typeof overrideCount === 'number' ? overrideCount : getCartCount();
+        const badges = document.querySelectorAll('[data-cart-count]');
+        badges.forEach(b => {
+            b.textContent = count;
+            b.setAttribute('data-cart-count', count);
+        });
+        try {
+            document.cookie = `jas_cart_count=${count}; path=/; max-age=2592000; SameSite=Lax`;
+            localStorage.setItem('jas_cart_count', count.toString());
+        } catch {}
     };
 
     window.jasUpdateWishlistCount = function() {
