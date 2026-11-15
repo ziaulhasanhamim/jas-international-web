@@ -39,6 +39,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrderTimelineEvent> OrderTimelineEvents => Set<OrderTimelineEvent>();
     public DbSet<UrlRedirect> UrlRedirects => Set<UrlRedirect>();
     public DbSet<Guide> Guides => Set<Guide>();
+    public DbSet<VisitorLog> VisitorLogs => Set<VisitorLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -52,6 +53,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         CommerceModel.Configure(builder);
         ProductAttributeModel.Configure(builder);
         ConfigureSeoAndRedirects(builder);
+        ConfigureVisitorLogs(builder);
+    }
+
+    private static void ConfigureVisitorLogs(ModelBuilder builder)
+    {
+        builder.Entity<VisitorLog>(e =>
+        {
+            e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => x.VisitorId);
+            e.HasIndex(x => x.SessionId);
+            e.HasIndex(x => x.Path);
+            e.HasIndex(x => x.ReferrerDomain);
+            e.HasIndex(x => x.DeviceType);
+            e.HasIndex(x => x.City);
+        });
     }
 
     private static void ConfigureSeoAndRedirects(ModelBuilder builder)

@@ -289,6 +289,25 @@ var canonicalMiddlewareCode = File.ReadAllText(Path.Combine(projectRoot, "Middle
 Assert(canonicalMiddlewareCode.Contains("path.Equals(\"/health\""), "Health check bypasses canonical host 301 redirection (Render/K8s/cloud probes)");
 
 // -----------------------------------------------------------------------------
+// 7. Industry-Standard Visitor Analytics & Tracking System
+// -----------------------------------------------------------------------------
+Console.ForegroundColor = ConsoleColor.Yellow;
+Console.WriteLine("\n--- 7. Industry-Standard Visitor Analytics & Tracking System ---");
+Console.ResetColor();
+
+Assert(programCode.Contains("IVisitorAnalyticsQueue") && programCode.Contains("VisitorAnalyticsBackgroundWorker"), "Visitor analytics uses non-blocking channel queue and background worker");
+Assert(programCode.Contains("IVisitorAnalyticsService") && programCode.Contains("VisitorAnalyticsService"), "Visitor analytics service registered for admin reporting");
+
+var appRazorCode = File.ReadAllText(Path.Combine(projectRoot, "Components", "App.razor"));
+Assert(appRazorCode.Contains("js/modules/analytics.js"), "Client-side tracking script registered in App.razor");
+
+var adminNavCode = File.ReadAllText(Path.Combine(projectRoot, "Components", "Admin", "AdminNavigation.razor"));
+Assert(adminNavCode.Contains("/admin/visitors"), "Live Traffic & Visitors menu item present in AdminNavigation.razor");
+
+var visitorsAdminCode = File.ReadAllText(Path.Combine(projectRoot, "Components", "Pages", "Admin", "Visitors", "VisitorsAdmin.razor"));
+Assert(visitorsAdminCode.Contains("@page \"/admin/visitors\""), "Admin visitors page route mapped at /admin/visitors");
+
+// -----------------------------------------------------------------------------
 // Summary & Exit
 // -----------------------------------------------------------------------------
 Console.WriteLine();

@@ -4,6 +4,7 @@ using JASIntWeb.Client.Contracts;
 using JASIntWeb.Endpoints;
 using JASIntWeb.Middleware;
 using JASIntWeb.Services;
+using JASIntWeb.Services.Analytics;
 using JASIntWeb.Services.Meta;
 using JASIntWeb.Services.Seo;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -68,6 +69,9 @@ builder.Services.Configure<MetaAdsOptions>(builder.Configuration.GetSection(Meta
 builder.Services.AddSingleton<IMetaCapiQueue, MetaCapiQueue>();
 builder.Services.AddHostedService<MetaCapiBackgroundWorker>();
 builder.Services.AddScoped<IMetaConversionsApiService, MetaConversionsApiService>();
+builder.Services.AddSingleton<IVisitorAnalyticsQueue, VisitorAnalyticsQueue>();
+builder.Services.AddHostedService<VisitorAnalyticsBackgroundWorker>();
+builder.Services.AddScoped<IVisitorAnalyticsService, VisitorAnalyticsService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
 builder.Services.AddScoped<AdminService>();

@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261113102426_AddSeoAndMarketingEntities";
+    public override string LastMigrationId => "20261115093300_AddVisitorTracking";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -1670,6 +1670,105 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("UserNameIndex");
 
                 b.ToTable("AspNetUsers");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.VisitorLog", b =>
+            {
+                var id = b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("bigint");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<string>("Browser")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("City")
+                    .HasColumnType("text");
+
+                b.Property<int?>("ConvertedOrderId")
+                    .HasColumnType("integer");
+
+                b.Property<string>("Country")
+                    .HasColumnType("text");
+
+                b.Property<string>("DeviceType")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<int>("DurationSeconds")
+                    .HasColumnType("integer");
+
+                b.Property<string>("Fbclid")
+                    .HasColumnType("text");
+
+                b.Property<string>("IpAddress")
+                    .HasColumnType("text");
+
+                b.Property<bool>("IsBounce")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("OperatingSystem")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Path")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Referrer")
+                    .HasColumnType("text");
+
+                b.Property<string>("ReferrerDomain")
+                    .HasColumnType("text");
+
+                b.Property<string>("SessionId")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset>("Timestamp")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("Title")
+                    .HasColumnType("text");
+
+                b.Property<string>("UserAgent")
+                    .HasColumnType("text");
+
+                b.Property<int?>("UserId")
+                    .HasColumnType("integer");
+
+                b.Property<string>("UtmCampaign")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmMedium")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmSource")
+                    .HasColumnType("text");
+
+                b.Property<string>("VisitorId")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.HasKey("Id");
+
+                b.HasIndex("City");
+
+                b.HasIndex("DeviceType");
+
+                b.HasIndex("Path");
+
+                b.HasIndex("ReferrerDomain");
+
+                b.HasIndex("SessionId");
+
+                b.HasIndex("Timestamp");
+
+                b.HasIndex("VisitorId");
+
+                b.ToTable("VisitorLogs");
             });
 
         modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>

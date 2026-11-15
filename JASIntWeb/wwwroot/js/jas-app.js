@@ -13,6 +13,7 @@ class AppOrchestrator {
         JAS?.OrderTracking?.init();
         JAS?.AdminEditor?.init();
         JAS?.MetaTracking?.init();
+        JAS?.VisitorAnalytics?.init();
     }
 
     /**
@@ -20,6 +21,7 @@ class AppOrchestrator {
      */
     static onEnhancedNavigationStart() {
         const JAS = window.JAS;
+        JAS?.VisitorAnalytics?.reportUnload();
         JAS?.Navigation?.start();
         JAS?.OrderTracking?.cleanup();
     }
@@ -37,6 +39,7 @@ class AppOrchestrator {
             JAS?.AdminEditor?.init();
             JAS?.MetaTracking?.init();
             JAS?.MetaTracking?.trackPageView();
+            JAS?.VisitorAnalytics?.trackPageView();
         };
 
         // Use modern native View Transitions API if supported by the browser
@@ -51,6 +54,7 @@ class AppOrchestrator {
      * Handles cleanup before window/tab unloads
      */
     static onBeforeUnload() {
+        window.JAS?.VisitorAnalytics?.reportUnload();
         window.JAS?.OrderTracking?.cleanup();
     }
 

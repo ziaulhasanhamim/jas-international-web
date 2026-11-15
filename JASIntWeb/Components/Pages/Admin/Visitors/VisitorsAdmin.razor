@@ -1,0 +1,422 @@
+@page "/admin/visitors"
+@attribute [StreamRendering]
+@layout AdminLayout
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services.Analytics
+@inject IVisitorAnalyticsService AnalyticsSvc
+@inject NavigationManager Nav
+
+<PageTitle>Live Traffic &amp; Visitors — JAS Admin</PageTitle>
+
+<AdminPageHeader Title="Live Traffic &amp; Store Visitors"
+                 Eyebrow="ANALYTICS / REAL-TIME"
+                 Description="Real-time visitor activity, acquisition sources, device intelligence, and engagement metrics."
+                 ActionHref="/admin"
+                 ActionText="Back to dashboard"
+                 SecondaryActionHref="@($"/admin/visitors?period={currentPeriod}")"
+                 SecondaryActionText="🔄 Refresh Data" />
+
+<div class="shop-container py-6 space-y-6">
+    <!-- Period Selector -->
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">Timeframe:</span>
+            <a href="/admin/visitors?period=today" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(currentPeriod == "today" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Today</a>
+            <a href="/admin/visitors?period=yesterday" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(currentPeriod == "yesterday" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Yesterday</a>
+            <a href="/admin/visitors?period=7d" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(currentPeriod == "7d" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Last 7 Days</a>
+            <a href="/admin/visitors?period=30d" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(currentPeriod == "30d" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Last 30 Days</a>
+            <a href="/admin/visitors?period=all" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(currentPeriod == "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">All Time</a>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <span>Bangladesh Standard Time (UTC+6)</span>
+        </div>
+    </div>
+
+    @if (data is null)
+    {
+        <div class="flex flex-col items-center justify-center p-12 text-center">
+            <div class="size-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600"></div>
+            <p class="mt-3 text-xs text-slate-500 font-medium">Loading visitor analytics data…</p>
+        </div>
+    }
+    else
+    {
+        <!-- Summary Cards Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Live Visitors Card -->
+            <div class="col-span-2 sm:col-span-1 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white p-5 shadow-2xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-800">Live Active</span>
+                    <span class="relative flex size-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
+                    </span>
+                </div>
+                <p class="mt-2 font-display text-3xl font-extrabold text-emerald-700">@data.Summary.LiveVisitorsCount</p>
+                <p class="mt-1 text-2xs text-emerald-600 font-medium">Active in last 5 minutes</p>
+            </div>
+
+            <!-- Unique Visitors -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Unique Visitors</span>
+                <p class="mt-2 font-display text-3xl font-extrabold text-slate-900">@data.Summary.UniqueVisitors.ToString("N0")</p>
+                <p class="mt-1 text-2xs text-slate-500 font-medium">Distinct shopper devices</p>
+            </div>
+
+            <!-- Total Pageviews -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Pageviews</span>
+                <p class="mt-2 font-display text-3xl font-extrabold text-blue-600">@data.Summary.TotalPageviews.ToString("N0")</p>
+                <p class="mt-1 text-2xs text-slate-500 font-medium">@data.Summary.TotalSessions.ToString("N0") visitor sessions</p>
+            </div>
+
+            <!-- Bounce Rate -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Bounce Rate</span>
+                <p class="mt-2 font-display text-3xl font-extrabold @(data.Summary.BounceRate > 60 ? "text-amber-600" : "text-slate-900")">
+                    @data.Summary.BounceRate.ToString("N1")%
+                </p>
+                <p class="mt-1 text-2xs text-slate-500 font-medium">Single-page visits</p>
+            </div>
+
+            <!-- Pages / Session -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Pages / Session</span>
+                <p class="mt-2 font-display text-3xl font-extrabold text-slate-900">@data.Summary.AvgPagesPerSession.ToString("N1")</p>
+                <p class="mt-1 text-2xs text-slate-500 font-medium">Average depth per visit</p>
+            </div>
+        </div>
+
+        <!-- 2-Column: Top Pages & Traffic Channels -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Top Content & URLs -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm">Top Pages &amp; Products</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Most viewed paths in selected timeframe</p>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500">@data.TopPages.Count items</span>
+                </div>
+
+                @if (data.TopPages.Count == 0)
+                {
+                    <p class="py-8 text-center text-xs text-slate-400">No page views recorded in this period yet.</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var pageItem in data.TopPages)
+                        {
+                            var pct = data.Summary.TotalPageviews > 0
+                                ? Math.Round((double)pageItem.Pageviews / data.Summary.TotalPageviews * 100.0, 1)
+                                : 0.0;
+                            <div>
+                                <div class="flex items-center justify-between text-xs mb-1">
+                                    <div class="flex items-center gap-2 truncate pr-2">
+                                        <a href="@pageItem.Path" target="_blank" class="font-semibold text-blue-600 hover:underline truncate max-w-xs sm:max-w-md">
+                                            @pageItem.Path
+                                        </a>
+                                        @if (!string.IsNullOrEmpty(pageItem.Title))
+                                        {
+                                            <span class="text-slate-400 text-2xs truncate hidden sm:inline">(@pageItem.Title)</span>
+                                        }
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span class="font-bold text-slate-900">@pageItem.Pageviews.ToString("N0")</span>
+                                        <span class="text-slate-400 text-2xs w-10 text-right">@pct%</span>
+                                    </div>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div class="bg-blue-600 h-1.5 rounded-full" style="width: @Math.Max(pct, 2)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Top Referrers & Channels -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm">Traffic Sources &amp; Referrers</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Where your shoppers are arriving from</p>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500">@data.TopSources.Count sources</span>
+                </div>
+
+                @if (data.TopSources.Count == 0)
+                {
+                    <p class="py-8 text-center text-xs text-slate-400">No external referrer data recorded yet.</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var src in data.TopSources)
+                        {
+                            <div>
+                                <div class="flex items-center justify-between text-xs mb-1">
+                                    <span class="font-semibold text-slate-800 flex items-center gap-1.5">
+                                        @if (src.Source.Contains("facebook", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <span class="size-2 rounded-full bg-blue-500"></span>
+                                        }
+                                        else if (src.Source.Contains("google", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <span class="size-2 rounded-full bg-red-500"></span>
+                                        }
+                                        else if (src.Source.Contains("instagram", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <span class="size-2 rounded-full bg-pink-500"></span>
+                                        }
+                                        else if (src.Source.Equals("Direct", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <span class="size-2 rounded-full bg-slate-400"></span>
+                                        }
+                                        else
+                                        {
+                                            <span class="size-2 rounded-full bg-emerald-500"></span>
+                                        }
+                                        @src.Source
+                                    </span>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span class="font-bold text-slate-900">@src.Pageviews.ToString("N0")</span>
+                                        <span class="text-slate-400 text-2xs w-10 text-right">@src.Percentage%</span>
+                                    </div>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: @Math.Max(src.Percentage, 2)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 3-Column: Devices, Browsers, Locations -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Device Breakdown -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <h3 class="font-bold text-slate-900 text-sm mb-3">Device Types</h3>
+                @if (data.Devices.Count == 0)
+                {
+                    <p class="py-6 text-center text-xs text-slate-400">No device data yet.</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var d in data.Devices)
+                        {
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-medium text-slate-700">@d.Name</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-900">@d.Count</span>
+                                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-slate-600">@d.Percentage%</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Operating Systems -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <h3 class="font-bold text-slate-900 text-sm mb-3">Operating Systems</h3>
+                @if (data.OperatingSystems.Count == 0)
+                {
+                    <p class="py-6 text-center text-xs text-slate-400">No OS data yet.</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var os in data.OperatingSystems)
+                        {
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-medium text-slate-700">@os.Name</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-900">@os.Count</span>
+                                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-slate-600">@os.Percentage%</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Locations (Cities/Country) -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <h3 class="font-bold text-slate-900 text-sm mb-3">Top Locations</h3>
+                @if (data.TopLocations.Count == 0)
+                {
+                    <p class="py-6 text-center text-xs text-slate-400">No geographic data recorded yet.</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var loc in data.TopLocations)
+                        {
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-medium text-slate-700">@loc.Location</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-900">@loc.Visitors</span>
+                                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-slate-600">@loc.Percentage%</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (data.TopCampaigns.Count > 0)
+        {
+            <!-- UTM Campaigns Table -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+                <h3 class="font-bold text-slate-900 text-sm mb-3">Meta &amp; Ad Campaigns (UTMs)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider text-2xs font-bold">
+                                <th class="py-2.5 px-3">Campaign</th>
+                                <th class="py-2.5 px-3">Source</th>
+                                <th class="py-2.5 px-3">Medium</th>
+                                <th class="py-2.5 px-3 text-right">Pageviews</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var c in data.TopCampaigns)
+                            {
+                                <tr class="hover:bg-slate-50/50">
+                                    <td class="py-2.5 px-3 font-semibold text-slate-900">@c.Campaign</td>
+                                    <td class="py-2.5 px-3 text-slate-600">@c.Source</td>
+                                    <td class="py-2.5 px-3 text-slate-600">@c.Medium</td>
+                                    <td class="py-2.5 px-3 font-bold text-slate-900 text-right">@c.Pageviews.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Real-Time Activity Log Table -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Recent Storefront Activity</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Live stream of the latest visitor hits</p>
+                </div>
+                <span class="text-xs font-semibold text-slate-500">Last @data.RecentActivity.Count hits</span>
+            </div>
+
+            @if (data.RecentActivity.Count == 0)
+            {
+                <p class="py-8 text-center text-xs text-slate-400">No activity logged yet.</p>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider text-2xs font-bold">
+                                <th class="py-2.5 px-3">Time (BD)</th>
+                                <th class="py-2.5 px-3">Path</th>
+                                <th class="py-2.5 px-3">Device / Browser</th>
+                                <th class="py-2.5 px-3">Location</th>
+                                <th class="py-2.5 px-3">Referrer / Source</th>
+                                <th class="py-2.5 px-3 text-right">Anonymized IP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 font-mono text-2xs">
+                            @foreach (var hit in data.RecentActivity)
+                            {
+                                var bdTime = hit.Timestamp.ToOffset(TimeSpan.FromHours(6));
+                                <tr class="hover:bg-slate-50/50 font-sans">
+                                    <td class="py-2.5 px-3 whitespace-nowrap text-slate-500">
+                                        @bdTime.ToString("hh:mm:ss tt")
+                                    </td>
+                                    <td class="py-2.5 px-3 max-w-xs truncate">
+                                        <a href="@hit.Path" target="_blank" class="font-semibold text-blue-600 hover:underline truncate">
+                                            @hit.Path
+                                        </a>
+                                    </td>
+                                    <td class="py-2.5 px-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-medium text-slate-700">
+                                            @hit.DeviceType · @hit.Browser
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 px-3 whitespace-nowrap text-slate-600">
+                                        @(string.IsNullOrEmpty(hit.City) ? (string.IsNullOrEmpty(hit.Country) ? "Unknown" : hit.Country) : $"{hit.City}, {hit.Country}")
+                                    </td>
+                                    <td class="py-2.5 px-3 whitespace-nowrap text-slate-600">
+                                        <span class="truncate max-w-[150px] inline-block">@hit.ReferrerDomain</span>
+                                    </td>
+                                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">
+                                        @(hit.IpAddress ?? "0.0.0.0")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? Period { get; set; }
+
+    private string currentPeriod = "today";
+    private VisitorDashboardData? data;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        currentPeriod = (Period?.ToLowerInvariant()) switch
+        {
+            "yesterday" => "yesterday",
+            "7d" => "7d",
+            "30d" => "30d",
+            "all" => "all",
+            _ => "today"
+        };
+
+        var bdNow = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(6));
+        DateTimeOffset start;
+        DateTimeOffset end;
+
+        switch (currentPeriod)
+        {
+            case "yesterday":
+                var yDate = bdNow.Date.AddDays(-1);
+                start = new DateTimeOffset(yDate, TimeSpan.FromHours(6)).ToUniversalTime();
+                end = new DateTimeOffset(yDate.AddDays(1).AddTicks(-1), TimeSpan.FromHours(6)).ToUniversalTime();
+                break;
+            case "7d":
+                start = bdNow.AddDays(-7).ToUniversalTime();
+                end = DateTimeOffset.UtcNow;
+                break;
+            case "30d":
+                start = bdNow.AddDays(-30).ToUniversalTime();
+                end = DateTimeOffset.UtcNow;
+                break;
+            case "all":
+                start = DateTimeOffset.MinValue;
+                end = DateTimeOffset.MaxValue;
+                break;
+            case "today":
+            default:
+                var tDate = bdNow.Date;
+                start = new DateTimeOffset(tDate, TimeSpan.FromHours(6)).ToUniversalTime();
+                end = DateTimeOffset.UtcNow;
+                break;
+        }
+
+        data = await AnalyticsSvc.GetDashboardDataAsync(start, end);
+    }
+}

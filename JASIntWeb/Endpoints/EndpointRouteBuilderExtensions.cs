@@ -9,6 +9,7 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapHealthEndpoints();
         endpoints.MapSeoEndpoints();
         endpoints.MapMetaFeedEndpoints();
+        endpoints.MapAnalyticsEndpoints();
         return endpoints;
     }
 }
