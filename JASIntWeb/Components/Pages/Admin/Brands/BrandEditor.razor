@@ -1,6 +1,7 @@
 @page "/admin/brands/new"
 @page "/admin/brands/{Id:int}/edit"
-@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject AdminSession Session
 @inject NavigationManager Nav
 
@@ -52,11 +53,74 @@ else
                 <small>Dedicated canonical brand page: /brand/[slug]</small>
             </label>
 
-            <label class="shop-label">
-                Logo URL (optional)
-                <InputText @bind-Value="Input!.LogoUrl" class="shop-input" placeholder="https://... or /brands/logo.svg" />
-                <small>SVG or high-res transparent PNG recommended.</small>
-            </label>
+            <!-- Brand Logo Upload & Visual Preview -->
+            <div class="shop-label space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-900 text-sm">Brand Logo</span>
+                    <span class="text-xs text-slate-400">SVG, PNG, WEBP, or JPG (max 5MB)</span>
+                </div>
+
+                <!-- Hidden Input bound to form model for enhanced form submission -->
+                <input type="hidden" name="Input.LogoUrl" id="input-brand-logo-url" value="@Input!.LogoUrl" />
+
+                <div id="brand-logo-uploader" class="space-y-3">
+                    <!-- Dropzone & Upload Action Area -->
+                    <div id="brand-logo-dropzone" class="border-2 border-dashed border-slate-300 rounded-2xl p-5 text-center hover:border-blue-500 hover:bg-blue-50/20 transition-all bg-slate-50/60">
+                        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <!-- Dual-Background Preview Card (Checks contrast against light and dark) -->
+                            <div id="brand-logo-preview-box" class="relative size-20 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xs flex items-center justify-center overflow-hidden shrink-0 group">
+                                <img id="brand-logo-preview-img"
+                                     src="@(string.IsNullOrWhiteSpace(Input!.LogoUrl) ? "/jas-logo.png" : Input!.LogoUrl)"
+                                     alt="Brand logo preview"
+                                     class="size-full object-contain @(string.IsNullOrWhiteSpace(Input!.LogoUrl) ? "opacity-25 grayscale" : "")" />
+                            </div>
+
+                            <div class="text-center sm:text-left">
+                                <p class="text-xs font-semibold text-slate-800" id="brand-logo-status-text">
+                                    @(string.IsNullOrWhiteSpace(Input!.LogoUrl) ? "No brand logo uploaded yet" : "Logo attached to brand")
+                                </p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Drag &amp; drop an image here, browse your device, or edit the URL</p>
+
+                                <div class="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                                    <label class="btn-primary cursor-pointer text-xs py-1.5 px-3.5 shadow-2xs inline-flex items-center gap-1.5 select-none">
+                                        <Icon Name="camera" Class="size-3.5" />
+                                        <span>Browse &amp; Upload</span>
+                                        <input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/avif" class="hidden" id="brand-logo-file-input" />
+                                    </label>
+
+                                    <button type="button" id="btn-toggle-logo-url" class="btn-secondary text-xs py-1.5 px-3">
+                                        Edit URL
+                                    </button>
+
+                                    <button type="button" id="btn-clear-brand-logo" class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 hover:bg-rose-50 border-rose-200 @(string.IsNullOrWhiteSpace(Input!.LogoUrl) ? "hidden" : "")" title="Remove logo">
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Indicator -->
+                        <div id="brand-logo-upload-progress" class="mt-3 flex items-center justify-center gap-2 text-xs font-semibold text-blue-600" hidden>
+                            <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+                            <span>Uploading brand logo...</span>
+                        </div>
+                    </div>
+
+                    <!-- Direct URL Drawer (collapsible or populated) -->
+                    <div id="brand-logo-url-drawer" class="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50/50 p-3 @(string.IsNullOrWhiteSpace(Input!.LogoUrl) ? "hidden" : "")">
+                        <div class="flex items-center justify-between text-2xs text-slate-500">
+                            <span class="font-semibold uppercase tracking-wider">Asset URL / Path</span>
+                            <span class="font-mono text-slate-600 truncate max-w-xs" id="brand-logo-url-display">@(Input!.LogoUrl ?? "")</span>
+                        </div>
+                        <input type="text"
+                               id="brand-logo-url-input"
+                               value="@Input!.LogoUrl"
+                               class="shop-input text-xs"
+                               placeholder="https://... or /uploads/..." />
+                        <small class="text-slate-400 block">Transparent SVG or PNG with 1:1 or 2:1 aspect ratio is recommended for best storefront appearance.</small>
+                    </div>
+                </div>
+            </div>
 
             <label class="shop-label">
                 Brief description (optional)
@@ -176,9 +240,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var db = await DbFactory.CreateDbContextAsync();
         if (Id != 0)
         {
-            productCount = await Db.Products.CountAsync(p => p.BrandId == Id && !p.IsDeleted);
+            productCount = await db.Products.CountAsync(p => p.BrandId == Id && !p.IsDeleted);
         }
 
         if (Input is not null)
@@ -190,12 +255,12 @@ else
         {
             Input = new BrandEditForm
             {
-                SortOrder = (await Db.Brands.MaxAsync(b => (int?)b.SortOrder) ?? 0) + 1
+                SortOrder = (await db.Brands.MaxAsync(b => (int?)b.SortOrder) ?? 0) + 1
             };
         }
         else
         {
-            var b = await Db.Brands.SingleOrDefaultAsync(x => x.Id == Id);
+            var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == Id);
             if (b is null)
             {
                 notFound = true;

@@ -332,8 +332,137 @@ class AdminEditorController {
      */
     static initAll() {
         this.initProductMediaManager();
+        this.initBrandLogoUploader();
         this.initWysiwygEditor();
         this.initAutoSlugGenerator();
+    }
+
+    /**
+     * Initializes Brand Logo Uploader & Preview
+     */
+    static initBrandLogoUploader() {
+        const container = document.getElementById("brand-logo-uploader");
+        if (!container) return;
+
+        const fileInput = document.getElementById("brand-logo-file-input");
+        const hiddenUrlInput = document.getElementById("input-brand-logo-url");
+        const manualUrlInput = document.getElementById("brand-logo-url-input");
+        const urlDisplay = document.getElementById("brand-logo-url-display");
+        const previewImg = document.getElementById("brand-logo-preview-img");
+        const statusText = document.getElementById("brand-logo-status-text");
+        const btnClear = document.getElementById("btn-clear-brand-logo");
+        const btnToggleUrl = document.getElementById("btn-toggle-logo-url");
+        const urlDrawer = document.getElementById("brand-logo-url-drawer");
+        const uploadProgress = document.getElementById("brand-logo-upload-progress");
+        const dropzone = document.getElementById("brand-logo-dropzone");
+
+        if (!hiddenUrlInput || !previewImg) return;
+
+        const setLogo = url => {
+            const trimmed = (url || "").trim();
+            hiddenUrlInput.value = trimmed;
+            if (manualUrlInput) manualUrlInput.value = trimmed;
+            if (urlDisplay) urlDisplay.textContent = trimmed;
+
+            if (trimmed) {
+                previewImg.src = trimmed;
+                previewImg.classList.remove("opacity-25", "grayscale");
+                if (statusText) statusText.textContent = "Logo attached to brand";
+                if (btnClear) btnClear.classList.remove("hidden");
+                if (urlDrawer) urlDrawer.classList.remove("hidden");
+            } else {
+                previewImg.src = "/jas-logo.png";
+                previewImg.classList.add("opacity-25", "grayscale");
+                if (statusText) statusText.textContent = "No brand logo uploaded yet";
+                if (btnClear) btnClear.classList.add("hidden");
+                if (urlDrawer) urlDrawer.classList.add("hidden");
+            }
+        };
+
+        const handleUpload = async file => {
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                alert("Logo file exceeds 5MB size limit.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            if (uploadProgress) uploadProgress.hidden = false;
+
+            try {
+                const response = await fetch("/api/admin/uploads/brand-logo", {
+                    method: "POST",
+                    body: formData,
+                    signal: AbortSignal.timeout(30000)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data?.url) {
+                        setLogo(data.url);
+                    }
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    alert(err.error || "Upload failed. Please ensure file is valid SVG, PNG, WEBP, or JPG.");
+                }
+            } catch (err) {
+                console.error("[BrandLogo] Upload error:", err);
+                alert("Upload failed due to connection error or timeout.");
+            } finally {
+                if (uploadProgress) uploadProgress.hidden = true;
+                if (fileInput) fileInput.value = "";
+            }
+        };
+
+        fileInput?.addEventListener("change", e => {
+            const file = e.target.files?.[0];
+            if (file) handleUpload(file);
+        });
+
+        if (dropzone) {
+            ["dragenter", "dragover"].forEach(eventName => {
+                dropzone.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add("border-blue-500", "bg-blue-50/50");
+                });
+            });
+
+            ["dragleave", "drop"].forEach(eventName => {
+                dropzone.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove("border-blue-500", "bg-blue-50/50");
+                });
+            });
+
+            dropzone.addEventListener("drop", e => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove("border-blue-500", "bg-blue-50/50");
+                const file = e.dataTransfer?.files?.[0];
+                if (file) handleUpload(file);
+            });
+        }
+
+        manualUrlInput?.addEventListener("input", () => {
+            setLogo(manualUrlInput.value);
+        });
+
+        btnToggleUrl?.addEventListener("click", () => {
+            if (urlDrawer) {
+                urlDrawer.classList.toggle("hidden");
+                if (!urlDrawer.classList.contains("hidden")) {
+                    manualUrlInput?.focus();
+                }
+            }
+        });
+
+        btnClear?.addEventListener("click", () => {
+            setLogo("");
+        });
     }
 }
 
@@ -345,6 +474,7 @@ class AdminEditorController {
     JAS.AdminEditor = {
         init: () => AdminEditorController.initAll(),
         initMedia: () => AdminEditorController.initProductMediaManager(),
+        initBrandLogo: () => AdminEditorController.initBrandLogoUploader(),
         initWysiwyg: () => AdminEditorController.initWysiwygEditor(),
         initSlugGenerator: () => AdminEditorController.initAutoSlugGenerator()
     };

@@ -17,6 +17,12 @@ public sealed class ImageOptimizerService : IImageOptimizerService
         string? contentType = null,
         CancellationToken ct = default)
     {
+        var originalExt = Path.GetExtension(originalFileName).ToLowerInvariant();
+        if (originalExt == ".svg" || contentType == "image/svg+xml")
+        {
+            throw new NotSupportedException("SVG images are vector assets and do not require raster optimization.");
+        }
+
         using var memoryStream = new MemoryStream();
         await inputStream.CopyToAsync(memoryStream, ct);
         memoryStream.Position = 0;
