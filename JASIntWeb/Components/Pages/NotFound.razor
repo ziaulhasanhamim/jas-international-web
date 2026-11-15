@@ -1,7 +1,6 @@
 @page "/not-found"
 @layout MainLayout
 
-<CascadingAuthenticationState>
 @{
     if (HttpContext != null)
     {
@@ -29,7 +28,6 @@
         </a>
     </div>
 </div>
-</CascadingAuthenticationState>
 
 @code {
     [CascadingParameter] private HttpContext? HttpContext { get; set; }

@@ -1,5 +1,4 @@
 @page "/guides/{Slug}"
-@attribute [StreamRendering]
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using JASIntWeb.Services.Seo
@@ -7,21 +6,7 @@
 @inject AppDbContext Db
 @inject ISeoService Seo
 
-<CascadingAuthenticationState>
-@if (loading)
-{
-    <div class="shop-container py-10 max-w-3xl mx-auto animate-pulse">
-        <div class="h-6 w-32 bg-slate-200 rounded mb-4"></div>
-        <div class="h-10 w-3/4 bg-slate-200 rounded mb-6"></div>
-        <div class="aspect-video bg-slate-200 rounded-3xl mb-8"></div>
-        <div class="space-y-3">
-            <div class="h-4 bg-slate-200 rounded"></div>
-            <div class="h-4 bg-slate-200 rounded"></div>
-            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
-        </div>
-    </div>
-}
-else if (guide is null)
+@if (guide is null)
 {
     <SeoHead Title="Guide Not Found | JAS International" Robots="noindex,follow" />
     <div class="shop-container py-16 text-center max-w-md mx-auto">
@@ -121,32 +106,22 @@ else
         </div>
     </article>
 }
-</CascadingAuthenticationState>
 
 @code {
     [Parameter] public string Slug { get; set; } = "";
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
-    private bool loading = true;
     private Guide? guide;
 
     protected override async Task OnParametersSetAsync()
     {
-        loading = true;
-        try
-        {
-            var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
-            guide = await Db.Guides.AsNoTracking()
-                .FirstOrDefaultAsync(g => g.Slug == cleanSlug && g.IsPublished && !g.IsDeleted);
+        var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
+        guide = await Db.Guides.AsNoTracking()
+            .FirstOrDefaultAsync(g => g.Slug == cleanSlug && g.IsPublished && !g.IsDeleted);
 
-            if (guide == null && HttpContext != null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            }
-        }
-        finally
+        if (guide == null && HttpContext != null)
         {
-            loading = false;
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
         }
     }
 }

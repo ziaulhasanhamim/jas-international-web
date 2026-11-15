@@ -84,4 +84,35 @@ public class SitemapAndRobotsIntegrationTests
         // Uptime monitors (e.g. Better Uptime, UptimeRobot, Pingdom) use HEAD by default
         await ((int)response.StatusCode).Should().BeEqualTo(200);
     }
+
+    [Test]
+    public async Task GetProductDetails_OraimoHeadPhone_ReturnsOk()
+    {
+        var client = Factory.CreateClient();
+        var response = await client.GetAsync("/product/oraimo-boompop2-ohp-610-head-phone");
+        var body = await response.Content.ReadAsStringAsync();
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        await body.Should().NotContain("unhandled exception");
+        await body.Should().Contain("oraimo BoomPop2");
+    }
+
+    [Test]
+    public async Task GetProductsListing_ReturnsOk()
+    {
+        var client = Factory.CreateClient();
+        var response = await client.GetAsync("/products");
+        var body = await response.Content.ReadAsStringAsync();
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        await body.Should().NotContain("unhandled exception");
+    }
+
+    [Test]
+    public async Task GetBrandPage_Apple_ReturnsOk()
+    {
+        var client = Factory.CreateClient();
+        var response = await client.GetAsync("/brand/apple");
+        var body = await response.Content.ReadAsStringAsync();
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        await body.Should().NotContain("unhandled exception");
+    }
 }
