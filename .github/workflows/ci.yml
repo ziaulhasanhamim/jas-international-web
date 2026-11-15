@@ -32,6 +32,9 @@ jobs:
       - name: Run Unit Tests
         run: dotnet run --project tests/JASIntWeb.Tests.Unit/JASIntWeb.Tests.Unit.csproj --no-build --configuration Release
 
+      - name: Run SEO & Meta Tests
+        run: dotnet run --project tests/JASIntWeb.Tests.Seo/JASIntWeb.Tests.Seo.csproj --no-build --configuration Release
+
       - name: Run Integration Tests
         run: dotnet run --project tests/JASIntWeb.Tests.Integration/JASIntWeb.Tests.Integration.csproj --no-build --configuration Release
 

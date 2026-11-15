@@ -50,7 +50,13 @@ public sealed class SeoService(IConfiguration configuration) : ISeoService
     {
         if (string.IsNullOrWhiteSpace(pathAndQuery))
         {
-            return PublicBaseUrl + "/";
+            return PublicBaseUrl;
+        }
+
+        var fragmentIndex = pathAndQuery.IndexOf('#');
+        if (fragmentIndex >= 0)
+        {
+            pathAndQuery = pathAndQuery[..fragmentIndex];
         }
 
         var questionIndex = pathAndQuery.IndexOf('?');
@@ -66,6 +72,10 @@ public sealed class SeoService(IConfiguration configuration) : ISeoService
         if (!path.StartsWith('/'))
         {
             path = "/" + path;
+        }
+        if (path == "/")
+        {
+            path = string.Empty;
         }
 
         // Whitelist only legitimate pagination: keep ?page=X if X > 1
@@ -113,6 +123,11 @@ public sealed class SeoService(IConfiguration configuration) : ISeoService
     public string BuildProductTitle(string productName, string? brandName = null)
     {
         var cleaned = productName.Trim();
+        if (!string.IsNullOrWhiteSpace(brandName) && !cleaned.StartsWith(brandName.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            cleaned = $"{brandName.Trim()} {cleaned}";
+        }
+
         var candidate = $"{cleaned} Price in Bangladesh | JAS International";
         if (candidate.Length <= 60) return candidate;
 
