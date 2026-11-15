@@ -151,11 +151,11 @@ Live feeds update in real-time with BDT pricing, inventory stock, and computed c
 - **Custom Audiences Export (`/admin/marketing/audiences`):** 1-click Meta-formatted CSV export of Purchasers, VIPs (৳5,000+ LTV), Repeat Buyers, and Abandoned Leads for Lookalike targeting.
 - **Feed Health Dashboard (`/admin/feeds`):** Diagnostic audit of active variants, in-stock percentages, and feed access tokens.
 
-### 5. Automated Regression Verification Suite
-Run the standalone regression test suite without starting a web server:
+### 5. Automated TUnit Verification Suite
+Run the unit, SEO, and structured data test suites using TUnit:
 
 ```bash
-dotnet run --project tests/JASIntWeb.SeoChecks
+dotnet test tests/JASIntWeb.Tests.Unit/JASIntWeb.Tests.Unit.csproj
 ```
 
 ---
