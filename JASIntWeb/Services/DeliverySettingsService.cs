@@ -7,7 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace JASIntWeb.Services;
 
-public sealed class DeliverySettingsService(AppDbContext db, IMemoryCache? cache = null)
+public sealed class DeliverySettingsService(IDbContextFactory<AppDbContext> dbFactory, IMemoryCache? cache = null)
 {
     private const string CacheKey = "Jas_DeliverySettings_Cache";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
@@ -26,6 +26,7 @@ public sealed class DeliverySettingsService(AppDbContext db, IMemoryCache? cache
 
         try
         {
+            using var db = dbFactory.CreateDbContext();
             var settings = db.DeliverySettings.AsNoTracking().FirstOrDefault() ?? new DeliverySettings();
             cache?.Set(CacheKey, settings, CacheDuration);
             return settings;
@@ -43,6 +44,7 @@ public sealed class DeliverySettingsService(AppDbContext db, IMemoryCache? cache
             return cached;
         }
 
+        await using var db = await dbFactory.CreateDbContextAsync();
         var settings = await db.DeliverySettings.FirstOrDefaultAsync();
         if (settings == null)
         {

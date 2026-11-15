@@ -1,6 +1,7 @@
 @rendermode InteractiveAuto
 @implements IDisposable
 @inject CartService Cart
+@inject NavigationManager Nav
 
 <div class="space-y-6">
     @if (!ready)
@@ -140,6 +141,9 @@
 
 @code
 {
+    [SupplyParameterFromQuery(Name = "added")]
+    public int? AddedVariantId { get; set; }
+
     private bool ready;
     private int? pendingVariantId;
 
@@ -150,6 +154,11 @@
         if (first)
         {
             await Cart.InitializeAsync();
+            if (AddedVariantId.HasValue && AddedVariantId.Value > 0)
+            {
+                await Cart.AddAsync(AddedVariantId.Value, 1);
+                Nav.NavigateTo("/cart", replace: true);
+            }
             ready = true;
             StateHasChanged();
         }

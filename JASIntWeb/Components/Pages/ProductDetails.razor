@@ -1,10 +1,11 @@
 @page "/product/{Slug}"
 @inject JASIntWeb.Services.CatalogService Catalog
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject NavigationManager Nav
 @inject JASIntWeb.Services.Seo.ISeoService Seo
 @inject IConfiguration Config
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Services.Seo
 
 @if (product is null)
@@ -542,7 +543,8 @@ else
         product = await Catalog.DetailsAsync(Slug);
         if (product is null)
         {
-            var isDeleted = await Db.Products.AnyAsync(p => p.Slug == Slug && p.IsDeleted);
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var isDeleted = await db.Products.AnyAsync(p => p.Slug == Slug && p.IsDeleted);
             if (HttpContext != null)
             {
                 HttpContext.Response.StatusCode = isDeleted ? StatusCodes.Status410Gone : StatusCodes.Status404NotFound;
@@ -571,7 +573,8 @@ else
     private async Task LoadReviewsAsync()
     {
         if (product is null) return;
-        reviews = await Db.ProductReviews.AsNoTracking()
+        await using var db = await DbFactory.CreateDbContextAsync();
+        reviews = await db.ProductReviews.AsNoTracking()
             .Where(r => r.ProductId == product.Id && r.IsApproved)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -596,8 +599,9 @@ else
             IsApproved = true
         };
 
-        Db.ProductReviews.Add(review);
-        await Db.SaveChangesAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.ProductReviews.Add(review);
+        await db.SaveChangesAsync();
 
         Nav.NavigateTo($"/product/{Slug}?review=success");
     }

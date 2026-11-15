@@ -1,11 +1,10 @@
 @page "/lp/{Slug}"
-@attribute [StreamRendering]
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using JASIntWeb.Services
 @using JASIntWeb.Services.Seo
 @using Microsoft.EntityFrameworkCore
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject ISeoService Seo
 @inject NavigationManager Nav
 @inject IConfiguration Config
@@ -173,7 +172,8 @@ else
         try
         {
             var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
-            product = await Db.Products.AsNoTracking()
+            await using var db = await DbFactory.CreateDbContextAsync();
+            product = await db.Products.AsNoTracking()
                 .Include(p => p.Brand)
                 .Include(p => p.Category)
                 .Include(p => p.ProductVariants)

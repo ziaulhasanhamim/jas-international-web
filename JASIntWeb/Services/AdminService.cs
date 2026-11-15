@@ -794,6 +794,70 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await cache.RemoveByTagAsync(CatalogService.TagSections);
     }
 
+    public async Task ToggleCategoryVisibilityAsync(int id)
+    {
+        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+        c.IsDeleted = !c.IsDeleted;
+        c.DeletedAt = c.IsDeleted ? DateTimeOffset.UtcNow : null;
+        if (c.IsDeleted)
+        {
+            var placements = await db.CategoryPlacements.Where(p => p.CategoryId == id).ToListAsync();
+            foreach (var p in placements)
+            {
+                p.IsActive = false;
+            }
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
+    }
+
+    public async Task ToggleCategoryFeaturedAsync(int id)
+    {
+        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+        var placement = await db.CategoryPlacements.SingleOrDefaultAsync(p => p.CategoryId == id && p.PlacementType == CategoryPlacementType.HomepageFeatured);
+        if (placement is null)
+        {
+            var maxSort = await db.CategoryPlacements.MaxAsync(p => (int?)p.SortOrder) ?? -1;
+            placement = new CategoryPlacement
+            {
+                CategoryId = id,
+                PlacementType = CategoryPlacementType.HomepageFeatured,
+                SortOrder = maxSort + 1,
+                IsActive = true
+            };
+            db.CategoryPlacements.Add(placement);
+        }
+        else
+        {
+            placement.IsActive = !placement.IsActive;
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
+    }
+
+    public async Task DeleteCategoryAsync(int id)
+    {
+        var c = await db.Categories.Include(x => x.ChildCategories).SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+        c.IsDeleted = true;
+        c.DeletedAt = DateTimeOffset.UtcNow;
+        foreach (var child in c.ChildCategories)
+        {
+            child.IsDeleted = true;
+            child.DeletedAt = DateTimeOffset.UtcNow;
+        }
+        var childIds = c.ChildCategories.Select(ch => ch.Id).ToList();
+        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == id || childIds.Contains(p.CategoryId)).ToListAsync();
+        foreach (var p in placements)
+        {
+            p.IsActive = false;
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
+    }
+
     public async Task SaveBrandAsync(BrandEditForm input)
     {
         Validate(input);

@@ -3,7 +3,7 @@
 @using JASIntWeb.Persistence.Entities
 @using JASIntWeb.Services.Seo
 @using Microsoft.EntityFrameworkCore
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject ISeoService Seo
 
 @if (guide is null)
@@ -116,7 +116,8 @@ else
     protected override async Task OnParametersSetAsync()
     {
         var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
-        guide = await Db.Guides.AsNoTracking()
+        await using var db = await DbFactory.CreateDbContextAsync();
+        guide = await db.Guides.AsNoTracking()
             .FirstOrDefaultAsync(g => g.Slug == cleanSlug && g.IsPublished && !g.IsDeleted);
 
         if (guide == null && HttpContext != null)

@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using JASIntWeb.Persistence;
 using JASIntWeb.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace JASIntWeb.Endpoints;
 
@@ -18,6 +20,39 @@ public static class CartEndpoints
         cart.MapPost("/merge", Merge).RequireAuthorization();
         cart.MapPost("", Add).RequireAuthorization();
         cart.MapPut("", Update).RequireAuthorization();
+
+        endpoints.MapPost("/cart/buy-now", async (
+            HttpContext context,
+            [FromForm] int productId,
+            [FromForm] int? variantId,
+            AppDbContext db,
+            ShoppingService shop) =>
+        {
+            var vId = variantId ?? 0;
+            if (vId <= 0 && productId > 0)
+            {
+                var defaultVariant = await db.ProductVariants.AsNoTracking()
+                    .Where(v => v.ProductId == productId && !v.IsDeleted && v.IsActive)
+                    .OrderByDescending(v => v.IsDefault)
+                    .ThenBy(v => v.Id)
+                    .Select(v => v.Id)
+                    .FirstOrDefaultAsync();
+                vId = defaultVariant;
+            }
+
+            if (vId > 0)
+            {
+                var userId = ShoppingService.UserId(context.User);
+                if (userId.HasValue)
+                {
+                    await shop.ChangeAsync(userId.Value, new CartLineRequest(vId, 1), true);
+                }
+            }
+
+            var redirectUrl = vId > 0 ? $"/cart?added={vId}" : "/cart";
+            return Results.Redirect(redirectUrl, false, false);
+        });
+
         return endpoints;
     }
 

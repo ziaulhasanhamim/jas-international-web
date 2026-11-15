@@ -1,5 +1,8 @@
 @page "/admin/categories"
 @inject AppDbContext Db
+@inject AdminService Admin
+@inject CatalogService Catalog
+@inject NavigationManager Nav
 
 <PageTitle>Categories · JAS Admin</PageTitle>
 
@@ -18,55 +21,193 @@
     </div>
 </div>
 
-<!-- Search Bar -->
-<div class="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
-    <form method="get" data-enhance class="flex flex-wrap items-center gap-3">
-        <div class="relative flex-1 min-w-[220px]">
-            <input name="q" value="@Query" class="field pr-9" placeholder="Search categories..." />
-            <span class="absolute right-3 top-3 text-slate-400">
-                <Icon Name="search" Class="size-4" />
-            </span>
-        </div>
-        <button type="submit" class="btn-primary">Search</button>
-        @if (!string.IsNullOrWhiteSpace(Query))
-        {
-            <a href="/admin/categories" class="btn-secondary">Clear</a>
-        }
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="close" Class="size-4 text-rose-600" />
+            @_error
+        </span>
+        <button type="button" @onclick="() => _error = null" class="text-rose-600 hover:text-rose-950">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<!-- Filters Bar -->
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+    <div class="flex flex-wrap items-center gap-2">
+        <a
+            href="@FilterUrl("all")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            All Categories (@totalAll)
+        </a>
+        <a
+            href="@FilterUrl("active")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "active" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            Active (@totalActive)
+        </a>
+        <a
+            href="@FilterUrl("featured")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            ⭐ Homepage Featured (@totalFeatured)
+        </a>
+        <a
+            href="@FilterUrl("hidden")"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "hidden" ? "bg-rose-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
+        >
+            Hidden / Archived (@totalHidden)
+        </a>
+    </div>
+
+    <form method="get" data-enhance class="relative w-64">
+        <input type="hidden" name="status" value="@Filter" />
+        <input
+            name="q"
+            value="@Query"
+            class="field pr-9 !py-1.5 text-xs"
+            placeholder="Search categories..."
+        />
+        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
+            <Icon Name="search" Class="size-3.5" />
+        </button>
     </form>
 </div>
 
-<!-- Categories QuickGrid -->
-<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-    <div class="table-scroll">
-        <QuickGrid Items="@categoriesQuery" Pagination="@pagination" class="data-table">
-            <TemplateColumn Title="Category Name" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.Name))">
-                <strong class="text-slate-900 block font-semibold">@context.Name</strong>
-            </TemplateColumn>
-            <TemplateColumn Title="URL Slug" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.Slug))">
-                <span class="font-mono text-xs text-slate-600">/@context.Slug</span>
-            </TemplateColumn>
-            <TemplateColumn Title="Parent Level">
-                <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 text-xs">
-                    @(context.ParentCategory?.Name ?? "Top level (Root)")
-                </span>
-            </TemplateColumn>
-            <TemplateColumn Title="Visibility" Sortable="true" SortBy="@(GridSort<Category>.ByAscending(c => c.IsDeleted))">
-                <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
-                    @(context.IsDeleted ? "Hidden" : "Active")
-                </span>
-            </TemplateColumn>
-            <TemplateColumn Title="Actions" Class="text-right">
-                <a href="/admin/categories/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                    Edit Category
-                </a>
-            </TemplateColumn>
-        </QuickGrid>
-    </div>
-</div>
+<!-- Categories Table -->
+<form method="post" @formname="categories-table-action">
+    <AntiforgeryToken />
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Category Name</th>
+                        <th>URL Slug</th>
+                        <th>Hierarchy Level</th>
+                        <th>Products</th>
+                        <th class="text-center">Homepage Featured</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in DisplayedCategories)
+                    {
+                        <tr>
+                            <td>
+                                <div class="flex items-center gap-2.5">
+                                    @if (!string.IsNullOrWhiteSpace(c.Icon))
+                                    {
+                                        <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm">
+                                            @c.Icon
+                                        </span>
+                                    }
+                                    <strong class="text-slate-900 block font-semibold">@c.Name</strong>
+                                </div>
+                            </td>
+                            <td class="font-mono text-xs text-slate-600">
+                                /category/@c.Slug
+                            </td>
+                            <td>
+                                @if (string.IsNullOrEmpty(c.ParentCategoryName))
+                                {
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 text-xs">
+                                        Top level (Root)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 text-xs">
+                                        ↳ Subcategory of @c.ParentCategoryName
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                    @c.ProductCount items
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <button
+                                    type="submit"
+                                    name="ToggleFeaturedId"
+                                    value="@c.Id"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(c.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                                    title="Click to toggle homepage featured status"
+                                >
+                                    <span class="size-1.5 rounded-full @(c.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
+                                    @(c.IsFeatured ? "⭐ Featured" : "Standard")
+                                </button>
+                            </td>
+                            <td>
+                                <span class="badge @(c.IsDeleted ? "badge-rose" : "badge-emerald")">
+                                    @(c.IsDeleted ? "Hidden" : "Active")
+                                </span>
+                            </td>
+                            <td class="text-right">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <a href="/admin/categories/@c.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                                        Edit
+                                    </a>
+                                    @if (!c.IsDeleted)
+                                    {
+                                        <button
+                                            type="submit"
+                                            name="DeleteCategoryId"
+                                            value="@c.Id"
+                                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                            onclick="return confirm('Are you sure you want to hide this category from the store?')"
+                                            title="Hide/Archive this category"
+                                        >
+                                            Hide
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button
+                                            type="submit"
+                                            name="ToggleVisibilityId"
+                                            value="@c.Id"
+                                            class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                            title="Restore this category to active catalog"
+                                        >
+                                            Restore
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
 
-<div class="mt-4 flex items-center justify-between">
-    <Paginator State="@pagination" />
-</div>
+        @if (DisplayedCategories.Count == 0)
+        {
+            <div class="empty-state py-12">
+                <Icon Name="box" Class="size-10 text-slate-300" />
+                <p>No categories found matching your criteria.</p>
+            </div>
+        }
+    </div>
+</form>
 
 @if (featured.Count > 0)
 {
@@ -75,32 +216,157 @@
     </div>
 }
 
-@code
-{
+@code {
+    [SupplyParameterFromQuery(Name = "status")]
+    public string Filter { get; set; } = "all";
+
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
-    private PaginationState pagination = new() { ItemsPerPage = 25 };
-    private IQueryable<Category>? categoriesQuery;
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public int ToggleFeaturedId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public int ToggleVisibilityId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public int DeleteCategoryId { get; set; }
+
+    public record AdminCategoryRow(
+        int Id,
+        string Name,
+        string Slug,
+        string? Icon,
+        int? ParentCategoryId,
+        string? ParentCategoryName,
+        int ProductCount,
+        bool IsFeatured,
+        int FeaturedSortOrder,
+        bool IsDeleted
+    );
+
+    private List<AdminCategoryRow> _allCategories = [];
     private List<OrderableItemDto> featured = [];
+    private string? _toast;
+    private string? _error;
+    private int totalAll;
+    private int totalActive;
+    private int totalFeatured;
+    private int totalHidden;
+
+    private string FilterUrl(string status)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status) && status != "all") parts.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
+        return parts.Count > 0 ? $"/admin/categories?{string.Join("&", parts)}" : "/admin/categories";
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        var q = Db.Categories.AsNoTracking().Include(c => c.ParentCategory).AsQueryable();
-        if (!string.IsNullOrWhiteSpace(Query))
+        try
         {
-            var filter = Query.Trim().ToLower();
-            q = q.Where(c => c.Name.ToLower().Contains(filter));
-        }
-        categoriesQuery = q;
+            if (ToggleFeaturedId > 0)
+            {
+                await Admin.ToggleCategoryFeaturedAsync(ToggleFeaturedId);
+                _toast = "Homepage featured status updated successfully.";
+                Nav.NavigateTo(FilterUrl(Filter));
+                return;
+            }
 
-        featured = await Db.CategoryPlacements.AsNoTracking()
-            .Where(p => p.IsActive
-            && p.PlacementType == CategoryPlacementType.HomepageFeatured
-            && !p.Category!.IsDeleted)
-            .OrderBy(p => p.SortOrder)
-            .ThenBy(p => p.Id)
-            .Select(p => new OrderableItemDto(p.Id, p.Category!.Name))
+            if (ToggleVisibilityId > 0)
+            {
+                await Admin.ToggleCategoryVisibilityAsync(ToggleVisibilityId);
+                _toast = "Category visibility restored.";
+                Nav.NavigateTo(FilterUrl(Filter));
+                return;
+            }
+
+            if (DeleteCategoryId > 0)
+            {
+                await Admin.DeleteCategoryAsync(DeleteCategoryId);
+                _toast = "Category hidden successfully.";
+                Nav.NavigateTo(FilterUrl(Filter));
+                return;
+            }
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Unable to load categories: {ex.Message}";
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        var categories = await Db.Categories.AsNoTracking()
+            .Include(c => c.ParentCategory)
+            .OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
+            .ThenBy(c => c.ParentCategory != null ? c.ParentCategory.Name : "")
+            .ThenBy(c => c.Name)
             .ToListAsync();
+
+        var placements = await Db.CategoryPlacements.AsNoTracking()
+            .Where(p => p.PlacementType == CategoryPlacementType.HomepageFeatured)
+            .ToListAsync();
+
+        var productCounts = await Db.Products.AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .GroupBy(p => p.CategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.CategoryId, g => g.Count);
+
+        _allCategories = categories.Select(c =>
+        {
+            var p = placements.FirstOrDefault(x => x.CategoryId == c.Id);
+            productCounts.TryGetValue(c.Id, out var pCount);
+            return new AdminCategoryRow(
+                c.Id,
+                c.Name,
+                c.Slug,
+                c.Icon,
+                c.ParentCategoryId,
+                c.ParentCategory?.Name,
+                pCount,
+                p?.IsActive == true,
+                p?.SortOrder ?? 0,
+                c.IsDeleted
+            );
+        }).ToList();
+
+        totalAll = _allCategories.Count;
+        totalActive = _allCategories.Count(c => !c.IsDeleted);
+        totalFeatured = _allCategories.Count(c => c.IsFeatured && !c.IsDeleted);
+        totalHidden = _allCategories.Count(c => c.IsDeleted);
+
+        featured = placements
+            .Where(p => p.IsActive)
+            .Join(categories.Where(c => !c.IsDeleted),
+                p => p.CategoryId,
+                c => c.Id,
+                (p, c) => new { p.Id, c.Name, p.SortOrder })
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.Id)
+            .Select(x => new OrderableItemDto(x.Id, x.Name))
+            .ToList();
+    }
+
+    private List<AdminCategoryRow> DisplayedCategories
+    {
+        get
+        {
+            var q = _allCategories.AsEnumerable();
+            if (Filter == "active") q = q.Where(c => !c.IsDeleted);
+            else if (Filter == "featured") q = q.Where(c => c.IsFeatured && !c.IsDeleted);
+            else if (Filter == "hidden") q = q.Where(c => c.IsDeleted);
+
+            if (!string.IsNullOrWhiteSpace(Query))
+            {
+                var term = Query.Trim().ToLowerInvariant();
+                q = q.Where(c => c.Name.ToLowerInvariant().Contains(term) || c.Slug.ToLowerInvariant().Contains(term));
+            }
+            return q.ToList();
+        }
     }
 }

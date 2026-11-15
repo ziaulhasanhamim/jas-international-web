@@ -1,7 +1,7 @@
 <article class="product-card group relative flex flex-col justify-between h-full bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden">
     @if (Product.IsNewArrival)
     {
-        <!-- Diagonal Red Ribbon (Gadget & Gear style) -->
+        <!-- Diagonal Red Ribbon -->
         <div class="absolute -top-1 -left-1 w-20 h-20 overflow-hidden pointer-events-none z-10">
             <div class="absolute transform -rotate-45 bg-[#ff0055] text-white font-extrabold text-[8.5px] leading-tight tracking-wider py-1 left-[-26px] top-[14px] w-[100px] text-center shadow-sm uppercase">
                 NEW<br />ARRIVAL
@@ -9,12 +9,21 @@
         </div>
     }
 
-    <!-- Wishlist Heart Button -->
-    <WishlistButton
-        Product="Product"
-        Class="absolute top-2.5 right-2.5 z-20 flex size-8 items-center justify-center rounded-full bg-white/90 backdrop-blur-sm border border-slate-200/90 text-slate-400 hover:text-rose-500 hover:scale-110 shadow-xs transition"
-        IconClass="size-4"
-    />
+    <!-- Static Wishlist Toggle Button (Driven by Vanilla JS via data-wishlist-toggle) -->
+    <button
+        type="button"
+        data-wishlist-toggle="@Product.Id"
+        data-product-name="@Product.Name"
+        data-product-slug="@Product.Slug"
+        data-product-image="@Product.Image"
+        data-product-price="@Product.Price"
+        class="absolute top-2.5 right-2.5 z-20 flex size-8 items-center justify-center rounded-full bg-white/90 backdrop-blur-sm border border-slate-200/90 text-slate-400 hover:text-rose-500 hover:scale-110 shadow-xs transition cursor-pointer"
+        aria-label="Add @Product.Name to wishlist"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-slate-400 group-[.is-wishlisted]:text-rose-500 group-[.is-wishlisted]:fill-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+    </button>
 
     <!-- Product Image Container -->
     <a href="/product/@Product.Slug" class="block relative aspect-square p-5 bg-white overflow-hidden">
@@ -29,7 +38,7 @@
         />
     </a>
 
-    <!-- Product Card Details (Gadget & Gear Layout) -->
+    <!-- Product Card Details -->
     <div class="px-4 pb-4 pt-1 flex flex-col flex-1 text-center">
         <!-- Brand Badge -->
         <div class="flex items-center justify-center mb-1.5 min-h-[22px]">
@@ -77,14 +86,22 @@
             <span class="text-[11px] text-slate-700 font-semibold">(@(Product.Rating > 0 ? Product.Rating.ToString("F1") : "5.0"))</span>
         </div>
 
-        <!-- Quick Add to Cart Action -->
+        <!-- Buy Now Action (Blazor Enhanced Form POST to /cart/buy-now) -->
         <div class="mt-auto pt-2 border-t border-slate-100">
-            <QuickAddToCart
-                @key="Product.DefaultVariantId"
-                VariantId="Product.DefaultVariantId"
-                Stock="Product.DefaultVariantStock"
-                ProductName="@Product.Name"
-            />
+            <form method="post" action="/cart/buy-now" data-enhance class="w-full">
+                <AntiforgeryToken />
+                <input type="hidden" name="productId" value="@Product.Id" />
+                <input type="hidden" name="variantId" value="@(Product.DefaultVariantId ?? 0)" />
+                <button
+                    type="submit"
+                    class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled="@(Product.DefaultVariantStock <= 0)"
+                    aria-label="Buy @Product.Name now"
+                >
+                    <Icon Name="cart" Class="size-3.5" />
+                    <span>@(Product.DefaultVariantStock <= 0 ? "Out of Stock" : "Buy Now")</span>
+                </button>
+            </form>
         </div>
     </div>
 </article>

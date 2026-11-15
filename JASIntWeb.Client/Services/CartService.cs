@@ -42,6 +42,7 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         try
         {
             await js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(cart, Json));
+            await js.InvokeVoidAsync("window.jasUpdateCartCount", cart.Items.Sum(i => i.Quantity));
         }
         catch (JSException)
         {
@@ -56,6 +57,7 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             try
             {
                 await js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+                await js.InvokeVoidAsync("window.jasUpdateCartCount", 0);
             }
             catch (JSException)
             {
@@ -69,6 +71,13 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         IsAuthenticated = cart.IsAuthenticated;
         Error = null;
         loaded = true;
+        try
+        {
+            _ = js.InvokeVoidAsync("window.jasUpdateCartCount", Items.Sum(i => i.Quantity));
+        }
+        catch
+        {
+        }
     }
 
     private async Task<LocalCartDto> IdentityAndMergeAsync()

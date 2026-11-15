@@ -5,7 +5,7 @@
 @using JASIntWeb.Services
 @using JASIntWeb.Services.Seo
 @using Microsoft.EntityFrameworkCore
-@inject AppDbContext Db
+@inject IDbContextFactory<AppDbContext> DbFactory
 @inject ISeoService Seo
 @inject NavigationManager Nav
 
@@ -165,7 +165,8 @@ else
     protected override async Task OnParametersSetAsync()
     {
         var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
-        brand = await Db.Brands.AsNoTracking()
+        await using var db = await DbFactory.CreateDbContextAsync();
+        brand = await db.Brands.AsNoTracking()
             .FirstOrDefaultAsync(b => b.Slug == cleanSlug && !b.IsDeleted);
 
         if (brand == null)
@@ -177,7 +178,7 @@ else
             return;
         }
 
-        var prods = await Db.Products.AsNoTracking()
+        var prods = await db.Products.AsNoTracking()
             .Include(p => p.ProductVariants)
             .Where(p => p.BrandId == brand.Id && !p.IsDeleted)
             .OrderBy(p => p.Name)

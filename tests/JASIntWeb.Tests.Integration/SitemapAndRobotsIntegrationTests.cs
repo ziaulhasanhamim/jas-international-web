@@ -202,4 +202,22 @@ public class SitemapAndRobotsIntegrationTests
         var recent = await svc.GetRecentActivityAsync(10);
         await recent.Should().NotBeEmpty();
     }
+
+    [Test]
+    public async Task HomePage_IsStaticSSR_HasNoInteractiveBlazorMarkers()
+    {
+        var client = Factory.CreateClient();
+        var response = await client.GetAsync("/");
+        var body = await response.Content.ReadAsStringAsync();
+
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        await body.Should().NotContain("unhandled exception");
+        // Verify no interactive Server/WASM blazor markers on homepage
+        await body.Should().NotContain("<!--blazor:{\"type\":\"server\"");
+        await body.Should().NotContain("<!--blazor:{\"type\":\"webassembly\"");
+        // Verify cart badge with data-cart-count and Buy Now enhanced form
+        await body.Should().Contain("data-cart-count");
+        await body.Should().Contain("action=\"/cart/buy-now\"");
+        await body.Should().Contain("data-enhance");
+    }
 }
