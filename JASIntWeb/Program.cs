@@ -200,12 +200,19 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
-if (app.Environment.IsDevelopment() 
-    || builder.Configuration.GetValue<bool>("Database:ApplyMigrations", false)
-    || builder.Configuration.GetValue<bool>("APPLY_MIGRATIONS", false))
+if (!builder.Configuration.GetValue<bool>("Database:SkipMigrations", false))
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while applying database migrations on startup.");
+    }
 }
 if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:Enabled", true))
 {

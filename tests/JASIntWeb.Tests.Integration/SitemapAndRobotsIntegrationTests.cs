@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace JASIntWeb.Tests.Integration;
 
@@ -114,5 +115,91 @@ public class SitemapAndRobotsIntegrationTests
         var body = await response.Content.ReadAsStringAsync();
         await ((int)response.StatusCode).Should().BeEqualTo(200);
         await body.Should().NotContain("unhandled exception");
+    }
+
+    [Test]
+    public async Task GetAllStorefrontPages_ReturnOkWithoutExceptions()
+    {
+        var client = Factory.CreateClient();
+        string[] publicRoutes =
+        [
+            "/",
+            "/products",
+            "/cart",
+            "/wishlist",
+            "/about",
+            "/contact",
+            "/faq",
+            "/terms",
+            "/privacy",
+            "/warranty-returns",
+            "/showroom",
+            "/track-order",
+            "/guides"
+        ];
+
+        foreach (var route in publicRoutes)
+        {
+            var response = await client.GetAsync(route);
+            var body = await response.Content.ReadAsStringAsync();
+            await ((int)response.StatusCode).Should().BeEqualTo(200);
+            await body.Should().NotContain("unhandled exception");
+        }
+    }
+
+    [Test]
+    public async Task VisitorAnalyticsService_PostgresQueries_ExecuteWithoutErrors()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<JASIntWeb.Persistence.AppDbContext>();
+        var svc = scope.ServiceProvider.GetRequiredService<JASIntWeb.Services.Analytics.IVisitorAnalyticsService>();
+
+        db.VisitorLogs.Add(new JASIntWeb.Persistence.Entities.VisitorLog
+        {
+            VisitorId = "test-vid-1",
+            SessionId = "test-sid-1",
+            Path = "/product/sample-1",
+            Title = "Sample Product",
+            City = "Khulna",
+            Country = "Bangladesh",
+            DeviceType = "Mobile",
+            Browser = "Chrome",
+            OperatingSystem = "Android",
+            ReferrerDomain = "google.com",
+            UtmCampaign = "spring_sale",
+            UtmSource = "facebook",
+            UtmMedium = "cpc",
+            Timestamp = DateTimeOffset.UtcNow
+        });
+        db.VisitorLogs.Add(new JASIntWeb.Persistence.Entities.VisitorLog
+        {
+            VisitorId = "test-vid-2",
+            SessionId = "test-sid-2",
+            Path = "/cart",
+            Title = "Shopping Cart",
+            City = "Dhaka",
+            Country = "Bangladesh",
+            DeviceType = "Desktop",
+            Browser = "Firefox",
+            OperatingSystem = "Windows",
+            Timestamp = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        // 1. Normal period
+        var dataToday = await svc.GetDashboardDataAsync(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        await dataToday.Should().NotBeNull();
+        await dataToday.Summary.TotalPageviews.Should().BeGreaterThanOrEqualTo(2);
+
+        // 2. All time (DateTimeOffset.MinValue / MaxValue check)
+        var dataAll = await svc.GetDashboardDataAsync(DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+        await dataAll.Should().NotBeNull();
+
+        // 3. Live count & recent
+        var live = await svc.GetLiveVisitorCountAsync();
+        await live.Should().BeGreaterThanOrEqualTo(1);
+
+        var recent = await svc.GetRecentActivityAsync(10);
+        await recent.Should().NotBeEmpty();
     }
 }

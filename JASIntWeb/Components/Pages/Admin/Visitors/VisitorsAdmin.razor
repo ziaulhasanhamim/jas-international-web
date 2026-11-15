@@ -1,5 +1,4 @@
 @page "/admin/visitors"
-@attribute [StreamRendering]
 @layout AdminLayout
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
@@ -406,8 +405,8 @@
                 end = DateTimeOffset.UtcNow;
                 break;
             case "all":
-                start = DateTimeOffset.MinValue;
-                end = DateTimeOffset.MaxValue;
+                start = DateTimeOffset.UtcNow.AddYears(-10);
+                end = DateTimeOffset.UtcNow.AddDays(1);
                 break;
             case "today":
             default:
@@ -417,6 +416,16 @@
                 break;
         }
 
-        data = await AnalyticsSvc.GetDashboardDataAsync(start, end);
+        try
+        {
+            data = await AnalyticsSvc.GetDashboardDataAsync(start, end);
+        }
+        catch (Exception)
+        {
+            data = new VisitorDashboardData(
+                new VisitorAnalyticsSummary(0, 0, 0, 0, 0, 0),
+                [], [], [], [], [], [], [], []
+            );
+        }
     }
 }
