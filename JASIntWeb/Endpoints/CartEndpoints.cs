@@ -58,12 +58,38 @@ public static class CartEndpoints
             ShoppingService shop) =>
         {
             await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop);
-            var target = !string.IsNullOrWhiteSpace(returnUrl) && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//")
-                ? returnUrl
-                : "/cart";
-            var sep = target.Contains('?') ? "&" : "?";
-            var redirectUrl = $"{target}{sep}cart=added";
-            return Results.Redirect(redirectUrl, false, false);
+
+            string target = "/";
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                if (returnUrl.StartsWith('/') && !returnUrl.StartsWith("//"))
+                {
+                    target = returnUrl;
+                }
+                else if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
+                {
+                    target = absUri.PathAndQuery;
+                }
+            }
+            else if (context.Request.Headers.TryGetValue("Referer", out var referer) &&
+                     Uri.TryCreate(referer.ToString(), UriKind.Absolute, out var refUri))
+            {
+                target = refUri.PathAndQuery;
+            }
+
+            // Add to cart must NEVER redirect to /cart - user remains on current browsing page
+            if (string.IsNullOrWhiteSpace(target) || target.StartsWith("/cart", StringComparison.OrdinalIgnoreCase))
+            {
+                target = "/";
+            }
+
+            if (!target.Contains("cart=added", StringComparison.OrdinalIgnoreCase))
+            {
+                var sep = target.Contains('?') ? "&" : "?";
+                target = $"{target}{sep}cart=added";
+            }
+
+            return Results.Redirect(target, false, false);
         }).DisableAntiforgery();
 
         return endpoints;

@@ -284,7 +284,7 @@ else
                             <AntiforgeryToken />
                             <input type="hidden" name="productId" value="@product.Id" />
                             <input type="hidden" name="variantId" value="@selected.Id" />
-                            <input type="hidden" name="returnUrl" value="@Nav.Uri" />
+                            <input type="hidden" name="returnUrl" value="/product/@product.Slug" />
 
                             <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
                                 <!-- Stepper -->
@@ -542,7 +542,7 @@ else
                         <input type="hidden" name="productId" value="@product.Id" />
                         <input type="hidden" name="variantId" value="@selected.Id" />
                         <input type="hidden" name="quantity" value="1" />
-                        <input type="hidden" name="returnUrl" value="@Nav.Uri" />
+                        <input type="hidden" name="returnUrl" value="/product/@product.Slug" />
                         <button type="submit" class="btn-secondary !py-2 !px-3 text-xs font-bold cursor-pointer">
                             Add
                         </button>

@@ -48,6 +48,7 @@ public class CartEnhancedFormIntegrationTests
         var location = response.Headers.Location?.ToString();
         await location.Should().NotBeNull();
         await location!.Should().Contain("cart=added");
+        await location!.Should().NotStartWith("/cart");
 
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
         var cartIdCookie = setCookies.FirstOrDefault(c => c.Contains("jas_cart_id="));
@@ -69,6 +70,46 @@ public class CartEnhancedFormIntegrationTests
         var cartInDb = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.Token == cartToken);
         await cartInDb.Should().NotBeNull();
         await cartInDb!.Items.Any(i => i.ProductVariantId == variant.Id && i.Quantity >= 2).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task Cart_AddToCart_FormPost_NeverRedirectsToCartPage()
+    {
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => !v.IsDeleted && v.IsActive);
+        if (variant == null) return;
+
+        // 1. With returnUrl pointing to product
+        var form1 = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "productId", variant.ProductId.ToString() },
+            { "variantId", variant.Id.ToString() },
+            { "quantity", "1" },
+            { "returnUrl", $"/product/{variant.Product?.Slug ?? "test"}" }
+        });
+        var res1 = await client.PostAsync("/cart/add", form1);
+        var loc1 = res1.Headers.Location?.ToString();
+        await loc1.Should().NotBeNull();
+        await loc1!.Should().StartWith("/product/");
+        await loc1!.Should().NotStartWith("/cart");
+
+        // 2. Without returnUrl (defaults to staying on page / referer / root, not /cart)
+        var form2 = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "productId", variant.ProductId.ToString() },
+            { "variantId", variant.Id.ToString() },
+            { "quantity", "1" }
+        });
+        var res2 = await client.PostAsync("/cart/add", form2);
+        var loc2 = res2.Headers.Location?.ToString();
+        await loc2.Should().NotBeNull();
+        await loc2!.Should().NotStartWith("/cart");
     }
 
     [Test]
