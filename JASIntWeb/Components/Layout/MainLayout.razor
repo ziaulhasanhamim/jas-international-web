@@ -1,4 +1,10 @@
 @inherits LayoutComponentBase
+@using JASIntWeb.Endpoints
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
 
 <div class="min-h-screen flex flex-col">
     <SiteHeader InitialCartCount="@initialCartCount" />
@@ -19,13 +25,27 @@
 
     private int initialCartCount;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (HttpContext != null &&
-            HttpContext.Request.Cookies.TryGetValue("jas_cart_count", out var cVal) &&
-            int.TryParse(cVal, out var count) && count >= 0)
+        if (HttpContext != null)
         {
-            initialCartCount = count;
+            var (token, userId) = CartEndpoints.ResolveCartIdentity(HttpContext);
+            if (userId.HasValue || token.HasValue)
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+                if (userId.HasValue)
+                {
+                    initialCartCount = await db.CartItems.AsNoTracking()
+                        .Where(i => i.Cart.UserId == userId.Value && i.Cart.Status == CartStatus.Active)
+                        .SumAsync(i => (int?)i.Quantity) ?? 0;
+                }
+                if (initialCartCount == 0 && token.HasValue)
+                {
+                    initialCartCount = await db.CartItems.AsNoTracking()
+                        .Where(i => i.Cart.Token == token.Value && i.Cart.Status == CartStatus.Active)
+                        .SumAsync(i => (int?)i.Quantity) ?? 0;
+                }
+            }
         }
     }
 }

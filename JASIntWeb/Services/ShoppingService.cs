@@ -25,21 +25,51 @@ public sealed class ShoppingService(
     public async Task LockUserAsync(int userId) => await db.Database.ExecuteSqlAsync(
         $"SELECT \"Id\" FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE");
 
-    private async Task<Cart> ActiveCartAsync(int userId)
+    public async Task<Cart> ActiveCartAsync(Guid? token, int? userId)
     {
-        var cart = await db.Carts.Include(c => c.Items)
-            .SingleOrDefaultAsync(c => c.UserId == userId && c.Status == CartStatus.Active);
+        Cart? cart = null;
+
+        if (userId.HasValue)
+        {
+            cart = await db.Carts.Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.UserId == userId.Value && c.Status == CartStatus.Active);
+
+            if (cart is null && token.HasValue && token.Value != Guid.Empty)
+            {
+                cart = await db.Carts.Include(c => c.Items)
+                    .FirstOrDefaultAsync(c => c.Token == token.Value && c.Status == CartStatus.Active);
+                if (cart != null)
+                {
+                    cart.UserId = userId.Value;
+                }
+            }
+        }
+        else if (token.HasValue && token.Value != Guid.Empty)
+        {
+            cart = await db.Carts.Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.Token == token.Value && c.Status == CartStatus.Active);
+        }
+
         if (cart is not null)
         {
+            cart.LastActivityAt = DateTimeOffset.UtcNow;
             return cart;
         }
+
         cart = new Cart
         {
-            UserId = userId
+            Token = (token.HasValue && token.Value != Guid.Empty) ? token.Value : Guid.CreateVersion7(),
+            UserId = userId,
+            Status = CartStatus.Active,
+            LastActivityAt = DateTimeOffset.UtcNow,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(30)
         };
         db.Carts.Add(cart);
+        await db.SaveChangesAsync();
         return cart;
     }
+
+    private Task<Cart> ActiveCartAsync(int userId) => ActiveCartAsync(null, userId);
 
     public async Task<CartDto> ResolveAsync(List<CartLineRequest> lines, bool authenticated = false)
     {
@@ -166,20 +196,44 @@ public sealed class ShoppingService(
         }
     }
 
-    public async Task<CartDto> GetCartAsync(int userId)
+    public async Task<CartDto> GetCartAsync(Guid? token, int? userId)
     {
-        var lines = await db.CartItems.AsNoTracking()
-            .Where(i => i.Cart.UserId == userId && i.Cart.Status == CartStatus.Active)
-            .Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity))
-            .ToListAsync();
-        return await ResolveAsync(lines, true);
+        var cart = await ActiveCartAsync(token, userId);
+        var lines = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+        return await ResolveAsync(lines, userId.HasValue);
     }
 
-    public async Task<CartDto> ChangeAsync(int userId, CartLineRequest line, bool add)
+    public Task<CartDto> GetCartAsync(int userId) => GetCartAsync(null, userId);
+
+    public async Task<int> GetCartItemCountAsync(Guid? token, int? userId)
+    {
+        if (userId.HasValue)
+        {
+            var userCartCount = await db.CartItems.AsNoTracking()
+                .Where(i => i.Cart.UserId == userId.Value && i.Cart.Status == CartStatus.Active)
+                .SumAsync(i => (int?)i.Quantity);
+            if (userCartCount.HasValue && userCartCount.Value > 0) return userCartCount.Value;
+        }
+
+        if (token.HasValue && token.Value != Guid.Empty)
+        {
+            var tokenCartCount = await db.CartItems.AsNoTracking()
+                .Where(i => i.Cart.Token == token.Value && i.Cart.Status == CartStatus.Active)
+                .SumAsync(i => (int?)i.Quantity);
+            return tokenCartCount ?? 0;
+        }
+
+        return 0;
+    }
+
+    public async Task<CartDto> ChangeAsync(Guid? token, int? userId, CartLineRequest line, bool add)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
-        await LockUserAsync(userId);
-        var cart = await ActiveCartAsync(userId);
+        if (userId.HasValue)
+        {
+            await LockUserAsync(userId.Value);
+        }
+        var cart = await ActiveCartAsync(token, userId);
         var item = cart.Items.FirstOrDefault(i => i.ProductVariantId == line.VariantId);
         var quantity = add ? (item?.Quantity ?? 0) + line.Quantity : line.Quantity;
         if (quantity < 0 || quantity > 99 || (add && line.Quantity <= 0))
@@ -217,10 +271,13 @@ public sealed class ShoppingService(
                 item.Quantity = quantity;
             }
         }
+        cart.LastActivityAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        return await GetCartAsync(userId);
+        return await GetCartAsync(cart.Token, userId);
     }
+
+    public Task<CartDto> ChangeAsync(int userId, CartLineRequest line, bool add) => ChangeAsync(null, userId, line, add);
 
     public async Task<CartDto> MergeAsync(int userId, CartMergeRequest request)
     {
@@ -271,15 +328,21 @@ public sealed class ShoppingService(
         return await GetCartAsync(userId);
     }
 
-    public async Task ClearAsync(int userId)
+    public async Task ClearAsync(Guid? token, int? userId)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
-        await LockUserAsync(userId);
-        var cart = await ActiveCartAsync(userId);
+        if (userId.HasValue)
+        {
+            await LockUserAsync(userId.Value);
+        }
+        var cart = await ActiveCartAsync(token, userId);
         db.CartItems.RemoveRange(cart.Items);
+        cart.LastActivityAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
     }
+
+    public Task ClearAsync(int userId) => ClearAsync(null, userId);
 
     public async Task<CheckoutResult> CheckoutAsync(int? userId, CheckoutRequest request)
     {
@@ -309,7 +372,7 @@ public sealed class ShoppingService(
         if (userId.HasValue)
         {
             await LockUserAsync(userId.Value);
-            cart = await ActiveCartAsync(userId.Value);
+            cart = await ActiveCartAsync(null, userId.Value);
             if (cart.Items.Count == 0 && request.Items.Count > 0)
             {
                 foreach (var line in request.Items)
@@ -320,6 +383,20 @@ public sealed class ShoppingService(
             else
             {
                 request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+            }
+        }
+        else
+        {
+            Guid? cartToken = request.CartToken.HasValue && request.CartToken.Value != Guid.Empty
+                ? request.CartToken.Value
+                : (httpContextAccessor?.HttpContext?.Request.Cookies.TryGetValue("jas_cart_id", out var tStr) == true && Guid.TryParse(tStr, out var g) ? g : (Guid?)null);
+            if (cartToken.HasValue)
+            {
+                cart = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.Token == cartToken.Value && c.Status == CartStatus.Active);
+                if (cart != null && cart.Items.Count > 0)
+                {
+                    request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+                }
             }
         }
         if (request.Items.Count == 0)

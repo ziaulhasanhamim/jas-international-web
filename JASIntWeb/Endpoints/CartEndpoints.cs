@@ -9,17 +9,19 @@ namespace JASIntWeb.Endpoints;
 
 public static class CartEndpoints
 {
+    public const string CartCookieName = "jas_cart_id";
+
     public static IEndpointRouteBuilder MapCartEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var cart = endpoints.MapGroup("/api/cart");
         cart.MapGet("/security", Security);
         cart.MapGet("/account", Account);
         cart.MapGet("/delivery-rates", Rates);
-        cart.MapGet("", Get).RequireAuthorization();
+        cart.MapGet("", Get);
         cart.MapPost("/resolve", Resolve);
         cart.MapPost("/merge", Merge).RequireAuthorization();
-        cart.MapPost("", Add).RequireAuthorization();
-        cart.MapPut("", Update).RequireAuthorization();
+        cart.MapPost("", Add);
+        cart.MapPut("", Update);
 
         // 100% Static SSR Enhanced Form Submission Endpoints (Zero WebSockets/WASM Overhead)
         endpoints.MapPost("/cart/buy-now", async (
@@ -67,6 +69,41 @@ public static class CartEndpoints
         return endpoints;
     }
 
+    public static (Guid? Token, int? UserId) ResolveCartIdentity(HttpContext context, ClaimsPrincipal? user = null)
+    {
+        var userId = ShoppingService.UserId(user ?? context.User);
+        Guid? token = null;
+        if (context.Request.Cookies.TryGetValue(CartCookieName, out var cookieVal) &&
+            Guid.TryParse(cookieVal, out var g) && g != Guid.Empty)
+        {
+            token = g;
+        }
+        return (token, userId);
+    }
+
+    public static (Guid Token, int? UserId) EnsureCartIdentity(HttpContext context, ClaimsPrincipal? user = null)
+    {
+        var (token, userId) = ResolveCartIdentity(context, user);
+        if (!token.HasValue)
+        {
+            token = Guid.CreateVersion7();
+            SetCartCookie(context, token.Value);
+        }
+        return (token.Value, userId);
+    }
+
+    public static void SetCartCookie(HttpContext context, Guid token)
+    {
+        context.Response.Cookies.Append(CartCookieName, token.ToString(), new CookieOptions
+        {
+            Path = "/",
+            Expires = DateTimeOffset.UtcNow.AddDays(30),
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            IsEssential = true
+        });
+    }
+
     private static async Task<int> ProcessAddToCartAsync(
         HttpContext context,
         int productId,
@@ -87,94 +124,15 @@ public static class CartEndpoints
         }
 
         var qty = Math.Clamp(quantity <= 0 ? 1 : quantity, 1, 99);
-        var totalCount = 0;
+        var (token, userId) = EnsureCartIdentity(context);
 
         if (vId > 0)
         {
-            var userId = ShoppingService.UserId(context.User);
-            if (userId.HasValue)
-            {
-                await shop.ChangeAsync(userId.Value, new CartLineRequest(vId, qty), true);
-                var userCart = await shop.GetCartAsync(userId.Value);
-                totalCount = userCart.Items.Sum(i => i.Quantity);
-            }
-            else
-            {
-                var guestItems = GetGuestCartItems(context);
-                var existing = guestItems.FirstOrDefault(i => i.VariantId == vId);
-                if (existing != null)
-                {
-                    existing.Quantity = Math.Clamp(existing.Quantity + qty, 1, 99);
-                }
-                else
-                {
-                    guestItems.Add(new GuestCartItem { VariantId = vId, Quantity = qty });
-                }
-
-                totalCount = guestItems.Sum(i => i.Quantity);
-                SetGuestCartCookies(context, guestItems, totalCount);
-                return totalCount;
-            }
-        }
-        else
-        {
-            var userId = ShoppingService.UserId(context.User);
-            if (userId.HasValue)
-            {
-                var userCart = await shop.GetCartAsync(userId.Value);
-                totalCount = userCart.Items.Sum(i => i.Quantity);
-            }
-            else
-            {
-                totalCount = GetGuestCartItems(context).Sum(i => i.Quantity);
-            }
+            var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
+            return cart.Items.Sum(i => i.Quantity);
         }
 
-        context.Response.Cookies.Append("jas_cart_count", totalCount.ToString(), new CookieOptions
-        {
-            Path = "/",
-            Expires = DateTimeOffset.UtcNow.AddDays(30),
-            HttpOnly = false,
-            SameSite = SameSiteMode.Lax,
-            IsEssential = true
-        });
-
-        return totalCount;
-    }
-
-    private sealed class GuestCartItem
-    {
-        public int VariantId { get; set; }
-        public int Quantity { get; set; }
-    }
-
-    private static List<GuestCartItem> GetGuestCartItems(HttpContext context)
-    {
-        try
-        {
-            if (context.Request.Cookies.TryGetValue("jas_guest_cart", out var json) && !string.IsNullOrWhiteSpace(json))
-            {
-                var items = System.Text.Json.JsonSerializer.Deserialize<List<GuestCartItem>>(json);
-                return items?.Where(i => i.VariantId > 0 && i.Quantity > 0).ToList() ?? [];
-            }
-        }
-        catch {}
-        return [];
-    }
-
-    private static void SetGuestCartCookies(HttpContext context, List<GuestCartItem> items, int totalCount)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(items);
-        var cookieOpts = new CookieOptions
-        {
-            Path = "/",
-            Expires = DateTimeOffset.UtcNow.AddDays(30),
-            HttpOnly = false,
-            SameSite = SameSiteMode.Lax,
-            IsEssential = true
-        };
-        context.Response.Cookies.Append("jas_guest_cart", json, cookieOpts);
-        context.Response.Cookies.Append("jas_cart_count", totalCount.ToString(), cookieOpts);
+        return await shop.GetCartItemCountAsync(token, userId);
     }
 
     public static AntiforgeryDto Security(HttpContext context, IAntiforgery csrf) =>
@@ -185,8 +143,15 @@ public static class CartEndpoints
 
     public static DeliveryRatesDto Rates(ShoppingService shop) => shop.Rates;
 
-    public static Task<CartDto> Get(ClaimsPrincipal user, ShoppingService shop) =>
-        shop.GetCartAsync(ShoppingService.UserId(user)!.Value);
+    public static async Task<CartDto> Get(HttpContext context, ClaimsPrincipal user, ShoppingService shop)
+    {
+        var (token, userId) = ResolveCartIdentity(context, user);
+        if (!token.HasValue && !userId.HasValue)
+        {
+            return new CartDto(false, []);
+        }
+        return await shop.GetCartAsync(token, userId);
+    }
 
     public static Task<CartDto> Resolve([FromBody] List<CartLineRequest> items, ShoppingService shop) =>
         shop.ResolveAsync(items);
@@ -201,9 +166,15 @@ public static class CartEndpoints
         return shop.MergeAsync(ShoppingService.UserId(user)!.Value, request);
     }
 
-    public static Task<CartDto> Add([FromBody] CartLineRequest line, ClaimsPrincipal user, ShoppingService shop) =>
-        shop.ChangeAsync(ShoppingService.UserId(user)!.Value, line, true);
+    public static async Task<CartDto> Add([FromBody] CartLineRequest line, HttpContext context, ClaimsPrincipal user, ShoppingService shop)
+    {
+        var (token, userId) = EnsureCartIdentity(context, user);
+        return await shop.ChangeAsync(token, userId, line, true);
+    }
 
-    public static Task<CartDto> Update([FromBody] CartLineRequest line, ClaimsPrincipal user, ShoppingService shop) =>
-        shop.ChangeAsync(ShoppingService.UserId(user)!.Value, line, false);
+    public static async Task<CartDto> Update([FromBody] CartLineRequest line, HttpContext context, ClaimsPrincipal user, ShoppingService shop)
+    {
+        var (token, userId) = EnsureCartIdentity(context, user);
+        return await shop.ChangeAsync(token, userId, line, false);
+    }
 }

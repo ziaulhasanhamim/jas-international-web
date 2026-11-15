@@ -2,33 +2,6 @@
 (function() {
     'use strict';
 
-    function getCartCount() {
-        try {
-            // 1. Check jas_cart_count cookie
-            const m = document.cookie.match(/(?:^|;\s*)jas_cart_count=([^;]+)/);
-            if (m) {
-                const n = parseInt(m[1], 10);
-                if (!isNaN(n) && n >= 0) return n;
-            }
-
-            // 2. Check jas_cart_count in localStorage
-            const stored = localStorage.getItem('jas_cart_count');
-            if (stored) {
-                const n = parseInt(stored, 10);
-                if (!isNaN(n) && n >= 0) return n;
-            }
-
-            // 3. Fallback to jas.cart.v2 items sum
-            const raw = localStorage.getItem('jas.cart.v2');
-            if (!raw) return 0;
-            const data = JSON.parse(raw);
-            if (!data || !Array.isArray(data.items)) return 0;
-            return data.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        } catch {
-            return 0;
-        }
-    }
-
     function getWishlistItems() {
         try {
             const raw = localStorage.getItem('jas.wishlist.v1');
@@ -40,14 +13,7 @@
         }
     }
 
-    function updateBadges() {
-        const count = getCartCount();
-        const badges = document.querySelectorAll('[data-cart-count]');
-        badges.forEach(b => {
-            b.textContent = count;
-            b.setAttribute('data-cart-count', count);
-        });
-
+    function updateWishlistBadges() {
         const wishlist = getWishlistItems();
         const wCount = wishlist.length;
         const wBadges = document.querySelectorAll('[data-wishlist-count]');
@@ -105,31 +71,27 @@
                     localStorage.setItem('jas.wishlist.v1', JSON.stringify(items));
                 } catch {}
 
-                updateBadges();
+                updateWishlistBadges();
             });
         });
     }
 
-    // Expose global updater so Blazor or other scripts can notify when cart changes
-    window.jasUpdateCartCount = function(overrideCount) {
-        let count = typeof overrideCount === 'number' ? overrideCount : getCartCount();
+    // Expose global updater so Blazor or other scripts can update cart count in DOM
+    window.jasUpdateCartCount = function(count) {
+        if (typeof count !== 'number') return;
         const badges = document.querySelectorAll('[data-cart-count]');
         badges.forEach(b => {
             b.textContent = count;
             b.setAttribute('data-cart-count', count);
         });
-        try {
-            document.cookie = `jas_cart_count=${count}; path=/; max-age=2592000; SameSite=Lax`;
-            localStorage.setItem('jas_cart_count', count.toString());
-        } catch {}
     };
 
     window.jasUpdateWishlistCount = function() {
-        updateBadges();
+        updateWishlistBadges();
     };
 
     function init() {
-        updateBadges();
+        updateWishlistBadges();
         initWishlistButtons();
     }
 
@@ -139,6 +101,6 @@
         init();
     }
 
-    window.addEventListener('storage', updateBadges);
+    window.addEventListener('storage', updateWishlistBadges);
     document.addEventListener('enhancedload', init);
 })();

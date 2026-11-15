@@ -1,8 +1,15 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
+using JASIntWeb.Client.Dtos;
+using JASIntWeb.Endpoints;
 using JASIntWeb.Persistence;
+using JASIntWeb.Persistence.Entities;
+using JASIntWeb.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JASIntWeb.Tests.Integration;
 
@@ -12,7 +19,7 @@ public class CartEnhancedFormIntegrationTests
     private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
-    public async Task Cart_AddToCart_FormPost_SetsCookieAndRedirects()
+    public async Task Cart_AddToCart_FormPost_SetsGuidCookieAndSavesToDb()
     {
         var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -43,15 +50,29 @@ public class CartEnhancedFormIntegrationTests
         await location!.Should().Contain("cart=added");
 
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
-        var hasCountCookie = setCookies.Any(c => c.Contains("jas_cart_count="));
-        var hasGuestCart = setCookies.Any(c => c.Contains("jas_guest_cart="));
+        var cartIdCookie = setCookies.FirstOrDefault(c => c.Contains("jas_cart_id="));
+        await cartIdCookie.Should().NotBeNull();
 
-        await hasCountCookie.Should().BeTrue();
-        await hasGuestCart.Should().BeTrue();
+        // Extract GUID
+        var match = Regex.Match(cartIdCookie!, @"jas_cart_id=([a-fA-F0-9\-]+)");
+        await match.Success.Should().BeTrue();
+        var parsed = Guid.TryParse(match.Groups[1].Value, out var cartToken);
+        await parsed.Should().BeTrue();
+
+        // Verify no cart payload in cookies
+        var hasGuestCartJson = setCookies.Any(c => c.Contains("jas_guest_cart="));
+        var hasCartCount = setCookies.Any(c => c.Contains("jas_cart_count="));
+        await hasGuestCartJson.Should().BeFalse();
+        await hasCartCount.Should().BeFalse();
+
+        // Verify cart exists in PostgreSQL DB
+        var cartInDb = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.Token == cartToken);
+        await cartInDb.Should().NotBeNull();
+        await cartInDb!.Items.Any(i => i.ProductVariantId == variant.Id && i.Quantity >= 2).Should().BeTrue();
     }
 
     [Test]
-    public async Task Cart_BuyNow_FormPost_SetsCookieAndRedirectsToCart()
+    public async Task Cart_BuyNow_FormPost_SetsGuidCookieAndRedirectsToCart()
     {
         var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -81,23 +102,107 @@ public class CartEnhancedFormIntegrationTests
         await location!.Should().StartWith("/cart");
 
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
-        var hasCountCookie = setCookies.Any(c => c.Contains("jas_cart_count="));
-        await hasCountCookie.Should().BeTrue();
+        var cartIdCookie = setCookies.FirstOrDefault(c => c.Contains("jas_cart_id="));
+        await cartIdCookie.Should().NotBeNull();
     }
 
     [Test]
-    public async Task SiteHeader_WithCartCountCookie_RendersCountOnSSR()
+    public async Task SiteHeader_WithCartGuidCookie_RendersCountFromDbOnSSR()
     {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => !v.IsDeleted && v.IsActive);
+        if (variant == null)
+        {
+            return;
+        }
+
+        // Create a test cart in DB with token
+        var testToken = Guid.CreateVersion7();
+        var cart = new Cart
+        {
+            Token = testToken,
+            Status = CartStatus.Active,
+            LastActivityAt = DateTimeOffset.UtcNow,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(30)
+        };
+        cart.Items.Add(new CartItem
+        {
+            ProductVariantId = variant.Id,
+            Quantity = 4
+        });
+        db.Carts.Add(cart);
+        await db.SaveChangesAsync();
+
         var client = Factory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.Add("Cookie", "jas_cart_count=3");
+        request.Headers.Add("Cookie", $"jas_cart_id={testToken}");
 
         var response = await client.SendAsync(request);
         var html = await response.Content.ReadAsStringAsync();
 
         await ((int)response.StatusCode).Should().BeEqualTo(200);
         await html.Should().Contain("data-cart-count");
-        await html.Should().Contain("3");
+        await html.Should().Contain("4");
+    }
+
+    [Test]
+    public async Task CartCleanup_PurgesConvertedAndInactiveCartsOlderThan30Days()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+
+        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => !v.IsDeleted && v.IsActive);
+        if (variant == null)
+        {
+            return;
+        }
+
+        // 1. Converted cart (should be deleted)
+        var convertedCart = new Cart
+        {
+            Token = Guid.CreateVersion7(),
+            Status = CartStatus.Converted,
+            LastActivityAt = DateTimeOffset.UtcNow
+        };
+        convertedCart.Items.Add(new CartItem { ProductVariantId = variant.Id, Quantity = 1 });
+
+        // 2. Inactive >30d cart (should be deleted)
+        var oldInactiveCart = new Cart
+        {
+            Token = Guid.CreateVersion7(),
+            Status = CartStatus.Active,
+            LastActivityAt = DateTimeOffset.UtcNow.AddDays(-35)
+        };
+        oldInactiveCart.Items.Add(new CartItem { ProductVariantId = variant.Id, Quantity = 2 });
+
+        // 3. Active fresh cart (should NOT be deleted)
+        var activeFreshCart = new Cart
+        {
+            Token = Guid.CreateVersion7(),
+            Status = CartStatus.Active,
+            LastActivityAt = DateTimeOffset.UtcNow
+        };
+        activeFreshCart.Items.Add(new CartItem { ProductVariantId = variant.Id, Quantity = 3 });
+
+        db.Carts.AddRange(convertedCart, oldInactiveCart, activeFreshCart);
+        await db.SaveChangesAsync();
+
+        var cleanup = new CartCleanupBackgroundService(dbFactory, NullLogger<CartCleanupBackgroundService>.Instance);
+        var deletedCount = await cleanup.CleanupStaleCartsAsync();
+
+        await (deletedCount >= 2).Should().BeTrue();
+
+        // Verify fresh active cart is still present
+        var freshInDb = await db.Carts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == activeFreshCart.Id);
+        await freshInDb.Should().NotBeNull();
+
+        // Verify converted and old carts are gone
+        var convertedInDb = await db.Carts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == convertedCart.Id);
+        var oldInDb = await db.Carts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == oldInactiveCart.Id);
+        await convertedInDb.Should().BeNull();
+        await oldInDb.Should().BeNull();
     }
 
     [Test]

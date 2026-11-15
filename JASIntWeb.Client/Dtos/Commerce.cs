@@ -19,6 +19,7 @@ public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items)
 public sealed class CheckoutRequest
 {
     public Guid RequestId { get; set; }
+    public Guid? CartToken { get; set; }
     public decimal? ExpectedTotal { get; set; }
     public List<CartLineRequest> Items { get; set; } = [];
     [Required, StringLength(100)]

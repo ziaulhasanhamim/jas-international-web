@@ -86,4 +86,29 @@ public class AdminCategoryIntegrationTests
         await savedPlacement.Should().NotBeNull();
         await savedPlacement!.IsActive.Should().BeFalse();
     }
+
+    [Test]
+    public async Task CategoriesAdmin_Query_ExecutesSuccessfullyOnDatabase()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var q = db.Categories.AsNoTracking();
+        var categoriesQuery = q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
+            .ThenBy(c => c.Name)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Slug,
+                c.Icon,
+                ParentCategoryName = c.ParentCategory != null ? c.ParentCategory.Name : null,
+                ProductCount = c.Products.Count(p => !p.IsDeleted),
+                IsFeatured = db.CategoryPlacements.Any(p => p.CategoryId == c.Id && p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive),
+                c.IsDeleted
+            });
+
+        var results = await categoriesQuery.Take(15).ToListAsync();
+        await results.Should().NotBeNull();
+    }
 }

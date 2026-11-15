@@ -71,6 +71,7 @@ builder.Services.AddHostedService<MetaCapiBackgroundWorker>();
 builder.Services.AddScoped<IMetaConversionsApiService, MetaConversionsApiService>();
 builder.Services.AddSingleton<IVisitorAnalyticsQueue, VisitorAnalyticsQueue>();
 builder.Services.AddHostedService<VisitorAnalyticsBackgroundWorker>();
+builder.Services.AddHostedService<CartCleanupBackgroundService>();
 builder.Services.AddScoped<IVisitorAnalyticsService, VisitorAnalyticsService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
