@@ -2,16 +2,14 @@ using JASIntWeb.Client.Dtos;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using JASIntWeb.Services;
-using Microsoft.AspNetCore.Mvc.Testing;
+using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class AdminCategoryIntegrationTests
+public class AdminCategoryIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task Categories_ExtraAutomationCategories_AreCleanedUpOnStartup()

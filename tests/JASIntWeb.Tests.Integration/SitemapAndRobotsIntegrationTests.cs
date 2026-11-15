@@ -1,13 +1,12 @@
 using System.Net;
+using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class SitemapAndRobotsIntegrationTests
+public class SitemapAndRobotsIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task GetSitemapXml_ReturnsOkWithXmlContent()

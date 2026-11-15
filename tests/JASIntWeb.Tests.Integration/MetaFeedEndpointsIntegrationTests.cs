@@ -1,12 +1,10 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
+using JASIntWeb.Tests.Integration.Infrastructure;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class MetaFeedEndpointsIntegrationTests
+public class MetaFeedEndpointsIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task GetMetaProductsXml_ReturnsOkWithValidRssAndGoogleMerchantElements()

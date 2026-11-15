@@ -1,12 +1,10 @@
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
+using JASIntWeb.Tests.Integration.Infrastructure;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class OrderEndpointsIntegrationTests
+public class OrderEndpointsIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task GetOrderStatus_ForExistingOrder_Returns200WithStatusDetails()

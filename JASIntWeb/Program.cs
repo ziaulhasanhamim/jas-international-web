@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Microsoft.Extensions.Caching.Hybrid;
 var builder = WebApplication.CreateBuilder(args);
 
 var portEnv = Environment.GetEnvironmentVariable("PORT");
@@ -25,16 +26,14 @@ builder.Services.AddQuickGridEntityFrameworkAdapter();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddMemoryCache();
-#pragma warning disable EXTEXP0018
 builder.Services.AddHybridCache(options =>
 {
-    options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+    options.DefaultEntryOptions = new HybridCacheEntryOptions
     {
         Expiration = TimeSpan.FromMinutes(30),
         LocalCacheExpiration = TimeSpan.FromMinutes(30)
     };
 });
-#pragma warning restore EXTEXP0018
 
 builder.Services.AddOutputCache(options =>
 {

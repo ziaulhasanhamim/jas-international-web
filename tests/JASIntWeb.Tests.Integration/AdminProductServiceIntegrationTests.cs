@@ -1,16 +1,14 @@
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services;
-using Microsoft.AspNetCore.Mvc.Testing;
+using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class AdminProductServiceIntegrationTests
+public class AdminProductServiceIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task SaveProductAsync_WhenSlugIsEmpty_AutoGeneratesSlugFromName()

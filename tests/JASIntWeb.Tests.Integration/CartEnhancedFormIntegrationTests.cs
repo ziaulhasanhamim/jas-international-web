@@ -6,6 +6,7 @@ using JASIntWeb.Endpoints;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using JASIntWeb.Services;
+using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +14,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class CartEnhancedFormIntegrationTests
+public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task Cart_AddToCart_FormPost_SetsGuidCookieAndSavesToDb()

@@ -3,16 +3,14 @@ using System.Text.Json;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services;
-using Microsoft.AspNetCore.Mvc.Testing;
+using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JASIntWeb.Tests.Integration;
 
-[NotInParallel("web-integration")]
-public class BrandLogoIntegrationTests
+public class BrandLogoIntegrationTests : JasIntegrationTestBase
 {
-    private static readonly WebApplicationFactory<Program> Factory = new();
 
     [Test]
     public async Task BrandLogo_UploadEndpoint_ValidPng_ReturnsOkWithUrl()
