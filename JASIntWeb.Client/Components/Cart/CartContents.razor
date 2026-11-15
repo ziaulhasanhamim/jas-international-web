@@ -141,9 +141,6 @@
 
 @code
 {
-    [SupplyParameterFromQuery(Name = "added")]
-    public int? AddedVariantId { get; set; }
-
     private bool ready;
     private int? pendingVariantId;
 
@@ -151,11 +148,6 @@
     {
         Cart.OnChange += Changed;
         await Cart.RefreshAsync();
-        if (AddedVariantId.HasValue && AddedVariantId.Value > 0)
-        {
-            await Cart.AddAsync(AddedVariantId.Value, 1);
-            Nav.NavigateTo("/cart", replace: true);
-        }
         ready = true;
     }
 

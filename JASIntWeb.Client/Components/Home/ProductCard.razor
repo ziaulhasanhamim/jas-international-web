@@ -72,18 +72,12 @@
         </div>
 
         <!-- Price Row -->
-        <div class="flex items-baseline justify-center gap-1.5 my-1">
+        <div class="flex items-baseline justify-center gap-1.5 my-1 mb-3">
             <span class="text-base sm:text-lg font-black text-[#ea580c]">Tk. @Product.Price.ToString("N0")</span>
             @if (Product.OriginalPrice.HasValue && Product.OriginalPrice > Product.Price)
             {
                 <span class="text-xs text-slate-400 line-through">Tk. @Product.OriginalPrice.Value.ToString("N0")</span>
             }
-        </div>
-
-        <!-- Rating Stars -->
-        <div class="flex items-center justify-center gap-1 text-xs text-amber-400 font-bold mb-3">
-            <span>★★★★★</span>
-            <span class="text-[11px] text-slate-700 font-semibold">(@(Product.Rating > 0 ? Product.Rating.ToString("F1") : "5.0"))</span>
         </div>
 
         <!-- Buy Now Action (Blazor Enhanced Form POST to /cart/buy-now) -->

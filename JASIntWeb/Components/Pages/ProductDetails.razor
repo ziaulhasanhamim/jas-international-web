@@ -1,12 +1,15 @@
 @page "/product/{Slug}"
 @inject JASIntWeb.Services.CatalogService Catalog
+@inject JASIntWeb.Services.ShoppingService Shop
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject NavigationManager Nav
 @inject JASIntWeb.Services.Seo.ISeoService Seo
 @inject IConfiguration Config
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Services
 @using JASIntWeb.Services.Seo
+@using JASIntWeb.Endpoints
 
 @if (product is null)
 {
@@ -267,41 +270,50 @@ else
                                 <span class="text-xs font-semibold text-emerald-700">✓ In Stock — Ready to ship from Khulna showroom</span>
                             </div>
                         }
-                        @if (CartQuery == "added")
+                        @if (!string.IsNullOrEmpty(cartSuccessMessage))
                         {
                             <div class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-900 flex items-center justify-between shadow-xs animate-fadeIn">
                                 <span class="flex items-center gap-2 font-semibold">
                                     <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px]">✓</span>
-                                    @product.Name added to your cart!
+                                    @cartSuccessMessage
                                 </span>
                                 <a href="/cart" class="btn-primary !py-1 !px-3 text-xs !bg-emerald-700 hover:!bg-emerald-800">
                                     View Cart &rarr;
                                 </a>
                             </div>
                         }
+                        @if (!string.IsNullOrEmpty(cartErrorMessage))
+                        {
+                            <div class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-center justify-between shadow-xs animate-fadeIn">
+                                <span class="flex items-center gap-2 font-semibold">
+                                    <span class="flex size-5 items-center justify-center rounded-full bg-amber-600 text-white text-[11px]">!</span>
+                                    @cartErrorMessage
+                                </span>
+                                <button type="button" onclick="this.parentElement.remove()" class="text-amber-700 hover:text-amber-950 font-bold p-1 cursor-pointer">✕</button>
+                            </div>
+                        }
 
-                        <form method="post" action="/cart/add" data-enhance class="space-y-3">
+                        <form method="post" @formname="product-purchase" data-enhance class="space-y-3">
                             <AntiforgeryToken />
-                            <input type="hidden" name="productId" value="@product.Id" />
-                            <input type="hidden" name="variantId" value="@selected.Id" />
-                            <input type="hidden" name="returnUrl" value="/product/@product.Slug" />
+                            <input type="hidden" name="ProductId" value="@product.Id" />
+                            <input type="hidden" name="VariantId" value="@selected.Id" />
 
                             <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
                                 <!-- Stepper -->
                                 <div class="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-2xs">
                                     <button type="button" onclick="const q = this.nextElementSibling; if (parseInt(q.value) > 1) { q.value = parseInt(q.value) - 1; }" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Decrease quantity">−</button>
-                                    <input type="number" name="quantity" value="1" min="1" max="@selected.Stock" class="w-12 text-center text-sm font-bold text-slate-800 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                    <input type="number" name="Quantity" value="1" min="1" max="@selected.Stock" class="w-12 text-center text-sm font-bold text-slate-800 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                     <button type="button" onclick="const q = this.previousElementSibling; if (parseInt(q.value) < @selected.Stock) { q.value = parseInt(q.value) + 1; }" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Increase quantity">+</button>
                                 </div>
 
                                 <!-- Add to Cart Button -->
-                                <button type="submit" class="flex-1 btn-secondary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition cursor-pointer">
+                                <button type="submit" name="Action" value="add" class="flex-1 btn-secondary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition cursor-pointer">
                                     <Icon Name="cart" Class="size-4 text-blue-600" />
                                     <span>Add to Cart</span>
                                 </button>
 
                                 <!-- Buy Now Button -->
-                                <button type="submit" formaction="/cart/buy-now" class="flex-1 btn-primary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs bg-blue-600 hover:bg-blue-700 transition cursor-pointer">
+                                <button type="submit" name="Action" value="buy" class="flex-1 btn-primary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs bg-blue-600 hover:bg-blue-700 transition cursor-pointer">
                                     <span>⚡ Buy Now</span>
                                 </button>
 
@@ -393,7 +405,7 @@ else
                             </span>
                         </div>
                     </div>
-                    <button type="button" onclick="document.getElementById('write-review-modal').classList.remove('hidden')" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <button type="button" data-open-modal="write-review-modal" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
                         <span>✍️ Write a Review</span>
                     </button>
                 </div>
@@ -459,48 +471,49 @@ else
             <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
-                    <button type="button" onclick="document.getElementById('write-review-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer">✕</button>
+                    <button type="button" data-close-modal="write-review-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer">✕</button>
                 </div>
-                <form method="post" @formname="submit-review" @onsubmit="SubmitReview" data-enhance class="space-y-3">
+                <form method="post" @formname="submit-review" data-enhance class="space-y-3">
                     <AntiforgeryToken />
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Your Rating</label>
                         <div class="flex items-center gap-2">
-                            <input type="hidden" id="review-rating-input" name="ReviewForm.Rating" value="@(ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)" />
+                            <input type="hidden" id="review-rating-input" name="Rating" value="@(ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5))" />
                             @for (int star = 1; star <= 5; star++)
                             {
                                 var s = star;
                                 <button
                                     type="button"
-                                    onclick="document.getElementById('review-rating-input').value = '@s'; document.getElementById('review-rating-text').textContent = '@s / 5 Stars'; document.querySelectorAll('.star-btn').forEach((b, idx) => { b.className = (idx < @s ? 'star-btn text-xl text-amber-400 hover:scale-110 transition cursor-pointer' : 'star-btn text-xl text-slate-200 hover:scale-110 transition cursor-pointer'); });"
-                                    class="star-btn text-xl @(s <= (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5) ? "text-amber-400" : "text-slate-200") hover:scale-110 transition cursor-pointer"
+                                    data-star-rating="@s"
+                                    class="star-btn text-xl @(s <= (ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)) ? "text-amber-400" : "text-slate-200") hover:scale-110 transition cursor-pointer"
+                                    aria-label="@s stars"
                                 >
                                     ★
                                 </button>
                             }
-                            <span id="review-rating-text" class="text-xs text-slate-500 ml-2 font-medium">@(ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5) / 5 Stars</span>
+                            <span id="review-rating-text" class="text-xs text-slate-500 ml-2 font-medium">@(ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)) / 5 Stars</span>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
-                            <input type="text" name="ReviewForm.Name" value="@ReviewForm?.Name" required placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
+                            <input type="text" name="Name" value="@(ReviewName ?? ReviewForm?.Name)" required placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                            <input type="email" name="ReviewForm.Email" value="@ReviewForm?.Email" placeholder="tanvir@example.com" class="field text-xs" />
+                            <input type="email" name="Email" value="@(ReviewEmail ?? ReviewForm?.Email)" placeholder="tanvir@example.com" class="field text-xs" />
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Headline / Review Title</label>
-                        <input type="text" name="ReviewForm.Title" value="@ReviewForm?.Title" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
+                        <input type="text" name="Title" value="@(ReviewTitle ?? ReviewForm?.Title)" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Your Detailed Experience *</label>
-                        <textarea name="ReviewForm.Comment" rows="3" required placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs">@ReviewForm?.Comment</textarea>
+                        <textarea name="Comment" rows="3" required placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs">@(ReviewComment ?? ReviewForm?.Comment)</textarea>
                     </div>
                     <div class="flex items-center justify-end gap-2 pt-2">
-                        <button type="button" onclick="document.getElementById('write-review-modal').classList.add('hidden')" class="btn-secondary text-xs cursor-pointer">Cancel</button>
+                        <button type="button" data-close-modal="write-review-modal" class="btn-secondary text-xs cursor-pointer">Cancel</button>
                         <button type="submit" class="btn-primary text-xs !bg-blue-600 hover:!bg-blue-700 cursor-pointer">Submit Review</button>
                     </div>
                 </form>
@@ -537,16 +550,15 @@ else
                     <a href="@waUrl" target="_blank" rel="noopener" class="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs" title="Order via WhatsApp">
                         <span class="text-base">💬</span>
                     </a>
-                    <form method="post" action="/cart/add" data-enhance class="flex items-center gap-1.5">
+                    <form method="post" @formname="product-purchase-mobile" data-enhance class="flex items-center gap-1.5">
                         <AntiforgeryToken />
-                        <input type="hidden" name="productId" value="@product.Id" />
-                        <input type="hidden" name="variantId" value="@selected.Id" />
-                        <input type="hidden" name="quantity" value="1" />
-                        <input type="hidden" name="returnUrl" value="/product/@product.Slug" />
-                        <button type="submit" class="btn-secondary !py-2 !px-3 text-xs font-bold cursor-pointer">
+                        <input type="hidden" name="ProductId" value="@product.Id" />
+                        <input type="hidden" name="VariantId" value="@selected.Id" />
+                        <input type="hidden" name="Quantity" value="1" />
+                        <button type="submit" name="Action" value="add" class="btn-secondary !py-2 !px-3 text-xs font-bold cursor-pointer">
                             Add
                         </button>
-                        <button type="submit" formaction="/cart/buy-now" class="btn-primary !py-2 !px-3.5 text-xs font-bold !bg-blue-600 hover:!bg-blue-700 cursor-pointer">
+                        <button type="submit" name="Action" value="buy" class="btn-primary !py-2 !px-3.5 text-xs font-bold !bg-blue-600 hover:!bg-blue-700 cursor-pointer">
                             Buy Now
                         </button>
                     </form>
@@ -562,14 +574,50 @@ else
     public string Slug { get; set; } = "";
     [SupplyParameterFromQuery(Name = "image")]
     public int? ImageIndex { get; set; }
-    [SupplyParameterFromQuery(Name = "review")]
-    public string? ReviewQuery { get; set; }
-    [SupplyParameterFromQuery(Name = "cart")]
-    public string? CartQuery { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review", Name = "Name")]
+    public string? ReviewName { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review", Name = "Email")]
+    public string? ReviewEmail { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review", Name = "Rating")]
+    public int? ReviewRating { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review", Name = "Title")]
+    public string? ReviewTitle { get; set; }
+    [SupplyParameterFromForm(FormName = "submit-review", Name = "Comment")]
+    public string? ReviewComment { get; set; }
     [SupplyParameterFromForm(FormName = "submit-review")]
     public ReviewFormModel? ReviewForm { get; set; }
 
+    [SupplyParameterFromForm(FormName = "product-purchase", Name = "ProductId")]
+    public int PurchaseProductId { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase", Name = "VariantId")]
+    public int PurchaseVariantId { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase", Name = "Quantity")]
+    public int PurchaseQuantity { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase", Name = "Action")]
+    public string? PurchaseAction { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase")]
+    public ProductPurchaseModel? PurchaseForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "product-purchase-mobile", Name = "ProductId")]
+    public int MobilePurchaseProductId { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase-mobile", Name = "VariantId")]
+    public int MobilePurchaseVariantId { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase-mobile", Name = "Quantity")]
+    public int MobilePurchaseQuantity { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase-mobile", Name = "Action")]
+    public string? MobilePurchaseAction { get; set; }
+    [SupplyParameterFromForm(FormName = "product-purchase-mobile")]
+    public ProductPurchaseModel? MobilePurchaseForm { get; set; }
+
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    public class ProductPurchaseModel
+    {
+        public int ProductId { get; set; }
+        public int VariantId { get; set; }
+        public int Quantity { get; set; } = 1;
+        public string Action { get; set; } = "add"; // "add" or "buy"
+    }
 
     private ProductDetailsDto? product;
     private ProductVariantDto? selected;
@@ -578,6 +626,8 @@ else
     private List<ProductSummaryDto> relatedProducts = [];
     private List<ProductReview> reviews = [];
     private string? reviewSuccessMessage;
+    private string? cartSuccessMessage;
+    private string? cartErrorMessage;
 
     private ProductSummaryDto CurrentSummary => new(
         product!.Id,
@@ -594,11 +644,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (ReviewQuery == "success")
-        {
-            reviewSuccessMessage = "Thank you! Your verified review has been published.";
-        }
-
         product = await Catalog.DetailsAsync(Slug);
         if (product is null)
         {
@@ -610,6 +655,7 @@ else
             }
             return;
         }
+
         var query = QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
         var requested = new Dictionary<string, string>();
         foreach (var definition in product.Attributes)
@@ -626,6 +672,63 @@ else
         var related = await Catalog.LatestAsync(product.CategorySlug, 8);
         relatedProducts = related.Where(p => p.Id != product.Id).ToList();
 
+        // Handle Add to Cart / Buy Now forms
+        var targetVariantId = PurchaseVariantId > 0 ? PurchaseVariantId : (MobilePurchaseVariantId > 0 ? MobilePurchaseVariantId : (PurchaseForm?.VariantId ?? MobilePurchaseForm?.VariantId ?? 0));
+        var targetAction = !string.IsNullOrEmpty(PurchaseAction) ? PurchaseAction : (!string.IsNullOrEmpty(MobilePurchaseAction) ? MobilePurchaseAction : (PurchaseForm?.Action ?? MobilePurchaseForm?.Action ?? "add"));
+        var targetQty = PurchaseQuantity > 0 ? PurchaseQuantity : (MobilePurchaseQuantity > 0 ? MobilePurchaseQuantity : (PurchaseForm?.Quantity ?? MobilePurchaseForm?.Quantity ?? 1));
+
+        if (targetVariantId > 0 && HttpContext != null)
+        {
+            var (token, userId) = CartEndpoints.EnsureCartIdentity(HttpContext);
+            var qty = Math.Clamp(targetQty <= 0 ? 1 : targetQty, 1, 99);
+            try
+            {
+                await Shop.ChangeAsync(token, userId, new CartLineRequest(targetVariantId, qty), add: true);
+                if (string.Equals(targetAction, "buy", StringComparison.OrdinalIgnoreCase))
+                {
+                    Nav.NavigateTo("/cart");
+                    return;
+                }
+                cartSuccessMessage = $"{product.Name} added to your cart!";
+            }
+            catch (ShopException ex)
+            {
+                cartErrorMessage = ex.Message;
+            }
+        }
+
+        // Handle Review Submission form
+        var reviewName = ReviewName?.Trim() ?? ReviewForm?.Name?.Trim() ?? "";
+        var reviewComment = ReviewComment?.Trim() ?? ReviewForm?.Comment?.Trim() ?? "";
+        var reviewEmail = ReviewEmail?.Trim() ?? ReviewForm?.Email?.Trim();
+        var reviewTitle = ReviewTitle?.Trim() ?? ReviewForm?.Title?.Trim();
+        var reviewRating = ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5);
+
+        if (!string.IsNullOrWhiteSpace(reviewName) && !string.IsNullOrWhiteSpace(reviewComment))
+        {
+            var review = new ProductReview
+            {
+                ProductId = product.Id,
+                CustomerName = reviewName,
+                CustomerEmail = string.IsNullOrWhiteSpace(reviewEmail) ? null : reviewEmail,
+                Rating = Math.Clamp(reviewRating, 1, 5),
+                Title = string.IsNullOrWhiteSpace(reviewTitle) ? "Customer Review" : reviewTitle,
+                Comment = reviewComment,
+                IsApproved = true
+            };
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.ProductReviews.Add(review);
+            await db.SaveChangesAsync();
+
+            reviewSuccessMessage = "Thank you! Your verified review has been published.";
+            ReviewName = null;
+            ReviewComment = null;
+            ReviewEmail = null;
+            ReviewTitle = null;
+            ReviewForm = null;
+        }
+
         await LoadReviewsAsync();
     }
 
@@ -637,31 +740,5 @@ else
             .Where(r => r.ProductId == product.Id && r.IsApproved)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
-    }
-
-    private async Task SubmitReview()
-    {
-        if (product == null) return;
-        ReviewForm ??= new();
-        var name = ReviewForm.Name?.Trim() ?? "";
-        var comment = ReviewForm.Comment?.Trim() ?? "";
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(comment)) return;
-
-        var review = new ProductReview
-        {
-            ProductId = product.Id,
-            CustomerName = name,
-            CustomerEmail = string.IsNullOrWhiteSpace(ReviewForm.Email) ? null : ReviewForm.Email.Trim(),
-            Rating = Math.Clamp(ReviewForm.Rating, 1, 5),
-            Title = string.IsNullOrWhiteSpace(ReviewForm.Title) ? "Customer Review" : ReviewForm.Title.Trim(),
-            Comment = comment,
-            IsApproved = true
-        };
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-        db.ProductReviews.Add(review);
-        await db.SaveChangesAsync();
-
-        Nav.NavigateTo($"/product/{Slug}?review=success");
     }
 }

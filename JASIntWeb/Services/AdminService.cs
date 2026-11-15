@@ -837,25 +837,121 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await cache.RemoveByTagAsync(CatalogService.TagSections);
     }
 
-    public async Task DeleteCategoryAsync(int id)
+    public async Task DeleteCategoryAsync(int id, bool permanent = false)
     {
-        var c = await db.Categories.Include(x => x.ChildCategories).SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
-        c.IsDeleted = true;
-        c.DeletedAt = DateTimeOffset.UtcNow;
+        var c = await db.Categories
+            .Include(x => x.ChildCategories)
+            .Include(x => x.Products)
+            .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+
+        if (permanent && !c.Products.Any(p => !p.IsDeleted))
+        {
+            var placementsToRemove = await db.CategoryPlacements.Where(p => p.CategoryId == id).ToListAsync();
+            db.CategoryPlacements.RemoveRange(placementsToRemove);
+            db.Categories.Remove(c);
+        }
+        else
+        {
+            c.IsDeleted = true;
+            c.DeletedAt = DateTimeOffset.UtcNow;
+            var placements = await db.CategoryPlacements.Where(p => p.CategoryId == id).ToListAsync();
+            foreach (var p in placements)
+            {
+                p.IsActive = false;
+            }
+        }
+
         foreach (var child in c.ChildCategories)
         {
             child.IsDeleted = true;
             child.DeletedAt = DateTimeOffset.UtcNow;
         }
         var childIds = c.ChildCategories.Select(ch => ch.Id).ToList();
-        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == id || childIds.Contains(p.CategoryId)).ToListAsync();
-        foreach (var p in placements)
+        var childPlacements = await db.CategoryPlacements.Where(p => childIds.Contains(p.CategoryId)).ToListAsync();
+        foreach (var p in childPlacements)
         {
             p.IsActive = false;
         }
         await db.SaveChangesAsync();
         await cache.RemoveByTagAsync(CatalogService.TagCategories);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
+    }
+
+    public Task HardDeleteCategoryAsync(int id) => DeleteCategoryAsync(id, permanent: true);
+
+    public async Task BulkCategoryActionAsync(List<int> ids, string action)
+    {
+        if (ids.Count == 0) return;
+        var categories = await db.Categories
+            .Include(c => c.Products)
+            .Where(c => ids.Contains(c.Id))
+            .ToListAsync();
+
+        foreach (var c in categories)
+        {
+            switch (action.ToLowerInvariant())
+            {
+                case "hide":
+                    c.IsDeleted = true;
+                    c.DeletedAt = DateTimeOffset.UtcNow;
+                    break;
+                case "restore":
+                    c.IsDeleted = false;
+                    c.DeletedAt = null;
+                    break;
+                case "delete":
+                    if (!c.Products.Any(p => !p.IsDeleted))
+                    {
+                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                        db.CategoryPlacements.RemoveRange(placements);
+                        db.Categories.Remove(c);
+                    }
+                    else
+                    {
+                        c.IsDeleted = true;
+                        c.DeletedAt = DateTimeOffset.UtcNow;
+                    }
+                    break;
+            }
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagCategories);
+        await cache.RemoveByTagAsync(CatalogService.TagSections);
+    }
+
+    public async Task BulkProductActionAsync(List<int> ids, string action, int? targetCategoryId = null)
+    {
+        if (ids.Count == 0) return;
+        var products = await db.Products
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
+
+        foreach (var p in products)
+        {
+            switch (action.ToLowerInvariant())
+            {
+                case "publish":
+                    p.IsDeleted = false;
+                    p.DeletedAt = null;
+                    break;
+                case "archive":
+                    p.IsDeleted = true;
+                    p.DeletedAt = DateTimeOffset.UtcNow;
+                    break;
+                case "delete":
+                    p.IsDeleted = true;
+                    p.DeletedAt = DateTimeOffset.UtcNow;
+                    break;
+                case "category":
+                    if (targetCategoryId.HasValue && targetCategoryId.Value > 0)
+                    {
+                        p.CategoryId = targetCategoryId.Value;
+                    }
+                    break;
+            }
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
     public async Task SaveBrandAsync(BrandEditForm input)

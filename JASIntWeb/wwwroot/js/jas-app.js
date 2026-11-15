@@ -3,11 +3,22 @@
  * Coordinates modular scripts with Blazor Static SSR enhanced navigation lifecycle
  * and optional native View Transitions API.
  */
+
+import { initWishlist } from './modules/wishlist.js';
+import { initCart } from './modules/cart.js';
+import { initGallery, switchMainImage } from './modules/gallery.js';
+import { initReviews } from './modules/reviews.js';
+
 class AppOrchestrator {
     /**
      * Initializes all UI and tracking modules for the current DOM state
      */
     static onDomReady() {
+        initWishlist();
+        initCart();
+        initGallery();
+        initReviews();
+
         const JAS = window.JAS;
         JAS?.Carousel?.init();
         JAS?.OrderTracking?.init();
@@ -33,6 +44,10 @@ class AppOrchestrator {
 
         const updateDom = () => {
             JAS?.Navigation?.finish();
+            initWishlist();
+            initCart();
+            initGallery();
+            initReviews();
             JAS?.Carousel?.init();
             JAS?.OrderTracking?.init();
             JAS?.AdminEditor?.init();
@@ -85,31 +100,8 @@ class AppOrchestrator {
     }
 }
 
-/**
- * Handles switching the main product image in the gallery with next-gen AVIF/WebP srcset support
- */
-window.switchMainProductImage = function (btn) {
-    if (!btn) return;
-    const src = btn.dataset.src;
-    const avif = btn.dataset.avif;
-    const webp = btn.dataset.webp;
-    const pic = document.getElementById("main-product-picture");
-    if (pic) {
-        const sourceAvif = pic.querySelector('source[type="image/avif"]');
-        if (sourceAvif && avif) sourceAvif.srcset = avif;
-        const sourceWebp = pic.querySelector('source[type="image/webp"]');
-        if (sourceWebp && webp) sourceWebp.srcset = webp;
-    }
-    const img = document.getElementById("main-product-img");
-    if (img && src) img.src = src;
-
-    document.querySelectorAll(".thumb-btn").forEach(b => {
-        b.classList.remove("border-blue-600", "shadow-xs", "ring-2", "ring-blue-500/20");
-        b.classList.add("border-slate-200");
-    });
-    btn.classList.remove("border-slate-200");
-    btn.classList.add("border-blue-600", "shadow-xs", "ring-2", "ring-blue-500/20");
-};
+// Backward-compatibility bridge for any legacy inline onclick calls
+window.switchMainProductImage = switchMainImage;
 
 // Bootstrap application
 AppOrchestrator.boot();

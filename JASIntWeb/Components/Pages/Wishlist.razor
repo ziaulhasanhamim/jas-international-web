@@ -26,6 +26,11 @@
         </div>
     </div>
 
-    <!-- Client Interactive Content -->
-    <WishlistClientView />
+    <!-- Client Wishlist Content (Rendered by modules/wishlist.js from localStorage) -->
+    <div id="wishlist-container" class="min-h-[300px]">
+        <div class="py-16 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+            <span class="size-2 rounded-full bg-rose-600 animate-ping"></span>
+            <span>Loading saved wishlist items…</span>
+        </div>
+    </div>
 </div>

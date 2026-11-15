@@ -39,12 +39,11 @@
         <script src="@Assets["_framework/blazor.web.js"]"></script>
         <!-- Application Scripts (Modular Architecture - Non-blocking Deferred Execution) -->
         <script src="@Assets["js/modules/navigation.js"]" defer></script>
-        <script src="@Assets["js/modules/cart-badge.js"]" defer></script>
         <script src="@Assets["js/modules/device-orders.js"]" defer></script>
         <script src="@Assets["js/modules/carousel.js"]" defer></script>
         <script src="@Assets["js/modules/order-tracking.js"]" defer></script>
         <script src="@Assets["js/modules/meta-tracking.js"]" defer></script>
         <script src="@Assets["js/modules/analytics.js"]" defer></script>
-        <script src="@Assets["js/jas-app.js"]" defer></script>
+        <script type="module" src="@Assets["js/jas-app.js"]"></script>
     </body>
 </html>

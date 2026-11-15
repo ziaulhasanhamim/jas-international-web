@@ -581,26 +581,29 @@ public static class JsonTestDataSeeder
             }
         }
 
-        // Clean up any extra categories (e.g. "Smart Automations" / "Smart Automation")
+        // Permanently remove any legacy extra categories (e.g. "Smart Automations" / "Smart Automation")
         var extraCategories = await db.Categories
-            .Where(c => !c.IsDeleted && (
-                c.Name.ToLower().Contains("automation") ||
-                c.Slug.ToLower().Contains("automation")
-            ))
+            .Include(c => c.Products)
+            .Where(c => c.Name.ToLower().Contains("automation") || c.Slug.ToLower().Contains("automation"))
             .ToListAsync(ct);
 
         if (extraCategories.Count > 0)
         {
-            foreach (var ec in extraCategories)
-            {
-                ec.IsDeleted = true;
-                ec.DeletedAt = DateTimeOffset.UtcNow;
-            }
             var extraIds = extraCategories.Select(c => c.Id).ToList();
             var placements = await db.CategoryPlacements.Where(p => extraIds.Contains(p.CategoryId)).ToListAsync(ct);
-            foreach (var p in placements)
+            db.CategoryPlacements.RemoveRange(placements);
+
+            foreach (var ec in extraCategories)
             {
-                p.IsActive = false;
+                if (ec.Products.Count == 0)
+                {
+                    db.Categories.Remove(ec);
+                }
+                else
+                {
+                    ec.IsDeleted = true;
+                    ec.DeletedAt = DateTimeOffset.UtcNow;
+                }
             }
             try
             {

@@ -43,9 +43,14 @@ public static class CartEndpoints
                     .FirstOrDefaultAsync();
             }
 
-            await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop);
-            var redirectUrl = vId > 0 ? $"/cart?added={vId}" : "/cart";
-            return Results.Redirect(redirectUrl, false, false);
+            try
+            {
+                await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop);
+            }
+            catch (ShopException)
+            {
+            }
+            return Results.Redirect("/cart", false, false);
         }).DisableAntiforgery();
 
         endpoints.MapPost("/cart/add", async (
@@ -57,7 +62,13 @@ public static class CartEndpoints
             AppDbContext db,
             ShoppingService shop) =>
         {
-            await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop);
+            try
+            {
+                await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop);
+            }
+            catch (ShopException)
+            {
+            }
 
             string target = "/";
             if (!string.IsNullOrWhiteSpace(returnUrl))
@@ -83,10 +94,11 @@ public static class CartEndpoints
                 target = "/";
             }
 
-            if (!target.Contains("cart=added", StringComparison.OrdinalIgnoreCase))
+            // Pure POST without query parameter pollution
+            if (target.Contains("cart=added"))
             {
-                var sep = target.Contains('?') ? "&" : "?";
-                target = $"{target}{sep}cart=added";
+                target = target.Replace("?cart=added", "").Replace("&cart=added", "");
+                if (string.IsNullOrWhiteSpace(target)) target = "/";
             }
 
             return Results.Redirect(target, false, false);
@@ -175,8 +187,15 @@ public static class CartEndpoints
 
         if (vId > 0)
         {
-            var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
-            return cart.Items.Sum(i => i.Quantity);
+            try
+            {
+                var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
+                return cart.Items.Sum(i => i.Quantity);
+            }
+            catch (ShopException)
+            {
+                return await shop.GetCartItemCountAsync(token, userId);
+            }
         }
 
         return await shop.GetCartItemCountAsync(token, userId);

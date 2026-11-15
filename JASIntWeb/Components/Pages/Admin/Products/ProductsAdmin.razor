@@ -2,6 +2,7 @@
 @layout AdminLayout
 @using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
+@inject AdminService Admin
 @inject CatalogService Catalog
 @inject NavigationManager Nav
 
@@ -89,9 +90,51 @@
 <!-- Products QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <form method="post" @formname="products-table-action">
     <AntiforgeryToken />
+
+    <!-- Bulk Actions Toolbar (POS App Pattern) -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-slate-50 p-3 shadow-2xs">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold text-slate-700">Bulk Actions:</span>
+            <button type="submit" name="BulkAction" value="publish" class="btn-secondary !py-1 !px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer">
+                Publish Selected
+            </button>
+            <button type="submit" name="BulkAction" value="archive" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 cursor-pointer">
+                Archive Selected
+            </button>
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Permanently archive/delete selected products?')">
+                Delete Selected
+            </button>
+        </div>
+        <div class="flex items-center gap-2">
+            <select name="TargetCategoryId" class="field !py-1 text-xs w-auto min-w-[140px]">
+                <option value="0">— Move to category —</option>
+                @foreach (var c in _categories)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+            <button type="submit" name="BulkAction" value="category" class="btn-secondary !py-1 !px-3 text-xs font-bold hover:bg-slate-200 cursor-pointer">
+                Apply Category
+            </button>
+        </div>
+    </div>
+
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@productsQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Class="w-10 text-center">
+                    <HeaderTemplate Context="_">
+                        <input type="checkbox" id="select-all-products"
+                               class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                               onclick="document.querySelectorAll('.prod-select-cb').forEach(cb => cb.checked = this.checked)"
+                               title="Select all" />
+                    </HeaderTemplate>
+                    <ChildContent Context="p">
+                        <input type="checkbox" name="SelectedProductIds" value="@p.Id"
+                               class="prod-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </ChildContent>
+                </TemplateColumn>
+
                 <TemplateColumn Title="Product Name & Slug" Sortable="true" SortBy="@sortByName">
                     <div class="flex items-center gap-3">
                         @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
@@ -173,6 +216,15 @@
     [SupplyParameterFromForm(FormName = "products-table-action")]
     public int ToggleProductId { get; set; }
 
+    [SupplyParameterFromForm(FormName = "products-table-action")]
+    public List<int>? SelectedProductIds { get; set; }
+
+    [SupplyParameterFromForm(FormName = "products-table-action")]
+    public string? BulkAction { get; set; }
+
+    [SupplyParameterFromForm(FormName = "products-table-action")]
+    public int TargetCategoryId { get; set; }
+
     public record AdminProductRow(
         int Id,
         string Name,
@@ -206,6 +258,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!string.IsNullOrWhiteSpace(BulkAction) && SelectedProductIds != null && SelectedProductIds.Count > 0)
+        {
+            await Admin.BulkProductActionAsync(SelectedProductIds, BulkAction, TargetCategoryId);
+            _toast = $"Bulk action '{BulkAction}' successfully applied to {SelectedProductIds.Count} products.";
+            Nav.NavigateTo(FilterUrl(Filter));
+            return;
+        }
+
         _categories = await Db.Categories.AsNoTracking()
             .Where(c => !c.IsDeleted)
             .OrderBy(c => c.Name)

@@ -95,9 +95,39 @@
 <!-- Categories QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <form method="post" @formname="categories-table-action">
     <AntiforgeryToken />
+
+    <!-- Bulk Actions Toolbar (POS App Pattern) -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-slate-50 p-3 shadow-2xs">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-700">Bulk Actions:</span>
+            <button type="submit" name="BulkAction" value="hide" class="btn-secondary !py-1 !px-3 text-xs font-bold hover:bg-slate-200 cursor-pointer">
+                Hide Selected
+            </button>
+            <button type="submit" name="BulkAction" value="restore" class="btn-secondary !py-1 !px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer">
+                Restore Selected
+            </button>
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Are you sure you want to delete selected categories? Categories with active products will be safely hidden.')">
+                Delete Selected
+            </button>
+        </div>
+    </div>
+
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@categoriesQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Class="w-10 text-center">
+                    <HeaderTemplate Context="_">
+                        <input type="checkbox" id="select-all-categories"
+                               class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                               onclick="document.querySelectorAll('.cat-select-cb').forEach(cb => cb.checked = this.checked)"
+                               title="Select all" />
+                    </HeaderTemplate>
+                    <ChildContent Context="c">
+                        <input type="checkbox" name="SelectedCategoryIds" value="@c.Id"
+                               class="cat-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </ChildContent>
+                </TemplateColumn>
+
                 <TemplateColumn Title="Category Name" Sortable="true" SortBy="@sortByName">
                     <div class="flex items-center gap-2.5">
                         @if (!string.IsNullOrWhiteSpace(context.Icon))
@@ -160,10 +190,10 @@
                                 name="DeleteCategoryId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                onclick="return confirm('Are you sure you want to hide this category from the store?')"
-                                title="Hide/Archive this category"
+                                onclick="return confirm('@(context.ProductCount > 0 ? "This category has active products. It will be hidden from the storefront." : "Permanently delete this category?")')"
+                                title="@(context.ProductCount > 0 ? "Hide/Archive category" : "Delete category")"
                             >
-                                Hide
+                                @(context.ProductCount > 0 ? "Hide" : "Delete")
                             </button>
                         }
                         else
@@ -176,6 +206,16 @@
                                 title="Restore this category to active catalog"
                             >
                                 Restore
+                            </button>
+                            <button
+                                type="submit"
+                                name="DeleteCategoryId"
+                                value="@context.Id"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                onclick="return confirm('Permanently remove this archived category?')"
+                                title="Permanently delete category"
+                            >
+                                Delete
                             </button>
                         }
                     </div>
@@ -211,6 +251,12 @@
 
     [SupplyParameterFromForm(FormName = "categories-table-action")]
     public int DeleteCategoryId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public List<int>? SelectedCategoryIds { get; set; }
+
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public string? BulkAction { get; set; }
 
     public record AdminCategoryRow(
         int Id,
@@ -248,6 +294,14 @@
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(BulkAction) && SelectedCategoryIds != null && SelectedCategoryIds.Count > 0)
+            {
+                await Admin.BulkCategoryActionAsync(SelectedCategoryIds, BulkAction);
+                _toast = $"Bulk action '{BulkAction}' successfully applied to {SelectedCategoryIds.Count} categories.";
+                Nav.NavigateTo(FilterUrl(Filter));
+                return;
+            }
+
             if (ToggleFeaturedId > 0)
             {
                 await Admin.ToggleCategoryFeaturedAsync(ToggleFeaturedId);
@@ -267,7 +321,7 @@
             if (DeleteCategoryId > 0)
             {
                 await Admin.DeleteCategoryAsync(DeleteCategoryId);
-                _toast = "Category hidden successfully.";
+                _toast = "Category action completed successfully.";
                 Nav.NavigateTo(FilterUrl(Filter));
                 return;
             }
@@ -276,7 +330,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Unable to load categories: {ex.Message}";
+            _error = $"Unable to process request: {ex.Message}";
         }
     }
 
@@ -284,7 +338,11 @@
     {
         totalAll = await Db.Categories.CountAsync();
         totalActive = await Db.Categories.CountAsync(c => !c.IsDeleted);
-        totalFeatured = await Db.CategoryPlacements.CountAsync(p => p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive && !p.Category!.IsDeleted);
+        var featuredIds = await Db.CategoryPlacements.AsNoTracking()
+            .Where(p => p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive)
+            .Select(p => p.CategoryId)
+            .ToListAsync();
+        totalFeatured = featuredIds.Count;
         totalHidden = await Db.Categories.CountAsync(c => c.IsDeleted);
 
         var q = Db.Categories.AsNoTracking();
@@ -295,7 +353,7 @@
         }
         else if (Filter == "featured")
         {
-            q = q.Where(c => Db.CategoryPlacements.Any(p => p.CategoryId == c.Id && p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive));
+            q = q.Where(c => featuredIds.Contains(c.Id) && !c.IsDeleted);
         }
         else if (Filter == "hidden")
         {
@@ -317,7 +375,7 @@
                 c.Icon,
                 c.ParentCategory != null ? c.ParentCategory.Name : null,
                 c.Products.Count(p => !p.IsDeleted),
-                Db.CategoryPlacements.Any(p => p.CategoryId == c.Id && p.PlacementType == CategoryPlacementType.HomepageFeatured && p.IsActive),
+                featuredIds.Contains(c.Id),
                 c.IsDeleted
             ));
 

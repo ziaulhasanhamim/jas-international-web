@@ -235,12 +235,12 @@ public sealed class ShoppingService(
         }
         var cart = await ActiveCartAsync(token, userId);
         var item = cart.Items.FirstOrDefault(i => i.ProductVariantId == line.VariantId);
-        var quantity = add ? (item?.Quantity ?? 0) + line.Quantity : line.Quantity;
-        if (quantity < 0 || quantity > 99 || (add && line.Quantity <= 0))
+        var requestedQuantity = add ? (item?.Quantity ?? 0) + line.Quantity : line.Quantity;
+        if (requestedQuantity < 0 || requestedQuantity > 99 || (add && line.Quantity <= 0))
         {
             throw new ShopException("Quantity must be between 1 and 99.");
         }
-        if (quantity == 0)
+        if (requestedQuantity == 0)
         {
             if (item is not null)
             {
@@ -249,11 +249,31 @@ public sealed class ShoppingService(
         }
         else
         {
-            var resolved = await ResolveAsync([new(line.VariantId, quantity)]);
-            if (!resolved.Items[0].IsAvailable || resolved.Items[0].Stock < quantity)
+            var resolved = await ResolveAsync([new(line.VariantId, requestedQuantity)]);
+            var lineStock = resolved.Items[0].Stock;
+            if (!resolved.Items[0].IsAvailable || lineStock <= 0)
             {
-                throw new ShopException("The requested quantity is unavailable.");
+                throw new ShopException("The requested item is currently sold out.");
             }
+
+            int finalQuantity;
+            if (add)
+            {
+                if (item is not null && item.Quantity >= lineStock)
+                {
+                    throw new ShopException($"Maximum available stock ({lineStock}) is already in your cart.");
+                }
+                finalQuantity = Math.Min(requestedQuantity, lineStock);
+            }
+            else
+            {
+                if (requestedQuantity > lineStock)
+                {
+                    throw new ShopException("The requested quantity is unavailable.");
+                }
+                finalQuantity = requestedQuantity;
+            }
+
             if (item is null)
             {
                 if (cart.Items.Count >= 100)
@@ -263,12 +283,12 @@ public sealed class ShoppingService(
                 cart.Items.Add(new CartItem
                     {
                         ProductVariantId = line.VariantId,
-                        Quantity = quantity
+                        Quantity = finalQuantity
                     });
             }
             else
             {
-                item.Quantity = quantity;
+                item.Quantity = finalQuantity;
             }
         }
         cart.LastActivityAt = DateTimeOffset.UtcNow;

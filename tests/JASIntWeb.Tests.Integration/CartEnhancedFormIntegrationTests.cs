@@ -46,7 +46,7 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
 
         var location = response.Headers.Location?.ToString();
         await location.Should().NotBeNull();
-        await location!.Should().Contain("cart=added");
+        await location!.Should().NotContain("cart=added");
         await location!.Should().NotStartWith("/cart");
 
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
@@ -139,7 +139,7 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
 
         var location = response.Headers.Location?.ToString();
         await location.Should().NotBeNull();
-        await location!.Should().StartWith("/cart");
+        await location!.Should().BeEqualTo("/cart");
 
         var setCookies = response.Headers.GetValues("Set-Cookie").ToList();
         var cartIdCookie = setCookies.FirstOrDefault(c => c.Contains("jas_cart_id="));
@@ -263,9 +263,9 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         var html = await response.Content.ReadAsStringAsync();
 
         await ((int)response.StatusCode).Should().BeEqualTo(200);
-        await html.Should().Contain("action=\"/cart/add\"");
-        await html.Should().Contain("formaction=\"/cart/buy-now\"");
-        await html.Should().Contain("name=\"quantity\"");
+        await html.Should().Contain("product-purchase");
+        await html.Should().Contain("name=\"Quantity\"");
+        await html.Should().Contain("Buy Now");
         await html.Should().Contain("data-wishlist-toggle");
     }
 
@@ -373,5 +373,149 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
 
         var emptyHtml = await emptyRes.Content.ReadAsStringAsync();
         await emptyHtml.Should().Contain("Your cart is empty");
+    }
+
+    [Test]
+    public async Task AddToCart_WhenQuantityExceedsAvailableStock_ClampsToAvailableStockAndNeverReturns500()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+
+        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => !v.IsDeleted && v.IsActive);
+        if (variant == null) return;
+
+        var resolved = await shop.ResolveAsync([new(variant.Id, 1)]);
+        var stock = resolved.Items[0].Stock;
+        if (stock <= 0) return;
+
+        var token = Guid.NewGuid();
+        // Add quantity equal to stock
+        var initial = await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, stock), add: true);
+        await initial.Items.First(i => i.VariantId == variant.Id).Quantity.Should().BeEqualTo(stock);
+
+        // Try adding more - should throw ShopException with friendly message, clamped
+        var ex = await Assert.ThrowsAsync<ShopException>(async () =>
+        {
+            await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, 1), add: true);
+        });
+        await (ex?.Message ?? "").Should().Contain("Maximum available stock");
+
+        // Now test via HTTP /cart/add endpoint with rapid clicks (never 500)
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var req = new HttpRequestMessage(HttpMethod.Post, "/cart/add")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "productId", variant.ProductId.ToString() },
+                { "variantId", variant.Id.ToString() },
+                { "quantity", "99" }
+            })
+        };
+        req.Headers.Add("Cookie", $"jas_cart_id={token}");
+        var res = await client.SendAsync(req);
+
+        // Must redirect cleanly without crashing or 500 error
+        await ((int)res.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
+    }
+
+    [Test]
+    public async Task ProductDetails_ReviewSubmission_SavesReviewDirectlyToDatabase()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.Products.FirstOrDefaultAsync(p => !p.IsDeleted);
+        if (product == null) return;
+
+        var client = Factory.CreateClient();
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "_handler", "submit-review" },
+            { "X-CSRF-TOKEN", "test-request-token" },
+            { "Name", "Hasan Tester" },
+            { "Email", "hasan@jasinternational.test" },
+            { "Rating", "5" },
+            { "Title", "Top quality gadget" },
+            { "Comment", "Battery lasts for 2 days as advertised. Fully authentic product with warranty." }
+        });
+
+        var response = await client.PostAsync($"/product/{product.Slug}", form);
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+
+        var reviewInDb = await db.ProductReviews.FirstOrDefaultAsync(r => r.ProductId == product.Id && r.CustomerName == "Hasan Tester");
+        await reviewInDb.Should().NotBeNull();
+        await reviewInDb!.Rating.Should().BeEqualTo(5);
+        await reviewInDb.Comment.Should().Contain("Battery lasts");
+    }
+
+    [Test]
+    public async Task AdminCategories_BulkActions_AppliesHideRestoreAndDelete()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cat1 = new Category { Name = "Bulk Cat 1", Slug = "bulk-cat-1-" + Guid.NewGuid().ToString("N")[..6] };
+        var cat2 = new Category { Name = "Bulk Cat 2", Slug = "bulk-cat-2-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.AddRange(cat1, cat2);
+        await db.SaveChangesAsync();
+
+        var ids = new List<int> { cat1.Id, cat2.Id };
+
+        // 1. Bulk Hide
+        await admin.BulkCategoryActionAsync(ids, "hide");
+        var hiddenCheck = await db.Categories.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync();
+        await hiddenCheck.All(c => c.IsDeleted).Should().BeTrue();
+
+        // 2. Bulk Restore
+        await admin.BulkCategoryActionAsync(ids, "restore");
+        var restoreCheck = await db.Categories.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync();
+        await restoreCheck.All(c => !c.IsDeleted).Should().BeTrue();
+
+        // 3. Bulk Delete (0 products -> hard delete)
+        await admin.BulkCategoryActionAsync(ids, "delete");
+        var deletedCheck = await db.Categories.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync();
+        await deletedCheck.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task AdminProducts_BulkActions_AppliesArchivePublishAndCategoryMove()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var catA = new Category { Name = "Category Alpha", Slug = "cat-alpha-" + Guid.NewGuid().ToString("N")[..6] };
+        var catB = new Category { Name = "Category Beta", Slug = "cat-beta-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.AddRange(catA, catB);
+        await db.SaveChangesAsync();
+
+        var prod = new Product
+        {
+            Name = "Bulk Product Test",
+            Slug = "bulk-prod-" + Guid.NewGuid().ToString("N")[..6],
+            CategoryId = catA.Id,
+            Details = "Test Details",
+            MainImageUrl = "/images/test.webp"
+        };
+        db.Products.Add(prod);
+        await db.SaveChangesAsync();
+
+        var ids = new List<int> { prod.Id };
+
+        // 1. Bulk Archive
+        await admin.BulkProductActionAsync(ids, "archive");
+        var archived = await db.Products.AsNoTracking().FirstAsync(p => p.Id == prod.Id);
+        await archived.IsDeleted.Should().BeTrue();
+
+        // 2. Bulk Publish
+        await admin.BulkProductActionAsync(ids, "publish");
+        var published = await db.Products.AsNoTracking().FirstAsync(p => p.Id == prod.Id);
+        await published.IsDeleted.Should().BeFalse();
+
+        // 3. Bulk Move Category
+        await admin.BulkProductActionAsync(ids, "category", catB.Id);
+        var moved = await db.Products.AsNoTracking().FirstAsync(p => p.Id == prod.Id);
+        await moved.CategoryId.Should().BeEqualTo(catB.Id);
     }
 }
