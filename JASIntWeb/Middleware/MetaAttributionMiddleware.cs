@@ -8,6 +8,7 @@ namespace JASIntWeb.Middleware;
 public sealed class MetaAttributionMiddleware(RequestDelegate next)
 {
     public const string AttributionCookieName = "jas_attribution";
+    public const string FirstTouchCookieName = "jas_first_touch";
     public const string FbcCookieName = "_fbc";
     public const string FbpCookieName = "_fbp";
     public const string AttributionItemKey = "MetaAttribution";
@@ -80,18 +81,55 @@ public sealed class MetaAttributionMiddleware(RequestDelegate next)
             }
         }
 
-        // 4. Handle UTM parameters
+        // 4. Handle UTM & Meta dynamic campaign parameters
         string? utmSource = query["utm_source"].FirstOrDefault();
         string? utmMedium = query["utm_medium"].FirstOrDefault();
         string? utmCampaign = query["utm_campaign"].FirstOrDefault();
         string? utmContent = query["utm_content"].FirstOrDefault();
         string? utmTerm = query["utm_term"].FirstOrDefault();
 
+        string? campaignId = query["campaign_id"].FirstOrDefault() ?? query["campaignid"].FirstOrDefault();
+        string? adSetId = query["adset_id"].FirstOrDefault() ?? query["adsetid"].FirstOrDefault();
+        string? adId = query["ad_id"].FirstOrDefault() ?? query["adid"].FirstOrDefault();
+
+        var landingPath = request.Path.Value ?? "/";
+        if (request.QueryString.HasValue)
+        {
+            landingPath += request.QueryString.Value;
+        }
+
         var hasUtmInQuery = !string.IsNullOrWhiteSpace(utmSource) ||
                             !string.IsNullOrWhiteSpace(utmMedium) ||
                             !string.IsNullOrWhiteSpace(utmCampaign) ||
                             !string.IsNullOrWhiteSpace(utmContent) ||
-                            !string.IsNullOrWhiteSpace(utmTerm);
+                            !string.IsNullOrWhiteSpace(utmTerm) ||
+                            !string.IsNullOrWhiteSpace(campaignId);
+
+        // 5. Manage First-Touch Source
+        string? firstTouchSource = null;
+        if (request.Cookies.TryGetValue(FirstTouchCookieName, out var existingFirstTouch) && !string.IsNullOrWhiteSpace(existingFirstTouch))
+        {
+            firstTouchSource = existingFirstTouch;
+        }
+        else if (hasUtmInQuery || !string.IsNullOrWhiteSpace(fbclid))
+        {
+            firstTouchSource = !string.IsNullOrWhiteSpace(utmSource) ? utmSource : (!string.IsNullOrWhiteSpace(fbclid) ? "meta_ads" : "direct");
+            try
+            {
+                response.Cookies.Append(FirstTouchCookieName, firstTouchSource, new CookieOptions
+                {
+                    Expires = DateTimeOffset.UtcNow.AddDays(90),
+                    Path = "/",
+                    HttpOnly = false,
+                    SameSite = SameSiteMode.Lax,
+                    Secure = request.IsHttps
+                });
+            }
+            catch
+            {
+                // Ignore cookie writing issues
+            }
+        }
 
         MetaAttributionDto attribution;
 
@@ -112,7 +150,13 @@ public sealed class MetaAttributionMiddleware(RequestDelegate next)
                 UtmMedium: utmMedium,
                 UtmCampaign: utmCampaign,
                 UtmContent: utmContent,
-                UtmTerm: utmTerm
+                UtmTerm: utmTerm,
+                CampaignId: campaignId,
+                AdSetId: adSetId,
+                AdId: adId,
+                LandingPath: landingPath,
+                FirstTouchSource: firstTouchSource,
+                LastTouchSource: utmSource ?? "meta_ads"
             );
 
             // Save attribution to cookie for 30 days
@@ -157,7 +201,13 @@ public sealed class MetaAttributionMiddleware(RequestDelegate next)
                 UtmMedium: stored?.UtmMedium,
                 UtmCampaign: stored?.UtmCampaign,
                 UtmContent: stored?.UtmContent,
-                UtmTerm: stored?.UtmTerm
+                UtmTerm: stored?.UtmTerm,
+                CampaignId: stored?.CampaignId ?? campaignId,
+                AdSetId: stored?.AdSetId ?? adSetId,
+                AdId: stored?.AdId ?? adId,
+                LandingPath: stored?.LandingPath ?? landingPath,
+                FirstTouchSource: firstTouchSource ?? stored?.FirstTouchSource,
+                LastTouchSource: stored?.LastTouchSource ?? stored?.UtmSource
             );
         }
 

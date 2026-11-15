@@ -59,7 +59,7 @@
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs transition hover:border-slate-300"
                 >
                     <div class="flex items-center gap-3.5 min-w-0 flex-1">
-                        <img src="@item.Image" alt="@item.Name" class="size-16 sm:size-20 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" />
+                        <PictureImage Src="@item.Image" Alt="@item.Name" Class="size-16 sm:size-20 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" Width="80" Height="80" Loading="lazy" />
                         <div class="min-w-0 flex-1">
                             <a class="font-semibold text-slate-900 text-sm hover:text-blue-600 transition line-clamp-1" href="/product/@item.Slug">@item.Name</a>
                             <p class="text-xs text-slate-500 mt-0.5">@item.Variant</p>

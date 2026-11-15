@@ -60,7 +60,7 @@
                     {
                         var isPending = pendingVariantId == item.VariantId;
                         <div @key="item.VariantId" class="flex gap-3.5 rounded-2xl border border-slate-100 bg-white p-3 shadow-2xs">
-                            <img src="@item.Image" alt="@item.Name" class="size-16 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" />
+                            <PictureImage Src="@item.Image" Alt="@item.Name" Class="size-16 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" Width="64" Height="64" Loading="lazy" />
                             <div class="flex-1 min-w-0 flex flex-col justify-between">
                                 <div>
                                     <a href="/product/@item.Slug" class="font-semibold text-slate-900 text-xs hover:text-blue-600 transition line-clamp-1" @onclick="Close">@item.Name</a>

@@ -15,6 +15,7 @@ public sealed partial class MetaConversionsApiService(
     IHttpClientFactory httpClientFactory,
     IConfiguration config,
     DeliverySettingsService deliverySettingsService,
+    IMetaCapiQueue queue,
     ILogger<MetaConversionsApiService> logger) : IMetaConversionsApiService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -28,7 +29,7 @@ public sealed partial class MetaConversionsApiService(
         string? pixelId = null;
         string? accessToken = null;
         string? testEventCode = null;
-        bool enabled = true;
+        var enabled = true;
 
         try
         {
@@ -43,7 +44,6 @@ public sealed partial class MetaConversionsApiService(
             logger.LogDebug(ex, "Could not fetch Meta Ads settings from database, falling back to configuration.");
         }
 
-        // Fallbacks to configuration / environment variables if not set in DB
         pixelId = string.IsNullOrWhiteSpace(pixelId)
             ? (config["Meta:PixelId"] ?? config["META_PIXEL_ID"])
             : pixelId;
@@ -63,19 +63,17 @@ public sealed partial class MetaConversionsApiService(
 
     public async Task<bool> SendPurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null, CancellationToken ct = default)
     {
+        return await EnqueuePurchaseEventAsync(order, request, httpContext);
+    }
+
+    public async Task<bool> EnqueuePurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null)
+    {
         try
         {
-            var cfg = await GetEffectiveConfigAsync();
-            if (!cfg.Enabled || !cfg.IsConfigured)
-            {
-                logger.LogDebug("Meta CAPI tracking is disabled or not configured; skipping Purchase event.");
-                return false;
-            }
-
             var eventId = order.PublicToken.ToString();
             var eventSourceUrl = httpContext != null
                 ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/order/{order.PublicToken}"
-                : $"https://jasinternational.com.bd/order/{order.PublicToken}";
+                : $"https://www.jasinternational.com.bd/order/{order.PublicToken}";
 
             var customerName = order.DeliveryAddress?.CustomerName ?? request?.CustomerName ?? "";
             var (firstName, lastName) = SplitName(customerName);
@@ -131,25 +129,147 @@ public sealed partial class MetaConversionsApiService(
                 Contents = items
             };
 
-            return await SendEventAsync("Purchase", eventId, eventSourceUrl, userData, customData, ct);
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "Purchase",
+                EventId = eventId,
+                EventSourceUrl = eventSourceUrl,
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogInformation("Enqueued Meta CAPI Purchase event for Order #{OrderId} (EventId: {EventId})", order.Id, eventId);
+            return true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to send Meta CAPI Purchase event for Order #{OrderId}", order.Id);
+            logger.LogError(ex, "Failed to enqueue Meta CAPI Purchase event for Order #{OrderId}", order.Id);
+            return false;
+        }
+    }
+
+    public async Task<bool> EnqueueDeliveredEventAsync(Order order, HttpContext? httpContext = null)
+    {
+        try
+        {
+            var eventId = $"deliv_{order.PublicToken}";
+            var customerName = order.DeliveryAddress?.CustomerName ?? "";
+            var (firstName, lastName) = SplitName(customerName);
+
+            var userData = new MetaUserData
+            {
+                Email = order.DeliveryAddress?.Email,
+                Phone = order.DeliveryAddress?.PhoneNumber,
+                FirstName = firstName,
+                LastName = lastName,
+                City = order.DeliveryAddress?.City ?? order.DeliveryAddress?.District,
+                Country = "BD",
+                ClientIpAddress = order.ClientIpAddress,
+                ClientUserAgent = order.ClientUserAgent,
+                Fbp = order.Fbp,
+                Fbc = order.Fbc,
+                ExternalId = order.UserId?.ToString()
+            };
+
+            var customData = new MetaCustomData
+            {
+                Value = order.Total,
+                Currency = "BDT",
+                ContentType = "product",
+                OrderId = order.Id.ToString(),
+                ContentName = "Order Delivered Confirmation"
+            };
+
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "OrderDelivered",
+                EventId = eventId,
+                EventSourceUrl = $"https://www.jasinternational.com.bd/order/{order.PublicToken}",
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogInformation("Enqueued Meta CAPI OrderDelivered event for Order #{OrderId}", order.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to enqueue Meta CAPI OrderDelivered event for Order #{OrderId}", order.Id);
+            return false;
+        }
+    }
+
+    public async Task<bool> EnqueueCancelledEventAsync(Order order, HttpContext? httpContext = null)
+    {
+        try
+        {
+            var eventId = $"cancel_{order.PublicToken}";
+            var customerName = order.DeliveryAddress?.CustomerName ?? "";
+            var (firstName, lastName) = SplitName(customerName);
+
+            var userData = new MetaUserData
+            {
+                Email = order.DeliveryAddress?.Email,
+                Phone = order.DeliveryAddress?.PhoneNumber,
+                FirstName = firstName,
+                LastName = lastName,
+                City = order.DeliveryAddress?.City ?? order.DeliveryAddress?.District,
+                Country = "BD",
+                ClientIpAddress = order.ClientIpAddress,
+                ClientUserAgent = order.ClientUserAgent,
+                Fbp = order.Fbp,
+                Fbc = order.Fbc,
+                ExternalId = order.UserId?.ToString()
+            };
+
+            var customData = new MetaCustomData
+            {
+                Value = order.Total,
+                Currency = "BDT",
+                ContentType = "product",
+                OrderId = order.Id.ToString(),
+                ContentName = "Order Cancelled"
+            };
+
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "OrderCancelled",
+                EventId = eventId,
+                EventSourceUrl = $"https://www.jasinternational.com.bd/order/{order.PublicToken}",
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogInformation("Enqueued Meta CAPI OrderCancelled event for Order #{OrderId}", order.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to enqueue Meta CAPI OrderCancelled event for Order #{OrderId}", order.Id);
             return false;
         }
     }
 
     public async Task<bool> SendEventAsync(string eventName, string eventId, string? eventSourceUrl, MetaUserData userData, MetaCustomData? customData = null, CancellationToken ct = default)
     {
-        var cfg = await GetEffectiveConfigAsync();
-        if (!cfg.Enabled || !cfg.IsConfigured)
+        var payload = new MetaCapiEventPayload
         {
-            return false;
-        }
+            EventName = eventName,
+            EventId = eventId,
+            EventSourceUrl = eventSourceUrl,
+            EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            UserData = userData,
+            CustomData = customData
+        };
 
-        var (success, _) = await ExecuteSendEventAsync(cfg.PixelId!, cfg.AccessToken!, cfg.TestEventCode, eventName, eventId, eventSourceUrl, userData, customData, ct);
-        return success;
+        await queue.EnqueueAsync(payload);
+        return true;
     }
 
     public async Task<(bool Success, string Message)> SendTestEventAsync(string pixelId, string accessToken, string? testEventCode, CancellationToken ct = default)
@@ -181,10 +301,10 @@ public sealed partial class MetaConversionsApiService(
         };
 
         var eventId = $"test_{Guid.NewGuid():N}";
-        return await ExecuteSendEventAsync(pixelId.Trim(), accessToken.Trim(), testEventCode?.Trim(), "TestEvent", eventId, "https://jasinternational.com.bd/admin/settings/meta-ads", dummyUserData, dummyCustomData, ct);
+        return await ExecuteSendDirectEventAsync(pixelId.Trim(), accessToken.Trim(), testEventCode?.Trim(), "TestEvent", eventId, "https://www.jasinternational.com.bd/admin/settings/meta-ads", dummyUserData, dummyCustomData, ct);
     }
 
-    private async Task<(bool Success, string Message)> ExecuteSendEventAsync(
+    private async Task<(bool Success, string Message)> ExecuteSendDirectEventAsync(
         string pixelId,
         string accessToken,
         string? testEventCode,
@@ -202,14 +322,14 @@ public sealed partial class MetaConversionsApiService(
                 ["event_name"] = eventName,
                 ["event_time"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 ["event_id"] = eventId,
-                ["event_source_url"] = eventSourceUrl ?? "https://jasinternational.com.bd",
+                ["event_source_url"] = eventSourceUrl ?? "https://www.jasinternational.com.bd",
                 ["action_source"] = "website",
-                ["user_data"] = FormatUserData(userData)
+                ["user_data"] = FormatUserDataInternal(userData)
             };
 
             if (customData != null)
             {
-                eventPayload["custom_data"] = FormatCustomData(customData);
+                eventPayload["custom_data"] = FormatCustomDataInternal(customData);
             }
 
             var requestBody = new Dictionary<string, object?>
@@ -236,23 +356,23 @@ public sealed partial class MetaConversionsApiService(
 
             if (response.IsSuccessStatusCode)
             {
-                logger.LogInformation("Meta CAPI event '{EventName}' sent successfully for EventId '{EventId}'. Response: {Response}", eventName, eventId, responseContent);
+                logger.LogInformation("Meta CAPI direct event '{EventName}' sent successfully for EventId '{EventId}'. Response: {Response}", eventName, eventId, responseContent);
                 return (true, $"Event received by Meta! ({response.StatusCode})");
             }
             else
             {
-                logger.LogWarning("Meta CAPI event '{EventName}' failed with HTTP {Status}: {Response}", eventName, response.StatusCode, responseContent);
+                logger.LogWarning("Meta CAPI direct event '{EventName}' failed with HTTP {Status}: {Response}", eventName, response.StatusCode, responseContent);
                 return (false, $"Meta API error ({response.StatusCode}): {responseContent}");
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception while sending Meta CAPI event '{EventName}'", eventName);
+            logger.LogError(ex, "Exception while sending direct Meta CAPI event '{EventName}'", eventName);
             return (false, $"Exception: {ex.Message}");
         }
     }
 
-    private static Dictionary<string, object?> FormatUserData(MetaUserData user)
+    public static Dictionary<string, object?> FormatUserDataInternal(MetaUserData user)
     {
         var dict = new Dictionary<string, object?>();
 
@@ -295,7 +415,7 @@ public sealed partial class MetaConversionsApiService(
         return dict;
     }
 
-    private static Dictionary<string, object?> FormatCustomData(MetaCustomData data)
+    public static Dictionary<string, object?> FormatCustomDataInternal(MetaCustomData data)
     {
         var dict = new Dictionary<string, object?>
         {
@@ -349,7 +469,12 @@ public sealed partial class MetaConversionsApiService(
 
     public static string NormalizePhone(string phone)
     {
+        if (string.IsNullOrWhiteSpace(phone)) return "";
         var digits = NonDigitsRegex().Replace(phone, "");
+        while (digits.StartsWith("00"))
+        {
+            digits = digits[2..];
+        }
         if (digits.StartsWith("880") && digits.Length >= 13)
         {
             return digits;
@@ -357,6 +482,10 @@ public sealed partial class MetaConversionsApiService(
         if (digits.StartsWith("01") && digits.Length == 11)
         {
             return "88" + digits;
+        }
+        if (digits.StartsWith("1") && digits.Length == 10)
+        {
+            return "880" + digits;
         }
         return digits;
     }

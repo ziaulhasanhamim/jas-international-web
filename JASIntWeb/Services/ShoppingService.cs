@@ -97,6 +97,75 @@ public sealed class ShoppingService(
             .ToList());
     }
 
+    public async Task<int?> RecordLeadCartAsync(int? userId, string phone, string? name, string? email, List<CartItemDto> items, MetaAttributionDto? attr = null)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return null;
+        phone = phone.Trim();
+
+        try
+        {
+            Cart? cart = null;
+            if (userId.HasValue)
+            {
+                cart = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.UserId == userId.Value && c.Status == CartStatus.Active);
+            }
+            else
+            {
+                cart = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.UserId == null && c.CustomerPhone == phone && c.Status == CartStatus.Active);
+            }
+
+            if (cart != null)
+            {
+                cart.CustomerPhone = phone;
+                if (!string.IsNullOrWhiteSpace(name)) cart.CustomerName = name.Trim();
+                if (!string.IsNullOrWhiteSpace(email)) cart.CustomerEmail = email.Trim();
+                cart.LastActivityAt = DateTimeOffset.UtcNow;
+                if (attr != null)
+                {
+                    cart.Fbclid = attr.Fbclid ?? cart.Fbclid;
+                    cart.Fbp = attr.Fbp ?? cart.Fbp;
+                    cart.Fbc = attr.Fbc ?? cart.Fbc;
+                    cart.UtmSource = attr.UtmSource ?? cart.UtmSource;
+                    cart.UtmCampaign = attr.UtmCampaign ?? cart.UtmCampaign;
+                }
+                await db.SaveChangesAsync();
+                return cart.Id;
+            }
+
+            if (items.Count == 0) return null;
+
+            var newCart = new Cart
+            {
+                UserId = userId,
+                Status = CartStatus.Active,
+                CustomerPhone = phone,
+                CustomerName = name?.Trim(),
+                CustomerEmail = email?.Trim(),
+                Fbclid = attr?.Fbclid,
+                Fbp = attr?.Fbp,
+                Fbc = attr?.Fbc,
+                UtmSource = attr?.UtmSource,
+                UtmMedium = attr?.UtmMedium,
+                UtmCampaign = attr?.UtmCampaign,
+                LastActivityAt = DateTimeOffset.UtcNow,
+                Items = items.Select(i => new CartItem
+                {
+                    ProductVariantId = i.VariantId,
+                    Quantity = i.Quantity
+                }).ToList()
+            };
+
+            db.Carts.Add(newCart);
+            await db.SaveChangesAsync();
+            return newCart.Id;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to record lead cart for phone {Phone}", phone);
+            return null;
+        }
+    }
+
     public async Task<CartDto> GetCartAsync(int userId)
     {
         var lines = await db.CartItems.AsNoTracking()
@@ -367,6 +436,13 @@ public sealed class ShoppingService(
         var utmCampaign = !string.IsNullOrWhiteSpace(request.UtmCampaign) ? request.UtmCampaign.Trim() : attr?.UtmCampaign;
         var utmContent = !string.IsNullOrWhiteSpace(request.UtmContent) ? request.UtmContent.Trim() : attr?.UtmContent;
         var utmTerm = !string.IsNullOrWhiteSpace(request.UtmTerm) ? request.UtmTerm.Trim() : attr?.UtmTerm;
+        var campaignId = !string.IsNullOrWhiteSpace(request.CampaignId) ? request.CampaignId.Trim() : attr?.CampaignId;
+        var adSetId = !string.IsNullOrWhiteSpace(request.AdSetId) ? request.AdSetId.Trim() : attr?.AdSetId;
+        var adId = !string.IsNullOrWhiteSpace(request.AdId) ? request.AdId.Trim() : attr?.AdId;
+        var landingPath = attr?.LandingPath;
+        var hasFbclid = !string.IsNullOrWhiteSpace(fbclid);
+        var firstTouch = attr?.FirstTouchSource ?? (hasFbclid ? "meta_ads" : (!string.IsNullOrWhiteSpace(utmSource) ? utmSource : "direct"));
+        var lastTouch = attr?.LastTouchSource ?? (!string.IsNullOrWhiteSpace(utmSource) ? utmSource : (hasFbclid ? "meta_ads" : "direct"));
 
         var order = new Order
         {
@@ -392,6 +468,13 @@ public sealed class ShoppingService(
             UtmCampaign = utmCampaign,
             UtmContent = utmContent,
             UtmTerm = utmTerm,
+            FirstTouchSource = firstTouch,
+            LastTouchSource = lastTouch,
+            CampaignId = campaignId,
+            AdSetId = adSetId,
+            AdId = adId,
+            LandingPath = landingPath,
+            MetaPurchaseSent = true,
             ClientIpAddress = clientIp,
             ClientUserAgent = clientUserAgent,
             Items = summary.Items.Select(i => new OrderItem
@@ -436,7 +519,8 @@ public sealed class ShoppingService(
         {
             try
             {
-                await metaApi.SendPurchaseEventAsync(order, request, httpContext);
+                order.MetaEventId = order.PublicToken.ToString();
+                await metaApi.EnqueuePurchaseEventAsync(order, request, httpContext);
             }
             catch (Exception ex)
             {

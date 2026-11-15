@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261112220241_AddMetaAdsTracking";
+    public override string LastMigrationId => "20261113102426_AddSeoAndMarketingEntities";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -94,6 +94,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("BottomSeoCopy")
+                    .HasColumnType("text");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone");
 
@@ -106,6 +109,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Description")
                     .HasColumnType("text");
 
+                b.Property<string>("IntroText")
+                    .HasColumnType("text");
+
                 b.Property<bool>("IsDeleted")
                     .HasColumnType("boolean");
 
@@ -115,8 +121,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("LogoUrl")
                     .HasColumnType("text");
 
+                b.Property<string>("MetaDescription")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaTitle")
+                    .HasColumnType("text");
+
                 b.Property<string>("Name")
                     .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("OgImageUrl")
                     .HasColumnType("text");
 
                 b.Property<string>("Slug")
@@ -200,7 +215,28 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("CreatedByUserId")
                     .HasColumnType("integer");
 
+                b.Property<string>("CustomerEmail")
+                    .HasColumnType("text");
+
+                b.Property<string>("CustomerName")
+                    .HasColumnType("text");
+
+                b.Property<string>("CustomerPhone")
+                    .HasColumnType("text");
+
                 b.Property<DateTimeOffset?>("ExpiresAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("Fbc")
+                    .HasColumnType("text");
+
+                b.Property<string>("Fbclid")
+                    .HasColumnType("text");
+
+                b.Property<string>("Fbp")
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset?>("LastActivityAt")
                     .HasColumnType("timestamp with time zone");
 
                 b.Property<int>("Status")
@@ -218,9 +254,28 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("UserId")
                     .HasColumnType("integer");
 
+                b.Property<string>("UtmCampaign")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmContent")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmMedium")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmSource")
+                    .HasColumnType("text");
+
+                b.Property<string>("UtmTerm")
+                    .HasColumnType("text");
+
                 b.HasKey("Id");
 
+                b.HasIndex("CustomerPhone");
+
                 b.HasIndex("ExpiresAt");
+
+                b.HasIndex("Status");
 
                 b.HasIndex("Token")
                     .IsUnique();
@@ -306,6 +361,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("BottomSeoCopy")
+                    .HasColumnType("text");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone");
 
@@ -318,11 +376,23 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Icon")
                     .HasColumnType("text");
 
+                b.Property<string>("IntroText")
+                    .HasColumnType("text");
+
                 b.Property<bool>("IsDeleted")
                     .HasColumnType("boolean");
 
+                b.Property<string>("MetaDescription")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaTitle")
+                    .HasColumnType("text");
+
                 b.Property<string>("Name")
                     .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("OgImageUrl")
                     .HasColumnType("text");
 
                 b.Property<int?>("ParentCategoryId")
@@ -547,8 +617,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasColumnType("text");
 
+                b.Property<string>("CatalogFeedToken")
+                    .HasColumnType("text");
+
+                b.Property<string>("FacebookDomainVerification")
+                    .HasColumnType("text");
+
                 b.Property<decimal?>("FreeDeliveryThreshold")
                     .HasColumnType("numeric");
+
+                b.Property<string>("GoogleSearchConsoleVerification")
+                    .HasColumnType("text");
 
                 b.Property<string>("HubCity")
                     .HasColumnType("text");
@@ -560,10 +639,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasColumnType("text");
 
+                b.Property<string>("MessengerPageId")
+                    .HasColumnType("text");
+
                 b.Property<string>("MetaAccessToken")
                     .HasColumnType("text");
 
                 b.Property<string>("MetaPixelId")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaPurchaseValueMode")
+                    .IsRequired()
                     .HasColumnType("text");
 
                 b.Property<string>("MetaTestEventCode")
@@ -591,9 +677,83 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateTimeOffset>("UpdatedAt")
                     .HasColumnType("timestamp with time zone");
 
+                b.Property<string>("WhatsAppNumber")
+                    .HasColumnType("text");
+
                 b.HasKey("Id");
 
                 b.ToTable("DeliverySettings");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.Guide", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<string>("Author")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("ContentHtml")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("CreatedByUserId")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset?>("DeletedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("FeaturedImageUrl")
+                    .HasColumnType("text");
+
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("boolean");
+
+                b.Property<bool>("IsPublished")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("MetaDescription")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaTitle")
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset>("PublishedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("Slug")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Summary")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset?>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("UpdatedByUserId")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Slug")
+                    .IsUnique();
+
+                b.HasIndex("IsPublished", "PublishedAt");
+
+                b.ToTable("Guides");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.HomepageSection", b =>
@@ -715,7 +875,16 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("AdId")
+                    .HasColumnType("text");
+
+                b.Property<string>("AdSetId")
+                    .HasColumnType("text");
+
                 b.Property<string>("AdminNotes")
+                    .HasColumnType("text");
+
+                b.Property<string>("CampaignId")
                     .HasColumnType("text");
 
                 b.Property<Guid>("CheckoutToken")
@@ -772,6 +941,21 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Fbp")
                     .HasColumnType("text");
 
+                b.Property<string>("FirstTouchSource")
+                    .HasColumnType("text");
+
+                b.Property<string>("LandingPath")
+                    .HasColumnType("text");
+
+                b.Property<string>("LastTouchSource")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaEventId")
+                    .HasColumnType("text");
+
+                b.Property<bool>("MetaPurchaseSent")
+                    .HasColumnType("boolean");
+
                 b.Property<decimal>("PaidAmount")
                     .HasColumnType("numeric");
 
@@ -827,12 +1011,16 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("DeliveryAddressId");
 
+                b.HasIndex("MetaPurchaseSent");
+
                 b.HasIndex("PaymentReferenceCode");
 
                 b.HasIndex("PublicToken")
                     .IsUnique();
 
                 b.HasIndex("TransactionId");
+
+                b.HasIndex("UtmCampaign");
 
                 b.HasIndex("Status", "CreatedAt");
 
@@ -996,6 +1184,12 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("BanglaDescription")
+                    .HasColumnType("text");
+
+                b.Property<string>("BanglaName")
+                    .HasColumnType("text");
+
                 b.Property<int?>("BrandId")
                     .HasColumnType("integer");
 
@@ -1044,6 +1238,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasColumnType("text");
 
+                b.Property<string>("OgImageUrl")
+                    .HasColumnType("text");
+
                 b.Property<decimal>("Rating")
                     .HasColumnType("numeric");
 
@@ -1057,6 +1254,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<string>("Slug")
                     .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Synonyms")
                     .HasColumnType("text");
 
                 b.Property<DateTimeOffset?>("UpdatedAt")
@@ -1182,6 +1382,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("ImageAltText")
+                    .HasColumnType("text");
+
                 b.Property<string>("ImageUrl")
                     .IsRequired()
                     .HasColumnType("text");
@@ -1225,6 +1428,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("text");
 
                 b.Property<bool>("IsApproved")
+                    .HasColumnType("boolean");
+
+                b.Property<bool>("IsVerifiedPurchase")
                     .HasColumnType("boolean");
 
                 b.Property<int>("ProductId")
@@ -1367,6 +1573,36 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("IX_VariantOptions_ProductOption");
 
                 b.ToTable("ProductVariantOptions");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.UrlRedirect", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("NewPath")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("OldPath")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<int>("StatusCode")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("OldPath")
+                    .IsUnique();
+
+                b.ToTable("UrlRedirects");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.User", b =>

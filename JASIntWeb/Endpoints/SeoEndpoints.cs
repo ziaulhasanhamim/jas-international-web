@@ -1,6 +1,5 @@
 using System.Text;
-using JASIntWeb.Persistence;
-using Microsoft.EntityFrameworkCore;
+using JASIntWeb.Services.Seo;
 
 namespace JASIntWeb.Endpoints;
 
@@ -8,89 +7,61 @@ public static class SeoEndpoints
 {
     public static IEndpointRouteBuilder MapSeoEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/sitemap.xml", async (HttpContext context, IServiceScopeFactory scopeFactory) =>
+        endpoints.MapGet("/sitemap.xml", (SitemapService sitemap) =>
         {
-            var baseUrl = $"{context.Request.Scheme}://{context.Request.Host.Value}";
-            if (!baseUrl.EndsWith("/")) baseUrl += "/";
-
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var products = await db.Products.AsNoTracking()
-                .Where(p => !p.IsDeleted)
-                .Select(p => new
-                {
-                    p.Slug,
-                    LastMod = p.UpdatedAt ?? p.CreatedAt
-                })
-                .ToListAsync();
-
-            var categories = await db.Categories.AsNoTracking()
-                .Select(c => c.Slug)
-                .ToListAsync();
-
-            var sb = new StringBuilder();
-            sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-            sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
-
-            // Homepage
-            sb.AppendLine("  <url>");
-            sb.AppendLine($"    <loc>{baseUrl}</loc>");
-            sb.AppendLine("    <changefreq>daily</changefreq>");
-            sb.AppendLine("    <priority>1.0</priority>");
-            sb.AppendLine("  </url>");
-
-            // Static Pages
-            var staticPages = new[] { "products", "about", "contact", "faq", "terms", "privacy", "warranty-returns" };
-            foreach (var page in staticPages)
-            {
-                sb.AppendLine("  <url>");
-                sb.AppendLine($"    <loc>{baseUrl}{page}</loc>");
-                sb.AppendLine("    <changefreq>weekly</changefreq>");
-                sb.AppendLine("    <priority>0.7</priority>");
-                sb.AppendLine("  </url>");
-            }
-
-            // Category Archives
-            foreach (var cat in categories)
-            {
-                sb.AppendLine("  <url>");
-                sb.AppendLine($"    <loc>{baseUrl}category/{cat}</loc>");
-                sb.AppendLine("    <changefreq>daily</changefreq>");
-                sb.AppendLine("    <priority>0.8</priority>");
-                sb.AppendLine("  </url>");
-            }
-
-            // Products
-            foreach (var prod in products)
-            {
-                sb.AppendLine("  <url>");
-                sb.AppendLine($"    <loc>{baseUrl}product/{prod.Slug}</loc>");
-                sb.AppendLine($"    <lastmod>{prod.LastMod:yyyy-MM-dd}</lastmod>");
-                sb.AppendLine("    <changefreq>daily</changefreq>");
-                sb.AppendLine("    <priority>0.9</priority>");
-                sb.AppendLine("  </url>");
-            }
-
-            sb.AppendLine("</urlset>");
-
-            return Results.Content(sb.ToString(), "application/xml", Encoding.UTF8);
+            var xml = sitemap.GenerateSitemapIndex();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
         }).CacheOutput("SitemapPolicy");
 
-        endpoints.MapGet("/robots.txt", (HttpContext context) =>
+        endpoints.MapGet("/sitemap-pages.xml", (SitemapService sitemap) =>
         {
-            var baseUrl = $"{context.Request.Scheme}://{context.Request.Host.Value}";
+            var xml = sitemap.GeneratePagesSitemap();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
+        endpoints.MapGet("/sitemap-categories.xml", async (SitemapService sitemap) =>
+        {
+            var xml = await sitemap.GenerateCategoriesSitemapAsync();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
+        endpoints.MapGet("/sitemap-brands.xml", async (SitemapService sitemap) =>
+        {
+            var xml = await sitemap.GenerateBrandsSitemapAsync();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
+        endpoints.MapGet("/sitemap-products.xml", async (SitemapService sitemap) =>
+        {
+            var xml = await sitemap.GenerateProductsSitemapAsync();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
+        endpoints.MapGet("/sitemap-guides.xml", async (SitemapService sitemap) =>
+        {
+            var xml = await sitemap.GenerateGuidesSitemapAsync();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
+        endpoints.MapGet("/robots.txt", (ISeoService seo) =>
+        {
             var sb = new StringBuilder();
             sb.AppendLine("User-agent: *");
             sb.AppendLine("Disallow: /admin/");
-            sb.AppendLine("Disallow: /payment-verification");
             sb.AppendLine("Disallow: /checkout");
             sb.AppendLine("Disallow: /cart");
+            sb.AppendLine("Disallow: /payment");
+            sb.AppendLine("Disallow: /payment-verification");
+            sb.AppendLine("Disallow: /order/");
+            sb.AppendLine("Disallow: /orders");
             sb.AppendLine("Disallow: /account/");
             sb.AppendLine("Disallow: /api/");
+            sb.AppendLine("Disallow: /*?q=");
+            sb.AppendLine("Disallow: /*?sort=");
+            sb.AppendLine("Disallow: /*fbclid=");
             sb.AppendLine("Allow: /");
             sb.AppendLine();
-            sb.AppendLine($"Sitemap: {baseUrl}/sitemap.xml");
+            sb.AppendLine($"Sitemap: {seo.PublicBaseUrl}/sitemap.xml");
 
             return Results.Content(sb.ToString(), "text/plain", Encoding.UTF8);
         }).CacheOutput("SitemapPolicy");

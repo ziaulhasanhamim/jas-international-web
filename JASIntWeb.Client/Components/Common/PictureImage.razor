@@ -1,0 +1,102 @@
+@using JASIntWeb.Client.Services
+
+@if (string.IsNullOrWhiteSpace(Src))
+{
+    <img
+        src="/jas-logo.png"
+        alt="@(Alt ?? "JAS International")"
+        class="@Class"
+        loading="@Loading"
+        decoding="@Decoding"
+        width="@Width"
+        height="@Height"
+        fetchpriority="@FetchPriority"
+        style="@Style"
+        @attributes="AdditionalAttributes"
+    />
+}
+else if (ImageUrlHelper.IsVectorOrDataUri(Src))
+{
+    <img
+        src="@Src"
+        alt="@Alt"
+        class="@Class"
+        loading="@Loading"
+        decoding="@Decoding"
+        width="@Width"
+        height="@Height"
+        fetchpriority="@FetchPriority"
+        style="@Style"
+        @attributes="AdditionalAttributes"
+    />
+}
+else
+{
+    var avif = ImageUrlHelper.GetAvifUrl(Src);
+    var webp = ImageUrlHelper.GetWebpUrl(Src);
+
+    <picture id="@PictureId" class="@PictureClass">
+        @if (!string.IsNullOrWhiteSpace(avif))
+        {
+            <source type="image/avif" srcset="@avif" />
+        }
+        @if (!string.IsNullOrWhiteSpace(webp))
+        {
+            <source type="image/webp" srcset="@webp" />
+        }
+        <img
+            id="@Id"
+            src="@Src"
+            alt="@Alt"
+            class="@Class"
+            loading="@Loading"
+            decoding="@Decoding"
+            width="@Width"
+            height="@Height"
+            fetchpriority="@FetchPriority"
+            style="@Style"
+            @attributes="AdditionalAttributes"
+        />
+    </picture>
+}
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    [Parameter]
+    public string? PictureId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string? Src { get; set; }
+
+    [Parameter]
+    public string? Alt { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public string? PictureClass { get; set; }
+
+    [Parameter]
+    public string Loading { get; set; } = "lazy";
+
+    [Parameter]
+    public string Decoding { get; set; } = "async";
+
+    [Parameter]
+    public object? Width { get; set; }
+
+    [Parameter]
+    public object? Height { get; set; }
+
+    [Parameter]
+    public string? FetchPriority { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+}

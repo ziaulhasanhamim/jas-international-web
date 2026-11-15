@@ -10,5 +10,6 @@ public sealed class ProductReview : AuditableEntity
     public string? Title { get; set; }
     public required string Comment { get; set; }
     public bool IsApproved { get; set; } = true;
+    public bool IsVerifiedPurchase { get; set; } = false;
     public string? StaffReply { get; set; }
 }

@@ -47,6 +47,9 @@ public sealed class CheckoutRequest
     public string? UtmCampaign { get; set; }
     public string? UtmContent { get; set; }
     public string? UtmTerm { get; set; }
+    public string? CampaignId { get; set; }
+    public string? AdSetId { get; set; }
+    public string? AdId { get; set; }
 }
 
 public sealed record MetaAttributionDto(
@@ -57,7 +60,13 @@ public sealed record MetaAttributionDto(
     string? UtmMedium = null,
     string? UtmCampaign = null,
     string? UtmContent = null,
-    string? UtmTerm = null
+    string? UtmTerm = null,
+    string? CampaignId = null,
+    string? AdSetId = null,
+    string? AdId = null,
+    string? LandingPath = null,
+    string? FirstTouchSource = null,
+    string? LastTouchSource = null
 );
 
 public sealed record CheckoutResult(int OrderId, Guid PublicToken, decimal Total, string? PaymentReferenceCode = null, decimal DeliveryCharge = 0, decimal DiscountAmount = 0);

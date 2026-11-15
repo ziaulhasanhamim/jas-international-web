@@ -17,14 +17,14 @@
             >
                 @if (category.IsIconUrl)
                 {
-                    <img
-                        src="@category.Icon"
-                        alt="@category.Name"
-                        loading="lazy"
-                        decoding="async"
-                        width="48"
-                        height="48"
-                        class="mx-auto h-12 w-12"
+                    <PictureImage
+                        Src="@category.Icon"
+                        Alt="@category.Name"
+                        Loading="lazy"
+                        Decoding="async"
+                        Width="48"
+                        Height="48"
+                        Class="mx-auto h-12 w-12 object-contain"
                     />
                 }
                 else

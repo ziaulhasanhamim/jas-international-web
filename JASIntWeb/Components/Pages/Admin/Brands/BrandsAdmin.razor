@@ -101,7 +101,7 @@
                             <div class="flex items-center gap-3">
                                 @if (!string.IsNullOrEmpty(b.LogoUrl))
                                 {
-                                    <img src="@b.LogoUrl" alt="@b.Name" class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" />
+                                    <PictureImage Src="@b.LogoUrl" Alt="@b.Name" Class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" Loading="lazy" Width="32" Height="32" />
                                 }
                                 else
                                 {

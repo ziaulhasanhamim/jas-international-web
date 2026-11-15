@@ -1,0 +1,120 @@
+@using JASIntWeb.Services
+@using JASIntWeb.Services.Seo
+@inject ISeoService Seo
+@inject DeliverySettingsService DeliverySettingsSvc
+@inject IConfiguration Config
+
+@{
+    var cleanTitle = string.IsNullOrWhiteSpace(Title) ? "JAS International — Tech Gadgets & Accessories in Bangladesh" : Title.Trim();
+    var cleanDesc = Seo.SanitizeDescription(Description);
+    var canonicalUrl = Seo.BuildCanonicalUrl(CanonicalPath ?? "/");
+    var ogImageUrl = Seo.BuildAbsoluteUrl(string.IsNullOrWhiteSpace(OgImage) ? "/jas-og-card.png" : OgImage);
+    var robotsDirective = string.IsNullOrWhiteSpace(Robots) ? "index,follow" : Robots.Trim();
+
+    var settings = DeliverySettingsSvc.GetDeliverySettings();
+    var gscVerification = !string.IsNullOrWhiteSpace(Config["Seo:GoogleSiteVerification"]) ? Config["Seo:GoogleSiteVerification"] : settings.GoogleSearchConsoleVerification;
+    var metaDomainVerification = !string.IsNullOrWhiteSpace(Config["Seo:FacebookDomainVerification"]) ? Config["Seo:FacebookDomainVerification"] : settings.FacebookDomainVerification;
+    var fbAppId = Config["Seo:FbAppId"];
+}
+
+<PageTitle>@cleanTitle</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="@cleanDesc" />
+    <meta name="robots" content="@robotsDirective" />
+    <link rel="canonical" href="@canonicalUrl" />
+
+    @if (!string.IsNullOrWhiteSpace(PrevUrl))
+    {
+        <link rel="prev" href="@Seo.BuildCanonicalUrl(PrevUrl)" />
+    }
+    @if (!string.IsNullOrWhiteSpace(NextUrl))
+    {
+        <link rel="next" href="@Seo.BuildCanonicalUrl(NextUrl)" />
+    }
+
+    <!-- Open Graph Metadata -->
+    <meta property="og:site_name" content="JAS International" />
+    <meta property="og:url" content="@canonicalUrl" />
+    <meta property="og:type" content="@(string.IsNullOrWhiteSpace(OgType) ? "website" : OgType)" />
+    <meta property="og:title" content="@cleanTitle" />
+    <meta property="og:description" content="@cleanDesc" />
+    <meta property="og:image" content="@ogImageUrl" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="@cleanTitle" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="bn_BD" />
+
+    <!-- Twitter Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@@jasinternational" />
+    <meta name="twitter:title" content="@cleanTitle" />
+    <meta name="twitter:description" content="@cleanDesc" />
+    <meta name="twitter:image" content="@ogImageUrl" />
+
+    <!-- Product Open Graph Tags (Scrapers, Meta Ads & WhatsApp/Messenger) -->
+    @if (ProductPrice.HasValue)
+    {
+        <meta property="product:price:amount" content="@ProductPrice.Value.ToString("F2")" />
+        <meta property="product:price:currency" content="@(ProductCurrency ?? "BDT")" />
+    }
+    @if (!string.IsNullOrWhiteSpace(ProductAvailability))
+    {
+        <meta property="product:availability" content="@ProductAvailability" />
+    }
+    @if (!string.IsNullOrWhiteSpace(ProductBrand))
+    {
+        <meta property="product:brand" content="@ProductBrand" />
+    }
+    @if (!string.IsNullOrWhiteSpace(ProductRetailerItemId))
+    {
+        <meta property="product:retailer_item_id" content="@ProductRetailerItemId" />
+    }
+
+    <!-- Verification Meta Tags -->
+    @if (!string.IsNullOrWhiteSpace(gscVerification))
+    {
+        <meta name="google-site-verification" content="@gscVerification" />
+    }
+    @if (!string.IsNullOrWhiteSpace(metaDomainVerification))
+    {
+        <meta name="facebook-domain-verification" content="@metaDomainVerification" />
+    }
+    @if (!string.IsNullOrWhiteSpace(fbAppId))
+    {
+        <meta property="fb:app_id" content="@fbAppId" />
+    }
+
+    <!-- Structured Data (JSON-LD) -->
+    @if (JsonLd != null)
+    {
+        @foreach (var snippet in JsonLd)
+        {
+            if (!string.IsNullOrWhiteSpace(snippet))
+            {
+                <script type="application/ld+json">
+                    @((MarkupString)snippet)
+                </script>
+            }
+        }
+    }
+</HeadContent>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? CanonicalPath { get; set; }
+    [Parameter] public string? OgImage { get; set; }
+    [Parameter] public string? OgType { get; set; } = "website";
+    [Parameter] public string? Robots { get; set; }
+    [Parameter] public string? PrevUrl { get; set; }
+    [Parameter] public string? NextUrl { get; set; }
+    [Parameter] public IEnumerable<string>? JsonLd { get; set; }
+
+    [Parameter] public decimal? ProductPrice { get; set; }
+    [Parameter] public string? ProductCurrency { get; set; } = "BDT";
+    [Parameter] public string? ProductAvailability { get; set; }
+    [Parameter] public string? ProductBrand { get; set; }
+    [Parameter] public string? ProductRetailerItemId { get; set; }
+}

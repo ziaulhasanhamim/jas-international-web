@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using JASIntWeb.Services.Meta;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Hybrid;
 namespace JASIntWeb.Services;
 // Called through AdminSession, which authorizes every operation in a fresh service scope.
 
-public sealed class AdminService(AppDbContext db, UserManager<User> users, HybridCache cache, AccountMailService mailService)
+public sealed class AdminService(AppDbContext db, UserManager<User> users, HybridCache cache, AccountMailService mailService, IMetaConversionsApiService? metaApi = null)
 {
     private static void Validate(object input)
     {
@@ -79,7 +80,29 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             productSlug = $"{baseSlug}-{slugCounter++}";
         }
+        if (input.Id != 0 && !string.IsNullOrEmpty(p.Slug) && !p.Slug.Equals(productSlug, StringComparison.OrdinalIgnoreCase))
+        {
+            var oldPath = $"/product/{p.Slug}";
+            var newPath = $"/product/{productSlug}";
+            if (!await db.UrlRedirects.AnyAsync(r => r.OldPath == oldPath))
+            {
+                db.UrlRedirects.Add(new UrlRedirect
+                {
+                    OldPath = oldPath,
+                    NewPath = newPath,
+                    StatusCode = 301,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
         p.Slug = productSlug;
+        p.MetaTitle = input.MetaTitle?.Trim();
+        p.MetaDescription = input.MetaDescription?.Trim();
+        p.OgImageUrl = string.IsNullOrWhiteSpace(input.OgImageUrl) ? null : Url(input.OgImageUrl);
+        p.Synonyms = input.Synonyms?.Trim();
+        p.BanglaName = input.BanglaName?.Trim();
+        p.BanglaDescription = input.BanglaDescription?.Trim();
+        p.WarrantyInfo = input.WarrantyInfo?.Trim() ?? "1 Year Official Brand Warranty";
 
         p.Description = input.Description?.Trim();
         p.Details = input.Details.Trim();
@@ -657,6 +680,25 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
         if (statusChanged)
         {
+            if (metaApi != null)
+            {
+                try
+                {
+                    if (status == OrderStatus.Delivered)
+                    {
+                        await metaApi.EnqueueDeliveredEventAsync(order);
+                    }
+                    else if (status == OrderStatus.Cancelled)
+                    {
+                        await metaApi.EnqueueCancelledEventAsync(order);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[MetaCAPI] Failed to enqueue status event: {ex.Message}");
+                }
+            }
+
             // Dispatch order status update email to customer
             try
             {
@@ -692,7 +734,27 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             catSlug = $"{baseCategorySlug}-{catCounter++}";
         }
+        if (input.Id != 0 && !string.IsNullOrEmpty(c.Slug) && !c.Slug.Equals(catSlug, StringComparison.OrdinalIgnoreCase))
+        {
+            var oldPath = $"/category/{c.Slug}";
+            var newPath = $"/category/{catSlug}";
+            if (!await db.UrlRedirects.AnyAsync(r => r.OldPath == oldPath))
+            {
+                db.UrlRedirects.Add(new UrlRedirect
+                {
+                    OldPath = oldPath,
+                    NewPath = newPath,
+                    StatusCode = 301,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
         c.Slug = catSlug;
+        c.MetaTitle = input.MetaTitle?.Trim();
+        c.MetaDescription = input.MetaDescription?.Trim();
+        c.OgImageUrl = string.IsNullOrWhiteSpace(input.OgImageUrl) ? null : Url(input.OgImageUrl);
+        c.IntroText = input.IntroText?.Trim();
+        c.BottomSeoCopy = input.BottomSeoCopy?.Trim();
 
         c.Icon = input.Icon?.Trim();
         c.IsDeleted = input.Hidden;
@@ -754,7 +816,27 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             brandSlug = $"{baseBrandSlug}-{brandCounter++}";
         }
+        if (input.Id != 0 && !string.IsNullOrEmpty(b.Slug) && !b.Slug.Equals(brandSlug, StringComparison.OrdinalIgnoreCase))
+        {
+            var oldPath = $"/brand/{b.Slug}";
+            var newPath = $"/brand/{brandSlug}";
+            if (!await db.UrlRedirects.AnyAsync(r => r.OldPath == oldPath))
+            {
+                db.UrlRedirects.Add(new UrlRedirect
+                {
+                    OldPath = oldPath,
+                    NewPath = newPath,
+                    StatusCode = 301,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
         b.Slug = brandSlug;
+        b.MetaTitle = input.MetaTitle?.Trim();
+        b.MetaDescription = input.MetaDescription?.Trim();
+        b.OgImageUrl = string.IsNullOrWhiteSpace(input.OgImageUrl) ? null : Url(input.OgImageUrl);
+        b.IntroText = input.IntroText?.Trim();
+        b.BottomSeoCopy = input.BottomSeoCopy?.Trim();
 
         b.Description = input.Description?.Trim();
         b.LogoUrl = string.IsNullOrWhiteSpace(input.LogoUrl) ? null : Url(input.LogoUrl);

@@ -1,0 +1,205 @@
+@page "/admin/marketing/abandoned-carts"
+@attribute [StreamRendering]
+@layout AdminLayout
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Abandoned Cart Recovery — JAS Admin</PageTitle>
+
+<AdminPageHeader Title="Abandoned Cart Recovery"
+                 Description="Recover high-intent shoppers who added items to cart or entered contact info before completing checkout."
+                 ActionHref="/admin/marketing"
+                 ActionText="Back to Marketing" />
+
+<div class="shop-container py-6 space-y-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Abandoned Leads</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">@abandonedCarts.Count</p>
+            <p class="mt-1 text-2xs text-slate-400">with captured mobile phone</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Potential Recoverable Value</p>
+            <p class="mt-2 text-2xl font-bold text-blue-600">৳@totalRecoverableValue.ToString("N0")</p>
+            <p class="mt-1 text-2xs text-slate-400">cart merchandise value</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Meta Ads Leads</p>
+            <p class="mt-2 text-2xl font-bold text-purple-600">@metaLeadCount</p>
+            <p class="mt-1 text-2xs text-slate-400">attributed to ad traffic</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Average Cart</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">
+                ৳@(abandonedCarts.Count > 0 ? (totalRecoverableValue / abandonedCarts.Count).ToString("N0") : "0")
+            </p>
+            <p class="mt-1 text-2xs text-slate-400">per abandoned shopper</p>
+        </div>
+    </div>
+
+    <!-- Abandoned Carts Table -->
+    <div class="rounded-2xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
+        <div class="border-b border-slate-200/80 px-6 py-4 flex items-center justify-between">
+            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Active Incomplete Carts</h2>
+            <span class="text-xs font-medium text-slate-400">Sorted by most recent activity</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 border-b border-slate-200 text-2xs uppercase font-bold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3 px-6">Customer / Contact</th>
+                        <th class="py-3 px-4">Cart Items</th>
+                        <th class="py-3 px-4">Source &amp; Campaign</th>
+                        <th class="py-3 px-4">Last Active</th>
+                        <th class="py-3 px-4 text-right">Cart Total</th>
+                        <th class="py-3 px-6 text-center">1-Click Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @if (abandonedCarts.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="py-12 text-center text-slate-400">
+                                <p class="text-sm font-semibold text-slate-600">No abandoned phone leads recorded yet.</p>
+                                <p class="text-xs mt-1">As customers enter their 11-digit phone number on checkout, incomplete carts will appear here for recovery.</p>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var c in abandonedCarts)
+                        {
+                            var waUrl = GetWhatsAppRecoveryUrl(c);
+                            var telUrl = $"tel:{c.Phone}";
+
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="py-3.5 px-6">
+                                    <p class="font-bold text-slate-900">@(string.IsNullOrWhiteSpace(c.Name) ? "Guest Customer" : c.Name)</p>
+                                    <p class="font-mono text-2xs text-blue-600 mt-0.5">@c.Phone</p>
+                                    @if (!string.IsNullOrWhiteSpace(c.Email))
+                                    {
+                                        <p class="text-3xs text-slate-400">@c.Email</p>
+                                    }
+                                </td>
+                                <td class="py-3.5 px-4">
+                                    <div class="space-y-1">
+                                        @foreach (var item in c.Items)
+                                        {
+                                            <div class="flex items-center gap-1.5 text-xs text-slate-800">
+                                                <span class="rounded bg-slate-100 px-1 py-0.5 text-3xs font-semibold text-slate-600">@item.Quantity&times;</span>
+                                                <span class="truncate max-w-[200px]" title="@item.Name">@item.Name</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-4">
+                                    <span class="rounded-md bg-blue-50 px-2 py-0.5 text-3xs font-semibold text-blue-700">
+                                        @(c.UtmSource ?? (c.HasFbclid ? "meta_ads" : "direct"))
+                                    </span>
+                                    @if (!string.IsNullOrWhiteSpace(c.UtmCampaign))
+                                    {
+                                        <p class="text-3xs text-slate-500 mt-1 truncate max-w-[150px]">@c.UtmCampaign</p>
+                                    }
+                                </td>
+                                <td class="py-3.5 px-4 text-2xs text-slate-500">
+                                    @c.LastActive.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                </td>
+                                <td class="py-3.5 px-4 text-right font-bold text-slate-900">
+                                    ৳@c.Total.ToString("N0")
+                                </td>
+                                <td class="py-3.5 px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <a href="@waUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-2xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition" title="Message on WhatsApp">
+                                            <span>💬 WhatsApp</span>
+                                        </a>
+                                        <a href="@telUrl" class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-2xs font-medium text-slate-700 hover:bg-slate-50 transition" title="Call Customer">
+                                            <span>📞 Call</span>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<AbandonedCartDto> abandonedCarts = [];
+    private decimal totalRecoverableValue = 0m;
+    private int metaLeadCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var rawCarts = await Db.Carts.AsNoTracking()
+            .Include(c => c.Items).ThenInclude(i => i.ProductVariant).ThenInclude(v => v!.Product)
+            .Where(c => c.Status == CartStatus.Active && !string.IsNullOrWhiteSpace(c.CustomerPhone) && c.Items.Count > 0)
+            .OrderByDescending(c => c.LastActivityAt ?? c.UpdatedAt ?? c.CreatedAt)
+            .ToListAsync();
+
+        abandonedCarts = rawCarts.Select(c =>
+        {
+            var items = c.Items.Select(i => new CartLineSummary(
+                i.ProductVariant?.Product?.Name ?? "Item",
+                i.Quantity,
+                (i.ProductVariant?.SellingPrice ?? 0m) * i.Quantity
+            )).ToList();
+
+            var total = items.Sum(i => i.Total);
+
+            return new AbandonedCartDto
+            {
+                Id = c.Id,
+                Phone = c.CustomerPhone!,
+                Name = c.CustomerName,
+                Email = c.CustomerEmail,
+                UtmSource = c.UtmSource,
+                UtmCampaign = c.UtmCampaign,
+                HasFbclid = !string.IsNullOrWhiteSpace(c.Fbclid),
+                LastActive = c.LastActivityAt ?? c.UpdatedAt ?? c.CreatedAt,
+                Items = items,
+                Total = total
+            };
+        }).ToList();
+
+        totalRecoverableValue = abandonedCarts.Sum(c => c.Total);
+        metaLeadCount = abandonedCarts.Count(c => c.HasFbclid || c.UtmSource?.Contains("meta", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private static string GetWhatsAppRecoveryUrl(AbandonedCartDto c)
+    {
+        var cleanPhone = c.Phone.Trim();
+        if (cleanPhone.StartsWith("01")) cleanPhone = "88" + cleanPhone;
+        else if (!cleanPhone.StartsWith("880")) cleanPhone = "880" + cleanPhone;
+
+        var itemName = c.Items.FirstOrDefault()?.Name ?? "your gadget";
+        var msg = $"Hi {(string.IsNullOrWhiteSpace(c.Name) ? "" : c.Name + ", ")}we noticed you left {itemName} in your cart at JAS International! Need any help or want us to confirm your order for fast delivery? Complete here: https://www.jasinternational.com.bd/cart";
+
+        return $"https://wa.me/{cleanPhone}?text={Uri.EscapeDataString(msg)}";
+    }
+
+    private sealed class AbandonedCartDto
+    {
+        public int Id { get; init; }
+        public required string Phone { get; init; }
+        public string? Name { get; init; }
+        public string? Email { get; init; }
+        public string? UtmSource { get; init; }
+        public string? UtmCampaign { get; init; }
+        public bool HasFbclid { get; init; }
+        public DateTimeOffset LastActive { get; init; }
+        public required List<CartLineSummary> Items { get; init; }
+        public decimal Total { get; init; }
+    }
+
+    private sealed record CartLineSummary(string Name, int Quantity, decimal Total);
+}

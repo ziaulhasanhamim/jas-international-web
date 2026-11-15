@@ -18,9 +18,21 @@ public class SitemapAndRobotsIntegrationTests
         await response.Content.Headers.ContentType!.MediaType.Should().BeEqualTo("application/xml");
 
         var content = await response.Content.ReadAsStringAsync();
-        await content.Should().Contain("<urlset");
-        await content.Should().Contain("/category/");
-        await content.Should().Contain("/product/");
+        await content.Should().Contain("<sitemapindex");
+        await content.Should().Contain("sitemap-products.xml");
+        await content.Should().Contain("sitemap-categories.xml");
+
+        var productsSitemapResp = await client.GetAsync("/sitemap-products.xml");
+        await ((int)productsSitemapResp.StatusCode).Should().BeEqualTo(200);
+        var productsContent = await productsSitemapResp.Content.ReadAsStringAsync();
+        await productsContent.Should().Contain("<urlset");
+        await productsContent.Should().Contain("/product/");
+
+        var categoriesSitemapResp = await client.GetAsync("/sitemap-categories.xml");
+        await ((int)categoriesSitemapResp.StatusCode).Should().BeEqualTo(200);
+        var categoriesContent = await categoriesSitemapResp.Content.ReadAsStringAsync();
+        await categoriesContent.Should().Contain("<urlset");
+        await categoriesContent.Should().Contain("/category/");
     }
 
     [Test]
@@ -49,5 +61,27 @@ public class SitemapAndRobotsIntegrationTests
 
         await response.StatusCode.Should().BeEqualTo(HttpStatusCode.MovedPermanently);
         await response.Headers.Location!.ToString().Should().BeEqualTo("/category/smartphones");
+    }
+
+    [Test]
+    public async Task GetHealth_ReturnsOkWithHealthyStatus()
+    {
+        var client = Factory.CreateClient();
+        var response = await client.GetAsync("/health");
+
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        var content = await response.Content.ReadAsStringAsync();
+        await content.Should().Contain("\"status\":\"healthy\"");
+    }
+
+    [Test]
+    public async Task HeadHealth_ReturnsOkWithoutBody()
+    {
+        var client = Factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Head, "/health");
+        var response = await client.SendAsync(request);
+
+        // Uptime monitors (e.g. Better Uptime, UptimeRobot, Pingdom) use HEAD by default
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
     }
 }

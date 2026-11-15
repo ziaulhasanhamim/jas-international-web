@@ -6,6 +6,18 @@ namespace JASIntWeb.Services;
 
 public sealed class DeliverySettingsService(AppDbContext db)
 {
+    public DeliverySettings GetDeliverySettings()
+    {
+        try
+        {
+            return db.DeliverySettings.AsNoTracking().FirstOrDefault() ?? new DeliverySettings();
+        }
+        catch
+        {
+            return new DeliverySettings();
+        }
+    }
+
     public async Task<DeliverySettings> GetSettingsAsync()
     {
         var settings = await db.DeliverySettings.FirstOrDefaultAsync();

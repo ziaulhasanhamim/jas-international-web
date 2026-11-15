@@ -25,13 +25,13 @@
                     >
                         <!-- Pure clean banner artwork without text clutter (Gadget & Gear style) -->
                         <a href="@targetUrl" class="block w-full h-full relative" title="@slide.ImageAlt">
-                            <img
-                                src="@slide.Image"
-                                alt="@slide.ImageAlt"
-                                loading="@(i == 0 ? "eager" : "lazy")"
-                                fetchpriority="@(i == 0 ? "high" : "low")"
-                                decoding="async"
-                                class="w-full h-full object-cover object-center"
+                            <PictureImage
+                                Src="@slide.Image"
+                                Alt="@slide.ImageAlt"
+                                Loading="@(i == 0 ? "eager" : "lazy")"
+                                FetchPriority="@(i == 0 ? "high" : "low")"
+                                Decoding="async"
+                                Class="w-full h-full object-cover object-center"
                             />
                         </a>
                     </div>

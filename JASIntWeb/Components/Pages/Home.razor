@@ -1,39 +1,33 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "HomePage")]
 @inject JASIntWeb.Services.CatalogService Catalog
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>JAS International — Gadgets &amp; Premium Tech Accessories (Since 2005)</PageTitle>
-
-<HeadContent>
-    <meta name="description" content="JAS International is Khulna's premier gadget boutique offering authentic smartwatches, wireless audio, fast chargers, power banks, and tech accessories with nationwide delivery since 2005." />
-    <meta property="og:title" content="JAS International — Premium Gadgets &amp; Tech Accessories (Since 2005)" />
-    <meta property="og:description" content="Shop 100% genuine tech gadgets from Apple, Samsung, Google Pixel, Anker, Sony, and more. Physical showroom in Khulna with nationwide delivery." />
-    <meta property="og:image" content="/jas-logo.png" />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="canonical" href="https://jasinternational.com.bd/" />
-    <script type="application/ld+json">
+@{
+    var homeJsonLd = new[]
     {
-        "@@context": "https://schema.org",
-        "@@type": "ElectronicsStore",
-        "name": "JAS International",
-        "image": "https://jasinternational.com.bd/jas-logo.png",
-        "telephone": "+8801711465078",
-        "email": "info@jasinternational.com.bd",
-        "foundingDate": "2005",
-        "address": {
-            "@@type": "PostalAddress",
-            "streetAddress": "Khulna Shopping Complex, 3rd Floor",
-            "addressLocality": "Khulna",
-            "addressCountry": "BD"
-        },
-        "priceRange": "৳৳",
-        "sameAs": [
-            "https://facebook.com/international.jas"
-        ]
-    }
-    </script>
-</HeadContent>
+        JASIntWeb.Services.Seo.JsonLdBuilder.BuildOrganization(
+            Seo.PublicBaseUrl,
+            Seo.BuildAbsoluteUrl("/jas-logo.png"),
+            ["JAS Gadgets", "JAS Tech", "JAS International BD", "JAS International Khulna"],
+            ["https://facebook.com/international.jas", "https://instagram.com/international.jas"]
+        ),
+        JASIntWeb.Services.Seo.JsonLdBuilder.BuildWebSite(
+            Seo.PublicBaseUrl,
+            ["JAS Gadgets", "JAS Tech", "JAS International BD", "JAS International Khulna"]
+        ),
+        JASIntWeb.Services.Seo.JsonLdBuilder.BuildLocalBusiness(
+            Seo.PublicBaseUrl,
+            Seo.BuildAbsoluteUrl("/jas-logo.png")
+        )
+    };
+}
+
+<SeoHead Title="JAS International — Gadgets, Smartwatches & Tech Accessories in Bangladesh | Khulna Showroom"
+         Description="JAS International is Khulna's premier gadget boutique offering authentic smartwatches, wireless audio, fast chargers, power banks, and tech accessories with nationwide cash on delivery since 2005."
+         CanonicalPath="/"
+         OgImage="/jas-og-card.png"
+         JsonLd="homeJsonLd" />
 
 <!-- Hero Carousel (Contained, clean modern look matching Gadget & Gear) -->
 <HeroCarousel Slides="slides" />
@@ -165,7 +159,7 @@
                         <div class="size-11 sm:size-12 rounded-xl bg-slate-50 flex items-center justify-center p-2 mb-2 group-hover:scale-105 transition-transform border border-slate-100">
                             @if (!string.IsNullOrEmpty(b.LogoUrl))
                             {
-                                <img src="@b.LogoUrl" alt="@b.Name" class="size-full object-contain" loading="lazy" />
+                                <PictureImage Src="@b.LogoUrl" Alt="@b.Name" Class="size-full object-contain" Loading="lazy" />
                             }
                             else
                             {

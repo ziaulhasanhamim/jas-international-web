@@ -46,6 +46,9 @@ public interface IMetaConversionsApiService
 {
     Task<MetaAdsConfig> GetEffectiveConfigAsync();
     Task<bool> SendPurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null, CancellationToken ct = default);
+    Task<bool> EnqueuePurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null);
+    Task<bool> EnqueueDeliveredEventAsync(Order order, HttpContext? httpContext = null);
+    Task<bool> EnqueueCancelledEventAsync(Order order, HttpContext? httpContext = null);
     Task<bool> SendEventAsync(string eventName, string eventId, string? eventSourceUrl, MetaUserData userData, MetaCustomData? customData = null, CancellationToken ct = default);
     Task<(bool Success, string Message)> SendTestEventAsync(string pixelId, string accessToken, string? testEventCode, CancellationToken ct = default);
 }

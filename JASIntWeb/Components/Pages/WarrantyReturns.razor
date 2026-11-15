@@ -1,7 +1,11 @@
 @page "/warranty-returns"
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "StaticPages")]
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>Warranty &amp; Return Policy · JAS International</PageTitle>
+<SeoHead Title="Official Warranty & 7-Day Replacement Policy | JAS International"
+         Description="Read JAS International's official warranty terms and 7-day replacement policy for smartwatches, wireless audio, chargers, and tech gadgets across Bangladesh."
+         CanonicalPath="/warranty-returns"
+         OgImage="/jas-og-card.png" />
 
 <div class="shop-container py-10 max-w-4xl mx-auto">
     <div class="mb-8">

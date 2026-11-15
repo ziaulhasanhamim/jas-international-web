@@ -1,7 +1,11 @@
 @page "/terms"
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "StaticPages")]
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>Terms &amp; Conditions · JAS International</PageTitle>
+<SeoHead Title="Terms of Service | JAS International"
+         Description="Review the terms and conditions governing purchases, deliveries, warranties, and orders placed at JAS International."
+         CanonicalPath="/terms"
+         OgImage="/jas-og-card.png" />
 
 <div class="shop-container py-10 max-w-4xl mx-auto">
     <div class="mb-8">

@@ -1,0 +1,141 @@
+@page "/showroom"
+@attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "StaticPages")]
+@inject JASIntWeb.Services.Seo.ISeoService Seo
+
+@{
+    var showroomJsonLd = new[]
+    {
+        JASIntWeb.Services.Seo.JsonLdBuilder.BuildLocalBusiness(
+            Seo.PublicBaseUrl,
+            Seo.BuildAbsoluteUrl("/jas-logo.png"),
+            telephone: "+8801711465078"
+        )
+    };
+}
+
+<SeoHead Title="Flagship Showroom in Khulna | JAS International (Khulna Shopping Complex)"
+         Description="Visit the JAS International flagship showroom at Khulna Shopping Complex (3rd Floor), Dakbangla, Khulna. Hands-on gadget testing, official warranty, and instant pickup."
+         CanonicalPath="/showroom"
+         OgImage="/jas-og-card.png"
+         JsonLd="showroomJsonLd" />
+
+<div class="shop-container py-10 max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 mb-3">
+            PHYSICAL STORE IN KHULNA
+        </span>
+        <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 mb-3">
+            Visit Our Khulna Showroom
+        </h1>
+        <p class="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            Experience genuine gadgets firsthand. Test smartwatches, audition wireless earbuds, and receive dedicated technical advice at our Khulna boutique.
+        </p>
+    </div>
+
+    <!-- Store Information Grid -->
+    <div class="grid gap-8 lg:grid-cols-3 mb-12">
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 text-slate-900 font-bold mb-3">
+                    <span class="flex size-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                        <Icon Name="map-pin" Class="size-5" />
+                    </span>
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-slate-400 block font-semibold">Store Address</span>
+                        <span class="text-sm font-bold text-slate-900">Showroom Location</span>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    <strong>JAS International</strong><br />
+                    Khulna Shopping Complex, 3rd Floor<br />
+                    Dakbangla, Khulna - 9100, Bangladesh
+                </p>
+                <p class="text-[11px] text-slate-400 mt-2">
+                    Landmark: Beside Dakbangla intersection, central Khulna commercial district.
+                </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-100">
+                <a href="https://maps.google.com/?q=Khulna+Shopping+Complex+Khulna" target="_blank" rel="noopener noreferrer" class="btn-primary w-full text-xs text-center !py-2">
+                    Open in Google Maps ↗
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 text-slate-900 font-bold mb-3">
+                    <span class="flex size-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                        <Icon Name="phone" Class="size-5" />
+                    </span>
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-slate-400 block font-semibold">Instant Contact</span>
+                        <span class="text-sm font-bold text-slate-900">Hotline &amp; WhatsApp</span>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Direct Phone: <a href="tel:01711465078" class="font-bold text-blue-600 hover:underline">01711465078</a><br />
+                    Showroom Staff: <a href="tel:01711465078" class="font-bold text-blue-600 hover:underline">+8801711465078</a><br />
+                    Email: <a href="mailto:info@jasinternational.com.bd" class="text-slate-600 hover:underline">info@jasinternational.com.bd</a>
+                </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-100 flex gap-2">
+                <a href="https://wa.me/8801711465078" target="_blank" rel="noopener noreferrer" class="btn-secondary w-full text-xs text-center !py-2 !text-emerald-700 !bg-emerald-50 !border-emerald-200">
+                    WhatsApp Chat
+                </a>
+            </div>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 text-slate-900 font-bold mb-3">
+                    <span class="flex size-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                        <Icon Name="box" Class="size-5" />
+                    </span>
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-slate-400 block font-semibold">Store Schedule</span>
+                        <span class="text-sm font-bold text-slate-900">Opening Hours</span>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-600 space-y-1.5 leading-relaxed">
+                    <div class="flex justify-between">
+                        <span class="font-semibold text-slate-700">Saturday – Thursday:</span>
+                        <span>10:00 AM – 9:00 PM</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-semibold text-slate-700">Friday:</span>
+                        <span>3:00 PM – 9:00 PM</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400 pt-1">
+                        <span>Showroom Trial:</span>
+                        <span>Free device demo</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-100">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                    <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Open Today
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Showroom Perks Strip -->
+    <div class="rounded-3xl bg-slate-900 text-white p-8 sm:p-10 mb-12 shadow-sm">
+        <h2 class="font-display text-2xl font-bold mb-4">Why Visit Our Khulna Showroom?</h2>
+        <div class="grid gap-6 sm:grid-cols-3 mt-6">
+            <div class="border-l-2 border-blue-500 pl-4">
+                <h3 class="font-bold text-sm text-white mb-1">Live Hands-On Trial</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">Try on smartwatches, test audio clarity, and inspect device ergonomics before paying.</p>
+            </div>
+            <div class="border-l-2 border-emerald-500 pl-4">
+                <h3 class="font-bold text-sm text-white mb-1">Instant Store Pickup</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">Skip courier transit time. Order online and pick up directly at the counter within 1 hour.</p>
+            </div>
+            <div class="border-l-2 border-amber-500 pl-4">
+                <h3 class="font-bold text-sm text-white mb-1">Direct Warranty Support</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">Drop off devices for replacement warranty verification directly with our showroom technicians.</p>
+            </div>
+        </div>
+    </div>
+</div>

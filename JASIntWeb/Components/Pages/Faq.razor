@@ -1,7 +1,26 @@
 @page "/faq"
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "StaticPages")]
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>Frequently Asked Questions · JAS International</PageTitle>
+@{
+    var faqs = new (string Q, string A)[]
+    {
+        ("What are the shipping charges and delivery timelines?", "Delivery fee is ৳80 within Khulna City (within 24 hours) and ৳130 for outside Khulna across all 64 districts of Bangladesh (2 to 4 business days via express courier)."),
+        ("Do you offer Cash on Delivery (COD)?", "Yes, we offer Cash on Delivery across all 64 districts of Bangladesh. You can inspect the outer packaging and pay the courier agent upon delivery."),
+        ("Are all products brand new and authentic?", "Every gadget sold at JAS International is 100% authentic, brand-new, and sealed in manufacturer packaging with official warranty."),
+        ("How does the 7-day replacement warranty work?", "If your device exhibits an inherent manufacturer hardware defect within 7 days of delivery, we issue an immediate replacement unit upon verification."),
+        ("Can I pick up my order directly from the Khulna showroom?", "Yes! You can pick up your order directly from our flagship store at Khulna Shopping Complex, 3rd Floor, Dakbangla, Khulna."),
+        ("How can I check the status of my order?", "Visit our Your Orders page (/orders) to view real-time fulfillment and tracking states.")
+    };
+
+    var faqJsonLd = new[] { JASIntWeb.Services.Seo.JsonLdBuilder.BuildFaq(faqs) };
+}
+
+<SeoHead Title="Frequently Asked Questions (FAQ) | JAS International"
+         Description="Find answers to common questions regarding delivery fees (৳80 Khulna, ৳130 nationwide), Cash on Delivery, official warranty, and showroom pickup at JAS International."
+         CanonicalPath="/faq"
+         OgImage="/jas-og-card.png"
+         JsonLd="faqJsonLd" />
 
 <div class="shop-container py-10 max-w-4xl mx-auto">
     <div class="text-center mb-10">

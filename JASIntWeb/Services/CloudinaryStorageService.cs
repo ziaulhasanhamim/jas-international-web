@@ -8,12 +8,18 @@ public sealed class CloudinaryStorageService : IStorageService
     private readonly Cloudinary? _cloudinary;
     private readonly ILogger<CloudinaryStorageService> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly IImageOptimizerService _imageOptimizer;
 
     public bool IsConfigured => _cloudinary is not null;
 
-    public CloudinaryStorageService(IConfiguration config, IWebHostEnvironment env, ILogger<CloudinaryStorageService> logger)
+    public CloudinaryStorageService(
+        IConfiguration config,
+        IWebHostEnvironment env,
+        IImageOptimizerService imageOptimizer,
+        ILogger<CloudinaryStorageService> logger)
     {
         _env = env;
+        _imageOptimizer = imageOptimizer;
         _logger = logger;
 
         var cloudinaryUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"];
@@ -53,7 +59,7 @@ public sealed class CloudinaryStorageService : IStorageService
         }
         else
         {
-            _logger.LogInformation("Cloudinary credentials not provided.");
+            _logger.LogInformation("Cloudinary credentials not provided; using local disk storage fallback.");
         }
     }
 
@@ -68,11 +74,39 @@ public sealed class CloudinaryStorageService : IStorageService
         var uniqueToken = Guid.NewGuid().ToString("N")[..8];
         var publicId = $"{dateFolder}/{safeBaseName}_{uniqueToken}";
 
+        OptimizedImageSet? optimized = null;
+        try
+        {
+            optimized = await _imageOptimizer.OptimizeImageAsync(stream, fileName, contentType, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Automatic image optimization failed for '{FileName}'. Proceeding with raw bytes fallback.", fileName);
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+        }
+
         if (_cloudinary is not null)
         {
+            Stream uploadStream;
+            string uploadFileName;
+
+            if (optimized is not null)
+            {
+                uploadStream = new MemoryStream(optimized.PrimaryBytes);
+                uploadFileName = $"{safeBaseName}_{uniqueToken}{optimized.PrimaryExtension}";
+            }
+            else
+            {
+                uploadStream = stream;
+                uploadFileName = fileName;
+            }
+
             var uploadParams = new ImageUploadParams
             {
-                File = new FileDescription(fileName, stream),
+                File = new FileDescription(uploadFileName, uploadStream),
                 PublicId = publicId,
                 Folder = "jas-storefront",
                 Overwrite = false,
@@ -87,23 +121,46 @@ public sealed class CloudinaryStorageService : IStorageService
             }
 
             var secureUrl = uploadResult.SecureUrl?.ToString() ?? uploadResult.Url?.ToString();
-            _logger.LogInformation("Uploaded image to Cloudinary: {Url}", secureUrl);
+            _logger.LogInformation("Uploaded optimized image to Cloudinary: {Url}", secureUrl);
             return secureUrl!;
         }
 
-        // Local disk fallback
-        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        // Local disk fallback with automatic AVIF and WebP companions
         var localFolder = Path.Combine(_env.WebRootPath, "uploads", "products", dateFolder);
         Directory.CreateDirectory(localFolder);
-        var localFileName = $"{safeBaseName}_{uniqueToken}{ext}";
-        var localFilePath = Path.Combine(localFolder, localFileName);
 
-        await using var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await stream.CopyToAsync(fileStream, ct);
+        if (optimized is not null)
+        {
+            var primaryFileName = $"{safeBaseName}_{uniqueToken}{optimized.PrimaryExtension}";
+            var webpFileName = $"{safeBaseName}_{uniqueToken}.webp";
+            var avifFileName = $"{safeBaseName}_{uniqueToken}.avif";
 
-        var localUrl = $"/uploads/products/{dateFolder}/{localFileName}";
-        _logger.LogInformation("Saved image to local disk fallback: {Url}", localUrl);
-        return localUrl;
+            var primaryPath = Path.Combine(localFolder, primaryFileName);
+            var webpPath = Path.Combine(localFolder, webpFileName);
+            var avifPath = Path.Combine(localFolder, avifFileName);
+
+            await File.WriteAllBytesAsync(primaryPath, optimized.PrimaryBytes, ct);
+            await File.WriteAllBytesAsync(webpPath, optimized.WebpBytes, ct);
+            await File.WriteAllBytesAsync(avifPath, optimized.AvifBytes, ct);
+
+            var localUrl = $"/uploads/products/{dateFolder}/{primaryFileName}";
+            _logger.LogInformation("Saved optimized image set (Fallback, WebP, AVIF) to local disk: {Url}", localUrl);
+            return localUrl;
+        }
+
+        // Fallback if optimization could not process the format (e.g. raw stream)
+        var rawExt = Path.GetExtension(fileName).ToLowerInvariant();
+        var rawFileName = $"{safeBaseName}_{uniqueToken}{rawExt}";
+        var rawPath = Path.Combine(localFolder, rawFileName);
+
+        await using (var fileStream = new FileStream(rawPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await stream.CopyToAsync(fileStream, ct);
+        }
+
+        var fallbackUrl = $"/uploads/products/{dateFolder}/{rawFileName}";
+        _logger.LogInformation("Saved raw image to local disk: {Url}", fallbackUrl);
+        return fallbackUrl;
     }
 
     public async Task DeleteFileAsync(string fileUrl, CancellationToken ct = default)
@@ -141,7 +198,7 @@ public sealed class CloudinaryStorageService : IStorageService
             return;
         }
 
-        // Local disk deletion
+        // Local disk deletion (delete primary file and companion .webp and .avif)
         if (fileUrl.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
         {
             var relativePath = fileUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
@@ -150,6 +207,25 @@ public sealed class CloudinaryStorageService : IStorageService
             {
                 File.Delete(localPath);
                 _logger.LogInformation("Deleted local file: {Path}", localPath);
+            }
+
+            var dir = Path.GetDirectoryName(localPath);
+            var nameWithoutExt = Path.GetFileNameWithoutExtension(localPath);
+            if (!string.IsNullOrEmpty(dir) && !string.IsNullOrEmpty(nameWithoutExt))
+            {
+                var companionWebp = Path.Combine(dir, $"{nameWithoutExt}.webp");
+                if (File.Exists(companionWebp))
+                {
+                    File.Delete(companionWebp);
+                    _logger.LogInformation("Deleted companion WebP file: {Path}", companionWebp);
+                }
+
+                var companionAvif = Path.Combine(dir, $"{nameWithoutExt}.avif");
+                if (File.Exists(companionAvif))
+                {
+                    File.Delete(companionAvif);
+                    _logger.LogInformation("Deleted companion AVIF file: {Path}", companionAvif);
+                }
             }
         }
     }

@@ -1,0 +1,170 @@
+@page "/admin/seo"
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>SEO & Search Engine Dashboard — JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="SEO & Search Engine Command Center"
+    Description="Monitor indexable coverage, structured data readiness, canonical redirects, and XML sitemaps."
+    ActionHref="/admin"
+    ActionText="Back to Dashboard"
+/>
+
+<div class="space-y-6">
+    <!-- Stat Metrics Row -->
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Active Products</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-slate-900">@totalProducts</span>
+                <span class="text-xs text-slate-500">(@inStockProducts in stock)</span>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Missing SEO Fields</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl font-bold @(missingSeoCount > 0 ? "text-amber-600" : "text-emerald-600")">@missingSeoCount</span>
+                <span class="text-xs text-slate-400">using auto-fallbacks</span>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Categories &amp; Brands</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-slate-900">@(totalCategories + totalBrands)</span>
+                <span class="text-xs text-slate-500">(@totalCategories cat, @totalBrands brands)</span>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Automatic 301 Redirects</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-blue-600">@redirectCount</span>
+                <span class="text-xs text-slate-400">active aliases</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sitemaps & Feeds Quick Links -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <span>🗺️ Crawl Assets &amp; XML Sitemaps</span>
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <a href="/sitemap.xml" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Sitemap Index</span>
+                    <span class="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">Root</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/sitemap.xml</span>
+            </a>
+
+            <a href="/sitemap-products.xml" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Products &amp; Images</span>
+                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">@totalProducts URLs</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/sitemap-products.xml</span>
+            </a>
+
+            <a href="/sitemap-categories.xml" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Category Pages</span>
+                    <span class="text-[10px] bg-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded-full">@totalCategories URLs</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/sitemap-categories.xml</span>
+            </a>
+
+            <a href="/sitemap-brands.xml" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Brand Showcases</span>
+                    <span class="text-[10px] bg-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded-full">@totalBrands URLs</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/sitemap-brands.xml</span>
+            </a>
+
+            <a href="/sitemap-guides.xml" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Buying Guides</span>
+                    <span class="text-[10px] bg-purple-100 text-purple-800 font-semibold px-2 py-0.5 rounded-full">Guides</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/sitemap-guides.xml</span>
+            </a>
+
+            <a href="/robots.txt" target="_blank" class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 hover:bg-blue-50/50 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-900">Robots.txt Directive</span>
+                    <span class="text-[10px] bg-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded-full">Crawlers</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-500 block truncate mt-1">/robots.txt</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Redirects Manager -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900">Permanent (301) URL Redirects</h3>
+                <p class="text-xs text-slate-500">Automatically created when product or category slugs change to preserve backlinks and rankings.</p>
+            </div>
+        </div>
+
+        @if (redirects.Count == 0)
+        {
+            <p class="text-xs text-slate-400 py-4 text-center">No URL redirects recorded yet.</p>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                    <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                        <tr>
+                            <th class="py-2.5 px-3">Old Path</th>
+                            <th class="py-2.5 px-3">Target Canonical Path</th>
+                            <th class="py-2.5 px-3">Status</th>
+                            <th class="py-2.5 px-3">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var r in redirects)
+                        {
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 px-3 font-mono text-slate-700">@r.OldPath</td>
+                                <td class="py-2 px-3 font-mono text-blue-600 font-semibold">@r.NewPath</td>
+                                <td class="py-2 px-3"><span class="badge badge-emerald">@r.StatusCode</span></td>
+                                <td class="py-2 px-3 text-slate-400">@r.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private int totalProducts;
+    private int inStockProducts;
+    private int missingSeoCount;
+    private int totalCategories;
+    private int totalBrands;
+    private int redirectCount;
+    private List<UrlRedirect> redirects = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        totalProducts = await Db.Products.CountAsync(p => !p.IsDeleted);
+        inStockProducts = await Db.Products.CountAsync(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted));
+        missingSeoCount = await Db.Products.CountAsync(p => !p.IsDeleted && (string.IsNullOrEmpty(p.MetaTitle) || string.IsNullOrEmpty(p.MetaDescription)));
+        totalCategories = await Db.Categories.CountAsync(c => !c.IsDeleted);
+        totalBrands = await Db.Brands.CountAsync(b => !b.IsDeleted);
+        redirectCount = await Db.UrlRedirects.CountAsync();
+        redirects = await Db.UrlRedirects.AsNoTracking().OrderByDescending(r => r.CreatedAt).Take(20).ToListAsync();
+    }
+}

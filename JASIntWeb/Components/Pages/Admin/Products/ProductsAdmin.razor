@@ -108,7 +108,7 @@
                             <div class="flex items-center gap-3">
                                 @if (!string.IsNullOrWhiteSpace(p.ImageUrl))
                                 {
-                                    <img src="@p.ImageUrl" alt="@p.Name" class="size-10 object-contain rounded-lg border border-slate-100 p-1 bg-white shrink-0" />
+                                    <PictureImage Src="@p.ImageUrl" Alt="@p.Name" Class="size-10 object-contain rounded-lg border border-slate-100 p-1 bg-white shrink-0" Loading="lazy" Width="40" Height="40" />
                                 }
                                 else
                                 {

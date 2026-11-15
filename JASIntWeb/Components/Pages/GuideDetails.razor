@@ -1,0 +1,152 @@
+@page "/guides/{Slug}"
+@attribute [StreamRendering]
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services.Seo
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject ISeoService Seo
+
+<CascadingAuthenticationState>
+@if (loading)
+{
+    <div class="shop-container py-10 max-w-3xl mx-auto animate-pulse">
+        <div class="h-6 w-32 bg-slate-200 rounded mb-4"></div>
+        <div class="h-10 w-3/4 bg-slate-200 rounded mb-6"></div>
+        <div class="aspect-video bg-slate-200 rounded-3xl mb-8"></div>
+        <div class="space-y-3">
+            <div class="h-4 bg-slate-200 rounded"></div>
+            <div class="h-4 bg-slate-200 rounded"></div>
+            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+        </div>
+    </div>
+}
+else if (guide is null)
+{
+    <SeoHead Title="Guide Not Found | JAS International" Robots="noindex,follow" />
+    <div class="shop-container py-16 text-center max-w-md mx-auto">
+        <Icon Name="alert" Class="size-12 text-slate-300 mx-auto mb-3" />
+        <h1 class="text-2xl font-bold text-slate-900">Guide Not Found</h1>
+        <p class="text-xs text-slate-500 mt-2 mb-6">The buying guide you requested does not exist or has been archived.</p>
+        <a href="/guides" class="btn-primary text-xs">Browse All Guides</a>
+    </div>
+}
+else
+{
+    var title = guide.MetaTitle ?? $"{guide.Title} | JAS International Guide";
+    var desc = guide.MetaDescription ?? guide.Summary;
+    var canonical = $"/guides/{guide.Slug}";
+    var guideUrl = Seo.BuildAbsoluteUrl(canonical);
+
+    var crumbs = new (string Name, string Url)[]
+    {
+        ("Home", Seo.PublicBaseUrl),
+        ("Guides", $"{Seo.PublicBaseUrl}/guides"),
+        (guide.Title, guideUrl)
+    };
+
+    var jsonLdList = new[]
+    {
+        JsonLdBuilder.BuildBreadcrumbs(crumbs),
+        JsonLdBuilder.BuildArticle(
+            title: guide.Title,
+            description: desc,
+            url: guideUrl,
+            imageUrl: !string.IsNullOrWhiteSpace(guide.FeaturedImageUrl) ? Seo.BuildAbsoluteUrl(guide.FeaturedImageUrl) : null,
+            author: guide.Author,
+            publishedAt: guide.PublishedAt,
+            updatedAt: guide.UpdatedAt
+        )
+    };
+
+    <SeoHead Title="@title"
+             Description="@desc"
+             CanonicalPath="@canonical"
+             OgImage="@guide.FeaturedImageUrl"
+             OgType="article"
+             JsonLd="jsonLdList" />
+
+    <article class="shop-container py-10 max-w-3xl mx-auto">
+        <!-- Breadcrumbs -->
+        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-6" aria-label="Breadcrumb">
+            <a href="/" class="hover:text-blue-600 transition">Home</a>
+            <span>/</span>
+            <a href="/guides" class="hover:text-blue-600 transition">Buying Guides</a>
+            <span>/</span>
+            <span class="font-semibold text-slate-800 truncate">@guide.Title</span>
+        </nav>
+
+        <!-- Article Header -->
+        <header class="mb-8">
+            <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight mb-4">
+                @guide.Title
+            </h1>
+            <div class="flex items-center gap-3 text-xs text-slate-500 border-b border-slate-100 pb-4">
+                <span>Published: <strong>@guide.PublishedAt.ToString("dd MMMM yyyy")</strong></span>
+                <span>•</span>
+                <span>Author: <strong>@guide.Author</strong></span>
+                <span>•</span>
+                <span class="text-blue-600 font-semibold">Verified Tech Guide</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(guide.Summary))
+            {
+                <p class="text-base text-slate-600 leading-relaxed mt-4 italic border-l-4 border-blue-500 pl-4 bg-slate-50 py-2 rounded-r-xl">
+                    @guide.Summary
+                </p>
+            }
+        </header>
+
+        <!-- Featured Image -->
+        @if (!string.IsNullOrWhiteSpace(guide.FeaturedImageUrl))
+        {
+            <div class="aspect-video w-full overflow-hidden rounded-3xl bg-slate-100 mb-8 shadow-xs">
+                <PictureImage Src="@guide.FeaturedImageUrl" Alt="@guide.Title" Class="size-full object-cover" FetchPriority="high" Loading="eager" />
+            </div>
+        }
+
+        <!-- Main Content -->
+        <div class="prose prose-slate max-w-none text-sm sm:text-base leading-relaxed text-slate-700 space-y-4">
+            @((MarkupString)guide.ContentHtml)
+        </div>
+
+        <!-- Call to Action Banner -->
+        <div class="mt-12 rounded-3xl bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md">
+            <div>
+                <h3 class="text-lg font-bold">Ready to choose your next gadget?</h3>
+                <p class="text-xs text-blue-200 mt-1">Browse our verified catalog with official brand warranty and nationwide delivery.</p>
+            </div>
+            <a href="/products" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-5 !py-2.5 text-xs font-bold shrink-0">
+                Shop Gadgets Now →
+            </a>
+        </div>
+    </article>
+}
+</CascadingAuthenticationState>
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private bool loading = true;
+    private Guide? guide;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
+            guide = await Db.Guides.AsNoTracking()
+                .FirstOrDefaultAsync(g => g.Slug == cleanSlug && g.IsPublished && !g.IsDeleted);
+
+            if (guide == null && HttpContext != null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            }
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

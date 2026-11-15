@@ -97,11 +97,13 @@
                     <tr>
                         <td>
                             <div class="flex items-center gap-3">
-                                <img
-                                    src="@p.MainImageUrl"
-                                    alt="@p.Name"
-                                    class="size-11 rounded-lg border border-slate-100 object-contain p-1 shrink-0 bg-white"
-                                    loading="lazy"
+                                <PictureImage
+                                    Src="@p.MainImageUrl"
+                                    Alt="@p.Name"
+                                    Class="size-11 rounded-lg border border-slate-100 object-contain p-1 shrink-0 bg-white"
+                                    Loading="lazy"
+                                    Width="44"
+                                    Height="44"
                                 />
                                 <div>
                                     <strong class="text-slate-900 block font-semibold text-xs sm:text-sm">@p.Name</strong>

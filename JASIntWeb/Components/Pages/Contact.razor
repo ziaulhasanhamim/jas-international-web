@@ -1,7 +1,41 @@
 @page "/contact"
 @inject NavigationManager Nav
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>Contact Us &amp; Showroom · JAS International</PageTitle>
+@{
+    var contactJsonLd = new[]
+    {
+        System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "ContactPage",
+            ["name"] = "Contact JAS International Showroom",
+            ["description"] = "Contact information and showroom location for JAS International in Khulna, Bangladesh.",
+            ["url"] = Seo.BuildAbsoluteUrl("/contact"),
+            ["mainEntity"] = new Dictionary<string, object>
+            {
+                ["@type"] = "ElectronicsStore",
+                ["name"] = "JAS International",
+                ["telephone"] = "+8801711465078",
+                ["email"] = "info@jasinternational.com.bd",
+                ["address"] = new Dictionary<string, object>
+                {
+                    ["@type"] = "PostalAddress",
+                    ["streetAddress"] = "Khulna Shopping Complex, 3rd Floor, Dakbangla",
+                    ["addressLocality"] = "Khulna",
+                    ["postalCode"] = "9100",
+                    ["addressCountry"] = "BD"
+                }
+            }
+        })
+    };
+}
+
+<SeoHead Title="Contact & Khulna Showroom | JAS International"
+         Description="Get in touch with JAS International. Visit our flagship Khulna showroom at Khulna Shopping Complex 3rd Floor, call 01711465078, or chat on WhatsApp."
+         CanonicalPath="/contact"
+         OgImage="/jas-og-card.png"
+         JsonLd="contactJsonLd" />
 
 <div class="shop-container py-10 max-w-5xl mx-auto">
     <div class="text-center mb-10">

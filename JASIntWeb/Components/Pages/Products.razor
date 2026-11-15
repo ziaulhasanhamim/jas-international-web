@@ -3,9 +3,79 @@
 @attribute [StreamRendering]
 @inject JASIntWeb.Services.CatalogService Catalog
 @inject NavigationManager Nav
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 @using Microsoft.AspNetCore.WebUtilities
+@using JASIntWeb.Services.Seo
 
-<PageTitle>@(string.IsNullOrWhiteSpace(Query) ? (activeCategoryName ?? "All Products") : $"“{Query}”") · JAS International</PageTitle>
+@{
+    var isSearch = !string.IsNullOrWhiteSpace(Query);
+    var isCategory = !string.IsNullOrWhiteSpace(CategorySlug);
+    var hasFilterParams = !string.IsNullOrWhiteSpace(BrandSlug) || !string.IsNullOrWhiteSpace(Sort) || MinPrice.HasValue || MaxPrice.HasValue;
+
+    string seoTitle;
+    string seoDesc;
+    string canonicalPath;
+    string robots = (isSearch || hasFilterParams) ? "noindex,follow" : "index,follow";
+
+    if (isSearch)
+    {
+        seoTitle = $"“{Query}” Search Results | JAS International";
+        seoDesc = $"Search results for “{Query}” at JAS International. Authentic tech gadgets, smartwatches, and accessories in Bangladesh.";
+        canonicalPath = "/products";
+    }
+    else if (isCategory)
+    {
+        seoTitle = Seo.BuildCategoryTitle(activeCategoryName ?? "Category");
+        seoDesc = $"Browse 100% authentic {activeCategoryName ?? "gadgets"} with official warranty, COD and nationwide delivery from JAS International.";
+        canonicalPath = $"/category/{CategorySlug!.ToLowerInvariant()}";
+    }
+    else
+    {
+        seoTitle = "All Gadgets, Smartwatches & Accessories Price in Bangladesh | JAS International";
+        seoDesc = "Explore premium tech gadgets, wireless earbuds, smartwatches, fast chargers, and accessories at JAS International with official warranty in Bangladesh.";
+        canonicalPath = "/products";
+    }
+
+    var crumbs = new List<(string Name, string Url)>
+    {
+        ("Home", Seo.PublicBaseUrl),
+        ("Products", $"{Seo.PublicBaseUrl}/products")
+    };
+    if (isCategory && !string.IsNullOrWhiteSpace(activeCategoryName))
+    {
+        crumbs.Add((activeCategoryName, $"{Seo.PublicBaseUrl}{canonicalPath}"));
+    }
+
+    var collectionItems = products.Select(p => (
+        Name: p.Name,
+        Url: Seo.BuildAbsoluteUrl($"/product/{p.Slug}"),
+        Price: p.Price,
+        Image: (string?)Seo.BuildAbsoluteUrl(p.Image)
+    ));
+
+    var jsonLdList = new[]
+    {
+        JsonLdBuilder.BuildBreadcrumbs(crumbs),
+        JsonLdBuilder.BuildCollection(seoTitle, seoDesc, Seo.BuildAbsoluteUrl(canonicalPath), collectionItems)
+    };
+}
+
+<SeoHead Title="@seoTitle"
+         Description="@seoDesc"
+         CanonicalPath="@canonicalPath"
+         Robots="@robots"
+         PrevUrl="@(Page > 1 ? (Page == 2 ? canonicalPath : $"{canonicalPath}?page={Page - 1}") : null)"
+         NextUrl="@((Page * 18 < total) ? $"{canonicalPath}?page={Page + 1}" : null)"
+         JsonLd="jsonLdList" />
+
+@if (isSearch)
+{
+    <div data-meta-event="Search" data-search-string="@Query" hidden></div>
+}
+else if (isCategory)
+{
+    <div data-meta-event="ViewCategory" data-content-category="@activeCategoryName" hidden></div>
+}
 
 <div class="shop-container py-8">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">

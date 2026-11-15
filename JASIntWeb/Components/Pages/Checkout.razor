@@ -99,6 +99,7 @@
                                     class="field @(hasValidated && !IsPhoneValid ? "!border-rose-500 !ring-rose-200 bg-rose-50/20" : "")"
                                     @bind="phoneNumber"
                                     @bind:event="oninput"
+                                    @bind:after="OnPhoneInputAfter"
                                     placeholder="017xxxxxxxx (11 digits)"
                                 />
                                 @if (hasValidated && !IsPhoneValid)
@@ -245,7 +246,7 @@
                         {
                             <div @key="item.VariantId" class="py-3 flex items-center justify-between gap-3 text-xs">
                                 <div class="flex items-center gap-3 min-w-0">
-                                    <img src="@item.Image" alt="@item.Name" class="size-12 shrink-0 rounded-lg object-contain bg-slate-50 border p-1" />
+                                    <PictureImage Src="@item.Image" Alt="@item.Name" Class="size-12 shrink-0 rounded-lg object-contain bg-slate-50 border p-1" Width="48" Height="48" Loading="lazy" />
                                     <div class="min-w-0">
                                         <strong class="text-slate-900 block font-semibold truncate">@item.Name</strong>
                                         <span class="text-slate-400 block mt-0.5">@item.Variant · Qty: @item.Quantity</span>
@@ -432,6 +433,30 @@
                         }
                     }
                 }
+
+                // Auto-apply deep-linked coupon or saved coupon
+                var uri = Nav.ToAbsoluteUri(Nav.Uri);
+                if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("coupon", out var couponParam) && !string.IsNullOrWhiteSpace(couponParam))
+                {
+                    couponInput = couponParam.ToString().Trim().ToUpperInvariant();
+                    await ApplyCoupon();
+                }
+                else
+                {
+                    try
+                    {
+                        var savedCoupon = await JS.InvokeAsync<string?>("localStorage.getItem", "jas_coupon");
+                        if (!string.IsNullOrWhiteSpace(savedCoupon))
+                        {
+                            couponInput = savedCoupon.Trim().ToUpperInvariant();
+                            await ApplyCoupon();
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore localStorage errors
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -442,6 +467,24 @@
                 cartReady = true;
                 UpdateDeliveryAndTotal();
                 StateHasChanged();
+            }
+        }
+    }
+
+    private async Task OnPhoneInputAfter()
+    {
+        if (IsPhoneValid && Cart.Items.Count > 0)
+        {
+            try
+            {
+                var auth = AuthStateTask != null ? await AuthStateTask : null;
+                var uid = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
+                var attr = await JS.InvokeAsync<MetaAttributionDto>("window.jasGetAttribution");
+                await Shop.RecordLeadCartAsync(uid, phoneNumber, customerName, email, Cart.Items.ToList(), attr);
+            }
+            catch
+            {
+                // Non-blocking lead capture
             }
         }
     }

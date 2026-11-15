@@ -1,0 +1,286 @@
+@page "/admin/marketing"
+@attribute [StreamRendering]
+@layout AdminLayout
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Marketing &amp; Meta ROAS — JAS Admin</PageTitle>
+
+<AdminPageHeader Title="Marketing &amp; Meta ROAS"
+                 Description="Meta Ads performance, attribution funnels, and real Delivered ROAS (Bangladesh UTC+6)."
+                 ActionHref="/admin"
+                 ActionText="Back to dashboard" />
+
+<div class="shop-container py-6 space-y-6">
+    <!-- Period & Spend Controls -->
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Date Range:</span>
+            <a href="/admin/marketing?period=all&spend=@adSpend" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(period == "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">All Time</a>
+            <a href="/admin/marketing?period=30d&spend=@adSpend" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(period == "30d" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Last 30 Days</a>
+            <a href="/admin/marketing?period=7d&spend=@adSpend" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(period == "7d" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Last 7 Days</a>
+            <a href="/admin/marketing?period=today&spend=@adSpend" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(period == "today" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Today</a>
+        </div>
+
+        <form method="get" action="/admin/marketing" class="flex items-center gap-2">
+            <input type="hidden" name="period" value="@period" />
+            <label for="spend-input" class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meta Ad Spend (৳):</label>
+            <input id="spend-input" type="number" step="100" name="spend" value="@adSpend" class="w-32 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-2xs focus:border-blue-500 focus:outline-none" placeholder="e.g. 5000" />
+            <button type="submit" class="rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition">Update ROAS</button>
+        </form>
+    </div>
+
+    <!-- Core Metrics Overview -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Delivered Net Revenue</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">৳@deliveredRevenue.ToString("N0")</p>
+            <p class="mt-1 text-2xs text-emerald-600 font-semibold">@deliveredOrdersCount delivered orders</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Meta Ad Spend</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">৳@adSpend.ToString("N0")</p>
+            <p class="mt-1 text-2xs text-slate-400">Owner-reported ad expenditure</p>
+        </div>
+
+        <div class="rounded-2xl border @(roas >= 3m ? "border-emerald-200 bg-emerald-50/40" : (roas > 0 ? "border-amber-200 bg-amber-50/40" : "border-slate-200/80 bg-white")) p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Delivered ROAS</p>
+            <p class="mt-2 text-2xl font-bold @(roas >= 3m ? "text-emerald-700" : (roas > 0 ? "text-amber-700" : "text-slate-900"))">
+                @(adSpend > 0 ? $"{roas:F2}x" : "—")
+            </p>
+            <p class="mt-1 text-2xs text-slate-500">
+                @(adSpend > 0 ? $"৳{cpa:F0} cost per delivered order" : "Enter ad spend to calculate")
+            </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Delivery Fulfillment Rate</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">@deliverySuccessRate.ToString("F1")%</p>
+            <p class="mt-1 text-2xs text-slate-500">@totalOrdersCount total orders placed</p>
+        </div>
+    </div>
+
+    <!-- Bangladesh COD Reality Note -->
+    <div class="rounded-2xl border border-blue-200/60 bg-blue-50/50 p-4 text-xs text-blue-900">
+        <p class="font-bold flex items-center gap-1.5">
+            <span>ℹ️</span> Cash-on-Delivery Attribution Rule
+        </p>
+        <p class="mt-1 text-blue-800 leading-relaxed">
+            In Bangladesh ecommerce, up to 15-25% of Cash-on-Delivery orders can be returned or cancelled before delivery.
+            This dashboard computes true ROAS strictly on <strong>Delivered Orders</strong> where cash was actually collected.
+        </p>
+    </div>
+
+    <!-- Campaign Performance Table -->
+    <div class="rounded-2xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
+        <div class="border-b border-slate-200/80 px-6 py-4 flex items-center justify-between">
+            <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Performance by Campaign</h2>
+            <span class="text-xs font-medium text-slate-400">@campaignGroups.Count Campaigns</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 border-b border-slate-200 text-2xs uppercase font-bold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3 px-6">Campaign / Identifier</th>
+                        <th class="py-3 px-4">Source</th>
+                        <th class="py-3 px-4 text-center">Placed</th>
+                        <th class="py-3 px-4 text-center">Delivered</th>
+                        <th class="py-3 px-4 text-center">Delivery Rate</th>
+                        <th class="py-3 px-6 text-right">Delivered Revenue</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @if (campaignGroups.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-slate-400">No attributed campaigns found in this time period.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var c in campaignGroups)
+                        {
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="py-3.5 px-6 font-semibold text-slate-900">
+                                    <div class="flex items-center gap-2">
+                                        <span>@c.CampaignName</span>
+                                        @if (!string.IsNullOrWhiteSpace(c.CampaignId))
+                                        {
+                                            <span class="rounded bg-slate-100 px-1.5 py-0.5 text-3xs font-mono text-slate-500">ID: @c.CampaignId</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-4">
+                                    <span class="rounded-md bg-blue-50 px-2 py-0.5 text-3xs font-semibold text-blue-700">@c.Source</span>
+                                </td>
+                                <td class="py-3.5 px-4 text-center font-medium">@c.TotalOrders</td>
+                                <td class="py-3.5 px-4 text-center font-semibold text-emerald-600">@c.DeliveredOrders</td>
+                                <td class="py-3.5 px-4 text-center">
+                                    @(c.TotalOrders > 0 ? $"{(decimal)c.DeliveredOrders / c.TotalOrders * 100:F0}%" : "0%")
+                                </td>
+                                <td class="py-3.5 px-6 text-right font-bold text-slate-900">৳@c.DeliveredRevenue.ToString("N0")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Traffic Sources Breakdown -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- By First-Touch Source -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">First-Touch Acquisition</h2>
+            <div class="space-y-3">
+                @foreach (var s in firstTouchGroups)
+                {
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-medium text-slate-700">@s.Source</span>
+                        <div class="flex items-center gap-4">
+                            <span class="text-slate-500">@s.Orders orders</span>
+                            <span class="font-bold text-slate-900">৳@s.Revenue.ToString("N0")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- By Last-Touch Source -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs">
+            <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">Last-Touch Conversion</h2>
+            <div class="space-y-3">
+                @foreach (var s in lastTouchGroups)
+                {
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-medium text-slate-700">@s.Source</span>
+                        <div class="flex items-center gap-4">
+                            <span class="text-slate-500">@s.Orders orders</span>
+                            <span class="font-bold text-slate-900">৳@s.Revenue.ToString("N0")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Period { get; set; }
+    [SupplyParameterFromQuery] public decimal? Spend { get; set; }
+
+    private string period = "all";
+    private decimal adSpend = 0m;
+
+    private int totalOrdersCount;
+    private int deliveredOrdersCount;
+    private decimal deliveredRevenue;
+    private decimal deliverySuccessRate;
+    private decimal roas;
+    private decimal cpa;
+
+    private List<CampaignStat> campaignGroups = [];
+    private List<SourceStat> firstTouchGroups = [];
+    private List<SourceStat> lastTouchGroups = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        period = (Period ?? "all").ToLowerInvariant();
+        adSpend = Spend ?? 0m;
+
+        var query = Db.Orders.AsNoTracking().AsQueryable();
+
+        var now = DateTimeOffset.UtcNow;
+        if (period == "today")
+        {
+            var startOfDay = new DateTimeOffset(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.FromHours(6)).ToUniversalTime();
+            query = query.Where(o => o.CreatedAt >= startOfDay);
+        }
+        else if (period == "7d")
+        {
+            var start7d = now.AddDays(-7);
+            query = query.Where(o => o.CreatedAt >= start7d);
+        }
+        else if (period == "30d")
+        {
+            var start30d = now.AddDays(-30);
+            query = query.Where(o => o.CreatedAt >= start30d);
+        }
+
+        var orders = await query.ToListAsync();
+
+        totalOrdersCount = orders.Count;
+        var deliveredOrders = orders.Where(o => o.Status == OrderStatus.Delivered).ToList();
+        deliveredOrdersCount = deliveredOrders.Count;
+        deliveredRevenue = deliveredOrders.Sum(o => o.Total);
+
+        deliverySuccessRate = totalOrdersCount > 0 ? (decimal)deliveredOrdersCount / totalOrdersCount * 100m : 0m;
+
+        roas = adSpend > 0 ? deliveredRevenue / adSpend : 0m;
+        cpa = deliveredOrdersCount > 0 && adSpend > 0 ? adSpend / deliveredOrdersCount : 0m;
+
+        campaignGroups = orders
+            .GroupBy(o => new
+            {
+                Name = !string.IsNullOrWhiteSpace(o.UtmCampaign) ? o.UtmCampaign : (!string.IsNullOrWhiteSpace(o.CampaignId) ? $"Campaign #{o.CampaignId}" : (string.IsNullOrWhiteSpace(o.UtmSource) && string.IsNullOrWhiteSpace(o.Fbclid) ? "Direct / None" : "Organic / Other")),
+                Id = o.CampaignId,
+                Source = !string.IsNullOrWhiteSpace(o.UtmSource) ? o.UtmSource : (!string.IsNullOrWhiteSpace(o.Fbclid) ? "meta_ads" : "direct")
+            })
+            .Select(g => new CampaignStat
+            {
+                CampaignName = g.Key.Name,
+                CampaignId = g.Key.Id,
+                Source = g.Key.Source,
+                TotalOrders = g.Count(),
+                DeliveredOrders = g.Count(o => o.Status == OrderStatus.Delivered),
+                DeliveredRevenue = g.Where(o => o.Status == OrderStatus.Delivered).Sum(o => o.Total)
+            })
+            .OrderByDescending(c => c.DeliveredRevenue)
+            .ThenByDescending(c => c.TotalOrders)
+            .ToList();
+
+        firstTouchGroups = orders
+            .GroupBy(o => string.IsNullOrWhiteSpace(o.FirstTouchSource) ? "Direct / Organic" : o.FirstTouchSource)
+            .Select(g => new SourceStat
+            {
+                Source = g.Key,
+                Orders = g.Count(),
+                Revenue = g.Where(o => o.Status == OrderStatus.Delivered).Sum(o => o.Total)
+            })
+            .OrderByDescending(s => s.Revenue)
+            .ToList();
+
+        lastTouchGroups = orders
+            .GroupBy(o => string.IsNullOrWhiteSpace(o.LastTouchSource) ? "Direct / Organic" : o.LastTouchSource)
+            .Select(g => new SourceStat
+            {
+                Source = g.Key,
+                Orders = g.Count(),
+                Revenue = g.Where(o => o.Status == OrderStatus.Delivered).Sum(o => o.Total)
+            })
+            .OrderByDescending(s => s.Revenue)
+            .ToList();
+    }
+
+    private sealed class CampaignStat
+    {
+        public required string CampaignName { get; init; }
+        public string? CampaignId { get; init; }
+        public required string Source { get; init; }
+        public int TotalOrders { get; init; }
+        public int DeliveredOrders { get; init; }
+        public decimal DeliveredRevenue { get; init; }
+    }
+
+    private sealed class SourceStat
+    {
+        public required string Source { get; init; }
+        public int Orders { get; init; }
+        public decimal Revenue { get; init; }
+    }
+}

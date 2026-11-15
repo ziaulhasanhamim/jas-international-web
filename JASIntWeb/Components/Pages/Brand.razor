@@ -1,0 +1,239 @@
+@page "/brand/{Slug}"
+@attribute [StreamRendering]
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using BrandEntity = JASIntWeb.Persistence.Entities.Brand
+@using JASIntWeb.Services
+@using JASIntWeb.Services.Seo
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject ISeoService Seo
+@inject NavigationManager Nav
+
+<CascadingAuthenticationState>
+@if (loading)
+{
+    <PageTitle>Loading Brand… — JAS International</PageTitle>
+    <div class="shop-container py-8 animate-pulse">
+        <div class="h-6 w-48 bg-slate-200 rounded mb-4"></div>
+        <div class="h-10 w-72 bg-slate-200 rounded mb-8"></div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            @for (var i = 0; i < 8; i++)
+            {
+                <div class="aspect-square bg-slate-200 rounded-2xl"></div>
+            }
+        </div>
+    </div>
+}
+else if (brand is null)
+{
+    <SeoHead Title="Brand Not Found | JAS International"
+             Robots="noindex,follow" />
+    <div class="shop-container py-16 text-center">
+        <Icon Name="alert" Class="size-12 text-slate-300 mx-auto mb-3" />
+        <h1 class="text-3xl font-bold text-slate-900">Brand Not Found</h1>
+        <p class="text-xs text-slate-500 mt-2 mb-6">The requested brand does not exist or has been removed from our catalog.</p>
+        <a href="/products" class="btn-primary">Browse All Products</a>
+    </div>
+}
+else
+{
+    var pageTitle = !string.IsNullOrWhiteSpace(brand.MetaTitle) ? brand.MetaTitle : Seo.BuildBrandTitle(brand.Name);
+    var metaDesc = !string.IsNullOrWhiteSpace(brand.MetaDescription) ? brand.MetaDescription : (brand.Description ?? $"Browse 100% authentic {brand.Name} gadgets and accessories at JAS International. Official warranty and fast delivery across Bangladesh.");
+    var canonical = $"/brand/{brand.Slug}";
+
+    var crumbs = new (string Name, string Url)[]
+    {
+        ("Home", Seo.PublicBaseUrl),
+        ("Brands", $"{Seo.PublicBaseUrl}/products"),
+        (brand.Name, $"{Seo.PublicBaseUrl}{canonical}")
+    };
+
+    var collectionItems = products.Select(p => (
+        Name: p.Name,
+        Url: Seo.BuildAbsoluteUrl($"/product/{p.Slug}"),
+        Price: p.Price,
+        Image: (string?)Seo.BuildAbsoluteUrl(p.MainImage)
+    ));
+
+    var jsonLdList = new[]
+    {
+        JsonLdBuilder.BuildBreadcrumbs(crumbs),
+        JsonLdBuilder.BuildCollection(pageTitle, metaDesc, Seo.BuildAbsoluteUrl(canonical), collectionItems)
+    };
+
+    <SeoHead Title="@pageTitle"
+             Description="@metaDesc"
+             CanonicalPath="@canonical"
+             OgImage="@(brand.OgImageUrl ?? brand.LogoUrl)"
+             JsonLd="jsonLdList" />
+
+    <div class="shop-container py-8">
+        <!-- Breadcrumb Navigation -->
+        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-6" aria-label="Breadcrumb">
+            <a href="/" class="hover:text-blue-600 transition">Home</a>
+            <span>/</span>
+            <a href="/products" class="hover:text-blue-600 transition">Brands</a>
+            <span>/</span>
+            <span class="font-semibold text-slate-800">@brand.Name</span>
+        </nav>
+
+        <!-- Brand Header Banner -->
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 mb-8 shadow-xs">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div class="flex items-center gap-5">
+                    @if (!string.IsNullOrWhiteSpace(brand.LogoUrl))
+                    {
+                        <div class="size-20 rounded-2xl border border-slate-100 bg-slate-50 p-2 flex items-center justify-center shrink-0">
+                            <PictureImage Src="@brand.LogoUrl" Alt="@($"{brand.Name} Logo")" Class="max-h-full max-w-full object-contain" Width="80" Height="80" />
+                        </div>
+                    }
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[11px] font-bold uppercase tracking-widest text-blue-600">OFFICIAL BRAND SHOWCASE</span>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-600/20">
+                                100% Genuine
+                            </span>
+                        </div>
+                        <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">
+                            @brand.Name in Bangladesh
+                        </h1>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                            @(brand.IntroText ?? brand.Description ?? $"Shop authentic {brand.Name} products with official brand warranty, nationwide cash on delivery, and showroom support in Khulna.")
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex sm:flex-col items-center sm:items-end gap-2 text-xs text-slate-500 shrink-0">
+                    <span class="font-bold text-slate-900 text-lg">@products.Count</span>
+                    <span>Available Model@(products.Count == 1 ? "" : "s")</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Grid -->
+        @if (products.Count == 0)
+        {
+            <div class="rounded-2xl border border-dashed border-slate-200 p-12 text-center">
+                <p class="text-sm font-semibold text-slate-600">No active products found for @brand.Name at this time.</p>
+                <p class="text-xs text-slate-400 mt-1">Check back soon as new shipments arrive regularly.</p>
+                <a href="/products" class="btn-primary mt-4 inline-block text-xs">View All Products</a>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 sm:gap-6">
+                @foreach (var p in products)
+                {
+                    <a href="/product/@p.Slug" class="shop-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 hover:border-blue-400 hover:shadow-md transition">
+                        <div>
+                            <div class="relative aspect-square w-full overflow-hidden rounded-xl bg-slate-50 mb-3">
+                                <PictureImage Src="@p.MainImage"
+                                             Alt="@($"{p.Name} Price in Bangladesh")"
+                                             Loading="lazy"
+                                             Width="300"
+                                             Height="300"
+                                             Class="size-full object-contain p-2 group-hover:scale-105 transition duration-300" />
+                                @if (p.Stock <= 0)
+                                {
+                                    <span class="absolute top-2 left-2 rounded-md bg-slate-900/80 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                                        Out of Stock
+                                    </span>
+                                }
+                            </div>
+                            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">@brand.Name</span>
+                            <h2 class="text-xs sm:text-sm font-bold text-slate-800 line-clamp-2 mt-0.5 group-hover:text-blue-600 transition">
+                                @p.Name
+                            </h2>
+                        </div>
+                        <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                            <div>
+                                <span class="text-xs sm:text-sm font-bold text-slate-900">৳@p.Price.ToString("N0")</span>
+                                @if (p.ComparePrice.HasValue && p.ComparePrice.Value > p.Price)
+                                {
+                                    <span class="text-[10px] text-slate-400 line-through ml-1">৳@p.ComparePrice.Value.ToString("N0")</span>
+                                }
+                            </div>
+                            <span class="text-[11px] font-bold text-blue-600 group-hover:translate-x-0.5 transition">View →</span>
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+
+        <!-- Bottom Rich SEO Content Block -->
+        @if (!string.IsNullOrWhiteSpace(brand.BottomSeoCopy))
+        {
+            <div class="mt-12 rounded-3xl border border-slate-200/70 bg-slate-50/50 p-6 sm:p-8 text-xs leading-relaxed text-slate-600 prose prose-slate max-w-none">
+                @((MarkupString)brand.BottomSeoCopy)
+            </div>
+        }
+    </div>
+}
+</CascadingAuthenticationState>
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private bool loading = true;
+    private BrandEntity? brand;
+    private List<ProductSummaryDto> products = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
+            brand = await Db.Brands.AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Slug == cleanSlug && !b.IsDeleted);
+
+            if (brand == null)
+            {
+                if (HttpContext != null)
+                {
+                    HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+                }
+                return;
+            }
+
+            var prods = await Db.Products.AsNoTracking()
+                .Include(p => p.ProductVariants)
+                .Where(p => p.BrandId == brand.Id && !p.IsDeleted)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            products = prods.Select(p =>
+            {
+                var defaultVariant = p.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
+                                    ?? p.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+                return new ProductSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Slug = p.Slug,
+                    MainImage = p.MainImageUrl,
+                    Price = defaultVariant?.SellingPrice ?? 0m,
+                    ComparePrice = p.CompareAtPrice,
+                    Stock = defaultVariant != null ? 10 : 0
+                };
+            }).ToList();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private sealed class ProductSummaryDto
+    {
+        public int Id { get; init; }
+        public required string Name { get; init; }
+        public required string Slug { get; init; }
+        public required string MainImage { get; init; }
+        public decimal Price { get; init; }
+        public decimal? ComparePrice { get; init; }
+        public int Stock { get; init; }
+    }
+}

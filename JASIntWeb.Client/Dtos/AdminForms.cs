@@ -24,6 +24,22 @@ public sealed class ProductEditForm
     public bool IsNewArrival { get; set; } = true;
     public decimal? CompareAtPrice { get; set; }
 
+    // SEO & Rich Search Fields
+    [StringLength(100)]
+    public string? MetaTitle { get; set; }
+    [StringLength(300)]
+    public string? MetaDescription { get; set; }
+    [StringLength(2000)]
+    public string? OgImageUrl { get; set; }
+    [StringLength(500)]
+    public string? Synonyms { get; set; }
+    [StringLength(200)]
+    public string? BanglaName { get; set; }
+    [StringLength(1000)]
+    public string? BanglaDescription { get; set; }
+    [StringLength(200)]
+    public string? WarrantyInfo { get; set; } = "1 Year Official Brand Warranty";
+
     // Quick Simple Product Fields (for effortless single-screen creation)
     [Range(0, 10000000)]
     public decimal? BasePrice { get; set; }
@@ -73,6 +89,16 @@ public sealed class CategoryEditForm
     public int? ParentId { get; set; }
     public bool Hidden { get; set; }
     public bool Featured { get; set; }
+    [StringLength(100)]
+    public string? MetaTitle { get; set; }
+    [StringLength(300)]
+    public string? MetaDescription { get; set; }
+    [StringLength(2000)]
+    public string? OgImageUrl { get; set; }
+    [StringLength(4000)]
+    public string? IntroText { get; set; }
+    [StringLength(10000)]
+    public string? BottomSeoCopy { get; set; }
 }
 
 public sealed class AttributeEditForm
@@ -272,6 +298,16 @@ public sealed class BrandEditForm
     public bool IsFeatured { get; set; }
     public int SortOrder { get; set; }
     public bool Hidden { get; set; }
+    [StringLength(100)]
+    public string? MetaTitle { get; set; }
+    [StringLength(300)]
+    public string? MetaDescription { get; set; }
+    [StringLength(2000)]
+    public string? OgImageUrl { get; set; }
+    [StringLength(4000)]
+    public string? IntroText { get; set; }
+    [StringLength(10000)]
+    public string? BottomSeoCopy { get; set; }
 }
 
 public sealed record AdminVariantRow(int Id, int ProductId, string ProductName, string Sku, string Label, decimal Price, int OnHand, int Reserved, bool Active, bool Default);

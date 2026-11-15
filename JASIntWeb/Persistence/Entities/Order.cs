@@ -42,6 +42,14 @@ public class Order : AuditableEntity
     public string? UtmCampaign { get; set; }
     public string? UtmContent { get; set; }
     public string? UtmTerm { get; set; }
+    public string? FirstTouchSource { get; set; }
+    public string? LastTouchSource { get; set; }
+    public string? CampaignId { get; set; }
+    public string? AdSetId { get; set; }
+    public string? AdId { get; set; }
+    public string? LandingPath { get; set; }
+    public bool MetaPurchaseSent { get; set; }
+    public string? MetaEventId { get; set; }
     public string? ClientIpAddress { get; set; }
     public string? ClientUserAgent { get; set; }
     public ICollection<OrderItem> Items { get; set; } = [];

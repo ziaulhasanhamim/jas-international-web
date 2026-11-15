@@ -1,0 +1,225 @@
+@page "/admin/marketing/audiences"
+@attribute [StreamRendering]
+@layout AdminLayout
+@using System.Text
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services.Meta
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Meta Custom Audiences Export — JAS Admin</PageTitle>
+
+<AdminPageHeader Title="Meta Custom Audiences"
+                 Description="Export high-value customer lists formatted for Meta Ads Manager custom audiences &amp; 1% Lookalikes."
+                 ActionHref="/admin/marketing"
+                 ActionText="Back to Marketing" />
+
+<div class="shop-container py-6 space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- 1. All Purchasers Audience -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="rounded bg-emerald-100 px-2.5 py-1 text-3xs font-bold text-emerald-800 uppercase">Core Audience</span>
+                    <span class="text-xs font-bold text-slate-900">@purchasers.Count Contacts</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">All Confirmed Purchasers</h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Every customer who completed an order at JAS International. Use to create 1% Lookalike Audiences in Bangladesh.
+                </p>
+            </div>
+            <a href="@GetCsvDataUri(purchasers, "purchasers")" download="jas_meta_audience_purchasers.csv" class="btn-primary w-full text-center text-xs py-2 font-semibold">
+                📥 Download Meta CSV
+            </a>
+        </div>
+
+        <!-- 2. High-Value VIP Customers -->
+        <div class="rounded-2xl border border-blue-200/80 bg-blue-50/30 p-6 shadow-2xs flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="rounded bg-blue-100 px-2.5 py-1 text-3xs font-bold text-blue-800 uppercase">VIP / High ROAS</span>
+                    <span class="text-xs font-bold text-blue-900">@highValueCustomers.Count Contacts</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">High-Value VIPs (৳5,000+ LTV)</h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Shoppers with lifetime spend above ৳5,000. Prime seed list for value-based Lookalike targeting on Instagram &amp; Facebook.
+                </p>
+            </div>
+            <a href="@GetCsvDataUri(highValueCustomers, "vip_customers")" download="jas_meta_audience_vips.csv" class="btn-primary w-full text-center text-xs py-2 font-semibold !bg-blue-600 hover:!bg-blue-700">
+                📥 Download VIP CSV
+            </a>
+        </div>
+
+        <!-- 3. Repeat Buyers -->
+        <div class="rounded-2xl border border-purple-200/80 bg-purple-50/30 p-6 shadow-2xs flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="rounded bg-purple-100 px-2.5 py-1 text-3xs font-bold text-purple-800 uppercase">Loyalty</span>
+                    <span class="text-xs font-bold text-purple-900">@repeatBuyers.Count Contacts</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">Repeat Customers (2+ Orders)</h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Brand champions who ordered multiple times. Ideal for new gadget launches, accessories upsells, and loyalty rewards.
+                </p>
+            </div>
+            <a href="@GetCsvDataUri(repeatBuyers, "repeat_buyers")" download="jas_meta_audience_repeat.csv" class="btn-primary w-full text-center text-xs py-2 font-semibold !bg-purple-600 hover:!bg-purple-700">
+                📥 Download Repeat CSV
+            </a>
+        </div>
+
+        <!-- 4. Abandoned Checkout Leads -->
+        <div class="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-6 shadow-2xs flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="rounded bg-amber-100 px-2.5 py-1 text-3xs font-bold text-amber-800 uppercase">High Intent</span>
+                    <span class="text-xs font-bold text-amber-900">@abandonedLeads.Count Contacts</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">Abandoned Cart Leads</h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Shoppers who provided phone/email at checkout but have not yet purchased. Retarget them with special discount coupon ads.
+                </p>
+            </div>
+            <a href="@GetCsvDataUri(abandonedLeads, "abandoned_leads")" download="jas_meta_audience_abandoned.csv" class="btn-secondary w-full text-center text-xs py-2 font-semibold">
+                📥 Download Leads CSV
+            </a>
+        </div>
+
+        <!-- 5. Registered Store Members -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="rounded bg-slate-100 px-2.5 py-1 text-3xs font-bold text-slate-700 uppercase">Members</span>
+                    <span class="text-xs font-bold text-slate-900">@registeredUsers.Count Accounts</span>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">Registered Store Members</h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    All created account profiles. Exclude them from acquisition campaigns or target them with member-exclusive deals.
+                </p>
+            </div>
+            <a href="@GetCsvDataUri(registeredUsers, "registered_members")" download="jas_meta_audience_members.csv" class="btn-secondary w-full text-center text-xs py-2 font-semibold">
+                📥 Download Members CSV
+            </a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<CustomerAudienceRecord> purchasers = [];
+    private List<CustomerAudienceRecord> highValueCustomers = [];
+    private List<CustomerAudienceRecord> repeatBuyers = [];
+    private List<CustomerAudienceRecord> abandonedLeads = [];
+    private List<CustomerAudienceRecord> registeredUsers = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var deliveredOrders = await Db.Orders.AsNoTracking()
+            .Include(o => o.DeliveryAddress)
+            .Where(o => o.Status != OrderStatus.Cancelled && o.DeliveryAddress != null)
+            .ToListAsync();
+
+        var customerGroups = deliveredOrders
+            .GroupBy(o => !string.IsNullOrWhiteSpace(o.DeliveryAddress!.PhoneNumber)
+                ? MetaConversionsApiService.NormalizePhone(o.DeliveryAddress.PhoneNumber)
+                : o.DeliveryAddress.Email ?? o.Id.ToString())
+            .Select(g =>
+            {
+                var first = g.First();
+                var (fn, ln) = MetaConversionsApiService.SplitName(first.DeliveryAddress?.CustomerName ?? "");
+                var totalSpent = g.Sum(o => o.Total);
+                return new CustomerAudienceRecord
+                {
+                    Phone = MetaConversionsApiService.NormalizePhone(first.DeliveryAddress?.PhoneNumber ?? ""),
+                    Email = first.DeliveryAddress?.Email ?? "",
+                    FirstName = fn,
+                    LastName = ln,
+                    City = first.DeliveryAddress?.City ?? first.DeliveryAddress?.District ?? "Khulna",
+                    OrderCount = g.Count(),
+                    LifetimeValue = totalSpent
+                };
+            })
+            .Where(c => !string.IsNullOrWhiteSpace(c.Phone) || !string.IsNullOrWhiteSpace(c.Email))
+            .ToList();
+
+        purchasers = customerGroups;
+        highValueCustomers = customerGroups.Where(c => c.LifetimeValue >= 5000m).ToList();
+        repeatBuyers = customerGroups.Where(c => c.OrderCount >= 2).ToList();
+
+        // Abandoned Carts
+        var activeCarts = await Db.Carts.AsNoTracking()
+            .Where(c => c.Status == CartStatus.Active && !string.IsNullOrWhiteSpace(c.CustomerPhone))
+            .ToListAsync();
+
+        var purchasedPhones = customerGroups.Select(c => c.Phone).ToHashSet();
+        abandonedLeads = activeCarts
+            .Select(c =>
+            {
+                var normPhone = MetaConversionsApiService.NormalizePhone(c.CustomerPhone!);
+                var (fn, ln) = MetaConversionsApiService.SplitName(c.CustomerName ?? "");
+                return new CustomerAudienceRecord
+                {
+                    Phone = normPhone,
+                    Email = c.CustomerEmail ?? "",
+                    FirstName = fn,
+                    LastName = ln,
+                    City = "Khulna",
+                    OrderCount = 0,
+                    LifetimeValue = 0m
+                };
+            })
+            .Where(c => !purchasedPhones.Contains(c.Phone))
+            .GroupBy(c => c.Phone)
+            .Select(g => g.First())
+            .ToList();
+
+        // Registered Users
+        var users = await Db.Users.AsNoTracking().ToListAsync();
+        registeredUsers = users.Select(u =>
+        {
+            var (fn, ln) = MetaConversionsApiService.SplitName(u.UserName ?? "");
+            return new CustomerAudienceRecord
+            {
+                Phone = MetaConversionsApiService.NormalizePhone(u.PhoneNumber ?? ""),
+                Email = u.Email ?? "",
+                FirstName = fn,
+                LastName = ln,
+                City = "Khulna",
+                OrderCount = 0,
+                LifetimeValue = 0m
+            };
+        }).Where(c => !string.IsNullOrWhiteSpace(c.Email) || !string.IsNullOrWhiteSpace(c.Phone)).ToList();
+    }
+
+    private static string GetCsvDataUri(List<CustomerAudienceRecord> records, string audienceName)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("email,phone,fn,ln,ct,country,value");
+
+        foreach (var r in records)
+        {
+            var email = r.Email.Trim().ToLowerInvariant();
+            var phone = r.Phone.Trim();
+            var fn = r.FirstName.Trim();
+            var ln = r.LastName.Trim();
+            var ct = r.City.Trim();
+            var val = r.LifetimeValue > 0 ? r.LifetimeValue.ToString("F2") : "";
+
+            sb.AppendLine($"\"{email}\",\"{phone}\",\"{fn}\",\"{ln}\",\"{ct}\",\"BD\",\"{val}\"");
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        return $"data:text/csv;base64,{Convert.ToBase64String(bytes)}";
+    }
+
+    private sealed class CustomerAudienceRecord
+    {
+        public required string Phone { get; init; }
+        public required string Email { get; init; }
+        public required string FirstName { get; init; }
+        public required string LastName { get; init; }
+        public required string City { get; init; }
+        public int OrderCount { get; init; }
+        public decimal LifetimeValue { get; init; }
+    }
+}

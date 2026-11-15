@@ -18,6 +18,10 @@ public sealed class Product : SoftDeletableEntity
     public int ReviewCount { get; set; } = 12;
     public string? MetaTitle { get; set; }
     public string? MetaDescription { get; set; }
+    public string? OgImageUrl { get; set; }
+    public string? Synonyms { get; set; }
+    public string? BanglaName { get; set; }
+    public string? BanglaDescription { get; set; }
     public string? WarrantyInfo { get; set; } = "1 Year Official Brand Warranty";
     public ICollection<ProductAttributeDefinition> Attributes { get; set; } = [];
     public ICollection<ProductImage> ProductImages { get; init; } = [];
@@ -29,6 +33,7 @@ public sealed class ProductImage
 {
     public int Id { get; init; }
     public required string ImageUrl { get; set; }
+    public string? ImageAltText { get; set; }
     public required int ProductId { get; init; }
     public int SortOrder { get; set; }
     public Product? Product { get; init; }

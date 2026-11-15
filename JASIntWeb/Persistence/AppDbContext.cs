@@ -37,6 +37,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CuratedPromoCard> CuratedPromoCards => Set<CuratedPromoCard>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
     public DbSet<OrderTimelineEvent> OrderTimelineEvents => Set<OrderTimelineEvent>();
+    public DbSet<UrlRedirect> UrlRedirects => Set<UrlRedirect>();
+    public DbSet<Guide> Guides => Set<Guide>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -49,6 +51,33 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         ConfigurePayments(builder);
         CommerceModel.Configure(builder);
         ProductAttributeModel.Configure(builder);
+        ConfigureSeoAndRedirects(builder);
+    }
+
+    private static void ConfigureSeoAndRedirects(ModelBuilder builder)
+    {
+        builder.Entity<UrlRedirect>(e =>
+        {
+            e.HasIndex(x => x.OldPath).IsUnique();
+        });
+
+        builder.Entity<Guide>(e =>
+        {
+            e.HasIndex(x => x.Slug).IsUnique();
+            e.HasIndex(x => new { x.IsPublished, x.PublishedAt });
+        });
+
+        builder.Entity<Order>(e =>
+        {
+            e.HasIndex(x => x.MetaPurchaseSent);
+            e.HasIndex(x => x.UtmCampaign);
+        });
+
+        builder.Entity<Cart>(e =>
+        {
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.CustomerPhone);
+        });
     }
 
     private static void ConfigureOrders(ModelBuilder builder)

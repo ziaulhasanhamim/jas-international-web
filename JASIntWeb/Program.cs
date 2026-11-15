@@ -5,6 +5,7 @@ using JASIntWeb.Endpoints;
 using JASIntWeb.Middleware;
 using JASIntWeb.Services;
 using JASIntWeb.Services.Meta;
+using JASIntWeb.Services.Seo;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -64,6 +65,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MetaCAPI");
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<MetaAdsOptions>(builder.Configuration.GetSection(MetaAdsOptions.SectionName));
+builder.Services.AddSingleton<IMetaCapiQueue, MetaCapiQueue>();
+builder.Services.AddHostedService<MetaCapiBackgroundWorker>();
 builder.Services.AddScoped<IMetaConversionsApiService, MetaConversionsApiService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ShoppingService>();
@@ -73,8 +76,11 @@ builder.Services.AddScoped<AdminSession>();
 builder.Services.AddScoped<AccountMailService>();
 builder.Services.AddScoped<CouponService>();
 builder.Services.AddScoped<DeliverySettingsService>();
+builder.Services.AddSingleton<ISeoService, SeoService>();
+builder.Services.AddScoped<SitemapService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddSingleton<CourierLogisticsService>();
+builder.Services.AddSingleton<IImageOptimizerService, ImageOptimizerService>();
 builder.Services.AddSingleton<IStorageService, CloudinaryStorageService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
@@ -172,7 +178,15 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardLimit = null;
 });
 
-builder.Services.AddDbContextFactory<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
+// Built-in .NET Health Check with EF Core Database Connectivity Check
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>(
+        name: "database",
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+        tags: ["ready", "db"]);
+
+// Pooled DbContext Factory: pools DbContext instances to eliminate instantiation overhead and reduce GC allocations
+builder.Services.AddPooledDbContextFactory<AppDbContext>(o => o.UseNpgsql(ResolvePostgresConnectionString(builder.Configuration)));
 builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
 var app = builder.Build();
 app.UseForwardedHeaders();
@@ -226,29 +240,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseHttpsRedirection();
-
-// Enforce clean canonical URLs: Redirect legacy /products/{slug} to /category/{slug}
-app.Use(async (context, next) =>
-{
-    var path = context.Request.Path.Value ?? "";
-    if (string.Equals(path, "/category", StringComparison.OrdinalIgnoreCase) || string.Equals(path, "/category/", StringComparison.OrdinalIgnoreCase))
-    {
-        context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
-        context.Response.Headers.Location = $"/products{context.Request.QueryString}";
-        return;
-    }
-    if (path.StartsWith("/products/", StringComparison.OrdinalIgnoreCase))
-    {
-        var slug = path["/products/".Length..];
-        if (!string.IsNullOrWhiteSpace(slug))
-        {
-            context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
-            context.Response.Headers.Location = $"/category/{slug}{context.Request.QueryString}";
-            return;
-        }
-    }
-    await next();
-});
+app.UseMiddleware<CanonicalHostAndRedirectMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

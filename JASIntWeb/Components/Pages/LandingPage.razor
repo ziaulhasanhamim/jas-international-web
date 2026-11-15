@@ -1,0 +1,193 @@
+@page "/lp/{Slug}"
+@attribute [StreamRendering]
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services
+@using JASIntWeb.Services.Seo
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject ISeoService Seo
+@inject NavigationManager Nav
+@inject IConfiguration Config
+
+@if (loading)
+{
+    <PageTitle>Loading Campaign… — JAS International</PageTitle>
+    <div class="shop-container py-12 animate-pulse text-center">
+        <div class="h-8 w-64 bg-slate-200 rounded mx-auto mb-4"></div>
+        <div class="h-4 w-96 bg-slate-200 rounded mx-auto mb-8"></div>
+        <div class="aspect-video max-w-xl bg-slate-200 rounded-3xl mx-auto"></div>
+    </div>
+}
+else if (product is null)
+{
+    <SeoHead Title="Campaign Not Found | JAS International" Robots="noindex,nofollow" />
+    <div class="shop-container py-16 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Campaign Not Found</h1>
+        <p class="text-xs text-slate-500 mt-2 mb-6">This promotion may have expired.</p>
+        <a href="/products" class="btn-primary">Browse All Gadgets</a>
+    </div>
+}
+else
+{
+    var defaultVariant = product.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
+                        ?? product.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+    var price = defaultVariant?.SellingPrice ?? 0m;
+    var comparePrice = product.CompareAtPrice;
+    var discountPercent = comparePrice.HasValue && comparePrice.Value > price
+        ? (int)Math.Round((comparePrice.Value - price) / comparePrice.Value * 100)
+        : 0;
+
+    var waNumber = Config["Contact:WhatsAppNumber"] ?? "8801711465078";
+    var currentUrl = $"{Seo.PublicBaseUrl}/lp/{product.Slug}";
+    var waText = Uri.EscapeDataString($"Hi JAS International, I want to order {product.Name} (৳{price:N0}) from your special offer. Link: {currentUrl}");
+    var waUrl = $"https://wa.me/{waNumber}?text={waText}";
+
+    <SeoHead Title="@($"{product.Name} — Exclusive Offer | JAS International")"
+             Description="@($"Special promotion on authentic {product.Name}. Fast delivery across Bangladesh with Cash on Delivery.")"
+             CanonicalPath="@($"/product/{product.Slug}")"
+             OgImage="@product.MainImageUrl"
+             Robots="noindex,follow" />
+
+    <div data-meta-event="ViewContent"
+         data-content-id="@(defaultVariant?.SKU ?? product.Id.ToString())"
+         data-content-name="@product.Name"
+         data-content-category="@(product.Category?.Name ?? "Gadgets")"
+         data-value="@price"
+         data-currency="BDT"
+         hidden></div>
+
+    <div class="min-h-screen bg-slate-50 py-6 sm:py-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6">
+            <!-- Top Trust Banner -->
+            <div class="rounded-2xl bg-slate-900 px-4 py-2.5 text-center text-xs font-semibold text-white shadow-xs mb-6 flex items-center justify-center gap-2">
+                <span class="rounded bg-rose-600 px-2 py-0.5 text-3xs uppercase font-bold tracking-wider animate-pulse">Limited Stock</span>
+                <span>Special Promotion · Cash on Delivery Available Across Bangladesh</span>
+            </div>
+
+            <!-- Main Offer Card -->
+            <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-10 shadow-xl space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <!-- Image Showcase -->
+                    <div class="relative rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 aspect-square flex items-center justify-center p-4">
+                        <PictureImage Src="@product.MainImageUrl" Alt="@product.Name" FetchPriority="high" Loading="eager" Class="max-h-full max-w-full object-contain hover:scale-105 transition duration-300" />
+                        @if (discountPercent > 0)
+                        {
+                            <span class="absolute top-4 right-4 rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-md">
+                                Save @discountPercent%
+                            </span>
+                        }
+                    </div>
+
+                    <!-- Details & Quick Conversion -->
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-3xs font-bold text-blue-700 uppercase">
+                                @(product.Brand?.Name ?? "JAS Official")
+                            </span>
+                            <div class="flex text-amber-400 text-xs">★★★★★</div>
+                            <span class="text-2xs text-slate-500 font-semibold">(4.9/5 · 100% Authentic)</span>
+                        </div>
+
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-snug">@product.Name</h1>
+
+                        <!-- Pricing -->
+                        <div class="flex items-baseline gap-3 pt-2">
+                            <span class="text-3xl font-extrabold text-blue-600">৳@price.ToString("N0")</span>
+                            @if (comparePrice.HasValue && comparePrice.Value > price)
+                            {
+                                <span class="text-base text-slate-400 line-through">৳@comparePrice.Value.ToString("N0")</span>
+                            }
+                        </div>
+
+                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 text-xs text-emerald-900 flex items-center gap-2.5">
+                            <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="font-semibold">In Stock — Dispatched within 24 hours from Khulna</span>
+                        </div>
+
+                        <!-- Direct Conversion CTAs -->
+                        <div class="pt-4 space-y-3">
+                            <a href="@($"/checkout?variant={defaultVariant?.Id}&qty=1")" class="btn-primary w-full text-center text-sm py-3.5 font-bold shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2">
+                                <span>⚡ Order Now (Cash on Delivery)</span>
+                            </a>
+
+                            <a href="@waUrl" target="_blank" rel="noopener" class="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-600/30 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs">
+                                <span class="text-base">💬</span>
+                                <span>Order via WhatsApp (Instant Confirmation)</span>
+                            </a>
+                        </div>
+
+                        <!-- Trust Features -->
+                        <div class="grid grid-cols-2 gap-2 pt-2 text-2xs text-slate-600 font-medium">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span> Cash on Delivery
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span> Official Warranty
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span> 7 Days Easy Return
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span> 100% Genuine Gadget
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Story / Highlights -->
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <div class="border-t border-slate-100 pt-6">
+                        <h2 class="text-base font-bold text-slate-900 mb-3">Product Overview</h2>
+                        <div class="text-xs text-slate-600 leading-relaxed space-y-2">
+                            @((MarkupString)product.Description)
+                        </div>
+                    </div>
+                }
+
+                <!-- Showroom Assurance -->
+                <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 text-xs text-slate-700 space-y-2">
+                    <p class="font-bold text-slate-900">Visit Our Physical Showroom in Khulna</p>
+                    <p class="text-slate-600 leading-relaxed">
+                        JAS International is a registered Bangladeshi business with an active showroom located at
+                        <strong>Khulna Shopping Complex (3rd Floor), Khulna</strong>. You can inspect gadgets in person or order online with complete confidence.
+                    </p>
+                    <p class="text-2xs text-slate-500">Hotline &amp; WhatsApp: 01711465078 · Email: info@jasinternational.com.bd</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private bool loading = true;
+    private Product? product;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            var cleanSlug = (Slug ?? "").Trim().ToLowerInvariant();
+            product = await Db.Products.AsNoTracking()
+                .Include(p => p.Brand)
+                .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
+                .Include(p => p.ProductImages)
+                .FirstOrDefaultAsync(p => p.Slug == cleanSlug && !p.IsDeleted);
+
+            if (product == null && HttpContext != null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            }
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

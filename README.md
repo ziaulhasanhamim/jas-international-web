@@ -98,3 +98,96 @@ The tests cover domain rules, cart behavior, order fulfillment, coupon calculati
 Password reset emails require `Mail:Host`, `Mail:Port`, `Mail:EnableSsl`, `Mail:From`, `Mail:Username` and `Mail:Password`. Configure `PublicBaseUrl` and `AllowedHosts` for your host. Environment variable names use double underscores, for example `Mail__Host`. Signup uses email/password without mandatory email confirmation.
 
 For production, persist data-protection keys with `Hosting:DataProtectionPath` and configure trusted reverse proxies with `Hosting:KnownProxies` if needed. Apply migrations deliberately and keep development seeding disabled.
+
+---
+
+## SEO & Meta Ads (Facebook/Instagram) Production System
+
+JAS International is engineered for maximum search engine domination on Google Bangladesh and high-converting Meta Ads with end-to-end attribution.
+
+### 1. Canonical Domain & Technical SEO
+- **Canonical Host:** `https://www.jasinternational.com.bd` (strict 301 redirection of non-www, HTTP, and legacy hosts).
+- **XML Sitemaps:**
+  - Index: `https://www.jasinternational.com.bd/sitemap.xml`
+  - Products: `https://www.jasinternational.com.bd/sitemap-products.xml`
+  - Categories: `https://www.jasinternational.com.bd/sitemap-categories.xml`
+  - Brands: `https://www.jasinternational.com.bd/sitemap-brands.xml`
+  - Buying Guides: `https://www.jasinternational.com.bd/sitemap-guides.xml`
+  - Core Pages: `https://www.jasinternational.com.bd/sitemap-pages.xml`
+- **Robots.txt:** Optimized disallow directives for private routes (`/checkout`, `/cart`, `/order/*`, `/account/*`, `/admin/*`) and filter queries (`?q=`, `?sort=`, `?page=`).
+- **Structured Data (JSON-LD):** Generated strictly via `System.Text.Json` (no string interpolation):
+  - `Product`: with variant SKUs, GTIN barcodes, price valid until, BDT currency, delivery fees (৳80 Khulna / ৳130 outside), 7-day return policy, and genuine aggregate ratings.
+  - `BreadcrumbList`, `Store` (LocalBusiness with Khulna showroom coordinates), `Organization`, `WebSite` with SearchAction, and `FAQPage`.
+- **Core Web Vitals & Next-Gen Image Optimization:**
+  - **AVIF & WebP Pipeline:** All static assets and runtime uploads are automatically compressed into next-gen **AVIF** and **WebP** formats alongside standard fallbacks.
+  - **Storefront `<picture>` Tags:** Reusable `<PictureImage>` Blazor component delivers `<picture><source type="image/avif" /><source type="image/webp" /><img /></picture>` across all product cards, product details, carousel hero banners, category tiles, brand showcases, and brand logos.
+  - **Automated Upload Compression:** `IImageOptimizerService` automatically strips camera metadata, auto-orients smartphone uploads, normalizes dimensions, and outputs optimized primary, WebP, and AVIF bytes.
+  - **Static Asset Reduction:** Brand logo shrunk from 506 KB down to 53 KB PNG, with companion 11 KB WebP and 10 KB AVIF (a ~98% weight reduction for instant mobile page loads).
+  - **TinyMCE Isolation:** TinyMCE and `admin-editor.js` load exclusively on Admin routes, eliminating heavy scripts from public visitor and Googlebot payloads.
+
+### 2. Meta Pixel & Conversions API (CAPI) Integration
+- **Zero-Latency Checkout Architecture:** Server conversions use an in-memory non-blocking channel (`MetaCapiQueue`) processed by a background worker (`MetaCapiBackgroundWorker`) with exponential backoff retries. Tracking never delays customer checkout.
+- **Bangladesh Phone Normalization:** Strict E.164 without `+` (`8801XXXXXXXX`) with SHA-256 lowercase hashing, matching >85% of BD Facebook/Instagram users.
+- **Deduplication:** Server CAPI events and client Pixel events share identical `event_id` (`order.PublicToken.ToString()`).
+- **Full Attribution:** Captures `fbclid`, `_fbp`, `_fbc`, `utm_*`, Meta dynamic URL tags (`campaign_id`, `adset_id`, `ad_id`), and records `FirstTouchSource` vs `LastTouchSource` on every Order.
+- **Post-Purchase Conversion Events:** Dispatches `OrderDelivered` when orders reach Delivered status and `OrderCancelled` on returns.
+- **Cookie Consent:** Non-blocking banner (`CookieConsentBanner.razor`) respecting customer privacy choices.
+
+### 3. Catalog Feeds & Dynamic Ads
+Live feeds update in real-time with BDT pricing, inventory stock, and computed custom labels:
+- **Meta Advantage+ Catalog (XML):** `https://www.jasinternational.com.bd/feeds/meta.xml`
+- **Meta Catalog (CSV):** `https://www.jasinternational.com.bd/feeds/meta.csv`
+- **Google Merchant Center (XML):** `https://www.jasinternational.com.bd/feeds/google.xml` (includes Bangladesh shipping rules: ৳80 Khulna, ৳130 Nationwide).
+- **Custom Labels Computed:**
+  - `custom_label_0`: Margin Tier (`High Margin`, `Standard Margin`, `Low Margin`)
+  - `custom_label_1`: Price Tier (`Under 1000 BDT`, `1000-5000 BDT`, `5000-15000 BDT`, `Above 15000 BDT`)
+  - `custom_label_2`: Best Seller status (`BestSeller`, `Standard`)
+  - `custom_label_3`: New Arrival (`NewArrival`, `Regular`)
+  - `custom_label_4`: Stock urgency (`InStock`, `LowStock`, `OutOfStock`)
+
+### 4. Admin Marketing Hub
+- **Meta Ads & ROAS Dashboard (`/admin/marketing`):** Tracks sales and true ROAS strictly calculated from **Delivered Orders** (reflecting Bangladesh COD realities).
+- **Abandoned Cart Recovery (`/admin/marketing/abandoned-carts`):** Captures shopper phone numbers early at checkout with 1-click WhatsApp and phone recovery links.
+- **Custom Audiences Export (`/admin/marketing/audiences`):** 1-click Meta-formatted CSV export of Purchasers, VIPs (৳5,000+ LTV), Repeat Buyers, and Abandoned Leads for Lookalike targeting.
+- **Feed Health Dashboard (`/admin/feeds`):** Diagnostic audit of active variants, in-stock percentages, and feed access tokens.
+
+### 5. Automated Regression Verification Suite
+Run the standalone regression test suite without starting a web server:
+
+```bash
+dotnet run --project tests/JASIntWeb.SeoChecks
+```
+
+---
+
+## Store Owner Action Checklist
+
+To begin running Meta Ads and ranking on Google Bangladesh:
+
+1. **Google Search Console:**
+   - Log in to [Google Search Console](https://search.google.com/search-console).
+   - Add property `https://www.jasinternational.com.bd`.
+   - Copy the verification token (HTML tag content) and enter it in `/admin/seo` or `appsettings.json` under `Seo:GoogleSiteVerification`.
+   - Submit the sitemap index: `https://www.jasinternational.com.bd/sitemap.xml`.
+
+2. **Facebook Domain Verification:**
+   - In Meta Business Settings > Brand Safety > Domains, add `jasinternational.com.bd`.
+   - Copy the verification meta-tag token and save it in `/admin/settings/delivery` or `appsettings.json` under `Seo:FacebookDomainVerification`.
+   - Click **Verify Domain** in Meta Business Manager.
+
+3. **Meta Pixel & Conversions API Setup:**
+   - Open Meta Events Manager and select your Pixel.
+   - Go to Settings > Conversions API > **Generate access token**.
+   - Navigate to `/admin/settings/meta-ads` in your JAS Command Center.
+   - Enter your **Pixel ID** and **Access Token**.
+   - Optional: paste a **Test Event Code** (e.g. `TEST12345`) to verify live events in Meta Events Manager's Test Events tab.
+
+4. **Connect Meta Advantage+ Product Catalog:**
+   - In Meta Commerce Manager, create a Catalog and select **Add Products > Data Feed**.
+   - Select **Scheduled Feed** and enter `https://www.jasinternational.com.bd/feeds/meta.xml`.
+   - Set refresh interval to Hourly or Daily.
+
+5. **Connect Google Merchant Center:**
+   - In Google Merchant Center, create a primary feed for Bangladesh (`BDT`).
+   - Enter feed URL `https://www.jasinternational.com.bd/feeds/google.xml`.
+

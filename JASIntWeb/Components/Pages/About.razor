@@ -1,7 +1,33 @@
 @page "/about"
 @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "StaticPages")]
+@inject JASIntWeb.Services.Seo.ISeoService Seo
 
-<PageTitle>About Us · JAS International</PageTitle>
+@{
+    var aboutJsonLd = new[]
+    {
+        System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "AboutPage",
+            ["name"] = "About JAS International",
+            ["description"] = "Khulna's premier destination for genuine smartwatches, wireless audio, fast chargers, power banks, and tech accessories.",
+            ["url"] = Seo.BuildAbsoluteUrl("/about"),
+            ["mainEntity"] = new Dictionary<string, object>
+            {
+                ["@type"] = "Organization",
+                ["name"] = "JAS International",
+                ["url"] = Seo.PublicBaseUrl,
+                ["foundingDate"] = "2005"
+            }
+        })
+    };
+}
+
+<SeoHead Title="About JAS International — Authentic Tech Gadgets in Bangladesh"
+         Description="Discover JAS International, Khulna's premier boutique for 100% genuine smartwatches, wireless audio, fast chargers, and gadget accessories with nationwide delivery."
+         CanonicalPath="/about"
+         OgImage="/jas-og-card.png"
+         JsonLd="aboutJsonLd" />
 
 <div class="shop-container py-10 max-w-5xl mx-auto">
     <!-- Hero Section -->
