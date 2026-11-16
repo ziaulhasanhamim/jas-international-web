@@ -183,78 +183,39 @@
                         <a href="/admin/categories/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                             Edit
                         </a>
-                        @if (!context.IsDeleted)
+                        <button
+                            type="submit"
+                            name="ToggleVisibilityId"
+                            value="@context.Id"
+                            class="btn-secondary !px-2.5 !py-1 text-xs @(context.IsDeleted ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-700 hover:bg-amber-50") cursor-pointer"
+                            onclick="@(context.IsDeleted ? "" : "return confirm('Hide this category from storefront?');")"
+                            title="@(context.IsDeleted ? "Restore category" : "Hide category")"
+                        >
+                            @(context.IsDeleted ? "Restore" : "Hide")
+                        </button>
+                        @if (context.ProductCount == 0)
                         {
                             <button
                                 type="submit"
-                                name="ToggleVisibilityId"
+                                name="HardDeleteCategoryId"
                                 value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 cursor-pointer"
-                                onclick="return confirm('Hide this category from the storefront? Its products will also be hidden from search and catalog.')"
-                                title="Hide category from storefront"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                onclick="return confirm('Permanently delete category \'@context.Name\'?');"
+                                title="Delete category"
                             >
-                                Hide
+                                Delete
                             </button>
-                            @if (context.ProductCount == 0)
-                            {
-                                <button
-                                    type="submit"
-                                    name="HardDeleteCategoryId"
-                                    value="@context.Id"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
-                                    onclick="return confirm('Permanently delete this empty category? This cannot be undone.')"
-                                    title="Permanently delete category"
-                                >
-                                    Delete
-                                </button>
-                            }
-                            else
-                            {
-                                <button
-                                    type="button"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
-                                    title="Cannot permanently delete: Contains @context.ProductCount products. Reassign or delete its products first, or click 'Hide' to remove from storefront."
-                                    disabled
-                                >
-                                    Delete
-                                </button>
-                            }
                         }
                         else
                         {
                             <button
-                                type="submit"
-                                name="ToggleVisibilityId"
-                                value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 cursor-pointer"
-                                title="Restore this category to active catalog"
+                                type="button"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
+                                title="Cannot delete: Contains @context.ProductCount products."
+                                disabled
                             >
-                                Restore
+                                Delete
                             </button>
-                            @if (context.ProductCount == 0)
-                            {
-                                <button
-                                    type="submit"
-                                    name="HardDeleteCategoryId"
-                                    value="@context.Id"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
-                                    onclick="return confirm('Permanently remove this archived category? This cannot be undone.')"
-                                    title="Permanently delete category"
-                                >
-                                    Delete Permanently
-                                </button>
-                            }
-                            else
-                            {
-                                <button
-                                    type="button"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
-                                    title="Cannot permanently delete: Contains @context.ProductCount products. Reassign or delete its products first."
-                                    disabled
-                                >
-                                    Delete Permanently
-                                </button>
-                            }
                         }
                     </div>
                 </TemplateColumn>

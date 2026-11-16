@@ -23,7 +23,7 @@ public sealed class CloudinaryStorageService : IStorageService
         _logger = logger;
 
         var rawUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"] ?? config["Cloudinary__Url"] ?? Environment.GetEnvironmentVariable("CLOUDINARY_URL");
-        var cloudinaryUrl = rawUrl?.Trim().Trim('"', '\'');
+        var cloudinaryUrl = rawUrl?.Trim(' ', '"', '\'');
         if (!string.IsNullOrWhiteSpace(cloudinaryUrl))
         {
             try
@@ -31,28 +31,22 @@ public sealed class CloudinaryStorageService : IStorageService
                 if (cloudinaryUrl.StartsWith("cloudinary://", StringComparison.OrdinalIgnoreCase))
                 {
                     var uri = new Uri(cloudinaryUrl);
-                    var userInfo = uri.UserInfo.Split(':');
-                    if (userInfo.Length == 2)
+                    var parts = uri.UserInfo.Split(':');
+                    if (parts.Length == 2)
                     {
-                        var key = userInfo[0];
-                        var secret = userInfo[1];
-                        var cloud = uri.Host;
-                        var account = new Account(cloud, key, secret);
-                        _cloudinary = new Cloudinary(account);
-                        _cloudinary.Api.Secure = true;
-                        _logger.LogInformation("Cloudinary media storage initialized successfully for cloud '{CloudName}'.", cloud);
+                        _cloudinary = new Cloudinary(new Account(uri.Host, parts[0], parts[1])) { Api = { Secure = true } };
+                        _logger.LogInformation("Cloudinary media storage initialized for cloud '{CloudName}'.", uri.Host);
                         return;
                     }
                 }
 
-                _cloudinary = new Cloudinary(cloudinaryUrl);
-                _cloudinary.Api.Secure = true;
-                _logger.LogInformation("Cloudinary media storage initialized successfully via CLOUDINARY_URL.");
+                _cloudinary = new Cloudinary(cloudinaryUrl) { Api = { Secure = true } };
+                _logger.LogInformation("Cloudinary media storage initialized via URL.");
                 return;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to initialize Cloudinary from CLOUDINARY_URL; checking explicit credentials.");
+                _logger.LogWarning(ex, "Failed to initialize Cloudinary from URL; checking explicit credentials.");
             }
         }
 

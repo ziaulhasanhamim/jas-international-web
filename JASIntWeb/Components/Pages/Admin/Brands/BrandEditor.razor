@@ -43,7 +43,7 @@ else
             <DataAnnotationsValidator />
             <ValidationSummary class="text-xs text-rose-600 mb-3" />
 
-            <input type="hidden" name="Input.Id" value="@(Id == 0 ? (Input?.Id ?? 0) : Id)" />
+            <input type="hidden" name="Input.Id" value="@Id" />
 
             <label class="shop-label">
                 Brand name
@@ -308,10 +308,7 @@ else
         error = null;
         try
         {
-            if (Id != 0 && Input is not null)
-            {
-                Input.Id = Id;
-            }
+            if (Input is not null) Input.Id = Id;
             await Session.RunAsync(s => s.SaveBrandAsync(Input!));
             Nav.NavigateTo("/admin/brands");
         }

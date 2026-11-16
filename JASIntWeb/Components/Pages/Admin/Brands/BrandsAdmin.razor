@@ -135,40 +135,40 @@
                         <a href="/admin/brands/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
                             Edit
                         </a>
-                        @if (!context.IsDeleted)
+                        <button
+                            type="submit"
+                            name="ToggleVisibilityId"
+                            value="@context.Id"
+                            class="btn-secondary !px-2.5 !py-1 text-xs @(context.IsDeleted ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-700 hover:bg-amber-50") cursor-pointer"
+                            onclick="@(context.IsDeleted ? "" : "return confirm('Hide this brand from catalog?');")"
+                            title="@(context.IsDeleted ? "Restore brand" : "Hide brand")"
+                        >
+                            @(context.IsDeleted ? "Restore" : "Hide")
+                        </button>
+                        @if (context.ProductCount == 0)
                         {
                             <button
                                 type="submit"
-                                name="ToggleVisibilityId"
+                                name="DeleteBrandId"
                                 value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 cursor-pointer"
-                                title="Hide brand from catalog"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                onclick="return confirm('Permanently delete brand \'@context.Name\'?');"
+                                title="Delete brand"
                             >
-                                Hide
+                                Delete
                             </button>
                         }
                         else
                         {
                             <button
-                                type="submit"
-                                name="ToggleVisibilityId"
-                                value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 cursor-pointer"
-                                title="Restore brand to catalog"
+                                type="button"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
+                                title="Cannot delete: Brand has @context.ProductCount products."
+                                disabled
                             >
-                                Restore
+                                Delete
                             </button>
                         }
-                        <button
-                            type="submit"
-                            name="DeleteBrandId"
-                            value="@context.Id"
-                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
-                            onclick="return confirm('Permanently delete brand \'@context.Name\'? Any assigned products will remain in the catalog.');"
-                            title="Permanently delete brand"
-                        >
-                            Delete
-                        </button>
                     </div>
                 </TemplateColumn>
             </QuickGrid>
@@ -254,9 +254,9 @@
 
             await LoadBrands();
         }
-        catch
+        catch (Exception ex)
         {
-            _toast = null;
+            _toast = ex.Message;
             await LoadBrands();
         }
     }

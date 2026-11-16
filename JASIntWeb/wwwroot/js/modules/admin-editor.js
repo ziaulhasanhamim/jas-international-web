@@ -612,33 +612,15 @@ class AdminEditorController {
         initSlugGenerator: () => AdminEditorController.initAutoSlugGenerator()
     };
 
-    // Auto-boot immediately if elements already exist
-    AdminEditorController.initAll();
-
-    // Auto-boot on DOM ready
+    // Auto-initialize on load and Blazor enhanced navigation
+    const init = () => AdminEditorController.initAll();
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => AdminEditorController.initAll());
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
     }
-
-    // Auto-boot on Blazor enhanced page navigation
-    if (typeof window !== "undefined") {
-        window.addEventListener("blazor:enhancedload", () => AdminEditorController.initAll());
-        document.addEventListener("blazor:enhancedload", () => AdminEditorController.initAll());
-        document.addEventListener("enhancednavigationend", () => AdminEditorController.initAll());
-
-        const hookBlazor = () => {
-            if (window.Blazor?.addEventListener) {
-                window.Blazor.addEventListener("enhancednavigationend", () => {
-                    AdminEditorController.initAll();
-                    setTimeout(() => AdminEditorController.initAll(), 50);
-                });
-            }
-        };
-
-        if (window.Blazor) {
-            hookBlazor();
-        } else {
-            document.addEventListener("DOMContentLoaded", hookBlazor);
-        }
-    }
+    window.Blazor?.addEventListener?.("enhancedload", init);
+    document.addEventListener("DOMContentLoaded", () => {
+        window.Blazor?.addEventListener?.("enhancedload", init);
+    });
 })(window);

@@ -36,7 +36,7 @@ else
         >
             <DataAnnotationsValidator />
             <ValidationSummary />
-            <input type="hidden" name="Input.Id" value="@(Id == 0 ? (Input?.Id ?? 0) : Id)" />
+            <input type="hidden" name="Input.Id" value="@Id" />
             <label class="shop-label">
                 Attribute name
                 <InputText @bind-Value="Input!.Name" class="shop-input" />
