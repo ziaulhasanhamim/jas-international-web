@@ -9,11 +9,32 @@ import { initCart, syncCartBadges } from './modules/cart.js';
 import { initGallery, switchMainImage } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
 
+/**
+ * Automatically decodes any Cloudflare Email Obfuscation (__cf_email__) tags
+ * in case Cloudflare's server-side ScrapeShield injected them into the DOM.
+ */
+function decodeCloudflareEmails() {
+    document.querySelectorAll(".__cf_email__").forEach(el => {
+        const encoded = el.getAttribute("data-cfemail");
+        if (encoded) {
+            try {
+                const key = parseInt(encoded.substring(0, 2), 16);
+                let email = "";
+                for (let n = 2; n < encoded.length; n += 2) {
+                    email += String.fromCharCode(parseInt(encoded.substring(n, n + 2), 16) ^ key);
+                }
+                el.replaceWith(document.createTextNode(email));
+            } catch (_) {}
+        }
+    });
+}
+
 class AppOrchestrator {
     /**
      * Initializes all UI and tracking modules for the current DOM state
      */
     static onDomReady() {
+        decodeCloudflareEmails();
         initWishlist();
         initCart();
         syncCartBadges();
@@ -44,6 +65,7 @@ class AppOrchestrator {
         const JAS = window.JAS;
 
         const updateDom = () => {
+            decodeCloudflareEmails();
             JAS?.Navigation?.finish();
             initWishlist();
             initCart();
