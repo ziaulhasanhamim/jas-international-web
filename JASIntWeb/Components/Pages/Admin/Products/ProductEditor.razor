@@ -317,11 +317,14 @@ else
                     </label>
                 </div>
 
-                <label class="shop-label">
-                    <span>Social Sharing / OG Image URL (Optional)</span>
-                    <InputText @bind-Value="Input!.OgImageUrl" class="shop-input" placeholder="https://res.cloudinary.com/... or /uploads/..." />
-                    <small>High-resolution 1200x630 image for Facebook/Instagram shares. Defaults to main image if empty.</small>
-                </label>
+                <!-- Social Sharing / OG Image -->
+                <AdminSingleImageUpload
+                    FieldName="Input.OgImageUrl"
+                    Value="@Input!.OgImageUrl"
+                    Label="Social Sharing / OG Image (Optional)"
+                    HelpText="High-resolution 1200×630 image for Facebook/Instagram shares. Defaults to cover photo if empty."
+                    Aspect="banner"
+                />
             </div>
 
             <div class="form-actions">

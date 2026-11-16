@@ -82,17 +82,23 @@ else
                 </label>
             </div>
 
-            <div class="admin-form-grid mt-4">
+            <div class="mt-4">
                 <label class="shop-label">
                     Nagad Number
                     <InputText @bind-Value="settings.NagadNumber" class="shop-input" />
                     <small>Alternative MFS number.</small>
                 </label>
-                <label class="shop-label">
-                    Bangla QR Image URL
-                    <InputText @bind-Value="settings.BanglaQrImageUrl" class="shop-input" />
-                    <small>Relative path (e.g. /jas-logo.png) or uploaded QR image.</small>
-                </label>
+            </div>
+
+            <div class="mt-4">
+                <AdminSingleImageUpload
+                    FieldName="settings.BanglaQrImageUrl"
+                    Value="@settings.BanglaQrImageUrl"
+                    Label="Bangla QR Code Image"
+                    HelpText="Upload your official bKash / Nagad / Bangla QR code graphic (PNG, JPG, WEBP, SVG)"
+                    Aspect="square"
+                    Placeholder="/jas-logo.png"
+                />
             </div>
         </div>
 

@@ -322,6 +322,29 @@ app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorag
     return Results.Ok(new { url });
 }).DisableAntiforgery();
 
+app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageService storage) =>
+{
+    if (!request.HasFormContentType)
+        return Results.BadRequest(new { error = "Form content required" });
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files.FirstOrDefault();
+    if (file is null || file.Length == 0)
+        return Results.BadRequest(new { error = "No file uploaded" });
+
+    if (file.Length > 10 * 1024 * 1024)
+        return Results.BadRequest(new { error = "Image file exceeds 10MB limit" });
+
+    string[] allowedExtensions = [".svg", ".png", ".webp", ".jpg", ".jpeg", ".avif", ".gif"];
+    var ext = Path.GetExtension(file.FileName);
+    if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+        return Results.BadRequest(new { error = "Unsupported image format. Please upload SVG, PNG, WEBP, AVIF, or JPG." });
+
+    await using var stream = file.OpenReadStream();
+    var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+    return Results.Ok(new { url });
+}).DisableAntiforgery();
+
 app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db, ShoppingService shop, DeliverySettingsService settingsSvc, ILogger<Program> logger) =>
 {
     string message = "";

@@ -190,8 +190,8 @@
                                 name="DeleteCategoryId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-                                onclick="return confirm('Hide this category from the storefront?')"
-                                title="Hide category from storefront"
+                                onclick="return confirm('Hide this category from the storefront? Its products will also be hidden from search and catalog.')"
+                                title="Hide category and products from storefront"
                             >
                                 Hide
                             </button>
@@ -204,6 +204,17 @@
                                     class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                                     onclick="return confirm('Permanently delete this empty category? This cannot be undone.')"
                                     title="Permanently delete category"
+                                >
+                                    Delete
+                                </button>
+                            }
+                            else
+                            {
+                                <button
+                                    type="button"
+                                    class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
+                                    title="Cannot permanently delete: Contains @context.ProductCount products. Reassign or delete its products first, or click 'Hide' to remove from storefront."
+                                    disabled
                                 >
                                     Delete
                                 </button>

@@ -173,4 +173,61 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         }
         await response.IsSuccessStatusCode.Should().BeTrue();
     }
+
+    [Test]
+    public async Task SaveCategoryAsync_CategoryWithChildrenReparented_SuccessfullyPreservesTwoTierHierarchy()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var catA = new Category { Name = "Parent A " + Guid.NewGuid().ToString("N")[..6], Slug = "parent-a-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.Add(catA);
+        await db.SaveChangesAsync();
+
+        var catB = new Category { Name = "Child B " + Guid.NewGuid().ToString("N")[..6], Slug = "child-b-" + Guid.NewGuid().ToString("N")[..6], ParentCategoryId = catA.Id };
+        db.Categories.Add(catB);
+
+        var catC = new Category { Name = "Top C " + Guid.NewGuid().ToString("N")[..6], Slug = "top-c-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.Add(catC);
+        await db.SaveChangesAsync();
+
+        // Reparent catA under catC
+        await admin.SaveCategoryAsync(new CategoryEditForm
+        {
+            Id = catA.Id,
+            Name = catA.Name,
+            Slug = catA.Slug,
+            ParentId = catC.Id
+        });
+
+        var checkA = await db.Categories.AsNoTracking().SingleOrDefaultAsync(x => x.Id == catA.Id);
+        await checkA.Should().NotBeNull();
+        await checkA!.ParentCategoryId.Should().BeEqualTo(catC.Id);
+
+        // Child B should be safely reparented to null so max 2-tier structure is maintained without error
+        var checkB = await db.Categories.AsNoTracking().SingleOrDefaultAsync(x => x.Id == catB.Id);
+        await checkB.Should().NotBeNull();
+        await checkB!.ParentCategoryId.Should().BeNull();
+    }
+
+    [Test]
+    public async Task UploadImageEndpoint_WithValidImage_ReturnsOkAndUrl()
+    {
+        using var content = new MultipartFormDataContent();
+        var dummyBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00 };
+        var fileContent = new ByteArrayContent(dummyBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "file", "test-image.png");
+
+        var response = await AdminClient.PostAsync("/api/admin/uploads/image", content);
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new Exception($"Upload failed with HTTP {(int)response.StatusCode}: {body}");
+        }
+
+        await response.IsSuccessStatusCode.Should().BeTrue();
+        await body.Should().Contain("url");
+    }
 }

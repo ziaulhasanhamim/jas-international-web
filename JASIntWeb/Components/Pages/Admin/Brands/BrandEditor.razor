@@ -202,6 +202,15 @@ else
                     <span>Bottom Rich SEO Text / Brand Story (HTML / Markdown supported)</span>
                     <InputTextArea @bind-Value="Input!.BottomSeoCopy" class="shop-input font-mono text-xs" rows="4" placeholder="Comprehensive brand buying guide, authorization statements, warranty and delivery details." />
                 </label>
+
+                <!-- Brand Social Sharing Image -->
+                <AdminSingleImageUpload
+                    FieldName="Input.OgImageUrl"
+                    Value="@Input!.OgImageUrl"
+                    Label="Brand Social Sharing / OG Image (Optional)"
+                    HelpText="High-res 1200×630 image for Facebook/WhatsApp shares"
+                    Aspect="banner"
+                />
             </div>
 
             <div class="form-actions mt-6 flex items-center justify-between">

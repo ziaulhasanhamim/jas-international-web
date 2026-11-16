@@ -767,7 +767,12 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             }
             if (c.Id != 0 && categories.Any(x => x.ParentCategoryId == c.Id))
             {
-                throw new ShopException("A category with children must remain at the top level.");
+                // Re-parent existing children to top level to preserve clean 2-tier hierarchy
+                var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
+                foreach (var child in childCategories)
+                {
+                    child.ParentCategoryId = null;
+                }
             }
         }
         if (c.Id == 0)
@@ -844,14 +849,37 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Include(x => x.Products)
             .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
 
-        var hasActiveProducts = c.Products.Any(p => !p.IsDeleted);
+        var activeProductsCount = c.Products.Count(p => !p.IsDeleted);
 
         // If permanent or if already soft-deleted and has no active products, perform permanent removal
-        if (permanent || (c.IsDeleted && !hasActiveProducts))
+        if (permanent || (c.IsDeleted && activeProductsCount == 0))
         {
-            if (hasActiveProducts)
+            if (activeProductsCount > 0)
             {
-                throw new ShopException("Cannot permanently delete category because it contains active products. Please move or reassign the products first.");
+                throw new ShopException($"Cannot permanently delete '{c.Name}' because it contains {activeProductsCount} active products. Please move or reassign the products first, or click 'Hide' to remove this category from the storefront.");
+            }
+
+            // If there are inactive products, reassign them to Uncategorized to avoid cascade delete FK issues
+            if (c.Products.Count > 0)
+            {
+                var uncategorized = await db.Categories.FirstOrDefaultAsync(x => x.Slug == "uncategorized");
+                if (uncategorized == null)
+                {
+                    uncategorized = new Category
+                    {
+                        Name = "Uncategorized",
+                        Slug = "uncategorized",
+                        IsDeleted = true,
+                        DeletedAt = DateTimeOffset.UtcNow
+                    };
+                    db.Categories.Add(uncategorized);
+                    await db.SaveChangesAsync();
+                }
+
+                foreach (var prod in c.Products)
+                {
+                    prod.CategoryId = uncategorized.Id;
+                }
             }
 
             // Re-parent any child categories so FK_Categories_Categories_ParentCategoryId restrict doesn't crash

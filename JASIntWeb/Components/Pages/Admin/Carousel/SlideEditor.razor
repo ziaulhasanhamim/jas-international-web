@@ -34,11 +34,16 @@ else
         >
             <DataAnnotationsValidator />
             <ValidationSummary />
-            <label class="shop-label">
-                Image URL
-                <InputText @bind-Value="Input!.Image" class="shop-input" />
-            </label>
-            <label class="shop-label">
+
+            <AdminSingleImageUpload
+                FieldName="Input.Image"
+                Value="@Input!.Image"
+                Label="Slide Banner Image"
+                HelpText="Recommended: 1920×600 or 1200×500 (WEBP, JPG, PNG, max 10MB)"
+                Aspect="banner"
+            />
+
+            <label class="shop-label mt-4">
                 Image description (alt text)
                 <InputText @bind-Value="Input!.Alt" class="shop-input" />
             </label>

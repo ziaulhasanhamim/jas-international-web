@@ -43,13 +43,25 @@ else
                 URL slug
                 <InputText @bind-Value="Input!.Slug" class="shop-input" />
             </label>
-            <label class="shop-label">
-                Icon / image URL
-                <InputText @bind-Value="Input!.Icon" class="shop-input" />
-                <small>Use an emoji or an HTTPS / site-relative image URL.</small>
-            </label>
-            <label class="shop-label">
-                Parent category
+
+            <!-- Category Icon / Visual Media -->
+            <AdminSingleImageUpload
+                FieldName="Input.Icon"
+                Value="@Input!.Icon"
+                Label="Category Icon / Image"
+                HelpText="Upload category badge/icon (PNG, SVG, WEBP) or paste URL / emoji"
+                Aspect="square"
+                Placeholder="/jas-logo.png"
+            />
+
+            <label class="shop-label mt-4">
+                <div class="flex items-center justify-between">
+                    <span>Parent category</span>
+                    @if (childCount > 0)
+                    {
+                        <span class="text-xs text-amber-600 font-semibold">Contains @childCount subcategories</span>
+                    }
+                </div>
                 <InputSelect @bind-Value="Input!.ParentId" class="shop-input">
                     <option value="">Top-level category</option>
                     @foreach (var p in parents)
@@ -57,7 +69,7 @@ else
                         <option value="@p.Id">@p.Name</option>
                     }
                 </InputSelect>
-                <small>Two levels: parent → subcategory → product.</small>
+                <small>Select an existing top-level category to make this a subcategory, or choose "Top-level category".</small>
             </label>
             <label class="check-label">
                 <input type="checkbox" name="Input.Hidden" checked="@(Input!.Hidden)" value="true" />
@@ -125,6 +137,15 @@ else
                     <span>Bottom Rich SEO Text / Buyer Guide (HTML / Markdown supported)</span>
                     <InputTextArea @bind-Value="Input!.BottomSeoCopy" class="shop-input font-mono text-xs" rows="4" placeholder="Comprehensive buying guide, brand options, price ranges in BD, warranty and delivery details." />
                 </label>
+
+                <!-- Category Social Sharing Image -->
+                <AdminSingleImageUpload
+                    FieldName="Input.OgImageUrl"
+                    Value="@Input!.OgImageUrl"
+                    Label="Social Sharing / OG Image (Optional)"
+                    HelpText="High-res 1200×630 image for Facebook/WhatsApp shares"
+                    Aspect="banner"
+                />
             </div>
 
             <div class="form-actions">
@@ -147,11 +168,12 @@ else
     private string? error;
     private bool notFound;
     private List<Category> parents = [];
+    private int childCount;
 
     protected override async Task OnInitializedAsync()
     {
-        var hasChildren = Id != 0 && await Db.Categories.AnyAsync(c => c.ParentCategoryId == Id);
-        parents = hasChildren ? [] : await Db.Categories.AsNoTracking()
+        childCount = Id != 0 ? await Db.Categories.CountAsync(c => c.ParentCategoryId == Id && !c.IsDeleted) : 0;
+        parents = await Db.Categories.AsNoTracking()
             .Where(c => c.Id != Id
             && !c.IsDeleted
             && c.ParentCategoryId == null)
