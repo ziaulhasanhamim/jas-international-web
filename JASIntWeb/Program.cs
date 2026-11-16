@@ -304,7 +304,7 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, ISt
     }
     catch (Exception ex)
     {
-        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+        return Results.BadRequest(new { error = ex.Message });
     }
 }).DisableAntiforgery();
 
@@ -334,7 +334,7 @@ app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorag
     }
     catch (Exception ex)
     {
-        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+        return Results.BadRequest(new { error = ex.Message });
     }
 }).DisableAntiforgery();
 
@@ -364,7 +364,7 @@ app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageServ
     }
     catch (Exception ex)
     {
-        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+        return Results.BadRequest(new { error = ex.Message });
     }
 }).DisableAntiforgery();
 
