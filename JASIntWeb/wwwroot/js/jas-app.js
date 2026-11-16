@@ -5,7 +5,7 @@
  */
 
 import { initWishlist } from './modules/wishlist.js';
-import { initCart } from './modules/cart.js';
+import { initCart, syncCartBadges } from './modules/cart.js';
 import { initGallery, switchMainImage } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
 
@@ -16,6 +16,7 @@ class AppOrchestrator {
     static onDomReady() {
         initWishlist();
         initCart();
+        syncCartBadges();
         initGallery();
         initReviews();
 
@@ -25,6 +26,10 @@ class AppOrchestrator {
         JAS?.AdminEditor?.init();
         JAS?.MetaTracking?.init();
         JAS?.VisitorAnalytics?.init();
+
+        if (window.location.pathname === '/cart') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
     }
 
     /**
@@ -42,10 +47,16 @@ class AppOrchestrator {
     static onEnhancedNavigationEnd() {
         const JAS = window.JAS;
 
+        // Instantly reset scroll to top when navigating to /cart or when no anchor hash is present
+        if (window.location.pathname === '/cart' || !window.location.hash) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+
         const updateDom = () => {
             JAS?.Navigation?.finish();
             initWishlist();
             initCart();
+            syncCartBadges();
             initGallery();
             initReviews();
             JAS?.Carousel?.init();
@@ -54,6 +65,10 @@ class AppOrchestrator {
             JAS?.MetaTracking?.init();
             JAS?.MetaTracking?.trackPageView();
             JAS?.VisitorAnalytics?.trackPageView();
+
+            if (window.location.pathname === '/cart' || !window.location.hash) {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+            }
         };
 
         // Use modern native View Transitions API if supported by the browser

@@ -1,6 +1,7 @@
 /**
  * JAS International - Cart Module (ES2024+)
- * Handles client-side cart badge updates and cart session token resolution.
+ * Handles client-side cart badge updates, synchronizing count attributes,
+ * and cart session token resolution for Blazor Server and WASM circuits.
  */
 
 /**
@@ -26,8 +27,29 @@ export function updateCartBadges(count) {
 }
 
 /**
- * Initializes cart module listeners.
+ * Synchronizes cart badges from in-page sync marker elements.
+ * Eliminates the 1-off lag when in-page SSR forms add items to the cart.
+ */
+export function syncCartBadges() {
+    const syncEl = document.getElementById('cart-badge-sync');
+    if (syncEl) {
+        const count = parseInt(syncEl.getAttribute('data-cart-count-sync'), 10);
+        if (!isNaN(count)) {
+            updateCartBadges(count);
+        }
+    }
+}
+
+/**
+ * Initializes cart module listeners and performs initial badge sync.
  */
 export function initCart() {
-    // Badges are SSR rendered by ASP.NET Core from database cart state.
+    syncCartBadges();
+}
+
+// Expose functions globally on window for Blazor Interop (CartService & ServerCartBackend)
+if (typeof window !== 'undefined') {
+    window.jasGetCartToken = getCartToken;
+    window.jasUpdateCartCount = updateCartBadges;
+    window.jasSyncCartBadges = syncCartBadges;
 }
