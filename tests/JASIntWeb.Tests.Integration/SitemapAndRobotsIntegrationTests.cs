@@ -214,9 +214,8 @@ public class SitemapAndRobotsIntegrationTests : JasIntegrationTestBase
         // Verify no interactive Server/WASM blazor markers on homepage
         await body.Should().NotContain("<!--blazor:{\"type\":\"server\"");
         await body.Should().NotContain("<!--blazor:{\"type\":\"webassembly\"");
-        // Verify cart badge with data-cart-count and Buy Now enhanced form
+        // Verify cart badge with data-cart-count and Buy Now button
         await body.Should().Contain("data-cart-count");
-        await body.Should().Contain("action=\"/cart/buy-now\"");
-        await body.Should().Contain("data-enhance");
+        await body.Should().Contain("data-buy-now");
     }
 }

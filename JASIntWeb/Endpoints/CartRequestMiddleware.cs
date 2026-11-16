@@ -1,11 +1,10 @@
 using JASIntWeb.Services;
-using Microsoft.AspNetCore.Antiforgery;
 
 namespace JASIntWeb.Endpoints;
 
 public sealed class CartRequestMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, IAntiforgery csrf)
+    public async Task InvokeAsync(HttpContext context)
     {
         if (!context.Request.Path.StartsWithSegments("/api/cart"))
         {
@@ -26,11 +25,6 @@ public sealed class CartRequestMiddleware(RequestDelegate next)
         try
         {
             await next(context);
-        }
-        catch (AntiforgeryValidationException)
-        {
-            await Results.BadRequest(new ApiErrorDto("Your session expired. Try again.", "antiforgery"))
-                .ExecuteAsync(context);
         }
         catch (BadHttpRequestException error) when (error.StatusCode == StatusCodes.Status400BadRequest)
         {

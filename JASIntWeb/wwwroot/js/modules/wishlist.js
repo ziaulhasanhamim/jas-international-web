@@ -204,17 +204,14 @@ export function renderWishlistPage() {
                     <span class="text-base sm:text-lg font-black text-[#ea580c]">Tk. ${Number(item.price).toLocaleString()}</span>
                 </div>
                 <div class="mt-auto pt-2 border-t border-slate-100">
-                    <form method="post" action="/cart/buy-now" data-enhance class="w-full">
-                        <input type="hidden" name="productId" value="${item.id}" />
-                        <button
-                            type="button"
-                            data-buy-now
-                            data-product-id="${item.id}"
-                            class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
-                        >
-                            <span>⚡ Buy Now</span>
-                        </button>
-                    </form>
+                    <button
+                        type="button"
+                        data-buy-now
+                        data-product-id="${item.id}"
+                        class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
+                    >
+                        <span>⚡ Buy Now</span>
+                    </button>
                 </div>
             </div>
         </article>

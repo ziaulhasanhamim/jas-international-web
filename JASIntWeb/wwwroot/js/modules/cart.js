@@ -121,18 +121,12 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
             productId: Number(productId) || 0
         };
 
-        const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        };
-        const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-        if (csrfToken) {
-            headers['X-CSRF-TOKEN'] = csrfToken;
-        }
-
         const response = await fetch('/api/cart', {
             method: 'POST',
-            headers,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             credentials: 'same-origin',
             body: JSON.stringify(payload)
         });
