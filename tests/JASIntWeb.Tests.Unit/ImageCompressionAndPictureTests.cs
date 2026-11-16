@@ -68,12 +68,33 @@ public class ImageCompressionAndPictureTests : IDisposable
 
         var avif = ImageUrlHelper.GetAvifUrl(input);
         var webp = ImageUrlHelper.GetWebpUrl(input);
+        var auto = ImageUrlHelper.GetAutoOptimizedUrl(input);
 
         await avif.Should().NotBeNull();
         await avif!.Contains("/upload/f_avif,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
 
         await webp.Should().NotBeNull();
         await webp!.Contains("/upload/f_webp,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
+
+        await auto.Contains("/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
+    }
+
+    [Test]
+    public async Task ImageUrlHelper_PreservesAndSwapsTransformationsForCloudinaryAutoUrls()
+    {
+        const string inputWithAuto = "https://res.cloudinary.com/jasint/image/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg";
+
+        var avif = ImageUrlHelper.GetAvifUrl(inputWithAuto);
+        var webp = ImageUrlHelper.GetWebpUrl(inputWithAuto);
+        var auto = ImageUrlHelper.GetAutoOptimizedUrl(inputWithAuto);
+
+        await avif.Should().NotBeNull();
+        await avif!.Contains("/upload/f_avif,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
+
+        await webp.Should().NotBeNull();
+        await webp!.Contains("/upload/f_webp,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
+
+        await auto.Contains("/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
     }
 
     [Test]

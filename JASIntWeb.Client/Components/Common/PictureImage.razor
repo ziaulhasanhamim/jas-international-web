@@ -46,7 +46,7 @@ else
         }
         <img
             id="@Id"
-            src="@Src"
+            src="@(ImageUrlHelper.GetAutoOptimizedUrl(Src))"
             alt="@Alt"
             class="@Class"
             loading="@Loading"

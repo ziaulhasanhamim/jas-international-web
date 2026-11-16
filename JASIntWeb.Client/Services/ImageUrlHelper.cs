@@ -87,6 +87,24 @@ public static class ImageUrlHelper
         return ReplaceExtension(trimmed, ".webp");
     }
 
+    /// <summary>
+    /// Generates an auto-optimized format and quality URL (f_auto,q_auto) for Cloudinary
+    /// so even fallback img tags deliver AVIF or WebP automatically via browser Content Negotiation.
+    /// </summary>
+    public static string GetAutoOptimizedUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || IsVectorOrDataUri(url))
+            return url ?? "";
+
+        var trimmed = url.Trim();
+        if (trimmed.Contains("res.cloudinary.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return TransformCloudinaryUrl(trimmed, "f_auto,q_auto");
+        }
+
+        return trimmed;
+    }
+
     private static string TransformCloudinaryUrl(string url, string formatTransform)
     {
         var match = CloudinaryUploadRegex.Match(url);

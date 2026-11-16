@@ -106,7 +106,13 @@ public sealed class CloudinaryStorageService : IStorageService
                 PublicId = publicId,
                 Folder = "jas-storefront",
                 Overwrite = false,
-                UniqueFilename = true
+                UniqueFilename = true,
+                EagerTransforms = new List<Transformation>
+                {
+                    new Transformation().FetchFormat("avif").Quality("auto"),
+                    new Transformation().FetchFormat("webp").Quality("auto")
+                },
+                EagerAsync = true
             };
 
             var uploadResult = await _cloudinary.UploadAsync(uploadParams, ct);
@@ -117,7 +123,11 @@ public sealed class CloudinaryStorageService : IStorageService
             }
 
             var secureUrl = uploadResult.SecureUrl?.ToString() ?? uploadResult.Url?.ToString();
-            _logger.LogInformation("Uploaded image to Cloudinary: {Url}", secureUrl);
+            if (!string.IsNullOrWhiteSpace(secureUrl) && secureUrl.Contains("/image/upload/"))
+            {
+                secureUrl = secureUrl.Replace("/image/upload/", "/image/upload/f_auto,q_auto/");
+            }
+            _logger.LogInformation("Uploaded image to Cloudinary (AVIF/WebP auto-optimized): {Url}", secureUrl);
             return secureUrl!;
         }
 
