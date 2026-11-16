@@ -26,6 +26,30 @@ public class ImageCompressionAndPictureTests : IDisposable
     }
 
     [Test]
+    public async Task CloudinaryStorageService_ParsesCloudinaryUrlCorrectly()
+    {
+        var inMemory = new Dictionary<string, string?>
+        {
+            ["CLOUDINARY_URL"] = "cloudinary://885657851225788:Y05Cs76XObWlxs4b_DcjAuo4Pdo@ziaulhasanhamim"
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
+        var envMock = new TestWebHostEnvironment { WebRootPath = _tempWebRoot };
+        var optimizer = new ImageOptimizerService(NullLogger<ImageOptimizerService>.Instance);
+        var storage = new CloudinaryStorageService(config, envMock, optimizer, NullLogger<CloudinaryStorageService>.Instance);
+
+        await storage.IsConfigured.Should().BeTrue();
+
+        using var testImage = new MagickImage(MagickColors.ForestGreen, 50, 50);
+        using var stream = new MemoryStream();
+        testImage.Write(stream, MagickFormat.Jpeg);
+        stream.Position = 0;
+
+        var uploadedUrl = await storage.UploadFileAsync(stream, "test_earbuds.jpg", "image/jpeg");
+        Console.WriteLine($"UPLOADED URL: {uploadedUrl}");
+        await uploadedUrl.Should().Contain("cloudinary.com");
+    }
+
+    [Test]
     public async Task ImageUrlHelper_ResolvesLocalAvifAndWebpUrls()
     {
         const string input = "/uploads/products/202611/earbuds_a1b2c3d4.jpg";

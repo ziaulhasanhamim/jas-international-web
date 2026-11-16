@@ -408,11 +408,11 @@ class AdminEditorController {
                         }
                     } else {
                         const err = await response.json().catch(() => ({}));
-                        alert(err.error || "Upload failed. Please ensure file is valid SVG, PNG, WEBP, AVIF, or JPG.");
+                        alert(err.error || err.message || `Upload failed (HTTP ${response.status}). Please ensure file is valid SVG, PNG, WEBP, AVIF, or JPG.`);
                     }
                 } catch (err) {
                     console.error("[UniversalUploader] Upload error:", err);
-                    alert("Upload failed due to connection error or timeout.");
+                    alert(`Upload failed: ${err.message || "connection error or timeout"}`);
                 } finally {
                     if (progress) progress.hidden = true;
                     if (fileInput) fileInput.value = "";
@@ -598,7 +598,7 @@ class AdminEditorController {
     }
 }
 
-// Global initialization
+// Global initialization and automatic lifecycle binding
 (function (global) {
     "use strict";
 
@@ -611,4 +611,34 @@ class AdminEditorController {
         initWysiwyg: () => AdminEditorController.initWysiwygEditor(),
         initSlugGenerator: () => AdminEditorController.initAutoSlugGenerator()
     };
+
+    // Auto-boot immediately if elements already exist
+    AdminEditorController.initAll();
+
+    // Auto-boot on DOM ready
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => AdminEditorController.initAll());
+    }
+
+    // Auto-boot on Blazor enhanced page navigation
+    if (typeof window !== "undefined") {
+        window.addEventListener("blazor:enhancedload", () => AdminEditorController.initAll());
+        document.addEventListener("blazor:enhancedload", () => AdminEditorController.initAll());
+        document.addEventListener("enhancednavigationend", () => AdminEditorController.initAll());
+
+        const hookBlazor = () => {
+            if (window.Blazor?.addEventListener) {
+                window.Blazor.addEventListener("enhancednavigationend", () => {
+                    AdminEditorController.initAll();
+                    setTimeout(() => AdminEditorController.initAll(), 50);
+                });
+            }
+        };
+
+        if (window.Blazor) {
+            hookBlazor();
+        } else {
+            document.addEventListener("DOMContentLoaded", hookBlazor);
+        }
+    }
 })(window);

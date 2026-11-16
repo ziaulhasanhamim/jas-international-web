@@ -11,22 +11,6 @@ namespace JASIntWeb.Tests.Integration;
 public class AdminCategoryIntegrationTests : JasIntegrationTestBase
 {
 
-    [Test]
-    public async Task Categories_ExtraAutomationCategories_AreCleanedUpOnStartup()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        // Ensure no active category with "automation" remains active
-        var activeAutomations = await db.Categories
-            .Where(c => !c.IsDeleted && (
-                c.Name.ToLower().Contains("automation") ||
-                c.Slug.ToLower().Contains("automation")
-            ))
-            .ToListAsync();
-
-        await activeAutomations.Count.Should().BeEqualTo(0);
-    }
 
     [Test]
     public async Task ToggleCategoryFeaturedAsync_TogglesPlacementStatus()

@@ -287,18 +287,25 @@ app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, ISt
     string[] allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg"];
     var urls = new List<string>();
 
-    foreach (var file in files)
+    try
     {
-        if (file.Length == 0 || file.Length > 10 * 1024 * 1024) continue;
-        var ext = Path.GetExtension(file.FileName);
-        if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
+        foreach (var file in files)
+        {
+            if (file.Length == 0 || file.Length > 10 * 1024 * 1024) continue;
+            var ext = Path.GetExtension(file.FileName);
+            if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
 
-        await using var stream = file.OpenReadStream();
-        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
-        urls.Add(url);
+            await using var stream = file.OpenReadStream();
+            var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+            urls.Add(url);
+        }
+
+        return Results.Ok(new { urls });
     }
-
-    return Results.Ok(new { urls });
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+    }
 }).DisableAntiforgery();
 
 app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorageService storage) =>
@@ -319,9 +326,16 @@ app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorag
     if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
         return Results.BadRequest(new { error = "Unsupported image format. Please upload SVG, PNG, WEBP, or JPG." });
 
-    await using var stream = file.OpenReadStream();
-    var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
-    return Results.Ok(new { url });
+    try
+    {
+        await using var stream = file.OpenReadStream();
+        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+        return Results.Ok(new { url });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+    }
 }).DisableAntiforgery();
 
 app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageService storage) =>
@@ -342,9 +356,16 @@ app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageServ
     if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
         return Results.BadRequest(new { error = "Unsupported image format. Please upload SVG, PNG, WEBP, AVIF, or JPG." });
 
-    await using var stream = file.OpenReadStream();
-    var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
-    return Results.Ok(new { url });
+    try
+    {
+        await using var stream = file.OpenReadStream();
+        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+        return Results.Ok(new { url });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Upload failed: {ex.Message}" });
+    }
 }).DisableAntiforgery();
 
 app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db, ShoppingService shop, DeliverySettingsService settingsSvc, ILogger<Program> logger) =>

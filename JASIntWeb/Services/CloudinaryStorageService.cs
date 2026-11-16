@@ -22,11 +22,29 @@ public sealed class CloudinaryStorageService : IStorageService
         _imageOptimizer = imageOptimizer;
         _logger = logger;
 
-        var cloudinaryUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"];
+        var rawUrl = config["CLOUDINARY_URL"] ?? config["Cloudinary:Url"] ?? config["Cloudinary__Url"] ?? Environment.GetEnvironmentVariable("CLOUDINARY_URL");
+        var cloudinaryUrl = rawUrl?.Trim().Trim('"', '\'');
         if (!string.IsNullOrWhiteSpace(cloudinaryUrl))
         {
             try
             {
+                if (cloudinaryUrl.StartsWith("cloudinary://", StringComparison.OrdinalIgnoreCase))
+                {
+                    var uri = new Uri(cloudinaryUrl);
+                    var userInfo = uri.UserInfo.Split(':');
+                    if (userInfo.Length == 2)
+                    {
+                        var key = userInfo[0];
+                        var secret = userInfo[1];
+                        var cloud = uri.Host;
+                        var account = new Account(cloud, key, secret);
+                        _cloudinary = new Cloudinary(account);
+                        _cloudinary.Api.Secure = true;
+                        _logger.LogInformation("Cloudinary media storage initialized successfully for cloud '{CloudName}'.", cloud);
+                        return;
+                    }
+                }
+
                 _cloudinary = new Cloudinary(cloudinaryUrl);
                 _cloudinary.Api.Secure = true;
                 _logger.LogInformation("Cloudinary media storage initialized successfully via CLOUDINARY_URL.");
@@ -74,39 +92,17 @@ public sealed class CloudinaryStorageService : IStorageService
         var uniqueToken = Guid.NewGuid().ToString("N")[..8];
         var publicId = $"{dateFolder}/{safeBaseName}_{uniqueToken}";
 
-        OptimizedImageSet? optimized = null;
-        try
-        {
-            optimized = await _imageOptimizer.OptimizeImageAsync(stream, fileName, contentType, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Automatic image optimization failed for '{FileName}'. Proceeding with raw bytes fallback.", fileName);
-            if (stream.CanSeek)
-            {
-                stream.Position = 0;
-            }
-        }
+        // Buffer the stream into memory upfront so we always have the complete file bytes
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, ct);
+        var fileBytes = memoryStream.ToArray();
 
         if (_cloudinary is not null)
         {
-            Stream uploadStream;
-            string uploadFileName;
-
-            if (optimized is not null)
-            {
-                uploadStream = new MemoryStream(optimized.PrimaryBytes);
-                uploadFileName = $"{safeBaseName}_{uniqueToken}{optimized.PrimaryExtension}";
-            }
-            else
-            {
-                uploadStream = stream;
-                uploadFileName = fileName;
-            }
-
+            using var uploadStream = new MemoryStream(fileBytes);
             var uploadParams = new ImageUploadParams
             {
-                File = new FileDescription(uploadFileName, uploadStream),
+                File = new FileDescription(fileName, uploadStream),
                 PublicId = publicId,
                 Folder = "jas-storefront",
                 Overwrite = false,
@@ -121,12 +117,24 @@ public sealed class CloudinaryStorageService : IStorageService
             }
 
             var secureUrl = uploadResult.SecureUrl?.ToString() ?? uploadResult.Url?.ToString();
-            _logger.LogInformation("Uploaded optimized image to Cloudinary: {Url}", secureUrl);
+            _logger.LogInformation("Uploaded image to Cloudinary: {Url}", secureUrl);
             return secureUrl!;
         }
 
         // Local disk fallback with automatic AVIF and WebP companions
-        var localFolder = Path.Combine(_env.WebRootPath, "uploads", "products", dateFolder);
+        OptimizedImageSet? optimized = null;
+        try
+        {
+            using var optStream = new MemoryStream(fileBytes);
+            optimized = await _imageOptimizer.OptimizeImageAsync(optStream, fileName, contentType, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Automatic image optimization failed for '{FileName}'. Proceeding with raw bytes fallback.", fileName);
+        }
+
+        var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var localFolder = Path.Combine(webRoot, "uploads", "products", dateFolder);
         Directory.CreateDirectory(localFolder);
 
         if (optimized is not null)
@@ -153,10 +161,7 @@ public sealed class CloudinaryStorageService : IStorageService
         var rawFileName = $"{safeBaseName}_{uniqueToken}{rawExt}";
         var rawPath = Path.Combine(localFolder, rawFileName);
 
-        await using (var fileStream = new FileStream(rawPath, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            await stream.CopyToAsync(fileStream, ct);
-        }
+        await File.WriteAllBytesAsync(rawPath, fileBytes, ct);
 
         var fallbackUrl = $"/uploads/products/{dateFolder}/{rawFileName}";
         _logger.LogInformation("Saved raw image to local disk: {Url}", fallbackUrl);

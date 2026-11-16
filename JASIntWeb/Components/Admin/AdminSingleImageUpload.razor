@@ -29,11 +29,11 @@
                 <p class="text-[11px] text-slate-500 mt-0.5">Drag &amp; drop an image, browse your device, or paste a URL</p>
 
                 <div class="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    <label class="btn-primary cursor-pointer text-xs py-1.5 px-3.5 shadow-2xs inline-flex items-center gap-1.5 select-none">
+                    <label for="@_inputId" class="btn-primary cursor-pointer text-xs py-1.5 px-3.5 shadow-2xs inline-flex items-center gap-1.5 select-none">
                         <Icon Name="camera" Class="size-3.5" />
                         <span>Browse &amp; Upload</span>
-                        <input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/avif,image/gif" class="hidden image-uploader-file-input" />
                     </label>
+                    <input type="file" id="@_inputId" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/avif,image/gif" class="sr-only opacity-0 absolute pointer-events-none image-uploader-file-input" />
 
                     <button type="button" class="btn-secondary text-xs py-1.5 px-3 image-uploader-btn-url">
                         Edit URL
@@ -67,6 +67,8 @@
 </div>
 
 @code {
+    private readonly string _inputId = $"img-input-{Guid.NewGuid():N}";
+
     [Parameter, EditorRequired]
     public required string FieldName { get; set; }
 
