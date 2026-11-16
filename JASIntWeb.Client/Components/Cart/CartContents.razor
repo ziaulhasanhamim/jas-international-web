@@ -2,7 +2,6 @@
 @implements IDisposable
 @inject CartService Cart
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <div class="space-y-6">
     <div class="flex items-center justify-between mb-6 sm:mb-8">
@@ -182,20 +181,6 @@
         Cart.OnChange += Changed;
         await Cart.RefreshAsync();
         ready = true;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            try
-            {
-                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
-            }
-            catch
-            {
-            }
-        }
     }
 
     private void Changed() => _ = InvokeAsync(StateHasChanged);
