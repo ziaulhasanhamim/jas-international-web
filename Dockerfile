@@ -39,6 +39,8 @@ WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV Database__ApplyMigrations=true
+ENV Seed__Enabled=false
 
 COPY --from=build /app/publish .
 

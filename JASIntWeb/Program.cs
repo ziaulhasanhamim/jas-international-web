@@ -200,7 +200,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
-if (!builder.Configuration.GetValue<bool>("Database:SkipMigrations", false))
+var applyMigrations = builder.Configuration.GetValue<bool>("Database:ApplyMigrations", true)
+    && !builder.Configuration.GetValue<bool>("Database:SkipMigrations", false);
+if (applyMigrations)
 {
     try
     {
