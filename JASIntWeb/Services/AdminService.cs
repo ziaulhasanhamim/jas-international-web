@@ -1088,13 +1088,75 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await cache.RemoveByTagAsync(CatalogService.TagBrands);
     }
 
-    public async Task DeleteBrandAsync(int id)
+    public async Task ToggleBrandVisibilityAsync(int id)
     {
         var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
-        b.IsDeleted = true;
-        b.DeletedAt = DateTimeOffset.UtcNow;
+        b.IsDeleted = !b.IsDeleted;
+        b.DeletedAt = b.IsDeleted ? DateTimeOffset.UtcNow : null;
+        b.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
         await cache.RemoveByTagAsync(CatalogService.TagBrands);
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
+    }
+
+    public async Task DeleteBrandAsync(int id, bool permanent = false)
+    {
+        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        var brandProducts = await db.Products.Where(p => p.BrandId == id).ToListAsync();
+        foreach (var p in brandProducts)
+        {
+            p.BrandId = null;
+        }
+
+        if (permanent)
+        {
+            db.Brands.Remove(b);
+        }
+        else
+        {
+            b.IsDeleted = true;
+            b.DeletedAt = DateTimeOffset.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagBrands);
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
+    }
+
+    public async Task BulkBrandActionAsync(List<int> ids, string action)
+    {
+        if (ids.Count == 0) return;
+        var brands = await db.Brands.Where(b => ids.Contains(b.Id)).ToListAsync();
+        var act = action.Trim().ToLowerInvariant();
+
+        if (act == "delete")
+        {
+            var brandProducts = await db.Products.Where(p => p.BrandId != null && ids.Contains(p.BrandId.Value)).ToListAsync();
+            foreach (var p in brandProducts)
+            {
+                p.BrandId = null;
+            }
+            db.Brands.RemoveRange(brands);
+        }
+        else if (act == "hide")
+        {
+            foreach (var b in brands)
+            {
+                b.IsDeleted = true;
+                b.DeletedAt = DateTimeOffset.UtcNow;
+            }
+        }
+        else if (act == "restore")
+        {
+            foreach (var b in brands)
+            {
+                b.IsDeleted = false;
+                b.DeletedAt = null;
+            }
+        }
+        await db.SaveChangesAsync();
+        await cache.RemoveByTagAsync(CatalogService.TagBrands);
+        await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
     public async Task<int> SaveAttributeAsync(AttributeEditForm input)

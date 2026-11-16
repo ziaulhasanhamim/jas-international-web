@@ -110,4 +110,94 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
         await saved!.LogoUrl.Should().BeEqualTo("/uploads/test-logo.png");
         await saved.Name.Should().BeEqualTo("Logo Test Brand");
     }
+
+    [Test]
+    public async Task SaveBrandAsync_ExistingBrand_UpdatesInPlaceWithoutCreatingNewRecord()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var slug = "brand-update-" + Guid.NewGuid().ToString("N")[..6];
+        var initialForm = new BrandEditForm
+        {
+            Name = "Initial Brand Name",
+            Slug = slug,
+            Description = "Initial description",
+            SortOrder = 10
+        };
+
+        await admin.SaveBrandAsync(initialForm);
+
+        var existing = await db.Brands.AsNoTracking().FirstOrDefaultAsync(b => b.Slug == slug);
+        await existing.Should().NotBeNull();
+        var existingId = existing!.Id;
+
+        var countBefore = await db.Brands.CountAsync();
+
+        // Update the brand with new name and description
+        var updateForm = new BrandEditForm
+        {
+            Id = existingId,
+            Name = "Updated Brand Name",
+            Slug = slug,
+            Description = "Updated brand description",
+            SortOrder = 20
+        };
+
+        await admin.SaveBrandAsync(updateForm);
+
+        var countAfter = await db.Brands.CountAsync();
+        // Brand count MUST not increase on update!
+        await countAfter.Should().BeEqualTo(countBefore);
+
+        var updated = await db.Brands.AsNoTracking().FirstOrDefaultAsync(b => b.Id == existingId);
+        await updated.Should().NotBeNull();
+        await updated!.Name.Should().BeEqualTo("Updated Brand Name");
+        await updated.Description.Should().BeEqualTo("Updated brand description");
+        await updated.SortOrder.Should().BeEqualTo(20);
+    }
+
+    [Test]
+    public async Task DeleteBrandAsync_Permanent_DeletesBrandAndDetachesProducts()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var slug = "brand-del-" + Guid.NewGuid().ToString("N")[..6];
+        var brandForm = new BrandEditForm
+        {
+            Name = "Brand To Delete",
+            Slug = slug
+        };
+        await admin.SaveBrandAsync(brandForm);
+        var brand = await db.Brands.FirstAsync(b => b.Slug == slug);
+
+        // Add a product linked to this brand
+        var category = await db.Categories.FirstAsync();
+        var product = new JASIntWeb.Persistence.Entities.Product
+        {
+            Name = "Product for brand delete test",
+            Slug = "prod-brand-del-" + Guid.NewGuid().ToString("N")[..6],
+            Details = "Details",
+            MainImageUrl = "/test.jpg",
+            CategoryId = category.Id,
+            BrandId = brand.Id
+        };
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        // Delete brand permanently
+        await admin.DeleteBrandAsync(brand.Id, permanent: true);
+
+        // Verify brand is removed
+        var deletedBrand = await db.Brands.FindAsync(brand.Id);
+        await deletedBrand.Should().BeNull();
+
+        // Verify product still exists and brand was safely detached (BrandId == null)
+        var updatedProduct = await db.Products.FindAsync(product.Id);
+        await updatedProduct.Should().NotBeNull();
+        await updatedProduct!.BrandId.Should().BeNull();
+    }
 }

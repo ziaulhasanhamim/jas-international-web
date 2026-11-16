@@ -424,7 +424,7 @@ else
                             <span class="ml-2 font-bold text-amber-700">COD Due: ৳@Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount).ToString("N0")</span>
                         </div>
 
-                        <form method="post" @formname="order-payment-action" class="inline-flex items-center gap-2">
+                        <form method="post" @formname="order-payment-action" data-enhance class="inline-flex items-center gap-2">
                             <AntiforgeryToken />
                             @if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Delivered)
                             {
@@ -455,7 +455,7 @@ else
                 </div>
 
                 <!-- Form a: Change Status Form -->
-                <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                <form method="post" @formname="change-status" @onsubmit="ChangeStatusAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Fulfillment Lifecycle Status</label>
@@ -476,7 +476,7 @@ else
                 </form>
 
                 <!-- Form e: Update Courier & Tracking Form -->
-                <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
+                <form method="post" @formname="update-tracking" @onsubmit="UpdateTrackingAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3 mb-5">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Courier Logistics &amp; Consignment</label>
@@ -526,7 +526,7 @@ else
                 </form>
 
                 <!-- Form f: Internal Fulfillment Notes Form -->
-                <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
+                <form method="post" @formname="save-notes" @onsubmit="SaveNotesAsync" data-enhance class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-xs space-y-3">
                     <AntiforgeryToken />
                     <div class="flex items-center justify-between pb-2 border-b border-slate-200/70">
                         <label class="field-label font-bold text-slate-800 mb-0!">Internal Fulfillment &amp; Packaging Notes</label>

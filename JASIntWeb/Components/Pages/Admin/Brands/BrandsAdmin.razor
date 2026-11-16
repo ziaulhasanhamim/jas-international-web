@@ -2,6 +2,7 @@
 @layout AdminLayout
 @using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
+@inject JASIntWeb.Services.AdminService AdminSvc
 @inject AdminSession Session
 @inject CatalogService Catalog
 @inject NavigationManager Nav
@@ -78,7 +79,7 @@
 }
 
 <!-- Brands QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
-<form method="post" @formname="brands-table-action">
+<form method="post" @formname="brands-table-action" data-enhance>
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
@@ -130,9 +131,45 @@
                 </TemplateColumn>
 
                 <TemplateColumn Title="Actions" Align="Align.End">
-                    <a href="/admin/brands/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                        Edit
-                    </a>
+                    <div class="flex items-center justify-end gap-1.5">
+                        <a href="/admin/brands/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                            Edit
+                        </a>
+                        @if (!context.IsDeleted)
+                        {
+                            <button
+                                type="submit"
+                                name="ToggleVisibilityId"
+                                value="@context.Id"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 cursor-pointer"
+                                title="Hide brand from catalog"
+                            >
+                                Hide
+                            </button>
+                        }
+                        else
+                        {
+                            <button
+                                type="submit"
+                                name="ToggleVisibilityId"
+                                value="@context.Id"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 cursor-pointer"
+                                title="Restore brand to catalog"
+                            >
+                                Restore
+                            </button>
+                        }
+                        <button
+                            type="submit"
+                            name="DeleteBrandId"
+                            value="@context.Id"
+                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
+                            onclick="return confirm('Permanently delete brand \'@context.Name\'? Any assigned products will remain in the catalog.');"
+                            title="Permanently delete brand"
+                        >
+                            Delete
+                        </button>
+                    </div>
                 </TemplateColumn>
             </QuickGrid>
         </div>
@@ -155,6 +192,12 @@
 
     [SupplyParameterFromForm(FormName = "brands-table-action")]
     public int ToggleBrandId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "brands-table-action")]
+    public int ToggleVisibilityId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "brands-table-action")]
+    public int DeleteBrandId { get; set; }
 
     public record AdminBrandRow(
         int Id,
@@ -188,21 +231,34 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (ToggleBrandId > 0)
+        try
         {
-            var brand = await Db.Brands.FindAsync(ToggleBrandId);
-            if (brand != null)
+            if (ToggleBrandId > 0)
             {
-                brand.IsFeatured = !brand.IsFeatured;
-                brand.UpdatedAt = DateTimeOffset.UtcNow;
-                await Db.SaveChangesAsync();
-                Catalog.InvalidateBrandsCache();
-                Nav.NavigateTo(FilterUrl(Filter));
-                return;
+                await AdminSvc.ToggleBrandFeaturedAsync(ToggleBrandId);
+                _toast = "Brand homepage featured status updated.";
+                ToggleBrandId = 0;
             }
-        }
+            else if (ToggleVisibilityId > 0)
+            {
+                await AdminSvc.ToggleBrandVisibilityAsync(ToggleVisibilityId);
+                _toast = "Brand visibility updated.";
+                ToggleVisibilityId = 0;
+            }
+            else if (DeleteBrandId > 0)
+            {
+                await AdminSvc.DeleteBrandAsync(DeleteBrandId, permanent: true);
+                _toast = "Brand permanently deleted. Any assigned products remain safely in the catalog.";
+                DeleteBrandId = 0;
+            }
 
-        await LoadBrands();
+            await LoadBrands();
+        }
+        catch
+        {
+            _toast = null;
+            await LoadBrands();
+        }
     }
 
     private async Task LoadBrands()

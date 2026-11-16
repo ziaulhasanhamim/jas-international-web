@@ -30,10 +30,13 @@ else
             OnValidSubmit="Save"
             FormName="OptionEditor"
             method="post"
+            Enhance="true"
+            data-submit-indication="true"
             class="shop-panel admin-form"
         >
             <DataAnnotationsValidator />
             <ValidationSummary />
+            <input type="hidden" name="Input.Id" value="@(Id == 0 ? (Input?.Id ?? 0) : Id)" />
             <label class="shop-label">
                 Display value
                 <InputText @bind-Value="Input!.Value" class="shop-input" />

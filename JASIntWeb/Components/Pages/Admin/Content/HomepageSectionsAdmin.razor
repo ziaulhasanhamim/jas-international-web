@@ -36,7 +36,7 @@
 }
 
 <!-- Single container form for all table actions (replaces duplicate nested forms) -->
-<form method="post" @formname="sections-table-action">
+<form method="post" @formname="sections-table-action" data-enhance>
     <AntiforgeryToken />
     <!-- Sections Table -->
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-8">
@@ -137,7 +137,7 @@
         <p class="text-xs text-slate-500">Configure section title, category filter, and display limit.</p>
     </div>
 
-    <form method="post" @formname="save-section" class="space-y-4">
+    <form method="post" @formname="save-section" data-enhance class="space-y-4">
         <AntiforgeryToken />
         <input type="hidden" name="SaveAction" value="save" />
         <input type="hidden" name="FormId" value="@(editSection?.Id ?? 0)" />

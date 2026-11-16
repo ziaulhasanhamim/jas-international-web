@@ -19,8 +19,9 @@
 }
 else
 {
-    <EditForm Model="coupon" OnValidSubmit="Save" FormName="coupon-editor" method="post" data-submit-indication="true" class="shop-panel admin-form space-y-4">
+    <EditForm Model="coupon" OnValidSubmit="Save" FormName="coupon-editor" method="post" Enhance="true" data-submit-indication="true" class="shop-panel admin-form space-y-4">
         <DataAnnotationsValidator />
+        <input type="hidden" name="Id" value="@Id" />
 
         <div class="admin-form-grid">
             <label class="shop-label">

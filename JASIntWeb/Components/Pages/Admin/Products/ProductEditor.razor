@@ -34,11 +34,13 @@ else
             OnValidSubmit="Save"
             FormName="product"
             method="post"
+            Enhance="true"
             data-submit-indication="true"
             class="shop-panel admin-form"
         >
             <DataAnnotationsValidator />
             <ValidationSummary />
+            <input type="hidden" name="Input.Id" value="@(Id == 0 ? (Input?.Id ?? 0) : Id)" />
             <div class="admin-form-grid">
                 <label class="shop-label">
                     Product name *

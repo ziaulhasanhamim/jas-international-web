@@ -25,7 +25,7 @@
             <a href="/admin/marketing?period=today&spend=@adSpend" class="rounded-lg px-3 py-1.5 text-xs font-semibold @(period == "today" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Today</a>
         </div>
 
-        <form method="get" action="/admin/marketing" class="flex items-center gap-2">
+        <form method="get" action="/admin/marketing" data-enhance class="flex items-center gap-2">
             <input type="hidden" name="period" value="@period" />
             <label for="spend-input" class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meta Ad Spend (৳):</label>
             <input id="spend-input" type="number" step="100" name="spend" value="@adSpend" class="w-32 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-2xs focus:border-blue-500 focus:outline-none" placeholder="e.g. 5000" />
