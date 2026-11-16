@@ -519,4 +519,32 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         var moved = await db.Products.AsNoTracking().FirstAsync(p => p.Id == prod.Id);
         await moved.CategoryId.Should().BeEqualTo(catB.Id);
     }
+
+    [Test]
+    public async Task ApiCart_PostAndPutWithoutCsrfToken_SucceedsAndNeverReturnsSessionExpired()
+    {
+        var client = Factory.CreateClient();
+
+        // 1. Post to /api/cart without any X-CSRF-TOKEN header
+        var addPayload = new { variantId = 1, quantity = 2 };
+        var postRes = await client.PostAsJsonAsync("/api/cart", addPayload);
+
+        await ((int)postRes.StatusCode).Should().BeEqualTo(200);
+        var cart = await postRes.Content.ReadFromJsonAsync<CartDto>();
+        await cart.Should().NotBeNull();
+        await cart!.ItemCount.Should().BeGreaterThanOrEqualTo(2);
+
+        // 2. Put to /api/cart without any X-CSRF-TOKEN header
+        var updatePayload = new { variantId = 1, quantity = 3 };
+        var putRes = await client.PutAsJsonAsync("/api/cart", updatePayload);
+
+        await ((int)putRes.StatusCode).Should().BeEqualTo(200);
+        var updatedCart = await putRes.Content.ReadFromJsonAsync<CartDto>();
+        await updatedCart.Should().NotBeNull();
+        await updatedCart!.Items.First(i => i.VariantId == 1).Quantity.Should().BeEqualTo(3);
+
+        // 3. Get /api/cart/count
+        var countRes = await client.GetAsync("/api/cart/count");
+        await ((int)countRes.StatusCode).Should().BeEqualTo(200);
+    }
 }

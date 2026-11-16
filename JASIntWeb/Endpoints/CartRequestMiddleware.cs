@@ -25,11 +25,6 @@ public sealed class CartRequestMiddleware(RequestDelegate next)
         }, context.Response);
         try
         {
-            if (!HttpMethods.IsGet(context.Request.Method))
-            {
-                await csrf.ValidateRequestAsync(context);
-            }
-
             await next(context);
         }
         catch (AntiforgeryValidationException)
