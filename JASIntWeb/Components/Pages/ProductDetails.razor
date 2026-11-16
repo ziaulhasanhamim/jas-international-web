@@ -691,7 +691,7 @@ else
                 var updatedCart = await Shop.ChangeAsync(token, userId, new CartLineRequest(targetVariantId, qty), add: true);
                 if (string.Equals(targetAction, "buy", StringComparison.OrdinalIgnoreCase))
                 {
-                    Nav.NavigateTo("/cart", forceLoad: true);
+                    Nav.NavigateTo("/cart");
                     return;
                 }
                 cartSuccessMessage = $"{product.Name} added to your cart!";
