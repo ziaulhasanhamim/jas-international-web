@@ -114,7 +114,7 @@
 
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@categoriesQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@categoriesQuery" class="data-table">
                 <TemplateColumn Class="w-10 text-center">
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-categories"
@@ -237,7 +237,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -255,6 +255,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromForm(FormName = "categories-table-action")]
     public int ToggleFeaturedId { get; set; }
@@ -286,10 +289,11 @@
     );
 
     private IQueryable<AdminCategoryRow>? categoriesQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 15 };
     private GridSort<AdminCategoryRow> sortByName = GridSort<AdminCategoryRow>.ByAscending(c => c.Name);
     private GridSort<AdminCategoryRow> sortByDeleted = GridSort<AdminCategoryRow>.ByAscending(c => c.IsDeleted);
 
+    private const int PageSize = 15;
+    private int totalFiltered;
     private List<OrderableItemDto> featured = [];
     private string? _toast;
     private string? _error;
@@ -362,6 +366,8 @@
 
     private async Task LoadDataAsync()
     {
+        Page = Math.Max(1, Page);
+
         totalAll = await Db.Categories.CountAsync();
         totalActive = await Db.Categories.CountAsync(c => !c.IsDeleted);
         var featuredIds = await Db.CategoryPlacements.AsNoTracking()
@@ -370,6 +376,13 @@
             .ToListAsync();
         totalFeatured = featuredIds.Count;
         totalHidden = await Db.Categories.CountAsync(c => c.IsDeleted);
+
+        featured = await Db.CategoryPlacements.AsNoTracking()
+            .Where(p => p.IsActive && p.PlacementType == CategoryPlacementType.HomepageFeatured && !p.Category!.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Id)
+            .Select(p => new OrderableItemDto(p.Id, p.Category!.Name))
+            .ToListAsync();
 
         var q = Db.Categories.AsNoTracking();
 
@@ -392,8 +405,12 @@
             q = q.Where(c => c.Name.ToLower().Contains(term) || c.Slug.ToLower().Contains(term));
         }
 
-        categoriesQuery = q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
             .ThenBy(c => c.Name)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(c => new AdminCategoryRow(
                 c.Id,
                 c.Name,
@@ -403,13 +420,9 @@
                 c.Products.Count(p => !p.IsDeleted),
                 featuredIds.Contains(c.Id),
                 c.IsDeleted
-            ));
-
-        featured = await Db.CategoryPlacements.AsNoTracking()
-            .Where(p => p.IsActive && p.PlacementType == CategoryPlacementType.HomepageFeatured && !p.Category!.IsDeleted)
-            .OrderBy(p => p.SortOrder)
-            .ThenBy(p => p.Id)
-            .Select(p => new OrderableItemDto(p.Id, p.Category!.Name))
+            ))
             .ToListAsync();
+
+        categoriesQuery = list.AsQueryable();
     }
 }

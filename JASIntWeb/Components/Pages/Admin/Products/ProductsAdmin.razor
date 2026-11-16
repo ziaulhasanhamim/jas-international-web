@@ -121,7 +121,7 @@
 
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@productsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@productsQuery" class="data-table">
                 <TemplateColumn Class="w-10 text-center">
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-products"
@@ -195,7 +195,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -209,6 +209,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromQuery(Name = "toast")]
     public string? ToastNotice { get; set; }
@@ -238,7 +241,8 @@
     public record CategoryOption(int Id, string Name);
 
     private IQueryable<AdminProductRow>? productsQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<AdminProductRow> sortByName = GridSort<AdminProductRow>.ByAscending(p => p.Name);
 
     private List<CategoryOption> _categories = [];
@@ -326,8 +330,13 @@
                              p.ProductVariants.Any(v => v.SKU.ToLower().Contains(term)));
         }
 
-        productsQuery = q.OrderBy(p => p.Name)
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderBy(p => p.Name)
             .ThenBy(p => p.Id)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(p => new AdminProductRow(
                 p.Id,
                 p.Name,
@@ -336,6 +345,9 @@
                 p.ProductVariants.Count(v => !v.IsDeleted),
                 p.IsDeleted,
                 p.MainImageUrl
-            ));
+            ))
+            .ToListAsync();
+
+        productsQuery = list.AsQueryable();
     }
 }

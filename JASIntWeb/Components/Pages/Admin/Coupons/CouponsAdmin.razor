@@ -38,7 +38,7 @@
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@couponsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@couponsQuery" class="data-table">
                 <TemplateColumn Title="Coupon Code" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.Code))">
                     <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
                     @if (!string.IsNullOrEmpty(context.Description))
@@ -112,17 +112,21 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
 
 @code
 {
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
     [SupplyParameterFromForm(FormName = "coupons-table-action")]
     public int ToggleCouponId { get; set; }
 
-    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private const int PageSize = 25;
+    private int totalFiltered;
     private IQueryable<Coupon>? couponsQuery;
     private string? _toast;
 
@@ -140,6 +144,15 @@
             ToggleCouponId = 0;
         }
 
-        couponsQuery = Db.Coupons.AsNoTracking().OrderByDescending(c => c.CreatedAt).AsQueryable();
+        Page = Math.Max(1, Page);
+        var q = Db.Coupons.AsNoTracking();
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderByDescending(c => c.CreatedAt)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync();
+
+        couponsQuery = list.AsQueryable();
     }
 }

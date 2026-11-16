@@ -82,7 +82,7 @@
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@brandsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@brandsQuery" class="data-table">
                 <TemplateColumn Title="Brand Name" Sortable="true" SortBy="@sortByName">
                     <div class="flex items-center gap-3">
                         @if (!string.IsNullOrEmpty(context.LogoUrl))
@@ -138,7 +138,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -149,6 +149,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromForm(FormName = "brands-table-action")]
     public int ToggleBrandId { get; set; }
@@ -166,7 +169,8 @@
     );
 
     private IQueryable<AdminBrandRow>? brandsQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 15 };
+    private const int PageSize = 15;
+    private int totalFiltered;
     private GridSort<AdminBrandRow> sortByName = GridSort<AdminBrandRow>.ByAscending(b => b.Name);
     private GridSort<AdminBrandRow> sortByDeleted = GridSort<AdminBrandRow>.ByAscending(b => b.IsDeleted);
 
@@ -219,8 +223,13 @@
             q = q.Where(b => b.Name.ToLower().Contains(term) || b.Slug.ToLower().Contains(term));
         }
 
-        brandsQuery = q.OrderBy(b => b.SortOrder)
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderBy(b => b.SortOrder)
             .ThenBy(b => b.Name)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(b => new AdminBrandRow(
                 b.Id,
                 b.Name,
@@ -231,6 +240,9 @@
                 b.SortOrder,
                 b.Products.Count(p => !p.IsDeleted),
                 b.IsDeleted
-            ));
+            ))
+            .ToListAsync();
+
+        brandsQuery = list.AsQueryable();
     }
 }

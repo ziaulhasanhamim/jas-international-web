@@ -73,7 +73,7 @@
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@inventoryQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@inventoryQuery" class="data-table">
                 <TemplateColumn Title="Product &amp; Variant SKU" Sortable="true" SortBy="@sortByProduct">
                     <div>
                         <strong class="text-slate-900 block font-semibold text-xs">@context.ProductName</strong>
@@ -145,7 +145,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -156,6 +156,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromQuery(Name = "toast")]
     public string? ToastNotice { get; set; }
@@ -176,7 +179,8 @@
     );
 
     private IQueryable<AdminVariantRow>? inventoryQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<AdminVariantRow> sortByProduct = GridSort<AdminVariantRow>.ByAscending(i => i.ProductName);
     private GridSort<AdminVariantRow> sortByAvailable = GridSort<AdminVariantRow>.ByAscending(i => i.OnHand - i.Reserved);
 
@@ -222,7 +226,7 @@
         else if (!string.IsNullOrWhiteSpace(ToastNotice)) _toast = ToastNotice;
 
         await LoadCountsAsync();
-        LoadRows();
+        await LoadRowsAsync();
     }
 
     private async Task LoadCountsAsync()
@@ -232,7 +236,7 @@
         _totalOut = await Db.InventoryItems.CountAsync(i => !i.ProductVariant!.IsDeleted && i.QuantityOnHand - i.QuantityReserved <= 0);
     }
 
-    private void LoadRows()
+    private async Task LoadRowsAsync()
     {
         var q = Db.InventoryItems.AsNoTracking().Where(i => !i.ProductVariant!.IsDeleted);
 
@@ -252,8 +256,13 @@
                              i.ProductVariant.Product!.Name.ToLower().Contains(term));
         }
 
-        inventoryQuery = q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
             .ThenBy(i => i.Id)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(i => new AdminVariantRow(
                 i.ProductVariantId,
                 i.ProductVariant!.ProductId,
@@ -264,6 +273,9 @@
                 i.QuantityReserved,
                 i.ProductVariant.IsActive,
                 i.ProductVariant.IsDefault
-            ));
+            ))
+            .ToListAsync();
+
+        inventoryQuery = list.AsQueryable();
     }
 }

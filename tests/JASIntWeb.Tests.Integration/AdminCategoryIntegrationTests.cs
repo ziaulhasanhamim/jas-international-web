@@ -161,4 +161,16 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         var results = await categoriesQuery.Take(15).ToListAsync();
         await results.Should().NotBeNull();
     }
+
+    [Test]
+    public async Task GetCategoriesAdminPage_WithPage2QueryParam_ReturnsOk()
+    {
+        var response = await AdminClient.GetAsync("/admin/categories?page=2");
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new Exception($"HTTP {(int)response.StatusCode}: {body}");
+        }
+        await response.IsSuccessStatusCode.Should().BeTrue();
+    }
 }

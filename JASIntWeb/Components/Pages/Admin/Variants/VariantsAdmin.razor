@@ -32,7 +32,7 @@
     <div class="table-scroll">
         @if (variantsQuery is not null)
         {
-            <QuickGrid Items="@variantsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@variantsQuery" class="data-table">
                 <TemplateColumn Title="Variant / SKU" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Label))">
                     <strong class="text-slate-900 block font-semibold text-xs">@context.Label</strong>
                     <span class="font-mono text-[11px] text-slate-500 block">@context.Sku</span>
@@ -85,7 +85,7 @@
     </div>
 
     <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-        <Paginator State="@pagination" />
+        <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
     </div>
 </div>
 
@@ -95,10 +95,13 @@
     public int ProductId { get; set; }
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
     [SupplyParameterFromQuery(Name = "created")]
     public int Created { get; set; }
     private string? name;
-    private PaginationState pagination = new() { ItemsPerPage = 25 };
+    private const int PageSize = 25;
+    private int totalFiltered;
     private IQueryable<AdminVariantRow>? variantsQuery;
 
     protected override async Task OnInitializedAsync()
@@ -141,6 +144,8 @@
                 v.IsActive,
                 v.IsDefault))
             .ToList();
-        variantsQuery = rows.AsQueryable();
+        totalFiltered = rows.Count;
+        Page = Math.Max(1, Page);
+        variantsQuery = rows.Skip((Page - 1) * PageSize).Take(PageSize).AsQueryable();
     }
 }

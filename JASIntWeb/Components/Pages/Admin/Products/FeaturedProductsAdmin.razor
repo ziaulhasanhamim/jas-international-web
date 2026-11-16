@@ -81,7 +81,7 @@
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@featuredProductsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@featuredProductsQuery" class="data-table">
                 <TemplateColumn Title="Product" Sortable="true" SortBy="@sortByName">
                     <div class="flex items-center gap-3">
                         <PictureImage
@@ -157,7 +157,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -168,6 +168,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromForm(FormName = "featured-table-action")]
     public string? Action { get; set; }
@@ -186,7 +189,8 @@
     );
 
     private IQueryable<FeaturedProductItem>? featuredProductsQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<FeaturedProductItem> sortByName = GridSort<FeaturedProductItem>.ByAscending(p => p.Name);
     private GridSort<FeaturedProductItem> sortByPrice = GridSort<FeaturedProductItem>.ByDescending(p => p.Price);
 
@@ -284,6 +288,13 @@
                 || p.CategoryName.ToLowerInvariant().Contains(term));
         }
 
-        featuredProductsQuery = list.AsQueryable();
+        var materialized = list.ToList();
+        totalFiltered = materialized.Count;
+        Page = Math.Max(1, Page);
+
+        featuredProductsQuery = materialized
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
+            .AsQueryable();
     }
 }

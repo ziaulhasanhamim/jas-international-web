@@ -24,7 +24,7 @@
 
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
-        <QuickGrid Items="@optionsQuery" Pagination="@pagination" class="data-table">
+        <QuickGrid Items="@optionsQuery" class="data-table">
             <TemplateColumn Title="Display Value" Sortable="true" SortBy="@(GridSort<AttributeOption>.ByAscending(o => o.Value))">
                 <strong class="text-slate-900 block font-semibold text-xs">@context.Value</strong>
             </TemplateColumn>
@@ -40,7 +40,7 @@
     </div>
 
     <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-        <Paginator State="@pagination" />
+        <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
     </div>
 </div>
 
@@ -48,13 +48,22 @@
 {
     [Parameter]
     public int AttributeId { get; set; }
-    private PaginationState pagination = new() { ItemsPerPage = 25 };
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
+    private const int PageSize = 25;
+    private int totalFiltered;
     private IQueryable<AttributeOption>? optionsQuery;
     private string? name;
 
     protected override async Task OnInitializedAsync()
     {
         name = await Db.AttributeDefinitions.Where(a => a.Id == AttributeId).Select(a => a.Name).SingleOrDefaultAsync();
-        optionsQuery = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId);
+        Page = Math.Max(1, Page);
+        var q = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId).OrderBy(o => o.Value);
+        totalFiltered = await q.CountAsync();
+        var list = await q.Skip((Page - 1) * PageSize).Take(PageSize).ToListAsync();
+        optionsQuery = list.AsQueryable();
     }
 }

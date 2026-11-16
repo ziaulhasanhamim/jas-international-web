@@ -119,7 +119,7 @@
 <!-- Users QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
-        <QuickGrid Items="@usersQuery" Pagination="@pagination" class="data-table">
+        <QuickGrid Items="@usersQuery" class="data-table">
             <TemplateColumn Title="User / Account" Sortable="true" SortBy="@sortByEmail">
                 <div class="flex items-center gap-3">
                     <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">
@@ -204,7 +204,7 @@
     </div>
 
     <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-        <Paginator State="@pagination" />
+        <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
     </div>
 </div>
 
@@ -214,6 +214,9 @@
 
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     public record AdminUserRow(
         int Id,
@@ -228,7 +231,8 @@
     );
 
     private IQueryable<AdminUserRow>? usersQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<AdminUserRow> sortByEmail = GridSort<AdminUserRow>.ByAscending(u => u.Email);
 
     private int statsTotal;
@@ -294,9 +298,14 @@
                           || Db.UserClaims.Any(c => c.UserId == u.Id && c.ClaimType == "name" && c.ClaimValue != null && c.ClaimValue.ToLower().Contains(search)));
         }
 
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
         var utcNow = DateTimeOffset.UtcNow;
-        usersQuery = q.OrderBy(u => u.Email)
+        var list = await q.OrderBy(u => u.Email)
             .ThenBy(u => u.Id)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(u => new AdminUserRow(
                 u.Id,
                 u.Email,
@@ -307,6 +316,9 @@
                 Db.UserClaims.Where(c => c.UserId == u.Id && c.ClaimType == "name").Select(c => c.ClaimValue).FirstOrDefault(),
                 Db.Orders.Count(o => o.UserId == u.Id),
                 Db.Orders.Where(o => o.UserId == u.Id).Sum(o => (decimal?)o.Total) ?? 0m
-            ));
+            ))
+            .ToListAsync();
+
+        usersQuery = list.AsQueryable();
     }
 }

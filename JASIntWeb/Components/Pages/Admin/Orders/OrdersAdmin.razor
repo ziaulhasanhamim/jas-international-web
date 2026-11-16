@@ -85,7 +85,7 @@
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@ordersQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@ordersQuery" class="data-table">
                 <TemplateColumn Title="Order #" Sortable="true" SortBy="@sortById">
                     <a href="/admin/orders/@context.Id" class="font-bold text-blue-600 hover:underline">
                         #@context.Id
@@ -195,7 +195,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -204,6 +204,9 @@
 {
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
 
     [SupplyParameterFromQuery(Name = "status")]
     public string? Status { get; set; }
@@ -215,7 +218,8 @@
     public string? Action { get; set; }
 
     private IQueryable<Order>? ordersQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<Order> sortById = GridSort<Order>.ByDescending(o => o.Id);
     private GridSort<Order> sortByDate = GridSort<Order>.ByDescending(o => o.CreatedAt);
     private GridSort<Order> sortByStatus = GridSort<Order>.ByAscending(o => o.Status);
@@ -286,6 +290,15 @@
                 || (o.DeliveryAddress != null && o.DeliveryAddress.PhoneNumber.Contains(search)));
         }
 
-        ordersQuery = q.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id);
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderByDescending(o => o.CreatedAt)
+            .ThenByDescending(o => o.Id)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync();
+
+        ordersQuery = list.AsQueryable();
     }
 }

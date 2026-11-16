@@ -90,7 +90,7 @@
 
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-            <QuickGrid Items="@reviewsQuery" Pagination="@pagination" class="data-table">
+            <QuickGrid Items="@reviewsQuery" class="data-table">
                 <TemplateColumn Class="w-10 text-center">
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-reviews"
@@ -195,7 +195,7 @@
         </div>
 
         <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <Paginator State="@pagination" />
+            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
         </div>
     </div>
 </form>
@@ -245,6 +245,9 @@
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
 
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
     [SupplyParameterFromQuery(Name = "reply")]
     public int ReplyId { get; set; }
 
@@ -281,7 +284,8 @@
     );
 
     private IQueryable<AdminReviewRow>? reviewsQuery;
-    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private const int PageSize = 20;
+    private int totalFiltered;
     private GridSort<AdminReviewRow> sortByRating = GridSort<AdminReviewRow>.ByDescending(r => r.Rating);
     private GridSort<AdminReviewRow> sortByStatus = GridSort<AdminReviewRow>.ByAscending(r => r.IsApproved);
 
@@ -394,7 +398,7 @@
         _totalPending = await Db.ProductReviews.CountAsync(r => !r.IsApproved);
     }
 
-    private Task LoadReviewsAsync()
+    private async Task LoadReviewsAsync()
     {
         var q = Db.ProductReviews.AsNoTracking().Include(r => r.Product).AsQueryable();
 
@@ -415,7 +419,12 @@
                              (r.Product != null && r.Product.Name.ToLower().Contains(term)));
         }
 
-        reviewsQuery = q.OrderByDescending(r => r.CreatedAt)
+        Page = Math.Max(1, Page);
+        totalFiltered = await q.CountAsync();
+
+        var list = await q.OrderByDescending(r => r.CreatedAt)
+            .Skip((Page - 1) * PageSize)
+            .Take(PageSize)
             .Select(r => new AdminReviewRow(
                 r.Id,
                 r.ProductId,
@@ -428,8 +437,9 @@
                 r.IsApproved,
                 r.StaffReply,
                 r.CreatedAt
-            ));
+            ))
+            .ToListAsync();
 
-        return Task.CompletedTask;
+        reviewsQuery = list.AsQueryable();
     }
 }
