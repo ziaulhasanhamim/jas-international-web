@@ -581,30 +581,101 @@ public static class JsonTestDataSeeder
             }
         }
 
-        // Permanently remove any legacy extra categories (e.g. "Smart Automations" / "Smart Automation")
-        var extraCategories = await db.Categories
+        // Permanently purge any legacy extra, fake, or test categories (e.g. "Smart Automations", "cat-to-delete-*", etc.)
+        var allCategories = await db.Categories
             .Include(c => c.Products)
-            .Where(c => c.Name.ToLower().Contains("automation") || c.Slug.ToLower().Contains("automation"))
             .ToListAsync(ct);
 
-        if (extraCategories.Count > 0)
+        var testCategories = allCategories
+            .Where(c => c.Slug != "uncategorized" && (
+                c.Name.ToLower().Contains("automation") ||
+                c.Slug.ToLower().Contains("automation") ||
+                c.Slug.StartsWith("test-") ||
+                c.Slug.StartsWith("cat-to-delete") ||
+                c.Slug.StartsWith("parent-cat") ||
+                c.Slug.StartsWith("child-cat") ||
+                c.Slug.StartsWith("archived-cat") ||
+                c.Slug.StartsWith("bulk-cat") ||
+                c.Slug.StartsWith("cat-alpha") ||
+                c.Slug.StartsWith("cat-beta") ||
+                c.Slug.StartsWith("temp-cat") ||
+                c.Slug.EndsWith("e4a890")
+            ))
+            .ToList();
+
+        if (testCategories.Count > 0)
         {
-            var extraIds = extraCategories.Select(c => c.Id).ToList();
-            var placements = await db.CategoryPlacements.Where(p => extraIds.Contains(p.CategoryId)).ToListAsync(ct);
+            var uncategorized = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "uncategorized", ct);
+            if (uncategorized == null)
+            {
+                uncategorized = new Category
+                {
+                    Name = "Uncategorized",
+                    Slug = "uncategorized",
+                    IsDeleted = false
+                };
+                db.Categories.Add(uncategorized);
+                await db.SaveChangesAsync(ct);
+            }
+            else if (uncategorized.IsDeleted)
+            {
+                uncategorized.IsDeleted = false;
+                uncategorized.DeletedAt = null;
+                await db.SaveChangesAsync(ct);
+            }
+
+            var testCatIds = testCategories.Select(c => c.Id).ToList();
+            var placements = await db.CategoryPlacements.Where(p => testCatIds.Contains(p.CategoryId)).ToListAsync(ct);
             db.CategoryPlacements.RemoveRange(placements);
 
-            foreach (var ec in extraCategories)
+            foreach (var tc in testCategories)
             {
-                if (ec.Products.Count == 0)
+                // Reassign all products to Uncategorized so real inventory is safely preserved
+                foreach (var p in tc.Products)
                 {
-                    db.Categories.Remove(ec);
+                    p.CategoryId = uncategorized.Id;
                 }
-                else
+
+                // Reparent child categories
+                var children = allCategories.Where(c => c.ParentCategoryId == tc.Id).ToList();
+                foreach (var child in children)
                 {
-                    ec.IsDeleted = true;
-                    ec.DeletedAt = DateTimeOffset.UtcNow;
+                    child.ParentCategoryId = tc.ParentCategoryId;
                 }
+
+                db.Categories.Remove(tc);
             }
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+            }
+        }
+
+        // Purge any orphan test products created during earlier integration tests
+        var testProducts = await db.Products
+            .Include(p => p.ProductImages)
+            .Include(p => p.ProductVariants)
+            .Where(p => p.Slug.StartsWith("test-") || p.Slug.StartsWith("temp-prod-") || p.Name.StartsWith("Test Product") || p.Name.StartsWith("Cart Product"))
+            .ToListAsync(ct);
+
+        if (testProducts.Count > 0)
+        {
+            foreach (var tp in testProducts)
+            {
+                var tpVariants = tp.ProductVariants.Select(v => v.Id).ToList();
+                var cartItems = await db.CartItems.Where(ci => tpVariants.Contains(ci.ProductVariantId)).ToListAsync(ct);
+                db.CartItems.RemoveRange(cartItems);
+
+                var orderItems = await db.OrderItems.Where(oi => tpVariants.Contains(oi.ProductVariantId)).ToListAsync(ct);
+                db.OrderItems.RemoveRange(orderItems);
+
+                db.Products.Remove(tp);
+            }
+
             try
             {
                 await db.SaveChangesAsync(ct);

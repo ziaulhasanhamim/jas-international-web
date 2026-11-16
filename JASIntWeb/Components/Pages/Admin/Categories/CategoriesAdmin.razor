@@ -106,7 +106,7 @@
             <button type="submit" name="BulkAction" value="restore" class="btn-secondary !py-1 !px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer">
                 Restore Selected
             </button>
-            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Are you sure you want to delete selected categories? Categories with active products will be safely hidden.')">
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Are you sure you want to permanently delete selected categories? Any assigned products will be moved to Uncategorized.')">
                 Delete Selected
             </button>
         </div>
@@ -187,38 +187,14 @@
                         {
                             <button
                                 type="submit"
-                                name="DeleteCategoryId"
+                                name="ToggleVisibilityId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
                                 onclick="return confirm('Hide this category from the storefront? Its products will also be hidden from search and catalog.')"
-                                title="Hide category and products from storefront"
+                                title="Hide category from storefront"
                             >
                                 Hide
                             </button>
-                            @if (context.ProductCount == 0)
-                            {
-                                <button
-                                    type="submit"
-                                    name="HardDeleteCategoryId"
-                                    value="@context.Id"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                    onclick="return confirm('Permanently delete this empty category? This cannot be undone.')"
-                                    title="Permanently delete category"
-                                >
-                                    Delete
-                                </button>
-                            }
-                            else
-                            {
-                                <button
-                                    type="button"
-                                    class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
-                                    title="Cannot permanently delete: Contains @context.ProductCount products. Reassign or delete its products first, or click 'Hide' to remove from storefront."
-                                    disabled
-                                >
-                                    Delete
-                                </button>
-                            }
                         }
                         else
                         {
@@ -231,17 +207,17 @@
                             >
                                 Restore
                             </button>
-                            <button
-                                type="submit"
-                                name="HardDeleteCategoryId"
-                                value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                onclick="return confirm('Permanently remove this archived category? This cannot be undone.')"
-                                title="Permanently delete category"
-                            >
-                                Delete Permanently
-                            </button>
                         }
+                        <button
+                            type="submit"
+                            name="DeleteCategoryId"
+                            value="@context.Id"
+                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                            onclick="return confirm('Permanently delete category \'@context.Name\'? Any assigned products will be safely moved to Uncategorized.')"
+                            title="Permanently delete category"
+                        >
+                            Delete
+                        </button>
                     </div>
                 </TemplateColumn>
             </QuickGrid>
@@ -340,19 +316,19 @@
             else if (ToggleVisibilityId > 0)
             {
                 await Admin.ToggleCategoryVisibilityAsync(ToggleVisibilityId);
-                _toast = "Category visibility restored.";
+                _toast = "Category visibility updated.";
                 ResetActionFields();
             }
             else if (DeleteCategoryId > 0)
             {
-                await Admin.DeleteCategoryAsync(DeleteCategoryId);
-                _toast = "Category hidden from storefront.";
+                await Admin.DeleteCategoryAsync(DeleteCategoryId, permanent: true);
+                _toast = "Category permanently deleted. Any assigned products were safely moved to Uncategorized.";
                 ResetActionFields();
             }
             else if (HardDeleteCategoryId > 0)
             {
                 await Admin.HardDeleteCategoryAsync(HardDeleteCategoryId);
-                _toast = "Category permanently deleted.";
+                _toast = "Category permanently deleted. Any assigned products were safely moved to Uncategorized.";
                 ResetActionFields();
             }
 

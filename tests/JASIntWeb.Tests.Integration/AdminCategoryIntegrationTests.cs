@@ -74,7 +74,7 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         db.CategoryPlacements.Add(placement);
         await db.SaveChangesAsync();
 
-        await admin.DeleteCategoryAsync(cat.Id);
+        await admin.DeleteCategoryAsync(cat.Id, permanent: false);
 
         var savedCat = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == cat.Id);
         await savedCat.Should().NotBeNull();
@@ -83,6 +83,44 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         var savedPlacement = await db.CategoryPlacements.AsNoTracking().SingleOrDefaultAsync(p => p.Id == placement.Id);
         await savedPlacement.Should().NotBeNull();
         await savedPlacement!.IsActive.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task DeleteCategoryAsync_WithActiveProducts_SafelyReassignsToUncategorizedAndDeletesPermanently()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cat = new Category { Name = "Cat With Products " + Guid.NewGuid().ToString("N")[..6], Slug = "cat-with-prods-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.Add(cat);
+        await db.SaveChangesAsync();
+
+        var prod = new Product
+        {
+            Name = "Product In Category " + Guid.NewGuid().ToString("N")[..6],
+            Slug = "prod-in-cat-" + Guid.NewGuid().ToString("N")[..6],
+            Details = "Test Details",
+            MainImageUrl = "/jas-logo.png",
+            CategoryId = cat.Id,
+            IsDeleted = false
+        };
+        db.Products.Add(prod);
+        await db.SaveChangesAsync();
+
+        // Delete category containing active products unconditionally
+        await admin.DeleteCategoryAsync(cat.Id, permanent: true);
+
+        // Verify category is permanently deleted
+        var checkCat = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == cat.Id);
+        await checkCat.Should().BeNull();
+
+        // Verify product was safely reassigned to Uncategorized
+        var checkProd = await db.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == prod.Id);
+        await checkProd.Should().NotBeNull();
+        var uncategorized = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Slug == "uncategorized");
+        await uncategorized.Should().NotBeNull();
+        await checkProd!.CategoryId.Should().BeEqualTo(uncategorized!.Id);
     }
 
     [Test]

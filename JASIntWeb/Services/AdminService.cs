@@ -849,17 +849,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Include(x => x.Products)
             .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
 
-        var activeProductsCount = c.Products.Count(p => !p.IsDeleted);
-
-        // If permanent or if already soft-deleted and has no active products, perform permanent removal
-        if (permanent || (c.IsDeleted && activeProductsCount == 0))
+        // If permanent or if already hidden, permanently delete the category and reassign all products
+        if (permanent || c.IsDeleted)
         {
-            if (activeProductsCount > 0)
-            {
-                throw new ShopException($"Cannot permanently delete '{c.Name}' because it contains {activeProductsCount} active products. Please move or reassign the products first, or click 'Hide' to remove this category from the storefront.");
-            }
-
-            // If there are inactive products, reassign them to Uncategorized to avoid cascade delete FK issues
             if (c.Products.Count > 0)
             {
                 var uncategorized = await db.Categories.FirstOrDefaultAsync(x => x.Slug == "uncategorized");
@@ -869,8 +861,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     {
                         Name = "Uncategorized",
                         Slug = "uncategorized",
-                        IsDeleted = true,
-                        DeletedAt = DateTimeOffset.UtcNow
+                        IsDeleted = false
                     };
                     db.Categories.Add(uncategorized);
                     await db.SaveChangesAsync();
@@ -952,29 +943,36 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     c.DeletedAt = null;
                     break;
                 case "delete":
-                    if (!c.Products.Any(p => !p.IsDeleted))
+                    if (c.Products.Count > 0)
                     {
-                        // Detach child categories to avoid FK restriction
-                        var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
-                        foreach (var child in childCategories)
+                        var uncategorized = await db.Categories.FirstOrDefaultAsync(x => x.Slug == "uncategorized");
+                        if (uncategorized == null)
                         {
-                            child.ParentCategoryId = c.ParentCategoryId;
+                            uncategorized = new Category
+                            {
+                                Name = "Uncategorized",
+                                Slug = "uncategorized",
+                                IsDeleted = false
+                            };
+                            db.Categories.Add(uncategorized);
+                            await db.SaveChangesAsync();
                         }
+                        foreach (var prod in c.Products)
+                        {
+                            prod.CategoryId = uncategorized.Id;
+                        }
+                    }
 
-                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
-                        db.CategoryPlacements.RemoveRange(placements);
-                        db.Categories.Remove(c);
-                    }
-                    else
+                    // Detach child categories to avoid FK restriction
+                    var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
+                    foreach (var child in childCategories)
                     {
-                        c.IsDeleted = true;
-                        c.DeletedAt = DateTimeOffset.UtcNow;
-                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
-                        foreach (var p in placements)
-                        {
-                            p.IsActive = false;
-                        }
+                        child.ParentCategoryId = c.ParentCategoryId;
                     }
+
+                    var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                    db.CategoryPlacements.RemoveRange(placements);
+                    db.Categories.Remove(c);
                     break;
             }
         }
