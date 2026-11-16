@@ -17,11 +17,21 @@ public static class CartEndpoints
         cart.MapGet("/security", Security);
         cart.MapGet("/account", Account);
         cart.MapGet("/delivery-rates", Rates);
+        cart.MapGet("/count", async (HttpContext context, ClaimsPrincipal user, ShoppingService shop) =>
+        {
+            var (token, userId) = ResolveCartIdentity(context, user);
+            if (!token.HasValue && !userId.HasValue)
+            {
+                return Results.Ok(new { count = 0 });
+            }
+            var count = await shop.GetCartItemCountAsync(token, userId);
+            return Results.Ok(new { count });
+        });
         cart.MapGet("", Get);
         cart.MapPost("/resolve", Resolve);
         cart.MapPost("/merge", Merge).RequireAuthorization();
-        cart.MapPost("", Add);
-        cart.MapPut("", Update);
+        cart.MapPost("", Add).DisableAntiforgery();
+        cart.MapPut("", Update).DisableAntiforgery();
 
         // 100% Static SSR Enhanced Form Submission Endpoints (Zero WebSockets/WASM Overhead)
         endpoints.MapPost("/cart/buy-now", async (
@@ -232,15 +242,56 @@ public static class CartEndpoints
         return shop.MergeAsync(ShoppingService.UserId(user)!.Value, request);
     }
 
-    public static async Task<CartDto> Add([FromBody] CartLineRequest line, HttpContext context, ClaimsPrincipal user, ShoppingService shop)
+    public static async Task<IResult> Add(
+        [FromBody] CartLineRequest line,
+        HttpContext context,
+        ClaimsPrincipal user,
+        ShoppingService shop,
+        AppDbContext db)
     {
+        var variantId = line.VariantId;
+        if (variantId <= 0 && line.ProductId > 0)
+        {
+            variantId = await db.ProductVariants.AsNoTracking()
+                .Where(v => v.ProductId == line.ProductId && !v.IsDeleted && v.IsActive)
+                .OrderByDescending(v => v.IsDefault)
+                .ThenBy(v => v.Id)
+                .Select(v => v.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        if (variantId <= 0)
+        {
+            return Results.BadRequest(new ApiErrorDto("A valid product variant is required.", "invalid_variant"));
+        }
+
         var (token, userId) = EnsureCartIdentity(context, user);
-        return await shop.ChangeAsync(token, userId, line, true);
+        try
+        {
+            var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, line.Quantity, line.ProductId), true);
+            return Results.Ok(cart);
+        }
+        catch (ShopException ex)
+        {
+            return Results.BadRequest(new ApiErrorDto(ex.Message, "shop_error"));
+        }
     }
 
-    public static async Task<CartDto> Update([FromBody] CartLineRequest line, HttpContext context, ClaimsPrincipal user, ShoppingService shop)
+    public static async Task<IResult> Update(
+        [FromBody] CartLineRequest line,
+        HttpContext context,
+        ClaimsPrincipal user,
+        ShoppingService shop)
     {
         var (token, userId) = EnsureCartIdentity(context, user);
-        return await shop.ChangeAsync(token, userId, line, false);
+        try
+        {
+            var cart = await shop.ChangeAsync(token, userId, line, false);
+            return Results.Ok(cart);
+        }
+        catch (ShopException ex)
+        {
+            return Results.BadRequest(new ApiErrorDto(ex.Message, "shop_error"));
+        }
     }
 }

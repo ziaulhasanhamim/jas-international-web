@@ -207,7 +207,9 @@ export function renderWishlistPage() {
                     <form method="post" action="/cart/buy-now" data-enhance class="w-full">
                         <input type="hidden" name="productId" value="${item.id}" />
                         <button
-                            type="submit"
+                            type="button"
+                            data-buy-now
+                            data-product-id="${item.id}"
                             class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
                         >
                             <span>⚡ Buy Now</span>

@@ -1,4 +1,3 @@
-@rendermode InteractiveAuto
 @implements IDisposable
 @inject CartService Cart
 @inject NavigationManager Nav
@@ -88,19 +87,14 @@
                     <div class="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         <!-- Stepper Buttons -->
                         <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
-                            <form method="post" action="/cart/update" class="inline m-0">
-                                <input type="hidden" name="variantId" value="@item.VariantId" />
-                                <input type="hidden" name="quantity" value="@(item.Quantity - 1)" />
-                                <button
-                                    type="submit"
-                                    @onclick:preventDefault="ready"
-                                    @onclick="() => Change(item, item.Quantity - 1)"
-                                    class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
-                                    aria-label="Decrease quantity"
-                                >
-                                    −
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                @onclick="() => Change(item, item.Quantity - 1)"
+                                class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                                aria-label="Decrease quantity"
+                            >
+                                −
+                            </button>
                             <span class="w-8 text-center text-xs font-bold text-slate-800 tabular-nums">
                                 @if (isPending)
                                 {
@@ -111,39 +105,29 @@
                                     @item.Quantity
                                 }
                             </span>
-                            <form method="post" action="/cart/update" class="inline m-0">
-                                <input type="hidden" name="variantId" value="@item.VariantId" />
-                                <input type="hidden" name="quantity" value="@(item.Quantity + 1)" />
-                                <button
-                                    type="submit"
-                                    disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)"
-                                    @onclick:preventDefault="ready"
-                                    @onclick="() => Change(item, item.Quantity + 1)"
-                                    class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
-                                    aria-label="Increase quantity"
-                                >
-                                    +
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)"
+                                @onclick="() => Change(item, item.Quantity + 1)"
+                                class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                                aria-label="Increase quantity"
+                            >
+                                +
+                            </button>
                         </div>
 
                         <!-- Line Total & Delete -->
                         <div class="flex items-center gap-4 text-right">
                             <strong class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums min-w-[70px]">৳@item.LineTotal.ToString("N0")</strong>
-                            <form method="post" action="/cart/update" class="inline m-0">
-                                <input type="hidden" name="variantId" value="@item.VariantId" />
-                                <input type="hidden" name="quantity" value="0" />
-                                <button
-                                    type="submit"
-                                    @onclick:preventDefault="ready"
-                                    @onclick="() => Change(item, 0)"
-                                    class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
-                                    title="Remove item"
-                                    aria-label="Remove item"
-                                >
-                                    ✕
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                @onclick="() => Change(item, 0)"
+                                class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
+                                title="Remove item"
+                                aria-label="Remove item"
+                            >
+                                ✕
+                            </button>
                         </div>
                     </div>
                 </article>

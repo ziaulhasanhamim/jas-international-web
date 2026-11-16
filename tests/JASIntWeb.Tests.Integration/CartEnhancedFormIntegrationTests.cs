@@ -263,7 +263,7 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         var html = await response.Content.ReadAsStringAsync();
 
         await ((int)response.StatusCode).Should().BeEqualTo(200);
-        await html.Should().Contain("product-purchase");
+        await html.Should().Contain("data-add-to-cart");
         await html.Should().Contain("name=\"Quantity\"");
         await html.Should().Contain("Buy Now");
         await html.Should().Contain("data-wishlist-toggle");
@@ -308,7 +308,8 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         await html.Should().Contain("Anker 737 Power Bank");
         await html.Should().Contain("Your Shopping Cart");
         await html.Should().Contain("2 items");
-        await html.Should().Contain("action=\"/cart/update\"");
+        await html.Should().Contain("Decrease quantity");
+        await html.Should().Contain("Increase quantity");
         await html.Should().NotContain("Your cart is empty");
         await html.Should().NotContain("Loading your cart…");
     }

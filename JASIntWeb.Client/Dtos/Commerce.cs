@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 namespace JASIntWeb.Client.Dtos;
 
-public sealed record CartLineRequest(int VariantId, int Quantity);
+public sealed record CartLineRequest(int VariantId, int Quantity, int ProductId = 0);
 
 public sealed record CartMergeRequest(Guid Token, List<CartLineRequest> Items);
 
@@ -14,6 +14,7 @@ public sealed record CartItemDto(int VariantId, string Name, string Slug, string
 public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items)
 {
     public decimal Subtotal => Items.Sum(x => x.LineTotal);
+    public int ItemCount => Items.Sum(x => x.Quantity);
 }
 
 public sealed class CheckoutRequest

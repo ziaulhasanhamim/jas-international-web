@@ -45,10 +45,17 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
     {
         try
         {
-            await js.InvokeVoidAsync("window.jasUpdateCartCount", ItemCount);
+            await js.InvokeVoidAsync("window.jasUpdateCartBadge", ItemCount);
         }
         catch
         {
+            try
+            {
+                await js.InvokeVoidAsync("window.jasUpdateCartCount", ItemCount);
+            }
+            catch
+            {
+            }
         }
     }
 
