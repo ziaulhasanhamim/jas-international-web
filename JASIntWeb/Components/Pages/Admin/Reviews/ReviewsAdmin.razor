@@ -1,5 +1,6 @@
 @page "/admin/reviews"
 @attribute [StreamRendering]
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -9,7 +10,7 @@
     <div>
         <p class="eyebrow">STOREFRONT REPUTATION</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Customer Reviews Moderation</h1>
-        <p class="text-sm text-slate-500 mt-1">Review, approve, and reply to genuine verified buyer feedback across the storefront.</p>
+        <p class="text-sm text-slate-500 mt-1">Review, approve, and reply to genuine verified buyer feedback across the storefront using QuickGrid.</p>
     </div>
 </div>
 
@@ -22,9 +23,9 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <a href="@FilterUrl(Filter)" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
-        </a>
+        </button>
     </div>
 }
 
@@ -67,87 +68,139 @@
     </form>
 </div>
 
-<!-- Single container form for all review table quick actions (guarantees exactly 1 form instance) -->
-<form method="post" @formname="reviews-table-action">
+<!-- Table Action Form -->
+<form method="post" @formname="reviews-table-action" data-enhance>
     <AntiforgeryToken />
-    <!-- Reviews Stream -->
-    <div class="space-y-4">
-        @foreach (var r in _reviews)
-        {
-            <div class="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs transition hover:border-slate-300">
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-3">
-                            <div class="flex items-center text-amber-400 text-sm">
-                                @for (int i = 1; i <= 5; i++)
-                                {
-                                    <span>@(i <= r.Rating ? "★" : "☆")</span>
-                                }
-                            </div>
-                            <span class="text-xs font-bold text-slate-800">@(r.Title ?? "Product Review")</span>
-                            <span class="badge @(r.IsApproved ? "badge-emerald" : "badge-amber") text-[10px]">
-                                @(r.IsApproved ? "Approved Live" : "Pending Moderation")
-                            </span>
-                        </div>
 
-                        <p class="text-sm text-slate-700 leading-relaxed">
-                            @r.Comment
-                        </p>
+    <!-- Bulk Actions Toolbar -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-slate-50 p-3 shadow-2xs">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-700">Bulk Actions:</span>
+            <button type="submit" name="BulkAction" value="approve" class="btn-secondary !py-1 !px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer">
+                Approve Selected
+            </button>
+            <button type="submit" name="BulkAction" value="hide" class="btn-secondary !py-1 !px-3 text-xs font-bold hover:bg-slate-200 cursor-pointer">
+                Hide Selected
+            </button>
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Permanently delete selected reviews?')">
+                Delete Selected
+            </button>
+        </div>
+    </div>
 
-                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1">
-                            <span class="font-semibold text-slate-900">@r.CustomerName</span>
-                            @if (!string.IsNullOrEmpty(r.CustomerEmail))
+    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div class="table-scroll">
+            <QuickGrid Items="@reviewsQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Class="w-10 text-center">
+                    <HeaderTemplate Context="_">
+                        <input type="checkbox" id="select-all-reviews"
+                               class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                               onclick="document.querySelectorAll('.rev-select-cb').forEach(cb => cb.checked = this.checked)"
+                               title="Select all" />
+                    </HeaderTemplate>
+                    <ChildContent Context="r">
+                        <input type="checkbox" name="SelectedReviewIds" value="@r.Id"
+                               class="rev-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </ChildContent>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Rating &amp; Title" Sortable="true" SortBy="@sortByRating">
+                    <div class="space-y-1">
+                        <div class="flex items-center text-amber-400 text-xs">
+                            @for (int i = 1; i <= 5; i++)
                             {
-                                <span class="text-slate-400 font-mono">(@r.CustomerEmail)</span>
+                                <span>@(i <= context.Rating ? "★" : "☆")</span>
                             }
-                            <span>•</span>
-                            <span class="font-medium text-blue-600">Product: @r.ProductName</span>
-                            <span>•</span>
-                            <span>@r.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                            <span class="text-slate-700 font-bold ml-1.5 text-2xs">@context.Rating.0</span>
                         </div>
+                        <strong class="text-slate-900 block font-semibold text-xs">
+                            @(context.Title ?? "Product Review")
+                        </strong>
+                        <span class="text-[11px] text-slate-400 block">
+                            @context.CreatedAt.ToString("dd MMM yyyy")
+                        </span>
+                    </div>
+                </TemplateColumn>
 
-                        @if (!string.IsNullOrEmpty(r.StaffReply))
+                <TemplateColumn Title="Customer">
+                    <div class="space-y-0.5">
+                        <strong class="text-slate-800 block text-xs font-semibold">@context.CustomerName</strong>
+                        @if (!string.IsNullOrEmpty(context.CustomerEmail))
                         {
-                            <div class="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs">
-                                <span class="font-bold text-slate-800 block mb-1">Official Response from JAS International:</span>
-                                <p class="text-slate-600">@r.StaffReply</p>
+                            <span class="text-xs font-mono text-slate-500 block">@context.CustomerEmail</span>
+                        }
+                    </div>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Product">
+                    <a href="/admin/products/@context.ProductId/edit" class="text-xs font-medium text-blue-600 hover:underline max-w-[180px] block truncate" title="@context.ProductName">
+                        @context.ProductName
+                    </a>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Customer Feedback">
+                    <div class="space-y-1.5 max-w-md">
+                        <p class="text-xs text-slate-700 line-clamp-2">
+                            "@context.Comment"
+                        </p>
+                        @if (!string.IsNullOrEmpty(context.StaffReply))
+                        {
+                            <div class="rounded-lg bg-slate-50 border border-slate-200/80 px-2 py-1 text-[11px] text-slate-600 line-clamp-1">
+                                <span class="font-bold text-slate-800 mr-1">Reply:</span>@context.StaffReply
                             </div>
                         }
                     </div>
+                </TemplateColumn>
 
-                    <div class="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
+                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByStatus" Align="Align.Center">
+                    <span class="badge @(context.IsApproved ? "badge-emerald" : "badge-amber") text-[11px]">
+                        @(context.IsApproved ? "Approved Live" : "Pending")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Actions" Align="Align.End">
+                    <div class="flex items-center justify-end gap-1.5">
                         <button
                             type="submit"
                             name="ToggleReviewId"
-                            value="@r.Id"
-                            class="btn-secondary !px-3 !py-1.5 text-xs font-bold cursor-pointer @(r.IsApproved ? "!text-rose-600 hover:!bg-rose-50" : "!text-emerald-700 hover:!bg-emerald-50")"
+                            value="@context.Id"
+                            class="btn-secondary !px-2.5 !py-1 text-xs font-bold cursor-pointer @(context.IsApproved ? "!text-amber-700 hover:!bg-amber-50" : "!text-emerald-700 hover:!bg-emerald-50")"
+                            title="@(context.IsApproved ? "Hide from storefront" : "Approve and show live")"
                         >
-                            @(r.IsApproved ? "Hide / Unpublish" : "✓ Approve & Publish")
+                            @(context.IsApproved ? "Hide" : "Approve")
                         </button>
 
                         <a
-                            href="@FilterUrl(Filter, r.Id)"
-                            class="btn-secondary !px-3 !py-1.5 text-xs font-medium text-slate-700 cursor-pointer inline-flex items-center gap-1.5"
+                            href="@FilterUrl(Filter, context.Id)"
+                            class="btn-secondary !px-2.5 !py-1 text-xs font-medium text-slate-700 cursor-pointer inline-flex items-center gap-1"
+                            title="Reply to this review"
                         >
                             <Icon Name="edit" Class="size-3" />
-                            <span>@(string.IsNullOrEmpty(r.StaffReply) ? "Reply to Review" : "Edit Reply")</span>
+                            <span>@(string.IsNullOrEmpty(context.StaffReply) ? "Reply" : "Edit")</span>
                         </a>
-                    </div>
-                </div>
-            </div>
-        }
 
-        @if (_reviews.Count == 0)
-        {
-            <div class="rounded-2xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
-                <Icon Name="box" Class="size-10 text-slate-300 mx-auto mb-3" />
-                <p class="text-slate-500 font-medium">No reviews match your selected filter.</p>
-            </div>
-        }
+                        <button
+                            type="submit"
+                            name="DeleteReviewId"
+                            value="@context.Id"
+                            class="btn-secondary !px-2 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
+                            onclick="return confirm('Permanently delete this customer review?')"
+                            title="Delete review"
+                        >
+                            <Icon Name="close" Class="size-3" />
+                        </button>
+                    </div>
+                </TemplateColumn>
+            </QuickGrid>
+        </div>
+
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
     </div>
 </form>
 
-<!-- Dedicated Single Reply Modal (rendered outside loop, guaranteed exactly 1 instance) -->
+<!-- Dedicated Single Reply Modal -->
 @if (_activeReplyReview != null)
 {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn">
@@ -168,7 +221,7 @@
                 <p class="text-slate-600 italic">"@_activeReplyReview.Comment"</p>
             </div>
 
-            <form method="post" @formname="review-reply-modal" class="space-y-3">
+            <form method="post" @formname="review-reply-modal" data-enhance class="space-y-3">
                 <AntiforgeryToken />
                 <input type="hidden" name="ModalReplyId" value="@_activeReplyReview.Id" />
                 <div>
@@ -195,11 +248,17 @@
     [SupplyParameterFromQuery(Name = "reply")]
     public int ReplyId { get; set; }
 
-    [SupplyParameterFromQuery(Name = "notice")]
-    public string? NoticeQuery { get; set; }
-
     [SupplyParameterFromForm(FormName = "reviews-table-action")]
     public int ToggleReviewId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "reviews-table-action")]
+    public int DeleteReviewId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "reviews-table-action")]
+    public List<int>? SelectedReviewIds { get; set; }
+
+    [SupplyParameterFromForm(FormName = "reviews-table-action")]
+    public string? BulkAction { get; set; }
 
     [SupplyParameterFromForm(FormName = "review-reply-modal")]
     public int ModalReplyId { get; set; }
@@ -207,14 +266,7 @@
     [SupplyParameterFromForm(FormName = "review-reply-modal")]
     public string? StaffReply { get; set; }
 
-    private string? _toast;
-    private int _totalAll;
-    private int _totalApproved;
-    private int _totalPending;
-    private List<ReviewRow> _reviews = [];
-    private ReviewRow? _activeReplyReview;
-
-    private sealed record ReviewRow(
+    public sealed record AdminReviewRow(
         int Id,
         int ProductId,
         string ProductName,
@@ -228,29 +280,28 @@
         DateTimeOffset CreatedAt
     );
 
-    private string FilterUrl(string status, int? replyId = null, string? notice = null)
+    private IQueryable<AdminReviewRow>? reviewsQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private GridSort<AdminReviewRow> sortByRating = GridSort<AdminReviewRow>.ByDescending(r => r.Rating);
+    private GridSort<AdminReviewRow> sortByStatus = GridSort<AdminReviewRow>.ByAscending(r => r.IsApproved);
+
+    private string? _toast;
+    private int _totalAll;
+    private int _totalApproved;
+    private int _totalPending;
+    private AdminReviewRow? _activeReplyReview;
+
+    private string FilterUrl(string status, int? replyId = null)
     {
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(status) && status != "all") parts.Add($"status={Uri.EscapeDataString(status)}");
         if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
         if (replyId.HasValue && replyId.Value > 0) parts.Add($"reply={replyId.Value}");
-        if (!string.IsNullOrWhiteSpace(notice)) parts.Add($"notice={Uri.EscapeDataString(notice)}");
         return parts.Count > 0 ? $"/admin/reviews?{string.Join("&", parts)}" : "/admin/reviews";
     }
 
     protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrWhiteSpace(NoticeQuery))
-        {
-            _toast = NoticeQuery switch
-            {
-                "approved" => "Review approved and published to storefront.",
-                "hidden" => "Review hidden from storefront.",
-                "replied" => "Saved official response to customer review.",
-                _ => NoticeQuery
-            };
-        }
-
         if (ToggleReviewId > 0)
         {
             var rev = await Db.ProductReviews.FindAsync(ToggleReviewId);
@@ -259,9 +310,20 @@
                 rev.IsApproved = !rev.IsApproved;
                 rev.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
-                Nav.NavigateTo(FilterUrl(Filter, notice: rev.IsApproved ? "approved" : "hidden"));
-                return;
+                _toast = rev.IsApproved ? "Review approved and published live." : "Review hidden from storefront.";
             }
+            ToggleReviewId = 0;
+        }
+        else if (DeleteReviewId > 0)
+        {
+            var rev = await Db.ProductReviews.FindAsync(DeleteReviewId);
+            if (rev != null)
+            {
+                Db.ProductReviews.Remove(rev);
+                await Db.SaveChangesAsync();
+                _toast = "Review permanently deleted.";
+            }
+            DeleteReviewId = 0;
         }
         else if (ModalReplyId > 0)
         {
@@ -271,9 +333,33 @@
                 rev.StaffReply = string.IsNullOrWhiteSpace(StaffReply) ? null : StaffReply.Trim();
                 rev.UpdatedAt = DateTimeOffset.UtcNow;
                 await Db.SaveChangesAsync();
-                Nav.NavigateTo(FilterUrl(Filter, notice: "replied"));
-                return;
+                _toast = "Official response saved.";
             }
+            ModalReplyId = 0;
+            StaffReply = null;
+            ReplyId = 0;
+        }
+        else if (!string.IsNullOrWhiteSpace(BulkAction) && SelectedReviewIds != null && SelectedReviewIds.Count > 0)
+        {
+            var reviews = await Db.ProductReviews.Where(r => SelectedReviewIds.Contains(r.Id)).ToListAsync();
+            switch (BulkAction.ToLowerInvariant())
+            {
+                case "approve":
+                    foreach (var r in reviews) r.IsApproved = true;
+                    _toast = $"{reviews.Count} reviews approved and published.";
+                    break;
+                case "hide":
+                    foreach (var r in reviews) r.IsApproved = false;
+                    _toast = $"{reviews.Count} reviews hidden from storefront.";
+                    break;
+                case "delete":
+                    Db.ProductReviews.RemoveRange(reviews);
+                    _toast = $"{reviews.Count} reviews permanently deleted.";
+                    break;
+            }
+            await Db.SaveChangesAsync();
+            BulkAction = null;
+            SelectedReviewIds = null;
         }
 
         await LoadCountsAsync();
@@ -281,7 +367,23 @@
 
         if (ReplyId > 0)
         {
-            _activeReplyReview = _reviews.FirstOrDefault(r => r.Id == ReplyId);
+            var r = await Db.ProductReviews.Include(x => x.Product).FirstOrDefaultAsync(x => x.Id == ReplyId);
+            if (r != null)
+            {
+                _activeReplyReview = new AdminReviewRow(
+                    r.Id,
+                    r.ProductId,
+                    r.Product?.Name ?? "Product",
+                    r.CustomerName,
+                    r.CustomerEmail,
+                    r.Rating,
+                    r.Title,
+                    r.Comment,
+                    r.IsApproved,
+                    r.StaffReply,
+                    r.CreatedAt
+                );
+            }
         }
     }
 
@@ -292,7 +394,7 @@
         _totalPending = await Db.ProductReviews.CountAsync(r => !r.IsApproved);
     }
 
-    private async Task LoadReviewsAsync()
+    private Task LoadReviewsAsync()
     {
         var q = Db.ProductReviews.AsNoTracking().Include(r => r.Product).AsQueryable();
 
@@ -313,8 +415,8 @@
                              (r.Product != null && r.Product.Name.ToLower().Contains(term)));
         }
 
-        _reviews = await q.OrderByDescending(r => r.CreatedAt)
-            .Select(r => new ReviewRow(
+        reviewsQuery = q.OrderByDescending(r => r.CreatedAt)
+            .Select(r => new AdminReviewRow(
                 r.Id,
                 r.ProductId,
                 r.Product != null ? r.Product.Name : "Product",
@@ -326,7 +428,8 @@
                 r.IsApproved,
                 r.StaffReply,
                 r.CreatedAt
-            ))
-            .ToListAsync();
+            ));
+
+        return Task.CompletedTask;
     }
 }

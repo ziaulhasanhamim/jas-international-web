@@ -1,5 +1,6 @@
 @page "/admin/featured-products"
 @attribute [StreamRendering]
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject AdminSession Session
 @inject CatalogService Catalog
@@ -12,7 +13,7 @@
         <p class="eyebrow">MERCHANDISING &amp; BADGES</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Featured &amp; New Arrivals</h1>
         <p class="text-sm text-slate-500 mt-1">
-            Toggle which products appear as Featured or carry the red "NEW ARRIVAL" diagonal badge on the storefront.
+            Toggle which products appear as Homepage Featured or carry the "NEW ARRIVAL" badge using QuickGrid.
         </p>
     </div>
 
@@ -44,19 +45,19 @@
             href="@FilterUrl("all")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
-            All Active Products
+            All Active Products (@_totalAll)
         </a>
         <a
             href="@FilterUrl("featured")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
-            ⭐ Featured Only (@_products.Count(p => p.IsFeatured))
+            ⭐ Featured Only (@_totalFeatured)
         </a>
         <a
             href="@FilterUrl("new")"
             class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Tab == "new" ? "bg-rose-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
         >
-            🏷️ New Arrivals (@_products.Count(p => p.IsNewArrival))
+            🏷️ New Arrivals (@_totalNew)
         </a>
     </div>
 
@@ -76,105 +77,89 @@
 </div>
 
 <!-- Products Table -->
-<form method="post" @formname="featured-table-action">
+<form method="post" @formname="featured-table-action" data-enhance>
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Category &amp; Brand</th>
-                    <th>Pricing</th>
-                    <th class="text-center">⭐ Featured</th>
-                    <th class="text-center">🏷️ New Arrival</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var p in FilteredProducts)
-                {
-                    <tr>
-                        <td>
-                            <div class="flex items-center gap-3">
-                                <PictureImage
-                                    Src="@p.MainImageUrl"
-                                    Alt="@p.Name"
-                                    Class="size-11 rounded-lg border border-slate-100 object-contain p-1 shrink-0 bg-white"
-                                    Loading="lazy"
-                                    Width="44"
-                                    Height="44"
-                                />
-                                <div>
-                                    <strong class="text-slate-900 block font-semibold text-xs sm:text-sm">@p.Name</strong>
-                                    <span class="font-mono text-[11px] text-slate-400">/@p.Slug</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="space-y-0.5">
-                                <span class="badge badge-slate text-[11px]">@p.CategoryName</span>
-                                @if (!string.IsNullOrWhiteSpace(p.BrandName))
-                                {
-                                    <span class="block text-[11px] font-bold text-slate-600">@p.BrandName</span>
-                                }
-                            </div>
-                        </td>
-                        <td>
-                            <div>
-                                <span class="font-bold text-xs sm:text-sm text-slate-900">
-                                    Tk. @p.Price.ToString("N0")
-                                </span>
-                                @if (p.CompareAtPrice.HasValue && p.CompareAtPrice.Value > p.Price)
-                                {
-                                    <div class="flex items-center gap-1.5 mt-0.5">
-                                        <span class="text-[11px] text-slate-400 line-through">Tk. @p.CompareAtPrice.Value.ToString("N0")</span>
-                                        <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-1 rounded border border-orange-200">
-                                            SAVE ৳ @((p.CompareAtPrice.Value - p.Price).ToString("N0"))
-                                        </span>
-                                    </div>
-                                }
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            <button
-                                type="submit"
-                                name="Action"
-                                value="@($"featured:{p.Id}")"
-                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                            >
-                                <span>@(p.IsFeatured ? "⭐ Featured" : "Standard")</span>
-                            </button>
-                        </td>
-                        <td class="text-center">
-                            <button
-                                type="submit"
-                                name="Action"
-                                value="@($"new:{p.Id}")"
-                                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(p.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                            >
-                                <span>@(p.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
-                            </button>
-                        </td>
-                        <td class="text-right">
-                            <a href="/admin/products/@p.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                                Edit Product
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+            <QuickGrid Items="@featuredProductsQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Title="Product" Sortable="true" SortBy="@sortByName">
+                    <div class="flex items-center gap-3">
+                        <PictureImage
+                            Src="@context.MainImageUrl"
+                            Alt="@context.Name"
+                            Class="size-11 rounded-lg border border-slate-100 object-contain p-1 shrink-0 bg-white"
+                            Loading="lazy"
+                            Width="44"
+                            Height="44"
+                        />
+                        <div>
+                            <strong class="text-slate-900 block font-semibold text-xs sm:text-sm">@context.Name</strong>
+                            <span class="font-mono text-[11px] text-slate-400">/@context.Slug</span>
+                        </div>
+                    </div>
+                </TemplateColumn>
 
-    @if (FilteredProducts.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="box" Class="size-10 text-slate-300" />
-            <p>No products match the selected filter.</p>
+                <TemplateColumn Title="Category &amp; Brand">
+                    <div class="space-y-0.5">
+                        <span class="badge badge-slate text-[11px]">@context.CategoryName</span>
+                        @if (!string.IsNullOrWhiteSpace(context.BrandName))
+                        {
+                            <span class="block text-[11px] font-bold text-slate-600">@context.BrandName</span>
+                        }
+                    </div>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Pricing" Sortable="true" SortBy="@sortByPrice">
+                    <div>
+                        <span class="font-bold text-xs sm:text-sm text-slate-900">
+                            Tk. @context.Price.ToString("N0")
+                        </span>
+                        @if (context.CompareAtPrice.HasValue && context.CompareAtPrice.Value > context.Price)
+                        {
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <span class="text-[11px] text-slate-400 line-through">Tk. @context.CompareAtPrice.Value.ToString("N0")</span>
+                                <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-1 rounded border border-orange-200">
+                                    SAVE ৳ @((context.CompareAtPrice.Value - context.Price).ToString("N0"))
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </TemplateColumn>
+
+                <TemplateColumn Title="⭐ Featured" Align="Align.Center">
+                    <button
+                        type="submit"
+                        name="Action"
+                        value="@($"featured:{context.Id}")"
+                        class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                    >
+                        <span>@(context.IsFeatured ? "⭐ Featured" : "Standard")</span>
+                    </button>
+                </TemplateColumn>
+
+                <TemplateColumn Title="🏷️ New Arrival" Align="Align.Center">
+                    <button
+                        type="submit"
+                        name="Action"
+                        value="@($"new:{context.Id}")"
+                        class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsNewArrival ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
+                    >
+                        <span>@(context.IsNewArrival ? "🏷️ New Arrival" : "Normal")</span>
+                    </button>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Actions" Align="Align.End">
+                    <a href="/admin/products/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Edit Product
+                    </a>
+                </TemplateColumn>
+            </QuickGrid>
         </div>
-    }
-</div>
+
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
+    </div>
 </form>
 
 @code {
@@ -187,7 +172,7 @@
     [SupplyParameterFromForm(FormName = "featured-table-action")]
     public string? Action { get; set; }
 
-    private sealed record FeaturedProductItem(
+    public sealed record FeaturedProductItem(
         int Id,
         string Name,
         string Slug,
@@ -200,7 +185,14 @@
         bool IsNewArrival
     );
 
-    private List<FeaturedProductItem> _products = [];
+    private IQueryable<FeaturedProductItem>? featuredProductsQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private GridSort<FeaturedProductItem> sortByName = GridSort<FeaturedProductItem>.ByAscending(p => p.Name);
+    private GridSort<FeaturedProductItem> sortByPrice = GridSort<FeaturedProductItem>.ByDescending(p => p.Price);
+
+    private int _totalAll;
+    private int _totalFeatured;
+    private int _totalNew;
     private string? _toast;
 
     private string FilterUrl(string tab)
@@ -225,25 +217,33 @@
                     if (actionType == "featured")
                     {
                         p.IsFeatured = !p.IsFeatured;
+                        _toast = p.IsFeatured ? $"'{p.Name}' marked as Homepage Featured." : $"'{p.Name}' removed from Homepage Featured.";
                     }
                     else if (actionType == "new")
                     {
                         p.IsNewArrival = !p.IsNewArrival;
+                        _toast = p.IsNewArrival ? $"'{p.Name}' marked as New Arrival." : $"'{p.Name}' marked as standard catalog item.";
                     }
                     p.UpdatedAt = DateTimeOffset.UtcNow;
                     await Db.SaveChangesAsync();
                     Catalog.InvalidateProductCache(p.Slug);
-
-                    Nav.NavigateTo(FilterUrl(Tab));
-                    return;
                 }
+                Action = null;
             }
         }
 
-        await LoadProducts();
+        await LoadCountsAsync();
+        await LoadProductsAsync();
     }
 
-    private async Task LoadProducts()
+    private async Task LoadCountsAsync()
+    {
+        _totalAll = await Db.Products.CountAsync(p => !p.IsDeleted);
+        _totalFeatured = await Db.Products.CountAsync(p => !p.IsDeleted && p.IsFeatured);
+        _totalNew = await Db.Products.CountAsync(p => !p.IsDeleted && p.IsNewArrival);
+    }
+
+    private async Task LoadProductsAsync()
     {
         var raw = await Db.Products
             .AsNoTracking()
@@ -254,7 +254,7 @@
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
 
-        _products = raw.Select(p =>
+        var list = raw.Select(p =>
         {
             var defaultVar = p.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
                 ?? p.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
@@ -271,25 +271,19 @@
                 p.IsFeatured,
                 p.IsNewArrival
             );
-        }).ToList();
-    }
+        });
 
-    private List<FeaturedProductItem> FilteredProducts
-    {
-        get
+        if (Tab == "featured") list = list.Where(p => p.IsFeatured);
+        else if (Tab == "new") list = list.Where(p => p.IsNewArrival);
+
+        if (!string.IsNullOrWhiteSpace(Query))
         {
-            var q = _products.AsEnumerable();
-            if (Tab == "featured") q = q.Where(p => p.IsFeatured);
-            else if (Tab == "new") q = q.Where(p => p.IsNewArrival);
-
-            if (!string.IsNullOrWhiteSpace(Query))
-            {
-                var term = Query.Trim().ToLowerInvariant();
-                q = q.Where(p => p.Name.ToLowerInvariant().Contains(term)
-                    || (p.BrandName != null && p.BrandName.ToLowerInvariant().Contains(term))
-                    || p.CategoryName.ToLowerInvariant().Contains(term));
-            }
-            return q.ToList();
+            var term = Query.Trim().ToLowerInvariant();
+            list = list.Where(p => p.Name.ToLowerInvariant().Contains(term)
+                || (p.BrandName != null && p.BrandName.ToLowerInvariant().Contains(term))
+                || p.CategoryName.ToLowerInvariant().Contains(term));
         }
+
+        featuredProductsQuery = list.AsQueryable();
     }
 }

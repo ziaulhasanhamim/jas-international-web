@@ -844,10 +844,27 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Include(x => x.Products)
             .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
 
-        if (permanent && !c.Products.Any(p => !p.IsDeleted))
+        var hasActiveProducts = c.Products.Any(p => !p.IsDeleted);
+
+        // If permanent or if already soft-deleted and has no active products, perform permanent removal
+        if (permanent || (c.IsDeleted && !hasActiveProducts))
         {
+            if (hasActiveProducts)
+            {
+                throw new ShopException("Cannot permanently delete category because it contains active products. Please move or reassign the products first.");
+            }
+
+            // Re-parent any child categories so FK_Categories_Categories_ParentCategoryId restrict doesn't crash
+            var childCategories = await db.Categories.Where(x => x.ParentCategoryId == id).ToListAsync();
+            foreach (var child in childCategories)
+            {
+                child.ParentCategoryId = c.ParentCategoryId;
+            }
+
+            // Remove placements
             var placementsToRemove = await db.CategoryPlacements.Where(p => p.CategoryId == id).ToListAsync();
             db.CategoryPlacements.RemoveRange(placementsToRemove);
+
             db.Categories.Remove(c);
         }
         else
@@ -859,19 +876,21 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             {
                 p.IsActive = false;
             }
+
+            // Soft-delete child categories as well
+            foreach (var child in c.ChildCategories)
+            {
+                child.IsDeleted = true;
+                child.DeletedAt = DateTimeOffset.UtcNow;
+            }
+            var childIds = c.ChildCategories.Select(ch => ch.Id).ToList();
+            var childPlacements = await db.CategoryPlacements.Where(p => childIds.Contains(p.CategoryId)).ToListAsync();
+            foreach (var p in childPlacements)
+            {
+                p.IsActive = false;
+            }
         }
 
-        foreach (var child in c.ChildCategories)
-        {
-            child.IsDeleted = true;
-            child.DeletedAt = DateTimeOffset.UtcNow;
-        }
-        var childIds = c.ChildCategories.Select(ch => ch.Id).ToList();
-        var childPlacements = await db.CategoryPlacements.Where(p => childIds.Contains(p.CategoryId)).ToListAsync();
-        foreach (var p in childPlacements)
-        {
-            p.IsActive = false;
-        }
         await db.SaveChangesAsync();
         await cache.RemoveByTagAsync(CatalogService.TagCategories);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
@@ -894,6 +913,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 case "hide":
                     c.IsDeleted = true;
                     c.DeletedAt = DateTimeOffset.UtcNow;
+                    var hidePlacements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                    foreach (var p in hidePlacements)
+                    {
+                        p.IsActive = false;
+                    }
                     break;
                 case "restore":
                     c.IsDeleted = false;
@@ -902,6 +926,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 case "delete":
                     if (!c.Products.Any(p => !p.IsDeleted))
                     {
+                        // Detach child categories to avoid FK restriction
+                        var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
+                        foreach (var child in childCategories)
+                        {
+                            child.ParentCategoryId = c.ParentCategoryId;
+                        }
+
                         var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
                         db.CategoryPlacements.RemoveRange(placements);
                         db.Categories.Remove(c);
@@ -910,6 +941,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     {
                         c.IsDeleted = true;
                         c.DeletedAt = DateTimeOffset.UtcNow;
+                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                        foreach (var p in placements)
+                        {
+                            p.IsActive = false;
+                        }
                     }
                     break;
             }

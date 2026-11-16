@@ -93,7 +93,7 @@
 </div>
 
 <!-- Categories QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
-<form method="post" @formname="categories-table-action">
+<form method="post" @formname="categories-table-action" data-enhance>
     <AntiforgeryToken />
 
     <!-- Bulk Actions Toolbar (POS App Pattern) -->
@@ -189,12 +189,25 @@
                                 type="submit"
                                 name="DeleteCategoryId"
                                 value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                onclick="return confirm('@(context.ProductCount > 0 ? "This category has active products. It will be hidden from the storefront." : "Permanently delete this category?")')"
-                                title="@(context.ProductCount > 0 ? "Hide/Archive category" : "Delete category")"
+                                class="btn-secondary !px-2.5 !py-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                onclick="return confirm('Hide this category from the storefront?')"
+                                title="Hide category from storefront"
                             >
-                                @(context.ProductCount > 0 ? "Hide" : "Delete")
+                                Hide
                             </button>
+                            @if (context.ProductCount == 0)
+                            {
+                                <button
+                                    type="submit"
+                                    name="HardDeleteCategoryId"
+                                    value="@context.Id"
+                                    class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                    onclick="return confirm('Permanently delete this empty category? This cannot be undone.')"
+                                    title="Permanently delete category"
+                                >
+                                    Delete
+                                </button>
+                            }
                         }
                         else
                         {
@@ -209,13 +222,13 @@
                             </button>
                             <button
                                 type="submit"
-                                name="DeleteCategoryId"
+                                name="HardDeleteCategoryId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                onclick="return confirm('Permanently remove this archived category?')"
+                                onclick="return confirm('Permanently remove this archived category? This cannot be undone.')"
                                 title="Permanently delete category"
                             >
-                                Delete
+                                Delete Permanently
                             </button>
                         }
                     </div>
@@ -251,6 +264,9 @@
 
     [SupplyParameterFromForm(FormName = "categories-table-action")]
     public int DeleteCategoryId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "categories-table-action")]
+    public int HardDeleteCategoryId { get; set; }
 
     [SupplyParameterFromForm(FormName = "categories-table-action")]
     public List<int>? SelectedCategoryIds { get; set; }
@@ -298,32 +314,31 @@
             {
                 await Admin.BulkCategoryActionAsync(SelectedCategoryIds, BulkAction);
                 _toast = $"Bulk action '{BulkAction}' successfully applied to {SelectedCategoryIds.Count} categories.";
-                Nav.NavigateTo(FilterUrl(Filter));
-                return;
+                ResetActionFields();
             }
-
-            if (ToggleFeaturedId > 0)
+            else if (ToggleFeaturedId > 0)
             {
                 await Admin.ToggleCategoryFeaturedAsync(ToggleFeaturedId);
                 _toast = "Homepage featured status updated successfully.";
-                Nav.NavigateTo(FilterUrl(Filter));
-                return;
+                ResetActionFields();
             }
-
-            if (ToggleVisibilityId > 0)
+            else if (ToggleVisibilityId > 0)
             {
                 await Admin.ToggleCategoryVisibilityAsync(ToggleVisibilityId);
                 _toast = "Category visibility restored.";
-                Nav.NavigateTo(FilterUrl(Filter));
-                return;
+                ResetActionFields();
             }
-
-            if (DeleteCategoryId > 0)
+            else if (DeleteCategoryId > 0)
             {
                 await Admin.DeleteCategoryAsync(DeleteCategoryId);
-                _toast = "Category action completed successfully.";
-                Nav.NavigateTo(FilterUrl(Filter));
-                return;
+                _toast = "Category hidden from storefront.";
+                ResetActionFields();
+            }
+            else if (HardDeleteCategoryId > 0)
+            {
+                await Admin.HardDeleteCategoryAsync(HardDeleteCategoryId);
+                _toast = "Category permanently deleted.";
+                ResetActionFields();
             }
 
             await LoadDataAsync();
@@ -331,7 +346,18 @@
         catch (Exception ex)
         {
             _error = $"Unable to process request: {ex.Message}";
+            await LoadDataAsync();
         }
+    }
+
+    private void ResetActionFields()
+    {
+        BulkAction = null;
+        SelectedCategoryIds = null;
+        ToggleFeaturedId = 0;
+        ToggleVisibilityId = 0;
+        DeleteCategoryId = 0;
+        HardDeleteCategoryId = 0;
     }
 
     private async Task LoadDataAsync()

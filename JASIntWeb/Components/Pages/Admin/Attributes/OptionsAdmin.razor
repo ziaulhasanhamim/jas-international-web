@@ -1,26 +1,47 @@
 @page "/admin/attributes/{AttributeId:int}/options"
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 
-<AdminPageHeader
-    Title="@($"{name} values")"
-    Description="Values are reusable across products. Product pages control which values are allowed and their order."
-    ActionHref="@($"/admin/attributes/{AttributeId}/options/new")"
-    ActionText="+ Add value"
-/>
-<a href="/admin/attributes" class="admin-back-link">← Attribute library</a>
-<div class="shop-panel admin-table-wrap">
-    <QuickGrid Items="@optionsQuery" Pagination="@pagination" class="shop-table">
-        <TemplateColumn Title="Display value" Sortable="true" SortBy="@(GridSort<AttributeOption>.ByAscending(o => o.Value))">
-            <strong>@context.Value</strong>
-        </TemplateColumn>
-        <PropertyColumn Property="@(o => o.Code)" Title="Code" Sortable="true" />
-        <TemplateColumn Title="Actions">
-            <a href="/admin/attributes/@AttributeId/options/@context.Id/edit">Edit value</a>
-        </TemplateColumn>
-    </QuickGrid>
+<PageTitle>@(name ?? "Attribute") Values · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">PRODUCT SPECIFICATIONS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">@(name ?? "Attribute") Values</h1>
+        <p class="text-sm text-slate-500 mt-1">Values are reusable across products. Product pages control which values are allowed and their order.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/attributes" class="btn-secondary shadow-xs">
+            ← Attribute Library
+        </a>
+        <a href="@($"/admin/attributes/{AttributeId}/options/new")" class="btn-primary shadow-xs">
+            <Icon Name="plus" Class="size-4" />
+            Add Value
+        </a>
+    </div>
 </div>
-<div class="mt-4 flex items-center justify-between">
-    <Paginator State="@pagination" />
+
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <QuickGrid Items="@optionsQuery" Pagination="@pagination" class="data-table">
+            <TemplateColumn Title="Display Value" Sortable="true" SortBy="@(GridSort<AttributeOption>.ByAscending(o => o.Value))">
+                <strong class="text-slate-900 block font-semibold text-xs">@context.Value</strong>
+            </TemplateColumn>
+
+            <PropertyColumn Property="@(o => o.Code)" Title="Code" Sortable="true" Class="font-mono text-xs text-slate-600" />
+
+            <TemplateColumn Title="Actions" Align="Align.End">
+                <a href="/admin/attributes/@AttributeId/options/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                    Edit Value
+                </a>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+
+    <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+        <Paginator State="@pagination" />
+    </div>
 </div>
 
 @code

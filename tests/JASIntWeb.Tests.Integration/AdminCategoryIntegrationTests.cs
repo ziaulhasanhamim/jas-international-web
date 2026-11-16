@@ -86,6 +86,58 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
+    public async Task DeleteCategoryAsync_WithChildCategories_SafelyReparentsAndDeletesPermanently()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var parentCat = new Category { Name = "Parent Cat " + Guid.NewGuid().ToString("N")[..6], Slug = "parent-cat-" + Guid.NewGuid().ToString("N")[..6] };
+        db.Categories.Add(parentCat);
+        await db.SaveChangesAsync();
+
+        var childCat = new Category { Name = "Child Cat " + Guid.NewGuid().ToString("N")[..6], Slug = "child-cat-" + Guid.NewGuid().ToString("N")[..6], ParentCategoryId = parentCat.Id };
+        db.Categories.Add(childCat);
+        await db.SaveChangesAsync();
+
+        // Permanent delete parent category
+        await admin.DeleteCategoryAsync(parentCat.Id, permanent: true);
+
+        // Verify parent is removed
+        var checkParent = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == parentCat.Id);
+        await checkParent.Should().BeNull();
+
+        // Verify child category was reparented to null and was not blocked by FK constraint
+        var checkChild = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == childCat.Id);
+        await checkChild.Should().NotBeNull();
+        await checkChild!.ParentCategoryId.Should().BeNull();
+    }
+
+    [Test]
+    public async Task DeleteCategoryAsync_AlreadyHiddenCategory_DeletesPermanently()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cat = new Category
+        {
+            Name = "Archived Cat " + Guid.NewGuid().ToString("N")[..6],
+            Slug = "archived-cat-" + Guid.NewGuid().ToString("N")[..6],
+            IsDeleted = true,
+            DeletedAt = DateTimeOffset.UtcNow
+        };
+        db.Categories.Add(cat);
+        await db.SaveChangesAsync();
+
+        // Calling standard delete on an already hidden category should permanently delete it
+        await admin.DeleteCategoryAsync(cat.Id, permanent: false);
+
+        var checkCat = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == cat.Id);
+        await checkCat.Should().BeNull();
+    }
+
+    [Test]
     public async Task CategoriesAdmin_Query_ExecutesSuccessfullyOnDatabase()
     {
         await using var scope = Factory.Services.CreateAsyncScope();

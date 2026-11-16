@@ -1,6 +1,7 @@
 @page "/admin/orders"
 @attribute [StreamRendering]
-@inject IServiceScopeFactory ScopeFactory
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject AppDbContext Db
 @inject ShoppingService Shop
 @inject NavigationManager Nav
 
@@ -10,9 +11,22 @@
     <div>
         <p class="eyebrow">COMMERCE OPERATIONS</p>
         <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Customer Orders</h1>
-        <p class="text-sm text-slate-500 mt-1">Review, confirm, dispatch, and fulfill online store orders.</p>
+        <p class="text-sm text-slate-500 mt-1">Review, confirm, dispatch, and fulfill online store orders using database-powered QuickGrid.</p>
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
 
 <!-- Filter Toolbar -->
 <div class="mb-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
@@ -67,157 +81,147 @@
 </div>
 
 <!-- Orders Table -->
-<form method="post" @formname="orders-quick-action">
+<form method="post" @formname="orders-quick-action" data-enhance>
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Order #</th>
-                    <th>Date & Time</th>
-                    <th>Customer Name</th>
-                    <th>Contact Phone</th>
-                    <th>Delivery Area</th>
-                    <th>Status</th>
-                    <th>Payment</th>
-                    <th class="text-right">Total Amount</th>
-                    <th class="text-right">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var o in orders)
-                {
-                    <tr>
-                        <td class="font-bold text-slate-900">
-                            <a href="/admin/orders/@o.Id" class="text-blue-600 hover:underline">#@o.Id</a>
-                        </td>
-                        <td class="text-xs text-slate-500 whitespace-nowrap">
-                            @o.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
-                        </td>
-                        <td class="font-semibold text-slate-800">
-                            @(o.DeliveryAddress?.CustomerName ?? "Guest")
-                        </td>
-                        <td class="text-xs font-mono text-slate-600">
-                            @(o.DeliveryAddress?.PhoneNumber ?? "-")
-                        </td>
-                        <td class="text-xs text-slate-600">
-                            @(o.DeliveryAddress?.City ?? "-"), @(o.DeliveryAddress?.District ?? "-")
-                        </td>
-                        <td>
-                            @switch (o.Status)
+            <QuickGrid Items="@ordersQuery" Pagination="@pagination" class="data-table">
+                <TemplateColumn Title="Order #" Sortable="true" SortBy="@sortById">
+                    <a href="/admin/orders/@context.Id" class="font-bold text-blue-600 hover:underline">
+                        #@context.Id
+                    </a>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Date & Time" Sortable="true" SortBy="@sortByDate">
+                    <span class="text-xs text-slate-500 whitespace-nowrap">
+                        @context.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Customer Name">
+                    <strong class="font-semibold text-slate-800 block text-xs">
+                        @(context.DeliveryAddress?.CustomerName ?? "Guest")
+                    </strong>
+                    <span class="text-xs font-mono text-slate-500">
+                        @(context.DeliveryAddress?.PhoneNumber ?? "-")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Delivery Area">
+                    <span class="text-xs text-slate-600">
+                        @(context.DeliveryAddress?.City ?? "-"), @(context.DeliveryAddress?.District ?? "-")
+                    </span>
+                </TemplateColumn>
+
+                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByStatus">
+                    @switch (context.Status)
+                    {
+                        case OrderStatus.Pending:
+                            <span class="badge badge-amber">Pending</span>
+                            break;
+                        case OrderStatus.Processing:
+                            <span class="badge badge-blue">Processing</span>
+                            break;
+                        case OrderStatus.InTransit:
+                            <span class="badge badge-purple">In Transit</span>
+                            break;
+                        case OrderStatus.Delivered:
+                            <span class="badge badge-emerald">Delivered</span>
+                            break;
+                        case OrderStatus.Cancelled:
+                            <span class="badge badge-rose">Cancelled</span>
+                            break;
+                        default:
+                            <span class="badge badge-slate">@context.Status</span>
+                            break;
+                    }
+                </TemplateColumn>
+
+                <TemplateColumn Title="Payment">
+                    @if (context.Status == OrderStatus.Cancelled)
+                    {
+                        <span class="badge badge-rose">Order Cancelled</span>
+                    }
+                    else if (context.PaidAmount > 0)
+                    {
+                        <div class="space-y-1">
+                            <span class="badge badge-emerald">
+                                <Icon Name="check" Class="size-3" />
+                                <span>Verified (৳@context.PaidAmount.ToString("N0"))</span>
+                            </span>
+                            <div>
+                                <button type="submit" name="Action" value="@($"unverify:{context.Id}")" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium cursor-pointer">
+                                    Mark Unverified
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-1.5">
+                            @if (!string.IsNullOrEmpty(context.TransactionId))
                             {
-                                case OrderStatus.Pending:
-                                    <span class="badge badge-amber">Pending</span>
-                                    break;
-                                case OrderStatus.Processing:
-                                    <span class="badge badge-blue">Processing</span>
-                                    break;
-                                case OrderStatus.InTransit:
-                                    <span class="badge badge-purple">In Transit</span>
-                                    break;
-                                case OrderStatus.Delivered:
-                                    <span class="badge badge-emerald">Delivered</span>
-                                    break;
-                                case OrderStatus.Cancelled:
-                                    <span class="badge badge-rose">Cancelled</span>
-                                    break;
-                                default:
-                                    <span class="badge badge-slate">@o.Status</span>
-                                    break;
-                            }
-                        </td>
-                        <td>
-                            @if (o.Status == OrderStatus.Cancelled)
-                            {
-                                <span class="badge badge-rose">Order Cancelled</span>
-                            }
-                            else if (o.PaidAmount > 0)
-                            {
-                                <div class="space-y-1">
-                                    <span class="badge badge-emerald">
-                                        <Icon Name="check" Class="size-3" />
-                                        <span>Verified (৳@o.PaidAmount.ToString("N0"))</span>
-                                    </span>
-                                    <div>
-                                        <button type="submit" name="Action" value="@($"unverify:{o.Id}")" class="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium cursor-pointer">
-                                            Mark Unverified
-                                        </button>
-                                    </div>
-                                </div>
+                                <span class="badge badge-amber font-bold animate-pulse">
+                                    Needs Confirmation
+                                    <span class="block font-mono text-[10px] font-normal">@context.TransactionId</span>
+                                </span>
                             }
                             else
                             {
-                                <div class="space-y-1.5">
-                                    @if (!string.IsNullOrEmpty(o.TransactionId))
-                                    {
-                                        <span class="badge badge-amber font-bold animate-pulse">
-                                            Needs Confirmation
-                                            <span class="block font-mono text-[10px] font-normal">@o.TransactionId</span>
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge badge-slate">Unpaid</span>
-                                    }
-                                    <div class="flex items-center gap-1.5 pt-0.5">
-                                        <button type="submit" name="Action" value="@($"verify:{o.Id}")" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
-                                            <Icon Name="check" Class="size-3" />
-                                            <span>Verify</span>
-                                        </button>
-                                        <button type="submit" name="Action" value="@($"reject:{o.Id}")" class="btn-secondary text-rose-700! hover:bg-rose-50! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
-                                            <Icon Name="close" Class="size-3" />
-                                            <span>Not Received</span>
-                                        </button>
-                                    </div>
-                                </div>
+                                <span class="badge badge-slate">Unpaid</span>
                             }
-                        </td>
-                        <td class="text-right font-bold text-slate-900 tabular-nums">
-                            ৳@o.Total.ToString("N0")
-                        </td>
-                        <td class="text-right whitespace-nowrap">
-                            <a href="/admin/orders/@o.Id" class="btn-secondary px-3! py-1! text-xs">
-                                View & Fulfill
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                            <div class="flex items-center gap-1.5 pt-0.5">
+                                <button type="submit" name="Action" value="@($"verify:{context.Id}")" class="btn-primary bg-emerald-600! hover:bg-emerald-700! text-white! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                    <Icon Name="check" Class="size-3" />
+                                    <span>Verify</span>
+                                </button>
+                                <button type="submit" name="Action" value="@($"reject:{context.Id}")" class="btn-secondary text-rose-700! hover:bg-rose-50! py-1! px-2! text-[11px] font-bold rounded-lg shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer">
+                                    <Icon Name="close" Class="size-3" />
+                                    <span>Not Received</span>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </TemplateColumn>
 
-    @if (orders.Count == 0)
-    {
-        <div class="empty-state py-12">
-            <Icon Name="cart" Class="size-10 text-slate-300" />
-            <p>No orders match the selected filters.</p>
+                <PropertyColumn Property="@(o => o.Total)" Title="Total Amount" Format="N0" Sortable="true" Align="Align.End" Class="text-right font-bold text-slate-900 tabular-nums" />
+
+                <TemplateColumn Title="Action" Align="Align.End">
+                    <a href="/admin/orders/@context.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        View &amp; Fulfill
+                    </a>
+                </TemplateColumn>
+            </QuickGrid>
         </div>
-    }
-</div>
-</form>
 
-<div class="mt-4">
-    <AdminPagination Total="total" Page="Page" />
-</div>
+        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
+            <Paginator State="@pagination" />
+        </div>
+    </div>
+</form>
 
 @code
 {
     [SupplyParameterFromQuery(Name = "q")]
     public string? Query { get; set; }
+
     [SupplyParameterFromQuery(Name = "status")]
     public string? Status { get; set; }
+
     [SupplyParameterFromQuery(Name = "payment")]
     public string? PaymentFilter { get; set; }
-    [SupplyParameterFromQuery(Name = "page")]
-    public int Page { get; set; } = 1;
 
     [SupplyParameterFromForm(FormName = "orders-quick-action")]
     public string? Action { get; set; }
 
-    private List<Order> orders = [];
-    private int total;
+    private IQueryable<Order>? ordersQuery;
+    private PaginationState pagination = new() { ItemsPerPage = 20 };
+    private GridSort<Order> sortById = GridSort<Order>.ByDescending(o => o.Id);
+    private GridSort<Order> sortByDate = GridSort<Order>.ByDescending(o => o.CreatedAt);
+    private GridSort<Order> sortByStatus = GridSort<Order>.ByAscending(o => o.Status);
+
     private int unconfirmedPaymentCount;
+    private string? _toast;
 
     private string FilterUrl(string? status, string? payment)
     {
@@ -225,8 +229,7 @@
         if (!string.IsNullOrWhiteSpace(status)) parts.Add($"status={Uri.EscapeDataString(status)}");
         if (!string.IsNullOrWhiteSpace(payment)) parts.Add($"payment={Uri.EscapeDataString(payment)}");
         if (!string.IsNullOrWhiteSpace(Query)) parts.Add($"q={Uri.EscapeDataString(Query)}");
-        parts.Add("page=1");
-        return $"/admin/orders?{string.Join("&", parts)}";
+        return parts.Count > 0 ? $"/admin/orders?{string.Join("&", parts)}" : "/admin/orders";
     }
 
     protected override async Task OnInitializedAsync()
@@ -240,18 +243,19 @@
                 if (actionType == "verify")
                 {
                     await Shop.VerifyPaymentAsync(orderId);
+                    _toast = $"Payment verified for order #{orderId}.";
                 }
                 else if (actionType == "unverify")
                 {
                     await Shop.UnverifyPaymentAsync(orderId);
+                    _toast = $"Payment unverified for order #{orderId}.";
                 }
                 else if (actionType == "reject")
                 {
                     await Shop.RejectPaymentAndCancelOrderAsync(orderId, "Payment not received");
+                    _toast = $"Order #{orderId} cancelled and marked as payment not received.";
                 }
-
-                Nav.NavigateTo(FilterUrl(Status, PaymentFilter));
-                return;
+                Action = null;
             }
         }
 
@@ -260,14 +264,9 @@
 
     private async Task LoadOrdersAsync()
     {
-        Page = Math.Clamp(Page, 1, 10000);
+        unconfirmedPaymentCount = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
 
-        await using var scope = ScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        unconfirmedPaymentCount = await db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
-
-        var q = db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
+        var q = Db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
 
         if (PaymentFilter == "unconfirmed" || Status == "unconfirmed_payment")
         {
@@ -287,29 +286,6 @@
                 || (o.DeliveryAddress != null && o.DeliveryAddress.PhoneNumber.Contains(search)));
         }
 
-        total = await q.CountAsync();
-        orders = await q.OrderByDescending(o => o.CreatedAt)
-            .ThenByDescending(o => o.Id)
-            .Skip((Page - 1) * 25)
-            .Take(25)
-            .ToListAsync();
-    }
-
-    private async Task QuickVerify(int orderId)
-    {
-        await Shop.VerifyPaymentAsync(orderId);
-        await LoadOrdersAsync();
-    }
-
-    private async Task QuickUnverify(int orderId)
-    {
-        await Shop.UnverifyPaymentAsync(orderId);
-        await LoadOrdersAsync();
-    }
-
-    private async Task QuickRejectAndCancel(int orderId)
-    {
-        await Shop.RejectPaymentAndCancelOrderAsync(orderId, "Payment not received");
-        await LoadOrdersAsync();
+        ordersQuery = q.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id);
     }
 }
