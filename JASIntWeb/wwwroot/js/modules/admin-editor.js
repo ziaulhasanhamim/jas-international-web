@@ -1,3 +1,9 @@
+async function uploadSecurityHeaders() {
+    const response = await fetch('/api/admin/uploads/security', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Please sign in as an administrator and try again.');
+    return { 'X-CSRF-TOKEN': (await response.json()).token };
+}
+
 /**
  * JAS International - Admin Product Editor Enhancements Module (ES2024+)
  * Product image gallery manager, TinyMCE WYSIWYG specification builder,
@@ -125,6 +131,7 @@ class AdminEditorController {
 
             try {
                 const response = await fetch("/api/admin/uploads/product-images", {
+                    headers: await uploadSecurityHeaders(),
                     method: "POST",
                     body: formData,
                     signal: AbortSignal.timeout(30000)
@@ -396,6 +403,7 @@ class AdminEditorController {
 
                 try {
                     const response = await fetch("/api/admin/uploads/image", {
+                    headers: await uploadSecurityHeaders(),
                         method: "POST",
                         body: formData,
                         signal: AbortSignal.timeout(30000)
@@ -525,6 +533,7 @@ class AdminEditorController {
 
             try {
                 const response = await fetch("/api/admin/uploads/brand-logo", {
+                    headers: await uploadSecurityHeaders(),
                     method: "POST",
                     body: formData,
                     signal: AbortSignal.timeout(30000)
@@ -612,15 +621,5 @@ class AdminEditorController {
         initSlugGenerator: () => AdminEditorController.initAutoSlugGenerator()
     };
 
-    // Auto-initialize on load and Blazor enhanced navigation
-    const init = () => AdminEditorController.initAll();
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
-    } else {
-        init();
-    }
-    window.Blazor?.addEventListener?.("enhancedload", init);
-    document.addEventListener("DOMContentLoaded", () => {
-        window.Blazor?.addEventListener?.("enhancedload", init);
-    });
+    // The application orchestrator owns initialization during enhanced navigation.
 })(window);

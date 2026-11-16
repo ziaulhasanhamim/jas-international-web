@@ -28,9 +28,11 @@
     }
     else
     {
+        <PaymentSummary Order="order" />
+        <OrderProgress Status="order.Status" />
         <div data-meta-event="Purchase"
              data-event-id="@order.PublicToken"
-             data-order-id="@order.Id"
+             data-order-id="@order.PublicToken"
              data-value="@order.Total"
              data-currency="BDT"
              hidden></div>
@@ -43,7 +45,7 @@
         var isInTransit = order.Status == OrderStatus.InTransit;
         var isProcessing = order.Status == OrderStatus.Processing;
 
-        <div id="live-order-tracker" data-order-id="@order.Id" data-current-status="@order.Status" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div id="live-order-tracker" data-order-id="@order.PublicToken" data-current-status="@order.Status" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
             <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isDelivered ? "from-emerald-600 via-teal-600 to-emerald-700" : (isInTransit ? "from-purple-600 via-indigo-600 to-blue-700" : "from-blue-600 via-indigo-600 to-blue-700"))) p-8 text-white text-center">
                 <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isDelivered ? "text-emerald-600" : (isInTransit ? "text-purple-600" : "text-blue-600"))) mx-auto mb-4 shadow-md">
@@ -126,7 +128,7 @@
                     }
                     else if (isProcessing)
                     {
-                        <span>Your payment has been verified. Our inventory team is currently packing your items with warranty inspection.</span>
+                        <span>Our inventory team is currently packing your items with warranty inspection. Check the separate payment summary for verified amounts.</span>
                     }
                     else
                     {
@@ -138,103 +140,8 @@
             <!-- Receipt & Tracking Stepper Body -->
             <div class="p-6 sm:p-8 space-y-6">
 
-                <!-- 5-Stage Visual Progress Stepper -->
-                <div class="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5">
-                    <div class="flex items-center justify-between mb-4 border-b border-slate-200/80 pb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                            <span class="relative flex size-2.5">
-                                @if (!isDelivered && !isCancelled)
-                                {
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full size-2.5 bg-blue-600"></span>
-                                }
-                                else if (isDelivered)
-                                {
-                                    <span class="relative inline-flex rounded-full size-2.5 bg-emerald-600"></span>
-                                }
-                                else
-                                {
-                                    <span class="relative inline-flex rounded-full size-2.5 bg-rose-600"></span>
-                                }
-                            </span>
-                            Live Order Tracking
-                        </span>
-
-                        <span class="text-xs text-slate-500 font-medium">
-                            @if (isDelivered && order.DeliveredAt.HasValue)
-                            {
-                                <span>Completed @order.DeliveredAt.Value.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")</span>
-                            }
-                            else
-                            {
-                                <span>Placed @order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM, hh:mm tt")</span>
-                            }
-                        </span>
-                    </div>
-
-                    @if (isCancelled)
-                    {
-                        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900 flex items-center gap-3">
-                            <Icon Name="close" Class="size-5 text-rose-600 shrink-0" />
-                            <div>
-                                <strong class="font-bold block">Order Cancelled</strong>
-                                <span class="text-rose-700">This order was cancelled and inventory released.</span>
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <!-- Step 1: Placed -->
-                            <div class="rounded-xl border p-3 bg-white border-emerald-200 shadow-2xs">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold">✓</span>
-                                    <span class="text-xs font-bold text-emerald-950">1. Placed</span>
-                                </div>
-                                <p class="text-[11px] text-slate-500">Order registered</p>
-                            </div>
-
-                            <!-- Step 2: Confirmed / Payment -->
-                            @{
-                                var isStep2Done = isPaymentVerified || isProcessing || isInTransit || isDelivered;
-                            }
-                            <div class="rounded-xl border p-3 bg-white @(isStep2Done ? "border-emerald-200 shadow-2xs" : "border-slate-200 opacity-60")">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="flex size-5 items-center justify-center rounded-full @(isStep2Done ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600") text-[10px] font-bold">
-                                        @(isStep2Done ? "✓" : "2")
-                                    </span>
-                                    <span class="text-xs font-bold @(isStep2Done ? "text-emerald-950" : "text-slate-700")">2. Confirmed</span>
-                                </div>
-                                <p class="text-[11px] text-slate-500">@(isPaymentVerified ? "bKash Verified" : "Order Confirmed")</p>
-                            </div>
-
-                            <!-- Step 3: Dispatched -->
-                            @{
-                                var isStep3Done = isInTransit || isDelivered;
-                            }
-                            <div class="rounded-xl border p-3 bg-white @(isStep3Done ? "border-emerald-200 shadow-2xs" : (isProcessing ? "border-blue-300 ring-2 ring-blue-500/20 shadow-2xs" : "border-slate-200 opacity-60"))">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="flex size-5 items-center justify-center rounded-full @(isStep3Done ? "bg-emerald-600 text-white" : (isProcessing ? "bg-blue-600 text-white animate-pulse" : "bg-slate-200 text-slate-600")) text-[10px] font-bold">
-                                        @(isStep3Done ? "✓" : "3")
-                                    </span>
-                                    <span class="text-xs font-bold @(isStep3Done ? "text-emerald-950" : (isProcessing ? "text-blue-900" : "text-slate-700"))">3. Dispatched</span>
-                                </div>
-                                <p class="text-[11px] text-slate-500">@(string.IsNullOrEmpty(order.CourierName) ? (isInTransit ? "In Delivery" : "Packaging") : order.CourierName)</p>
-                            </div>
-
-                            <!-- Step 4: Delivered -->
-                            <div class="rounded-xl border p-3 bg-white @(isDelivered ? "border-emerald-300 bg-emerald-50/50 shadow-2xs font-bold" : "border-slate-200 opacity-60")">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="flex size-5 items-center justify-center rounded-full @(isDelivered ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600") text-[10px] font-bold">
-                                        @(isDelivered ? "✓" : "4")
-                                    </span>
-                                    <span class="text-xs font-bold @(isDelivered ? "text-emerald-950" : "text-slate-700")">4. Delivered</span>
-                                </div>
-                                <p class="text-[11px] text-slate-500">@(isDelivered ? "Received" : "Pending")</p>
-                            </div>
-                        </div>
-                    }
-
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <p class="text-xs text-slate-500">Placed @order.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt") · Bangladesh time</p>
                     <!-- Courier Tracking Banner if Available -->
                     @if (!string.IsNullOrEmpty(order.CourierTrackingId) || !string.IsNullOrEmpty(order.CourierName))
                     {

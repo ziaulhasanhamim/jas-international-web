@@ -104,13 +104,13 @@
                                 <div class="flex items-center gap-2">
                                     @if (!isVerified && !isCancelled)
                                     {
-                                        <a href="/payment-verification?orderid=@o.Id" class="btn-primary !px-3 !py-1.5 text-xs">
+                                        <a href="/payment-verification?token=@o.PublicToken" class="btn-primary !px-3 !py-1.5 text-xs">
                                             Awaiting Verification →
                                         </a>
                                     }
                                     else
                                     {
-                                        <a href="/order/@o.Id" class="btn-secondary !px-3 !py-1.5 text-xs">
+                                        <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
                                             View Order Receipt
                                         </a>
                                     }

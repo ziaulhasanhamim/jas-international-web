@@ -11,7 +11,7 @@
     var ogImageUrl = Seo.BuildAbsoluteUrl(string.IsNullOrWhiteSpace(OgImage) ? "/jas-og-card.png" : OgImage);
     var robotsDirective = string.IsNullOrWhiteSpace(Robots) ? "index,follow" : Robots.Trim();
 
-    var settings = DeliverySettingsSvc.GetDeliverySettings();
+
     var gscVerification = !string.IsNullOrWhiteSpace(Config["Seo:GoogleSiteVerification"]) ? Config["Seo:GoogleSiteVerification"] : settings.GoogleSearchConsoleVerification;
     var metaDomainVerification = !string.IsNullOrWhiteSpace(Config["Seo:FacebookDomainVerification"]) ? Config["Seo:FacebookDomainVerification"] : settings.FacebookDomainVerification;
     var fbAppId = Config["Seo:FbAppId"];
@@ -102,6 +102,9 @@
 </HeadContent>
 
 @code {
+    private JASIntWeb.Persistence.Entities.DeliverySettings settings = new();
+    protected override async Task OnInitializedAsync() => settings = await DeliverySettingsSvc.GetSettingsAsync();
+
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? CanonicalPath { get; set; }

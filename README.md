@@ -1,10 +1,10 @@
 # JAS International
 
-Blazor Web App using .NET 10, PostgreSQL, EF Core and ASP.NET Core Identity. The storefront and admin forms use static SSR with enhanced navigation. Small Interactive Auto components handle cart actions; JavaScript interop is limited to browser local storage.
+Blazor Web App using .NET 11, PostgreSQL, EF Core and ASP.NET Core Identity. The storefront and admin forms use static SSR with enhanced navigation. Landing, catalog and product-detail routes stay static SSR with small JavaScript modules. Checkout/payment retain their existing Interactive Server modes; do not introduce active Blazor circuits or WASM startup on the hot storefront routes.
 
 ## Development setup
 
-Install the .NET 10 SDK, PostgreSQL and Node.js with npm. Start PostgreSQL and create a local `jas_ecommerce` database. Run all commands below from the solution directory.
+Install the .NET 11 SDK, PostgreSQL and Node.js with npm. Start PostgreSQL and create a local `jas_ecommerce` database. Run all commands below from the solution directory.
 
 Configure your local database and administrator with user secrets:
 
@@ -54,11 +54,11 @@ dotnet run --project JASIntWeb --launch-profile https
 The current schema is checked in under `JASIntWeb/Persistence/Migrations`. Generate a new migration only when you change the EF models:
 
 ```bash
-dotnet tool install --global dotnet-ef --version 10.0.0
+dotnet tool install --global dotnet-ef --version 11.0.0
 dotnet ef migrations add YourMigrationName --project JASIntWeb --startup-project JASIntWeb --output-dir Persistence/Migrations
 ```
 
-If `dotnet-ef` is already installed, ensure its major version matches EF Core 10. Review generated migrations and any required data conversions before applying them. Test changes against a database backup when existing data matters. Development startup applies pending migrations; to apply them manually, run:
+If `dotnet-ef` is already installed, ensure its major version matches EF Core 11. Review generated migrations and any required data conversions before applying them. Test changes against a database backup when existing data matters. Development startup applies pending migrations; to apply them manually, run:
 
 ```bash
 dotnet ef database update --project JASIntWeb --startup-project JASIntWeb
@@ -95,7 +95,7 @@ The tests cover domain rules, cart behavior, order fulfillment, coupon calculati
 
 ## Email and hosting
 
-Password reset emails require `Mail:Host`, `Mail:Port`, `Mail:EnableSsl`, `Mail:From`, `Mail:Username` and `Mail:Password`. Configure `PublicBaseUrl` and `AllowedHosts` for your host. Environment variable names use double underscores, for example `Mail__Host`. Signup uses email/password without mandatory email confirmation.
+Password reset emails require `Mail:Host`, `Mail:Port`, `Mail:EnableSsl`, `Mail:From`, `Mail:Username` and `Mail:Password`. Configure `PublicBaseUrl` and `AllowedHosts` for your host. Environment variable names use double underscores, for example `Mail__Host`. Signup uses email/password with email-code verification. Local verification codes are shown only in Development when mail is not configured.
 
 For production, persist data-protection keys with `Hosting:DataProtectionPath` and configure trusted reverse proxies with `Hosting:KnownProxies` if needed. Apply migrations deliberately and keep development seeding disabled.
 
@@ -156,13 +156,13 @@ Run the specialized test suites using TUnit:
 
 ```bash
 # Core business logic and calculations
-dotnet test tests/JASIntWeb.Tests.Unit/JASIntWeb.Tests.Unit.csproj
+dotnet test --project tests/JASIntWeb.Tests.Unit/JASIntWeb.Tests.Unit.csproj
 
 # Dedicated SEO, JSON-LD, OpenGraph & Meta CAPI/Pixel test suite
-dotnet test tests/JASIntWeb.Tests.Seo/JASIntWeb.Tests.Seo.csproj
+dotnet test --project tests/JASIntWeb.Tests.Seo/JASIntWeb.Tests.Seo.csproj
 
 # End-to-end integration tests (PostgreSQL Testcontainers)
-dotnet test tests/JASIntWeb.Tests.Integration/JASIntWeb.Tests.Integration.csproj
+dotnet test --project tests/JASIntWeb.Tests.Integration/JASIntWeb.Tests.Integration.csproj
 ```
 
 ---
@@ -198,3 +198,24 @@ To begin running Meta Ads and ranking on Google Bangladesh:
    - In Google Merchant Center, create a primary feed for Bangladesh (`BDT`).
    - Enter feed URL `https://www.jasinternational.com.bd/feeds/google.xml`.
 
+
+
+## Customer confidence and stock alerts
+
+See [release notes](RELEASE_NOTES.md) for the v1.1.0 migration and compatibility changes. All application cache consumers use `Microsoft.Extensions.Caching.Hybrid.HybridCache`. Settings and redirects are read asynchronously; admin changes await invalidation.
+
+Sold-out variants offer an SSR email-alert form. Requests stay pending until the recipient confirms via the emailed form. A database-backed worker checks availability every minute and processes up to 25 notifications per cycle. Failed sends retry with backoff, then appear as Failed in `/admin/stock-notifications` after five attempts. Administrators can retry after correcting mail configuration. Alerts never reserve stock.
+
+Run browser checks only against an isolated database: the test server applies migrations and seeds development fixtures. Never point `TEST_DB_URL` at production or a database you want to preserve.
+
+```bash
+npm ci --ignore-scripts
+npm run css
+dotnet build JASIntWeb.sln --configuration Release
+npx playwright install chromium
+TEST_DB_URL='Host=localhost;Database=jas_browser_test;Username=postgres;Password=TEST_ONLY' npm run test:browser
+```
+
+Browser checks cover desktop/mobile rendering, static SSR hot paths, cart interactions, review moderation, consent, and release screenshots. Integration tests use PostgreSQL Testcontainers by default; an explicitly supplied `TEST_DB_URL` is reset destructively by the integration harness and must be disposable.
+
+CI validates PRs and main without publishing releases. Push a version tag after merging to run the release workflow; it repeats validation and publishes `RELEASE_NOTES.md` only after success. Production deployment and production migrations remain separate operations.

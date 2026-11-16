@@ -17,7 +17,8 @@ public sealed class ShoppingService(
     AccountMailService mailService,
     IMetaConversionsApiService? metaApi = null,
     IHttpContextAccessor? httpContextAccessor = null,
-    ILogger<ShoppingService>? logger = null)
+    ILogger<ShoppingService>? logger = null,
+    CatalogService? catalog = null)
 {
     public static int? UserId(ClaimsPrincipal user) => int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 50), config.GetValue<decimal>("Delivery:OutsideKhulna", 150));
@@ -294,6 +295,7 @@ public sealed class ShoppingService(
         cart.LastActivityAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         return await GetCartAsync(cart.Token, userId);
     }
 
@@ -345,6 +347,7 @@ public sealed class ShoppingService(
             await db.SaveChangesAsync();
         }
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         return await GetCartAsync(userId);
     }
 
@@ -360,6 +363,7 @@ public sealed class ShoppingService(
         cart.LastActivityAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
     }
 
     public Task ClearAsync(int userId) => ClearAsync(null, userId);
@@ -393,14 +397,7 @@ public sealed class ShoppingService(
         {
             await LockUserAsync(userId.Value);
             cart = await ActiveCartAsync(null, userId.Value);
-            if (cart.Items.Count == 0 && request.Items.Count > 0)
-            {
-                foreach (var line in request.Items)
-                {
-                    cart.Items.Add(new CartItem { ProductVariantId = line.VariantId, Quantity = line.Quantity });
-                }
-            }
-            else
+            if (cart.Items.Count > 0)
             {
                 request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
             }
@@ -483,7 +480,10 @@ public sealed class ShoppingService(
         string? appliedCoupon = null;
         if (!string.IsNullOrWhiteSpace(request.CouponCode))
         {
+            var couponCode = request.CouponCode.Trim().ToUpperInvariant();
+            await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Coupons\" WHERE \"Code\" = {couponCode} FOR UPDATE");
             var couponVal = await couponService.ValidateCouponAsync(request.CouponCode, summary.Subtotal, delivery);
+            if (!couponVal.IsValid) throw new ShopException(couponVal.Message ?? "Coupon is no longer available.");
             if (couponVal.IsValid && !string.IsNullOrEmpty(couponVal.Code))
             {
                 discount = couponVal.DiscountAmount;
@@ -537,6 +537,12 @@ public sealed class ShoppingService(
         var adSetId = !string.IsNullOrWhiteSpace(request.AdSetId) ? request.AdSetId.Trim() : attr?.AdSetId;
         var adId = !string.IsNullOrWhiteSpace(request.AdId) ? request.AdId.Trim() : attr?.AdId;
         var landingPath = attr?.LandingPath;
+        var marketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted";
+        if (!marketingConsent)
+        {
+            fbclid = fbp = fbc = utmSource = utmMedium = utmCampaign = utmContent = utmTerm = campaignId = adSetId = adId = landingPath = null;
+            clientIp = clientUserAgent = null;
+        }
         var hasFbclid = !string.IsNullOrWhiteSpace(fbclid);
         var firstTouch = attr?.FirstTouchSource ?? (hasFbclid ? "meta_ads" : (!string.IsNullOrWhiteSpace(utmSource) ? utmSource : "direct"));
         var lastTouch = attr?.LastTouchSource ?? (!string.IsNullOrWhiteSpace(utmSource) ? utmSource : (hasFbclid ? "meta_ads" : "direct"));
@@ -571,7 +577,8 @@ public sealed class ShoppingService(
             AdSetId = adSetId,
             AdId = adId,
             LandingPath = landingPath,
-            MetaPurchaseSent = true,
+            MarketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted",
+            MetaPurchaseSent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted",
             ClientIpAddress = clientIp,
             ClientUserAgent = clientUserAgent,
             Items = summary.Items.Select(i => new OrderItem
@@ -610,6 +617,7 @@ public sealed class ShoppingService(
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
 
         // Dispatch Meta Conversions API (CAPI) server-side Purchase event
         if (metaApi != null)
@@ -640,6 +648,8 @@ public sealed class ShoppingService(
 
     public async Task<Order> ConfirmPaymentAsync(Guid publicToken, ConfirmPaymentRequest request)
     {
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"PublicToken\" = {publicToken} FOR UPDATE");
         var order = await db.Orders
             .Include(o => o.DeliveryAddress)
             .Include(o => o.Items)
@@ -654,6 +664,10 @@ public sealed class ShoppingService(
             throw new ShopException($"This order cannot be updated because its status is {order.Status}.");
         }
 
+        await db.Entry(order).ReloadAsync();
+        if (order.PaidAmount > 0) throw new ShopException("This payment is already verified.");
+        if (request.PaymentMethod is not ("COD" or "BkashAdvance" or "FullPayment"))
+            throw new ShopException("Select a supported payment method.");
         var dSettings = await deliverySettings.GetSettingsAsync();
 
         if (request.PaymentMethod is "BkashAdvance" or "FullPayment")
@@ -677,7 +691,7 @@ public sealed class ShoppingService(
             order.SenderPhoneNumber = request.SenderPhoneNumber.Trim();
             order.TransactionId = request.TransactionId.Trim().ToUpperInvariant();
             order.PaidAmount = 0m; // Verification pending!
-            order.Status = OrderStatus.Pending; // Order remains pending until admin confirmation!
+            // Fulfillment is independent of payment submission.
 
             var existingPayment = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash);
             if (existingPayment != null)
@@ -705,15 +719,22 @@ public sealed class ShoppingService(
                 throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
             }
             order.PaidAmount = 0m;
-            order.Status = OrderStatus.Pending;
+            // Preserve fulfillment progress.
         }
 
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         return order;
     }
 
     public async Task<Order> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
     {
+        await using var tx = await db.Database.BeginTransactionAsync();
+        var transactionId = verifiedTrxId?.Trim().ToUpperInvariant();
+        // Serialize all verifications. This also protects legacy rows without a transaction ID.
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({739172004L})");
+        await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE");
         var order = await db.Orders
             .Include(o => o.DeliveryAddress)
             .Include(o => o.Items)
@@ -725,16 +746,32 @@ public sealed class ShoppingService(
             throw new ShopException("Order not found.");
         }
 
+        await db.Entry(order).ReloadAsync();
+        foreach (var payment in order.Payments) await db.Entry(payment).ReloadAsync();
+        if (order.Status == OrderStatus.Cancelled) throw new ShopException("Cancelled orders cannot accept payment.");
         var dSettings = await deliverySettings.GetSettingsAsync();
-        var amount = verifiedAmount ?? (order.PaidAmount > 0 ? order.PaidAmount : dSettings.AdvanceAmount);
-
-        if (!string.IsNullOrEmpty(verifiedTrxId))
+        var amount = verifiedAmount ?? order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash)?.Amount ?? dSettings.AdvanceAmount;
+        if (amount <= 0) amount = verifiedAmount ?? dSettings.AdvanceAmount;
+        transactionId ??= order.TransactionId?.Trim().ToUpperInvariant();
+        if (amount <= 0 || amount > order.Total) throw new ShopException("Payment amount must be positive and cannot exceed the order total.");
+        if (string.IsNullOrWhiteSpace(transactionId) || transactionId.Length < 6)
+            throw new ShopException("A valid transaction ID is required for verification.");
+        var completed = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash && p.Status == PaymentStatus.Completed);
+        if (completed != null)
         {
-            order.TransactionId = verifiedTrxId.Trim().ToUpperInvariant();
+            if (completed.ExternalReference == transactionId && completed.Amount == amount)
+            {
+                await tx.CommitAsync();
+                return order;
+            }
+            throw new ShopException("This order already has a verified payment. Review it manually.");
         }
+        if (await db.Payments.AnyAsync(p => p.OrderId != orderId && p.Method == PaymentMethod.Bkash
+            && p.Status == PaymentStatus.Completed && p.ExternalReference == transactionId))
+            throw new ShopException("This transaction has already been verified against another order.");
+        order.TransactionId = transactionId;
         order.PaidAmount = amount;
-        // Keep order.Status as Pending! Admin must explicitly confirm the order.
-        order.Status = OrderStatus.Pending;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.OrderTimelineEvents.Add(new OrderTimelineEvent
         {
@@ -765,6 +802,8 @@ public sealed class ShoppingService(
         }
 
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
 
         // Send payment verified email with full order summary
         try
@@ -813,6 +852,8 @@ public sealed class ShoppingService(
 
     public async Task<Order> RejectPaymentAndCancelOrderAsync(int orderId, string? reason = null)
     {
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE");
         var order = await db.Orders
             .Include(o => o.DeliveryAddress)
             .Include(o => o.Items)
@@ -824,12 +865,12 @@ public sealed class ShoppingService(
             throw new ShopException("Order not found.");
         }
 
+        await db.Entry(order).ReloadAsync();
         if (order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)
         {
             throw new ShopException($"Order #{orderId} is already {order.Status}.");
         }
 
-        await using var tx = await db.Database.BeginTransactionAsync();
 
         // Release reserved inventory back to stock
         foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
@@ -862,6 +903,7 @@ public sealed class ShoppingService(
 
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
 
         // Dispatch cancellation email to customer
         try

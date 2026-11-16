@@ -5,7 +5,7 @@
 
 <PageTitle>Track Your Order · JAS International</PageTitle>
 
-<div class="shop-container py-8 sm:py-12 max-w-4xl mx-auto">
+<div class="shop-container tracking-journey py-8 sm:py-12 max-w-4xl mx-auto">
     <!-- Header -->
     <div class="text-center mb-8 sm:mb-10">
         <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 mb-3">
@@ -233,7 +233,7 @@
                 </div>
                 <h3 class="text-base font-bold text-rose-950">No Order Found</h3>
                 <p class="text-xs text-rose-700 mt-1 max-w-sm mx-auto">
-                    We could not find an order matching ID <strong>#@OrderId</strong> with phone number ending in <strong>@PhoneNumber</strong>.
+                    We could not find an order with those details. Check your order number and full phone number.
                 </p>
                 <!--email_off-->
                 <p class="text-[11px] text-slate-400 mt-3">
@@ -260,19 +260,16 @@
         if (OrderId.HasValue && OrderId.Value > 0 && !string.IsNullOrWhiteSpace(PhoneNumber))
         {
             hasSearched = true;
-            var cleanPhone = new string(PhoneNumber.Where(char.IsDigit).ToArray());
-            if (cleanPhone.Length > 8)
+            var cleanPhone = JASIntWeb.Services.BangladeshPhone.Normalize(PhoneNumber);
+            foundOrder = null;
+            if (cleanPhone is not null)
             {
-                cleanPhone = cleanPhone[^8..]; // Match last 8 digits for flexible entry (e.g. 01711465078 or +8801711465078)
+                var candidate = await Db.Orders.AsNoTracking()
+                    .Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.TimelineEvents)
+                    .SingleOrDefaultAsync(o => o.Id == OrderId.Value);
+                if (JASIntWeb.Services.BangladeshPhone.Normalize(candidate?.DeliveryAddress?.PhoneNumber) == cleanPhone)
+                    foundOrder = candidate;
             }
-
-            foundOrder = await Db.Orders.AsNoTracking()
-                .Include(o => o.DeliveryAddress)
-                .Include(o => o.Items)
-                .Include(o => o.TimelineEvents)
-                .SingleOrDefaultAsync(o => o.Id == OrderId.Value && 
-                    o.DeliveryAddress != null && 
-                    o.DeliveryAddress.PhoneNumber.Contains(cleanPhone));
         }
         else
         {

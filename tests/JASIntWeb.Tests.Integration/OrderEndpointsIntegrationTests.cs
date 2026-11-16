@@ -7,21 +7,6 @@ public class OrderEndpointsIntegrationTests : JasIntegrationTestBase
 {
 
     [Test]
-    public async Task GetOrderStatus_ForExistingOrder_Returns200WithStatusDetails()
-    {
-        var client = Factory.CreateClient();
-        var response = await client.GetAsync("/api/orders/1/status");
-
-        if (response.StatusCode == System.Net.HttpStatusCode.OK)
-        {
-            var data = await response.Content.ReadFromJsonAsync<OrderStatusDto>();
-            await data.Should().NotBeNull();
-            await data!.Id.Should().BeEqualTo(1);
-            await data.Status.Should().NotBeNull();
-        }
-    }
-
-    [Test]
     public async Task GetOrderStatus_ForNonExistentOrder_Returns404NotFound()
     {
         var client = Factory.CreateClient();

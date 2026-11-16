@@ -1,3 +1,4 @@
+@inject JASIntWeb.Services.CatalogService Catalog
 @page "/admin/inventory"
 @layout AdminLayout
 @using Microsoft.AspNetCore.Components.QuickGrid
@@ -215,6 +216,7 @@
                 });
 
                 await Db.SaveChangesAsync();
+                await Catalog.InvalidateProductCacheAsync();
                 var targetUrl = FilterUrl(Filter);
                 var sep = targetUrl.Contains('?') ? "&" : "?";
                 Nav.NavigateTo($"{targetUrl}{sep}toast=restocked");

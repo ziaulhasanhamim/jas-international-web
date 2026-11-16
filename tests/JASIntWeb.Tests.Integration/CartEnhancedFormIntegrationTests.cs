@@ -440,12 +440,13 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
             { "Comment", "Battery lasts for 2 days as advertised. Fully authentic product with warranty." }
         });
 
-        var response = await client.PostAsync($"/product/{product.Slug}", form);
+        var response = await client.PostAsync($"/products/{product.Id}/reviews", form);
         await ((int)response.StatusCode).Should().BeEqualTo(200);
 
         var reviewInDb = await db.ProductReviews.FirstOrDefaultAsync(r => r.ProductId == product.Id && r.CustomerName == "Hasan Tester");
         await reviewInDb.Should().NotBeNull();
         await reviewInDb!.Rating.Should().BeEqualTo(5);
+        await reviewInDb.IsApproved.Should().BeFalse();
         await reviewInDb.Comment.Should().Contain("Battery lasts");
     }
 

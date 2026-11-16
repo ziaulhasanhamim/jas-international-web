@@ -13,7 +13,7 @@ public class DeliverySettings : Entity
     public string NagadNumber { get; set; } = "01711465078";
     public string? BanglaQrImageUrl { get; set; } = "/jas-logo.png";
     public string? PaymentInstructions { get; set; }
-    public string? SmsWebhookSecret { get; set; } = "jas_sms_secret_2026";
+    public string? SmsWebhookSecret { get; set; }
     public string? WhatsAppNumber { get; set; } = "8801711465078";
     public string? MessengerPageId { get; set; } = "international.jas";
     public string? FacebookDomainVerification { get; set; }

@@ -230,7 +230,8 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
     public async Task UploadImageEndpoint_WithValidImage_ReturnsOkAndUrl()
     {
         using var content = new MultipartFormDataContent();
-        var dummyBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00 };
+        using var image = new ImageMagick.MagickImage(ImageMagick.MagickColors.White, 2, 2);
+        var dummyBytes = image.ToByteArray(ImageMagick.MagickFormat.Png);
         var fileContent = new ByteArrayContent(dummyBytes);
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
         content.Add(fileContent, "file", "test-image.png");

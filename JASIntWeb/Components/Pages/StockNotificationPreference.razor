@@ -1,0 +1,32 @@
+@page "/stock-notifications/{Token:guid}/{Action}"
+@page "/stock-notifications/requested"
+@inject NavigationManager Navigation
+<PageTitle>Stock alerts · JAS International</PageTitle>
+<div class="shop-container confidence-page">
+    <section class="confidence-panel">
+        <span class="section-eyebrow">JAS stock alerts</span>
+        @if (Action == "confirm" || Action == "unsubscribe")
+        {
+            <h1>@(Done ? "Your preference has been saved" : Action == "confirm" ? "Confirm your stock alert" : "Cancel your stock alert")</h1>
+            <p>@(Done ? "Confirmed requests receive one email when the option is available. Cancelled requests receive no further alerts." : "Save your preference for the request linked in your email.")</p>
+            @if (!Done)
+            {
+                <form method="post" action="@($"/stock-notifications/{Token}/{Action}")" data-enhance="false">
+                    <AntiforgeryToken />
+                    <button class="btn-primary" type="submit">@(Action == "confirm" ? "Confirm email & activate alert" : "Unsubscribe")</button>
+                </form>
+            }
+        }
+        else
+        {
+            <h1>Check your inbox</h1>
+            <p>If this is a new request, we’ll email a confirmation link. Confirm it to activate your stock alert. Check your spam folder too.</p>
+        }
+        <a href="/products" class="confidence-return">Continue shopping →</a>
+    </section>
+</div>
+@code {
+    [Parameter] public Guid Token { get; set; }
+    [Parameter] public string? Action { get; set; }
+    private bool Done => Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).ContainsKey("done");
+}

@@ -25,7 +25,6 @@ builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
 builder.Services.AddQuickGridEntityFrameworkAdapter();
 builder.AddStoreHosting();
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
-builder.Services.AddMemoryCache();
 builder.Services.AddHybridCache(options =>
 {
     options.DefaultEntryOptions = new HybridCacheEntryOptions
@@ -79,6 +78,9 @@ builder.Services.AddScoped<SalesMetricsService>();
 builder.Services.AddScoped<AdminSession>();
 builder.Services.AddScoped<AccountMailService>();
 builder.Services.AddScoped<CouponService>();
+builder.Services.AddScoped<IStockNotificationMailTransport, StockNotificationMailTransport>();
+builder.Services.AddScoped<StockNotificationService>();
+builder.Services.AddHostedService<StockNotificationWorker>();
 builder.Services.AddScoped<DeliverySettingsService>();
 builder.Services.AddSingleton<ISeoService, SeoService>();
 builder.Services.AddScoped<SitemapService>();
@@ -89,7 +91,7 @@ builder.Services.AddSingleton<IStorageService, CloudinaryStorageService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
-        options.DetailedErrors = true;
+        options.DetailedErrors = builder.Environment.IsDevelopment();
         options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(5);
     })
     .AddHubOptions(options =>
@@ -97,7 +99,7 @@ builder.Services.AddRazorComponents()
         options.MaximumReceiveMessageSize = 1024 * 1024;
         options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
         options.HandshakeTimeout = TimeSpan.FromSeconds(30);
-        options.EnableDetailedErrors = true;
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     })
     .AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
@@ -177,9 +179,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-    options.ForwardLimit = null;
+    foreach (var proxy in builder.Configuration.GetSection("Hosting:KnownProxies").Get<string[]>() ?? [])
+    {
+        if (!System.Net.IPAddress.TryParse(proxy, out var address))
+            throw new InvalidOperationException("Hosting:KnownProxies must contain valid IP addresses.");
+        options.KnownProxies.Add(address);
+    }
+    options.ForwardLimit = 1;
 });
 
 // Built-in .NET Health Check with EF Core Database Connectivity Check
@@ -223,7 +229,8 @@ if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("See
     await app.Services.SeedCommerceEnhancementsAsync();
 }
 await app.Services.SeedAdminAsync(builder.Configuration);
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseWhen(context => !context.Request.Path.StartsWithSegments("/api"), branch =>
+    branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.Use(async (context, next) =>
 {
     var response = context.Response;
@@ -257,6 +264,7 @@ app.UseMiddleware<CanonicalHostAndRedirectMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.Use(JASIntWeb.Services.OrderAccess.ProtectAsync);
 app.UseOutputCache();
 app.UseMiddleware<MetaAttributionMiddleware>();
 app.UseMiddleware<CartRequestMiddleware>();
@@ -274,45 +282,57 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseStaticFiles();
 app.MapStaticAssets();
 
-app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IStorageService storage) =>
+app.MapGet("/api/admin/uploads/security", (HttpContext context, Microsoft.AspNetCore.Antiforgery.IAntiforgery csrf) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    return Results.Ok(new { token = csrf.GetAndStoreTokens(context).RequestToken });
+}).RequireAuthorization("AdminOnly");
+
+app.MapPost("/api/admin/uploads/product-images", async (HttpRequest request, IStorageService storage, Microsoft.AspNetCore.Antiforgery.IAntiforgery csrf, ILogger<Program> uploadLogger) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Form content required" });
 
+    try { await csrf.ValidateRequestAsync(request.HttpContext); }
+    catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException) { return Results.BadRequest(new { error = "Refresh the page and try again." }); }
     var form = await request.ReadFormAsync();
     var files = form.Files;
     if (files.Count == 0)
         return Results.BadRequest(new { error = "No files uploaded" });
 
     string[] allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg"];
+    if (files.Count > 10) return Results.BadRequest(new { error = "Upload up to 10 images at a time." });
     var urls = new List<string>();
 
     try
     {
         foreach (var file in files)
         {
-            if (file.Length == 0 || file.Length > 10 * 1024 * 1024) continue;
+            if (file.Length == 0 || file.Length > 10 * 1024 * 1024) return Results.BadRequest(new { error = "Each image must be between 1 byte and 10MB." });
             var ext = Path.GetExtension(file.FileName);
-            if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
+            if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) return Results.BadRequest(new { error = "Unsupported image format." });
 
             await using var stream = file.OpenReadStream();
-            var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+            var url = await ImageUploadValidator.UploadAsync(storage, stream, file.FileName, file.ContentType, request.HttpContext.RequestAborted);
             urls.Add(url);
         }
 
         return Results.Ok(new { urls });
     }
-    catch (Exception ex)
+    catch (Exception error)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        uploadLogger.LogWarning(error, "Admin image upload failed.");
+        return Results.BadRequest(new { error = "The image could not be uploaded. Check its format and try again." });
     }
-}).DisableAntiforgery();
+}).RequireAuthorization("AdminOnly");
 
-app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorageService storage) =>
+app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorageService storage, Microsoft.AspNetCore.Antiforgery.IAntiforgery csrf, ILogger<Program> uploadLogger) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Form content required" });
 
+    try { await csrf.ValidateRequestAsync(request.HttpContext); }
+    catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException) { return Results.BadRequest(new { error = "Refresh the page and try again." }); }
     var form = await request.ReadFormAsync();
     var file = form.Files.FirstOrDefault();
     if (file is null || file.Length == 0)
@@ -329,20 +349,23 @@ app.MapPost("/api/admin/uploads/brand-logo", async (HttpRequest request, IStorag
     try
     {
         await using var stream = file.OpenReadStream();
-        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+        var url = await ImageUploadValidator.UploadAsync(storage, stream, file.FileName, file.ContentType, request.HttpContext.RequestAborted);
         return Results.Ok(new { url });
     }
-    catch (Exception ex)
+    catch (Exception error)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        uploadLogger.LogWarning(error, "Admin image upload failed.");
+        return Results.BadRequest(new { error = "The image could not be uploaded. Check its format and try again." });
     }
-}).DisableAntiforgery();
+}).RequireAuthorization("AdminOnly");
 
-app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageService storage) =>
+app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageService storage, Microsoft.AspNetCore.Antiforgery.IAntiforgery csrf, ILogger<Program> uploadLogger) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Form content required" });
 
+    try { await csrf.ValidateRequestAsync(request.HttpContext); }
+    catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException) { return Results.BadRequest(new { error = "Refresh the page and try again." }); }
     var form = await request.ReadFormAsync();
     var file = form.Files.FirstOrDefault();
     if (file is null || file.Length == 0)
@@ -359,14 +382,15 @@ app.MapPost("/api/admin/uploads/image", async (HttpRequest request, IStorageServ
     try
     {
         await using var stream = file.OpenReadStream();
-        var url = await storage.UploadFileAsync(stream, file.FileName, file.ContentType);
+        var url = await ImageUploadValidator.UploadAsync(storage, stream, file.FileName, file.ContentType, request.HttpContext.RequestAborted);
         return Results.Ok(new { url });
     }
-    catch (Exception ex)
+    catch (Exception error)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        uploadLogger.LogWarning(error, "Admin image upload failed.");
+        return Results.BadRequest(new { error = "The image could not be uploaded. Check its format and try again." });
     }
-}).DisableAntiforgery();
+}).RequireAuthorization("AdminOnly");
 
 app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db, ShoppingService shop, DeliverySettingsService settingsSvc, ILogger<Program> logger) =>
 {
@@ -377,6 +401,8 @@ app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db
     string directRef = "";
     decimal directAmount = 0;
 
+    try
+    {
     if (request.HasJsonContentType())
     {
         using var doc = await System.Text.Json.JsonDocument.ParseAsync(request.Body);
@@ -418,15 +444,19 @@ app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db
         decimal.TryParse(form["amount"].ToString(), out directAmount);
     }
 
-    // Verify secret if configured
-    var settings = await settingsSvc.GetSettingsAsync();
-    if (!string.IsNullOrWhiteSpace(settings.SmsWebhookSecret) && !string.IsNullOrWhiteSpace(secret))
-    {
-        if (!string.Equals(settings.SmsWebhookSecret.Trim(), secret.Trim(), StringComparison.Ordinal))
-        {
-            return Results.Json(new { success = false, error = "Invalid secret key" }, statusCode: 401);
-        }
     }
+    catch (Exception error) when (error is System.Text.Json.JsonException or InvalidOperationException or FormatException or OverflowException)
+    {
+        return Results.BadRequest(new { error = "Invalid payment notification." });
+    }
+
+    var settings = await settingsSvc.GetSettingsAsync();
+    if (string.IsNullOrWhiteSpace(settings.SmsWebhookSecret) || settings.SmsWebhookSecret is "jas_sms_secret_2026" or "jas_secret_sms_2026")
+        return Results.Json(new { error = "Payment webhook is disabled." }, statusCode: 503);
+    var expectedSecret = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(settings.SmsWebhookSecret));
+    var actualSecret = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(secret));
+    if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedSecret, actualSecret))
+        return Results.Unauthorized();
 
     decimal amount = directAmount;
     string refCode = directRef;
@@ -455,28 +485,23 @@ app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db
         return Results.BadRequest(new { error = "No message, TrxID, or reference provided" });
     }
 
-    Order? order = null;
-    if (!string.IsNullOrEmpty(refCode))
-    {
-        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.PaymentReferenceCode == refCode || o.PublicToken.ToString().EndsWith(refCode));
-    }
-    if (order == null && !string.IsNullOrEmpty(trxId))
-    {
-        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.TransactionId == trxId);
-    }
-    if (order == null && !string.IsNullOrEmpty(fromPhone))
-    {
-        order = await db.Orders.Include(o => o.DeliveryAddress).Include(o => o.Items).Include(o => o.Payments)
-            .Where(o => o.SenderPhoneNumber == fromPhone && o.PaidAmount == 0)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync();
-    }
+    trxId = trxId.Trim().ToUpperInvariant();
+    refCode = refCode.Trim();
+    if (amount <= 0 || amount > 10000000m || string.IsNullOrWhiteSpace(trxId) || trxId.Length < 6)
+        return Results.BadRequest(new { error = "A positive amount and valid transaction ID are required." });
+    var matches = await db.Orders.AsNoTracking()
+        .Where(o => (!string.IsNullOrEmpty(refCode) && o.PaymentReferenceCode == refCode)
+            || o.TransactionId == trxId)
+        .Select(o => o.Id).Distinct().Take(2).ToListAsync();
+    if (matches.Count != 1)
+        return Results.Conflict(new { error = "No unambiguous order match. Review this payment manually." });
+    var order = await db.Orders.FindAsync(matches[0]);
 
     if (order != null)
     {
-        var verified = await shop.VerifyPaymentAsync(order.Id, amount > 0 ? amount : null, !string.IsNullOrEmpty(trxId) ? trxId : null);
+        Order verified;
+        try { verified = await shop.VerifyPaymentAsync(order.Id, amount, trxId); }
+        catch (ShopException ex) { return Results.Conflict(new { error = ex.Message }); }
         logger.LogInformation("SMS Webhook: Payment verified for Order #{OrderId} (TrxID: {TrxId}, Amount: {Amount})", verified.Id, verified.TransactionId, verified.PaidAmount);
 
         return Results.Ok(new
@@ -487,7 +512,7 @@ app.MapPost("/api/webhooks/mfs-sms", async (HttpRequest request, AppDbContext db
             reference = verified.PaymentReferenceCode,
             trxId = verified.TransactionId,
             amountPaid = verified.PaidAmount,
-            orderStatus = "Pending",
+            orderStatus = verified.Status.ToString(),
             paymentStatus = "Verified",
             message = "Payment verified successfully. Order status remains Pending until confirmed by admin in Admin Panel."
         });
@@ -510,7 +535,7 @@ app.MapGet("/api/orders/{id:int}/payment-status", async (int id, AppDbContext db
     {
         id = order.Id,
         status = order.Status.ToString(),
-        isPaid = order.PaidAmount > 0 || order.Status == OrderStatus.Processing || order.Status == OrderStatus.InTransit || order.Status == OrderStatus.Delivered,
+        isPaid = order.PaidAmount > 0 && await db.Payments.AnyAsync(p => p.OrderId == id && p.Status == PaymentStatus.Completed),
         paidAmount = order.PaidAmount,
         trxId = order.TransactionId
     });
@@ -623,6 +648,7 @@ app.MapGet("/account/external-login-callback", async (
 });
 
 app.MapStoreEndpoints();
+app.MapCustomerConfidenceEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(JASIntWeb.Client._Imports).Assembly);
 app.Run();

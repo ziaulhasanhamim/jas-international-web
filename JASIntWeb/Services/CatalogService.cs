@@ -325,8 +325,8 @@ public sealed class CatalogService(
                 p.Brand != null ? p.Brand.Name : null,
                 p.Brand != null ? p.Brand.Slug : null,
                 p.CompareAtPrice,
-                p.Rating > 0 ? p.Rating : 5.0m,
-                p.ReviewCount > 0 ? p.ReviewCount : 12,
+                db.ProductReviews.Where(r => r.ProductId == p.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
+                db.ProductReviews.Count(r => r.ProductId == p.Id && r.IsApproved),
                 p.IsNewArrival,
                 p.IsFeatured))
             .ToListAsync();
@@ -520,8 +520,8 @@ public sealed class CatalogService(
                     p.Product.Brand != null ? p.Product.Brand.Name : null,
                     p.Product.Brand != null ? p.Product.Brand.Slug : null,
                     p.Product.CompareAtPrice,
-                    p.Product.Rating > 0 ? p.Product.Rating : 5.0m,
-                    p.Product.ReviewCount > 0 ? p.Product.ReviewCount : 12,
+                    db.ProductReviews.Where(r => r.ProductId == p.Product.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
+                    db.ProductReviews.Count(r => r.ProductId == p.Product.Id && r.IsApproved),
                     p.Product.IsNewArrival,
                     p.Product.IsFeatured))
             .ToListAsync(), count);

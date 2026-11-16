@@ -128,7 +128,7 @@ class OrderTrackingController {
                 try {
                     const data = JSON.parse(event.data);
                     if (data && (data.isPaymentVerified || data.isCancelled)) {
-                        redirectToOrder(data.orderId || orderId);
+                        redirectToOrder(orderId);
                     }
                 } catch {
                     // Ignore non-JSON heartbeat pings
@@ -149,7 +149,7 @@ class OrderTrackingController {
                 if (response.ok) {
                     const data = await response.json();
                     if (data && (data.isPaymentVerified || data.isCancelled)) {
-                        redirectToOrder(data.id || orderId);
+                        redirectToOrder(orderId);
                     }
                 }
             } catch {

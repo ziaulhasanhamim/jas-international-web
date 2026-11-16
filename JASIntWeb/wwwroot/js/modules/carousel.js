@@ -140,7 +140,7 @@ class CarouselInstance {
 (function (global) {
     "use strict";
 
-    const activeCarousels = new WeakMap();
+    const activeCarousels = new Map();
 
     function initCarousels() {
         const carouselElements = document.querySelectorAll("[data-carousel]");
@@ -153,6 +153,10 @@ class CarouselInstance {
 
     const JAS = global.JAS ??= {};
     JAS.Carousel = {
-        init: initCarousels
+        init: initCarousels,
+        cleanup: () => {
+            for (const carousel of activeCarousels.values()) carousel.destroy();
+            activeCarousels.clear();
+        }
     };
 })(window);

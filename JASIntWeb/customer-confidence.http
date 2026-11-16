@@ -1,0 +1,35 @@
+@baseUrl = https://localhost:7176
+@token = replace-with-private-order-guid
+
+### Guest order status requires the private token
+GET {{baseUrl}}/api/orders/{{token}}/status
+
+### Numeric order IDs require owner or admin authentication
+GET {{baseUrl}}/api/orders/1/status
+
+### Obtain upload CSRF token (admin cookie required)
+GET {{baseUrl}}/api/admin/uploads/security
+
+### Subscribe using the antiforgery hidden field and cookie from the product page
+POST {{baseUrl}}/stock-notifications
+Content-Type: application/x-www-form-urlencoded
+
+variantId=1&email=shopper%40example.test&__RequestVerificationToken=replace-with-form-token
+
+### Review pending moderation (antiforgery cookie and form token required)
+POST {{baseUrl}}/products/1/reviews
+Content-Type: application/x-www-form-urlencoded
+
+Name=Test+Shopper&Rating=5&Comment=A+helpful+and+detailed+review&__RequestVerificationToken=replace-with-form-token
+
+### Confirm subscription (use actual subscription token and form token)
+POST {{baseUrl}}/stock-notifications/{{token}}/confirm
+Content-Type: application/x-www-form-urlencoded
+
+__RequestVerificationToken=replace-with-form-token
+
+### Unsubscribe
+POST {{baseUrl}}/stock-notifications/{{token}}/unsubscribe
+Content-Type: application/x-www-form-urlencoded
+
+__RequestVerificationToken=replace-with-form-token

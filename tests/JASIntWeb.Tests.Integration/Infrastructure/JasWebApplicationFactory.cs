@@ -13,6 +13,7 @@ namespace JASIntWeb.Tests.Integration.Infrastructure;
 
 public class JasWebApplicationFactory : TestWebApplicationFactory<Program>
 {
+    protected virtual bool UseRealAntiforgery => false;
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         PostgreSqlTestDatabase.InitializeAsync().GetAwaiter().GetResult();
@@ -23,12 +24,15 @@ public class JasWebApplicationFactory : TestWebApplicationFactory<Program>
             {
                 ["DB_URL"] = PostgreSqlTestDatabase.ConnectionString,
                 ["Seed:Enabled"] = "false",
+                ["Mail:Provider"] = "Smtp", ["Mail:Host"] = "", ["Mail:Smtp:Host"] = "",
                 ["ConnectionStrings:DefaultConnection"] = PostgreSqlTestDatabase.ConnectionString
             });
         });
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<JASIntWeb.Services.IStorageService>();
+            services.AddSingleton<JASIntWeb.Services.IStorageService, TestImageStorage>();
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextFactory<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
@@ -41,8 +45,14 @@ public class JasWebApplicationFactory : TestWebApplicationFactory<Program>
                 o.UseNpgsql(PostgreSqlTestDatabase.ConnectionString)
                  .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
-            services.RemoveAll<IAntiforgery>();
-            services.AddSingleton<IAntiforgery, TestAntiforgery>();
+            if (!UseRealAntiforgery)
+            {
+                services.RemoveAll<IAntiforgery>();
+                services.AddSingleton<IAntiforgery, TestAntiforgery>();
+            }
+            var stockWorker = services.FirstOrDefault(s => s.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+                && s.ImplementationType == typeof(JASIntWeb.Services.StockNotificationWorker));
+            if (stockWorker != null) services.Remove(stockWorker);
 
             services.AddAuthentication(options =>
             {
@@ -82,4 +92,11 @@ public class JasWebApplicationFactory : TestWebApplicationFactory<Program>
     {
         await PostgreSqlTestDatabase.ResetAsync();
     }
+}
+
+internal sealed class TestImageStorage : JASIntWeb.Services.IStorageService
+{
+    public bool IsConfigured => true;
+    public Task<string> UploadFileAsync(Stream stream, string fileName, string contentType, CancellationToken ct = default) => Task.FromResult("/uploads/" + Path.GetFileName(fileName));
+    public Task DeleteFileAsync(string fileUrl, CancellationToken ct = default) => Task.CompletedTask;
 }

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 namespace JASIntWeb.Services;
 // Called through AdminSession, which authorizes every operation in a fresh service scope.
 
-public sealed class AdminService(AppDbContext db, UserManager<User> users, HybridCache cache, AccountMailService mailService, IMetaConversionsApiService? metaApi = null)
+public sealed class AdminService(AppDbContext db, UserManager<User> users, HybridCache cache, AccountMailService mailService, IMetaConversionsApiService? metaApi = null, CatalogService? catalog = null)
 {
     private static void Validate(object input)
     {
@@ -332,6 +332,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await SetStockCoreAsync(v.Id, input.Stock, "Variant editor stock count");
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
         return v.Id;
@@ -379,6 +380,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await SetStockCoreAsync(input.VariantId, input.Quantity, input.Reason.Trim());
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
@@ -477,6 +479,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
@@ -579,6 +582,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
         return count;
     }
@@ -677,6 +681,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
 
         if (statusChanged)
         {
@@ -795,6 +800,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         placement.IsActive = input.Featured && !input.Hidden;
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagCategories);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
     }
@@ -1055,6 +1061,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagBrands);
     }
 
@@ -1256,6 +1263,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             }
         }
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
     }
 
     public async Task ReorderAsync(OrderableKind kind, int scopeId, List<int> ids)
@@ -1325,6 +1333,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
+        if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagSlides);
         await cache.RemoveByTagAsync(CatalogService.TagCategories);
         await cache.RemoveByTagAsync(CatalogService.TagSections);

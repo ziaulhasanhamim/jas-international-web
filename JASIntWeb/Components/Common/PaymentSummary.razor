@@ -1,0 +1,28 @@
+@using JASIntWeb.Persistence.Entities
+<section class="confidence-panel payment-summary" aria-labelledby="payment-summary-title">
+    <div class="confidence-heading">
+        <div><span class="section-eyebrow">Payment</span><h2 id="payment-summary-title">@StatusLabel</h2></div>
+        <span class="confidence-status" data-state="@State">@State</span>
+    </div>
+    <p>@Description</p>
+    <dl class="payment-amounts">
+        <div><dt>Order total</dt><dd>৳@Order.Total.ToString("N0")</dd></div>
+        <div><dt>Verified payment</dt><dd>৳@Order.PaidAmount.ToString("N0")</dd></div>
+        <div><dt>Remaining balance</dt><dd>৳@Math.Max(0, Order.Total - Order.PaidAmount).ToString("N0")</dd></div>
+    </dl>
+    @if (Order.PaidAmount <= 0 && Order.Status != OrderStatus.Cancelled)
+    {
+        <a href="@($"/payment/{Order.PublicToken}")" class="confidence-return">Review payment instructions →</a>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public Order Order { get; set; } = null!;
+    private bool Verified => Order.Payments.Any(p => p.Status == PaymentStatus.Completed && p.Method == PaymentMethod.Bkash) && Order.PaidAmount > 0;
+    private bool Rejected => Order.Payments.Any(p => p.Method == PaymentMethod.Bkash && p.Status == PaymentStatus.Failed);
+    private string State => Verified ? "Verified" : Rejected ? "Rejected" : string.IsNullOrEmpty(Order.TransactionId) ? "Awaiting payment" : "Awaiting verification";
+    private string StatusLabel => Verified ? "Payment received" : Rejected ? "Payment needs attention" : string.IsNullOrEmpty(Order.TransactionId) ? "Choose how to pay" : "Payment details submitted";
+    private string Description => Verified ? "Your verified amount is recorded below. Fulfillment progress is shown separately."
+        : Rejected ? "Contact support with your payment receipt. Do not send another payment until the store has reviewed it."
+        : string.IsNullOrEmpty(Order.TransactionId) ? "For cash on delivery, the remaining balance is collected on delivery. Check your instructions for any required advance."
+        : "The store is checking your transaction. Submitting details does not verify a payment. You can safely return to this page later.";
+}

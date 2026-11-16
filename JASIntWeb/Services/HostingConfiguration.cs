@@ -26,22 +26,24 @@ internal static class HostingConfiguration
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                     {
                         var path = context.Request.Path;
-                        if (!HttpMethods.IsPost(context.Request.Method) && !HttpMethods.IsPut(context.Request.Method))
+                        var tracking = path.StartsWithSegments("/track-order") || path.StartsWithSegments("/track");
+                        var notification = path.StartsWithSegments("/stock-notifications") || (path.StartsWithSegments("/products") && HttpMethods.IsPost(context.Request.Method));
+                        if (!tracking && !notification && !HttpMethods.IsPost(context.Request.Method) && !HttpMethods.IsPut(context.Request.Method))
                         {
                             return RateLimitPartition.GetNoLimiter("read");
                         }
                         var account = path.StartsWithSegments("/account");
                         var checkout = path.StartsWithSegments("/checkout");
                         var cart = path.StartsWithSegments("/api/cart");
-                        if (!account && !checkout && !cart)
+                        if (!account && !checkout && !cart && !tracking && !notification)
                         {
                             return RateLimitPartition.GetNoLimiter("other");
                         }
-                        var group = account ? "account" : checkout ? "checkout" : "cart";
+                        var group = tracking ? "tracking" : notification ? "notification" : account ? "account" : checkout ? "checkout" : "cart";
                         var key = group + ":" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
                         return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
                             {
-                                PermitLimit = account ? 10 : checkout ? 20 : 80,
+                                PermitLimit = tracking || notification ? 10 : account ? 10 : checkout ? 20 : 80,
                                 Window = TimeSpan.FromMinutes(1),
                                 QueueLimit = 0,
                                 AutoReplenishment = true

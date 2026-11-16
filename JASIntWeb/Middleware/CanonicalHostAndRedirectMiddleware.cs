@@ -1,17 +1,13 @@
-using System.Collections.Concurrent;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services.Seo;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace JASIntWeb.Middleware;
 
 public sealed class CanonicalHostAndRedirectMiddleware(RequestDelegate next)
 {
-    private static readonly ConcurrentDictionary<string, string> MemoryRedirects = new(StringComparer.OrdinalIgnoreCase);
-    private static DateTimeOffset _lastRedirectSync = DateTimeOffset.MinValue;
-
-    public async Task InvokeAsync(HttpContext context, ISeoService seo, IServiceProvider sp, IWebHostEnvironment env)
+    public async Task InvokeAsync(HttpContext context, ISeoService seo, IServiceProvider sp, IWebHostEnvironment env, HybridCache cache)
     {
         var request = context.Request;
         var host = request.Host.Host;
@@ -61,7 +57,7 @@ public sealed class CanonicalHostAndRedirectMiddleware(RequestDelegate next)
         }
 
         // 4. Legacy category route consolidation: /products/{slug} -> /category/{slug}
-        if (path.StartsWith("/products/", StringComparison.OrdinalIgnoreCase))
+        if (HttpMethods.IsGet(request.Method) && path.StartsWith("/products/", StringComparison.OrdinalIgnoreCase) && !path["/products/".Length..].Contains('/'))
         {
             var slug = path["/products/".Length..].Trim().ToLowerInvariant();
             if (!string.IsNullOrWhiteSpace(slug))
@@ -79,29 +75,15 @@ public sealed class CanonicalHostAndRedirectMiddleware(RequestDelegate next)
             return;
         }
 
-        // 5. Database 301 redirects (from UrlRedirect table, cached)
-        if (DateTimeOffset.UtcNow - _lastRedirectSync > TimeSpan.FromMinutes(5))
+        var redirects = await cache.GetOrCreateAsync("seo:redirects", async ct =>
         {
-            try
-            {
-                using var scope = sp.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var redirects = await db.UrlRedirects.AsNoTracking().ToListAsync();
-                MemoryRedirects.Clear();
-                foreach (var r in redirects)
-                {
-                    MemoryRedirects[r.OldPath.Trim().ToLowerInvariant()] = r.NewPath.Trim();
-                }
-                _lastRedirectSync = DateTimeOffset.UtcNow;
-            }
-            catch
-            {
-                // Silently fallback to existing memory dictionary
-            }
-        }
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.UrlRedirects.AsNoTracking().ToDictionaryAsync(r => r.OldPath.Trim().ToLower(), r => r.NewPath, ct);
+        }, new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(5), LocalCacheExpiration = TimeSpan.FromMinutes(5) }, cancellationToken: context.RequestAborted);
 
         var normalizedLookup = path.Trim().ToLowerInvariant();
-        if (MemoryRedirects.TryGetValue(normalizedLookup, out var targetRedirect))
+        if (redirects.TryGetValue(normalizedLookup, out var targetRedirect))
         {
             context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
             context.Response.Headers.Location = targetRedirect + query;

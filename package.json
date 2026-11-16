@@ -1,11 +1,13 @@
 {
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/cli": "^4.3.3",
     "tailwindcss": "^4.3.3"
   },
   "scripts": {
     "css": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --minify",
-    "css:watch": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --watch"
+    "css:watch": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --watch",
+    "test:browser": "playwright test"
   },
   "name": "jas-international-web",
   "private": true

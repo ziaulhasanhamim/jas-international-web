@@ -90,13 +90,13 @@ else
                     <span class="text-[11px] text-slate-400">@(o.IsVerified ? "Payment Verified" : (o.Status == "Cancelled" ? "Cancelled" : "Verification Pending"))</span>
                     @if (!o.IsVerified && o.Status != "Cancelled")
                     {
-                        <a href="/payment-verification?orderid=@o.Id" class="btn-primary !px-3 !py-1.5 text-xs">
+                        <a href="/payment-verification?token=@o.PublicToken" class="btn-primary !px-3 !py-1.5 text-xs">
                             Awaiting Verification →
                         </a>
                     }
                     else
                     {
-                        <a href="/order/@o.Id" class="btn-secondary !px-3 !py-1.5 text-xs">
+                        <a href="/order/@o.PublicToken" class="btn-secondary !px-3 !py-1.5 text-xs">
                             View Order Receipt
                         </a>
                     }

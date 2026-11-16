@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115093300_AddVisitorTracking";
+    public override string LastMigrationId => "20261116211856_CustomerConfidenceAndStockNotifications";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -950,6 +950,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("LastTouchSource")
                     .HasColumnType("text");
 
+                b.Property<bool>("MarketingConsent")
+                    .HasColumnType("boolean");
+
                 b.Property<string>("MetaEventId")
                     .HasColumnType("text");
 
@@ -1575,6 +1578,83 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("ProductVariantOptions");
             });
 
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.StockNotification", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<int>("Attempts")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset?>("ConfirmationSentAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<DateTimeOffset?>("ConfirmedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("CreatedByUserId")
+                    .HasColumnType("integer");
+
+                b.Property<string>("Email")
+                    .IsRequired()
+                    .HasMaxLength(254)
+                    .HasColumnType("character varying(254)");
+
+                b.Property<string>("LastError")
+                    .HasColumnType("text");
+
+                b.Property<Guid?>("LeaseToken")
+                    .HasColumnType("uuid");
+
+                b.Property<DateTimeOffset?>("LeaseUntil")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<DateTimeOffset>("NextAttemptAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("NormalizedEmail")
+                    .IsRequired()
+                    .HasMaxLength(254)
+                    .HasColumnType("character varying(254)");
+
+                b.Property<DateTimeOffset?>("NotificationSentAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int>("ProductVariantId")
+                    .HasColumnType("integer");
+
+                b.Property<int>("Status")
+                    .HasColumnType("integer");
+
+                b.Property<Guid>("Token")
+                    .HasColumnType("uuid");
+
+                b.Property<DateTimeOffset?>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("UpdatedByUserId")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Token")
+                    .IsUnique();
+
+                b.HasIndex("ProductVariantId", "NormalizedEmail")
+                    .IsUnique()
+                    .HasFilter("\"Status\" IN (0, 1, 4)");
+
+                b.HasIndex("Status", "NextAttemptAt");
+
+                b.ToTable("StockNotifications");
+            });
+
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.UrlRedirect", b =>
             {
                 var id = b.Property<int>("Id")
@@ -2183,6 +2263,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasConstraintName("FK_VariantOptions_ProductOption");
 
                 b.Navigation("ProductAttributeOption");
+
+                b.Navigation("ProductVariant");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.StockNotification", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.ProductVariant", "ProductVariant")
+                    .WithMany()
+                    .HasForeignKey("ProductVariantId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
                 b.Navigation("ProductVariant");
             });

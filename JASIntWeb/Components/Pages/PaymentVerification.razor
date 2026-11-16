@@ -27,7 +27,9 @@
     }
     else
     {
-        <div id="payment-verification-stream" data-order-id="@order.Id" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <PaymentSummary Order="order" />
+        <OrderProgress Status="order.Status" />
+        <div id="payment-verification-stream" data-order-id="@order.PublicToken" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
             <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-8 text-white text-center">
                 <span class="flex size-14 items-center justify-center rounded-full bg-white/10 ring-4 ring-white/20 text-white mx-auto mb-4 backdrop-blur-xs">
@@ -112,13 +114,13 @@
                         Verification Timeline
                     </div>
                     <p class="text-[11px] text-amber-800">
-                        Payments are usually verified within 2 to 10 minutes during business hours. An official confirmation email will also be sent as soon as verified.
+                        The store will review your transaction during business hours. Keep your receipt and contact support if you need help.
                     </p>
                 </div>
 
                 <!-- Manual refresh button & history button -->
                 <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                    <a href="/order/@order.Id" class="btn-primary w-full text-center">
+                    <a href="/order/@order.PublicToken" class="btn-primary w-full text-center">
                         Check Status &amp; Go to Order
                     </a>
                     <a href="/orders" class="btn-secondary w-full text-center">
@@ -171,7 +173,7 @@
                 // If already verified or cancelled, redirect immediately to final order summary!
                 if (isVerified || isCancelled)
                 {
-                    Nav.NavigateTo($"/order/{order.Id}");
+                    Nav.NavigateTo($"/order/{order.PublicToken}");
                     return;
                 }
             }

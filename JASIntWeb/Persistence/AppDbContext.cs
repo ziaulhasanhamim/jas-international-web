@@ -41,9 +41,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Guide> Guides => Set<Guide>();
     public DbSet<VisitorLog> VisitorLogs => Set<VisitorLog>();
 
+    public DbSet<StockNotification> StockNotifications => Set<StockNotification>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.Entity<StockNotification>(e =>
+        {
+            e.Property(x => x.Email).HasMaxLength(254);
+            e.Property(x => x.NormalizedEmail).HasMaxLength(254);
+            e.HasIndex(x => x.Token).IsUnique();
+            e.HasIndex(x => new { x.ProductVariantId, x.NormalizedEmail }).IsUnique().HasFilter("\"Status\" IN (0, 1, 4)");
+            e.HasIndex(x => new { x.Status, x.NextAttemptAt });
+            e.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Cascade);
+        });
         ConfigureCatalog(builder);
         ConfigureProductVariants(builder);
         ConfigureInventory(builder);

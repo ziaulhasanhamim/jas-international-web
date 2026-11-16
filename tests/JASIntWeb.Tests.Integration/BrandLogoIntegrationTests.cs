@@ -15,22 +15,11 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
     [Test]
     public async Task BrandLogo_UploadEndpoint_ValidPng_ReturnsOkWithUrl()
     {
-        var client = Factory.CreateClient();
+        var client = AdminClient;
 
         using var content = new MultipartFormDataContent();
-        // 1x1 transparent PNG bytes
-        byte[] pngBytes =
-        [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-            0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
-            0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
-            0x42, 0x60, 0x82
-        ];
+        using var image = new ImageMagick.MagickImage(ImageMagick.MagickColors.White, 2, 2);
+        var pngBytes = image.ToByteArray(ImageMagick.MagickFormat.Png);
         var fileContent = new ByteArrayContent(pngBytes);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         content.Add(fileContent, "file", "test-brand-logo.png");
@@ -48,7 +37,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
     [Test]
     public async Task BrandLogo_UploadEndpoint_InvalidExtension_ReturnsBadRequest()
     {
-        var client = Factory.CreateClient();
+        var client = AdminClient;
 
         using var content = new MultipartFormDataContent();
         var fileContent = new StringContent("invalid executable content");
@@ -62,7 +51,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
     [Test]
     public async Task BrandLogo_UploadEndpoint_EmptyFile_ReturnsBadRequest()
     {
-        var client = Factory.CreateClient();
+        var client = AdminClient;
 
         using var content = new MultipartFormDataContent();
         var emptyContent = new ByteArrayContent([]);

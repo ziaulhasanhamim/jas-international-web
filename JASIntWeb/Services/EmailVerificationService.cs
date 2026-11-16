@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace JASIntWeb.Services;
 
 public sealed class EmailVerificationService(
-    IMemoryCache cache,
+    HybridCache cache,
+    IWebHostEnvironment environment,
     AccountMailService mailService,
     ILogger<EmailVerificationService> logger)
 {
@@ -18,8 +19,8 @@ public sealed class EmailVerificationService(
         // Generate a 6-digit numeric verification code (100000 - 999999)
         var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
-        // Store in memory cache for 15 minutes
-        cache.Set(CacheKey(normalizedEmail), code, TimeSpan.FromMinutes(15));
+        // Store through HybridCache for 15 minutes
+        await cache.SetAsync(CacheKey(normalizedEmail), code, new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(15), LocalCacheExpiration = TimeSpan.FromMinutes(15) });
 
         logger.LogInformation("[EmailVerification] Generated verification code for {Email}", normalizedEmail);
 
@@ -40,17 +41,18 @@ public sealed class EmailVerificationService(
         return (code, sent);
     }
 
-    public bool ValidateCode(string email, string code)
+    public async Task<bool> ValidateCodeAsync(string email, string code)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(code)) return false;
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var key = CacheKey(normalizedEmail);
 
-        if (cache.TryGetValue(key, out string? cachedCode) && !string.IsNullOrWhiteSpace(cachedCode))
+        var cachedCode = await cache.GetOrCreateAsync(key, _ => ValueTask.FromResult(""));
+        if (!string.IsNullOrWhiteSpace(cachedCode))
         {
             if (string.Equals(cachedCode.Trim(), code.Trim(), StringComparison.Ordinal))
             {
-                cache.Remove(key);
+                await cache.RemoveAsync(key);
                 return true;
             }
         }
@@ -58,16 +60,9 @@ public sealed class EmailVerificationService(
         return false;
     }
 
-    public string? GetDevCode(string email)
+    public async Task<string?> GetDevCodeAsync(string email)
     {
-        // Only show dev code on screen if SMTP is not configured
-        if (!mailService.IsConfigured)
-        {
-            if (cache.TryGetValue(CacheKey(email), out string? code))
-            {
-                return code;
-            }
-        }
-        return null;
+        if (!environment.IsDevelopment() || mailService.IsConfigured) return null;
+        return await cache.GetOrCreateAsync(CacheKey(email), _ => ValueTask.FromResult(""));
     }
 }

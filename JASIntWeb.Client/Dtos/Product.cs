@@ -2,7 +2,7 @@ namespace JASIntWeb.Client.Dtos;
 
 public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal Price, string Category, string Image,
     int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,
-    decimal? OriginalPrice = null, decimal Rating = 5.0m, int ReviewCount = 12, bool IsNewArrival = true, bool IsFeatured = false);
+    decimal? OriginalPrice = null, decimal Rating = 0m, int ReviewCount = 0, bool IsNewArrival = false, bool IsFeatured = false);
 
 public sealed record HomepageSectionDto(
     int Id,
