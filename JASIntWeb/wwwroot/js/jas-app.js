@@ -1,7 +1,8 @@
+import { initConsent } from './modules/consent.js';
 /**
  * JAS International - Main Application Orchestrator (ES2024+)
  * Coordinates modular scripts with Blazor Static SSR enhanced navigation lifecycle
- * and optional native View Transitions API.
+ * without starting Blazor circuits on static storefront routes.
  */
 
 import { initWishlist } from './modules/wishlist.js';
@@ -10,10 +11,17 @@ import { initGallery, switchMainImage } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
 
 class AppOrchestrator {
+    static async initOrderTracking() {
+        if (!document.querySelector('#live-order-tracker, #payment-verification-stream')) return;
+        await import('./modules/order-tracking.js');
+        window.JAS?.OrderTracking?.init();
+    }
+
     /**
      * Initializes all UI and tracking modules for the current DOM state
      */
     static onDomReady() {
+        initConsent();
         initWishlist();
         initCart();
         syncCartBadges();
@@ -22,9 +30,10 @@ class AppOrchestrator {
 
         const JAS = window.JAS;
         JAS?.Carousel?.init();
-        JAS?.OrderTracking?.init();
+        AppOrchestrator.initOrderTracking();
         JAS?.AdminEditor?.init();
         JAS?.MetaTracking?.init();
+        JAS?.MetaTracking?.trackPageView();
         JAS?.VisitorAnalytics?.init();
     }
 
@@ -35,6 +44,7 @@ class AppOrchestrator {
         const JAS = window.JAS;
         JAS?.Navigation?.start();
         JAS?.OrderTracking?.cleanup();
+        JAS?.Carousel?.cleanup();
     }
 
     /**
@@ -45,25 +55,23 @@ class AppOrchestrator {
 
         const updateDom = () => {
             JAS?.Navigation?.finish();
+            initConsent();
             initWishlist();
             initCart();
             syncCartBadges();
             initGallery();
             initReviews();
             JAS?.Carousel?.init();
-            JAS?.OrderTracking?.init();
+            AppOrchestrator.initOrderTracking();
             JAS?.AdminEditor?.init();
             JAS?.MetaTracking?.init();
             JAS?.MetaTracking?.trackPageView();
             JAS?.VisitorAnalytics?.trackPageView();
         };
 
-        // Use modern native View Transitions API if supported by the browser
-        if (typeof document.startViewTransition === "function") {
-            document.startViewTransition(() => updateDom());
-        } else {
-            updateDom();
-        }
+        // Blazor has already patched the DOM. Re-initialize directly; starting a
+        // view transition here can leave an input-blocking snapshot over mobile pages.
+        updateDom();
     }
 
     /**
@@ -71,6 +79,7 @@ class AppOrchestrator {
      */
     static onPageHide() {
         window.JAS?.OrderTracking?.cleanup();
+        window.JAS?.Carousel?.cleanup();
     }
 
     /**
@@ -80,12 +89,12 @@ class AppOrchestrator {
         // Connect to Blazor enhanced navigation events
         if (window.Blazor) {
             window.Blazor.addEventListener("enhancednavigationstart", this.onEnhancedNavigationStart);
-            window.Blazor.addEventListener("enhancednavigationend", this.onEnhancedNavigationEnd);
+            window.Blazor.addEventListener("enhancedload", this.onEnhancedNavigationEnd);
         } else {
             document.addEventListener("DOMContentLoaded", () => {
                 if (window.Blazor) {
                     window.Blazor.addEventListener("enhancednavigationstart", this.onEnhancedNavigationStart);
-                    window.Blazor.addEventListener("enhancednavigationend", this.onEnhancedNavigationEnd);
+                    window.Blazor.addEventListener("enhancedload", this.onEnhancedNavigationEnd);
                 }
             }, { once: true });
         }
@@ -99,6 +108,7 @@ class AppOrchestrator {
 
         // Use pagehide instead of beforeunload to guarantee bfcache (Back/Forward Cache) eligibility
         window.addEventListener("pagehide", this.onPageHide, { passive: true });
+        window.addEventListener("pageshow", event => { if (event.persisted) this.onDomReady(); }, { passive: true });
     }
 }
 

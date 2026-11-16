@@ -170,7 +170,7 @@ public static class PostgreSqlTestDatabase
             HubCity = "Khulna Sadar",
             HubCityFee = 60m,
             OutsideFee = 120m,
-            FreeDeliveryThreshold = 5000m,
+            FreeDeliveryThreshold = null,
             BkashNumber = "01711465078",
             NagadNumber = "01711465078",
             BanglaQrImageUrl = "/images/bangla-qr.png",

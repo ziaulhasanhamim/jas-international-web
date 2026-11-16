@@ -29,5 +29,8 @@ public abstract class JasIntegrationTestBase
     public async Task SetupDatabaseAsync()
     {
         await PostgreSqlTestDatabase.ResetAsync();
+        await JASIntWeb.Services.DeliverySettingsService.InvalidateCacheAsync(Factory.Services.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>());
+        await using var scope = Factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<JASIntWeb.Services.CatalogService>().InvalidateAllAsync();
     }
 }

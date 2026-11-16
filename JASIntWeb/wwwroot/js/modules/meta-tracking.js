@@ -36,6 +36,7 @@ class MetaTrackingController {
      * Captures ad click IDs (fbclid) and UTM parameters from current URL
      */
     static initAttribution() {
+        if (this.getCookie('jas_cookie_consent') !== 'accepted') return;
         try {
             const urlParams = new URLSearchParams(window.location.search);
             const now = Date.now();
@@ -187,7 +188,7 @@ class MetaTrackingController {
      * @param {string|null} eventId Deduplication identifier
      */
     static track(eventName, customData = {}, eventId = null) {
-        if (typeof window.fbq !== "function") return;
+        if (this.getCookie("jas_cookie_consent") !== "accepted" || typeof window.fbq !== "function") return;
         try {
             if (eventId) {
                 window.fbq("track", eventName, customData, { eventID: String(eventId) });
@@ -204,7 +205,7 @@ class MetaTrackingController {
      * Tracks a PageView event on route change during enhanced navigation
      */
     static trackPageView() {
-        if (typeof window.fbq === "function") {
+        if (this.getCookie("jas_cookie_consent") === "accepted" && typeof window.fbq === "function") {
             window.fbq("track", "PageView");
         }
     }
@@ -216,7 +217,20 @@ class MetaTrackingController {
 
     const JAS = global.JAS ??= {};
     JAS.MetaTracking = {
-        init: () => MetaTrackingController.initAttribution(),
+        init: () => {
+            if (MetaTrackingController.getCookie('jas_cookie_consent') !== 'accepted') return;
+            const pixel = document.querySelector('meta[name="jas-meta-pixel"]')?.content;
+            if (!pixel) return;
+            if (!window.fbq) {
+                const fbq = window.fbq = function() { fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments); };
+                fbq.queue = []; fbq.loaded = true; fbq.version = '2.0';
+                const script = document.createElement('script'); script.async = true;
+                script.src = 'https://connect.facebook.net/en_US/fbevents.js'; document.head.append(script);
+                fbq('init', pixel);
+            }
+            window.fbq('consent', 'grant');
+            MetaTrackingController.initAttribution();
+        },
         scan: () => MetaTrackingController.scanDeclarativeEvents(),
         getAttribution: () => MetaTrackingController.getAttribution(),
         track: (eventName, customData, eventId) => MetaTrackingController.track(eventName, customData, eventId),

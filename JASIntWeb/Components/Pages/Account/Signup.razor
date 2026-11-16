@@ -76,7 +76,7 @@
                         </div>
 
                         @{
-                            var devCode = Verification.GetDevCode(ActiveEmail);
+                            var devCode = developmentCode;
                             if (!string.IsNullOrEmpty(devCode))
                             {
                                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs text-amber-800">
@@ -198,10 +198,11 @@
         ? VerifyInput.Email.Trim()
         : (!string.IsNullOrWhiteSpace(QueryEmail) ? QueryEmail.Trim() : (SignupInput?.Email?.Trim() ?? ""));
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         SignupInput ??= new();
         VerifyInput ??= new() { Email = ActiveEmail };
+        developmentCode = await Verification.GetDevCodeAsync(ActiveEmail);
 
         if (!string.IsNullOrWhiteSpace(QueryNotice))
         {
@@ -215,6 +216,8 @@
             }
         }
     }
+
+    private string? developmentCode;
 
     private async Task SubmitSignup()
     {
@@ -295,7 +298,7 @@
             return;
         }
 
-        var isValid = Verification.ValidateCode(email, code);
+        var isValid = await Verification.ValidateCodeAsync(email, code);
         if (!isValid)
         {
             error = "Invalid or expired verification code. Please check the code or click Resend.";

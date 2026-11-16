@@ -14,7 +14,7 @@
 @if (product is null)
 {
     <SeoHead Title="Product Not Found | JAS International" Robots="noindex,follow" />
-    <div class="shop-container py-12 text-center">
+    <div class="shop-container product-journey py-12 text-center">
         <Icon Name="alert" Class="size-12 text-slate-300 mx-auto mb-3" />
         <h1 class="text-3xl font-bold text-slate-900">Product Not Found</h1>
         <p class="text-sm text-slate-500 mt-2 mb-6">The requested product could not be located in our catalog.</p>
@@ -156,7 +156,6 @@ else
                             var isSelected = image == imgUrl;
                             <button
                                 type="button"
-                                onclick="window.switchMainProductImage(this)"
                                 data-src="@imgUrl"
                                 data-avif="@ImageUrlHelper.GetAvifUrl(imgUrl)"
                                 data-webp="@ImageUrlHelper.GetWebpUrl(imgUrl)"
@@ -373,7 +372,7 @@ else
             </div>
         </section>
 
-        <!-- Verified Customer Reviews Section -->
+        <!-- Customer Reviews Section -->
         <section class="mt-16 border-t border-slate-200 pt-10">
             <div class="max-w-4xl">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -415,7 +414,7 @@ else
                                                 <span>@(i <= rev.Rating ? "★" : "☆")</span>
                                             }
                                         </div>
-                                        <strong class="text-xs font-bold text-slate-900">@(rev.Title ?? "Verified Customer Review")</strong>
+                                        <strong class="text-xs font-bold text-slate-900">@(rev.Title ?? "Customer Review")</strong>
                                     </div>
                                     <span class="text-[11px] text-slate-400">@rev.CreatedAt.ToString("dd MMM yyyy")</span>
                                 </div>
@@ -449,51 +448,56 @@ else
             </div>
         </section>
 
+        @if (selected is not null && selected.Stock <= 0)
+        {
+            <StockNotificationForm VariantId="selected.Id" />
+        }
+
         <!-- Write Review Modal -->
-        <div id="write-review-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn hidden">
-            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+        <div id="write-review-modal" class="review-dialog fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="review-dialog-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
+                    <h3 id="review-dialog-title" class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
                     <button type="button" data-close-modal="write-review-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer">✕</button>
                 </div>
-                <form method="post" @formname="submit-review" data-enhance class="space-y-3">
+                <form method="post" action="@($"/products/{product.Id}/reviews")" data-enhance="false" class="space-y-3">
                     <AntiforgeryToken />
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Your Rating</label>
                         <div class="flex items-center gap-2">
-                            <input type="hidden" id="review-rating-input" name="Rating" value="@(ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5))" />
+                            <input type="hidden" id="review-rating-input" name="Rating" value="5" />
                             @for (int star = 1; star <= 5; star++)
                             {
                                 var s = star;
                                 <button
                                     type="button"
                                     data-star-rating="@s"
-                                    class="star-btn text-xl @(s <= (ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)) ? "text-amber-400" : "text-slate-200") hover:scale-110 transition cursor-pointer"
+                                    class="star-btn text-xl text-amber-400 hover:scale-110 transition cursor-pointer"
                                     aria-label="@s stars"
                                 >
                                     ★
                                 </button>
                             }
-                            <span id="review-rating-text" class="text-xs text-slate-500 ml-2 font-medium">@(ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5)) / 5 Stars</span>
+                            <span id="review-rating-text" class="text-xs text-slate-500 ml-2 font-medium">5 / 5 Stars</span>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
-                            <input type="text" name="Name" value="@(ReviewName ?? ReviewForm?.Name)" required placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
+                            <label for="review-name" class="block text-xs font-semibold text-slate-700 mb-1">Your Name *</label>
+                            <input type="text" id="review-name" name="Name" maxlength="100" required placeholder="e.g. Tanvir Ahmed" class="field text-xs" />
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
-                            <input type="email" name="Email" value="@(ReviewEmail ?? ReviewForm?.Email)" placeholder="tanvir@example.com" class="field text-xs" />
+                            <label for="review-email" class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                            <input type="email" id="review-email" name="Email" maxlength="254" placeholder="tanvir@example.com" class="field text-xs" />
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Headline / Review Title</label>
-                        <input type="text" name="Title" value="@(ReviewTitle ?? ReviewForm?.Title)" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
+                        <label for="review-title" class="block text-xs font-semibold text-slate-700 mb-1">Headline / Review Title</label>
+                        <input type="text" id="review-title" name="Title" maxlength="150" placeholder="e.g. Excellent battery life and authentic product" class="field text-xs" />
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Your Detailed Experience *</label>
-                        <textarea name="Comment" rows="3" required placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs">@(ReviewComment ?? ReviewForm?.Comment)</textarea>
+                        <label for="review-comment" class="block text-xs font-semibold text-slate-700 mb-1">Your Detailed Experience *</label>
+                        <textarea id="review-comment" name="Comment" rows="3" minlength="10" maxlength="3000" required placeholder="Share details about performance, build quality, and delivery speed..." class="field text-xs"></textarea>
                     </div>
                     <div class="flex items-center justify-end gap-2 pt-2">
                         <button type="button" data-close-modal="write-review-modal" class="btn-secondary text-xs cursor-pointer">Cancel</button>
@@ -561,19 +565,6 @@ else
     public string Slug { get; set; } = "";
     [SupplyParameterFromQuery(Name = "image")]
     public int? ImageIndex { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review", Name = "Name")]
-    public string? ReviewName { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review", Name = "Email")]
-    public string? ReviewEmail { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review", Name = "Rating")]
-    public int? ReviewRating { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review", Name = "Title")]
-    public string? ReviewTitle { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review", Name = "Comment")]
-    public string? ReviewComment { get; set; }
-    [SupplyParameterFromForm(FormName = "submit-review")]
-    public ReviewFormModel? ReviewForm { get; set; }
-
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
     private ProductDetailsDto? product;
@@ -620,6 +611,11 @@ else
                 requested[definition.Code] = value.ToString();
             }
         }
+        if (query.TryGetValue("variant", out var variantValue) && int.TryParse(variantValue, out var variantId))
+        {
+            var requestedVariant = product.Variants.FirstOrDefault(v => v.Id == variantId);
+            if (requestedVariant is not null) requested = new Dictionary<string, string>(requestedVariant.Options);
+        }
         choices = ProductOptions.Selection(product, requested);
         selected = ProductOptions.Match(product, choices);
         image = product.Images.ElementAtOrDefault(ImageIndex ?? 0) ?? product.MainImage;
@@ -627,37 +623,8 @@ else
         var related = await Catalog.LatestAsync(product.CategorySlug, 8);
         relatedProducts = related.Where(p => p.Id != product.Id).ToList();
 
-        // Handle Review Submission form
-        var reviewName = ReviewName?.Trim() ?? ReviewForm?.Name?.Trim() ?? "";
-        var reviewComment = ReviewComment?.Trim() ?? ReviewForm?.Comment?.Trim() ?? "";
-        var reviewEmail = ReviewEmail?.Trim() ?? ReviewForm?.Email?.Trim();
-        var reviewTitle = ReviewTitle?.Trim() ?? ReviewForm?.Title?.Trim();
-        var reviewRating = ReviewRating ?? (ReviewForm?.Rating > 0 ? ReviewForm.Rating : 5);
-
-        if (!string.IsNullOrWhiteSpace(reviewName) && !string.IsNullOrWhiteSpace(reviewComment))
-        {
-            var review = new ProductReview
-            {
-                ProductId = product.Id,
-                CustomerName = reviewName,
-                CustomerEmail = string.IsNullOrWhiteSpace(reviewEmail) ? null : reviewEmail,
-                Rating = Math.Clamp(reviewRating, 1, 5),
-                Title = string.IsNullOrWhiteSpace(reviewTitle) ? "Customer Review" : reviewTitle,
-                Comment = reviewComment,
-                IsApproved = true
-            };
-
-            await using var db = await DbFactory.CreateDbContextAsync();
-            db.ProductReviews.Add(review);
-            await db.SaveChangesAsync();
-
-            reviewSuccessMessage = "Thank you! Your verified review has been published.";
-            ReviewName = null;
-            ReviewComment = null;
-            ReviewEmail = null;
-            ReviewTitle = null;
-            ReviewForm = null;
-        }
+        if (QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("review"))
+            reviewSuccessMessage = "Thank you. Your review is awaiting moderation.";
 
         await LoadReviewsAsync();
     }

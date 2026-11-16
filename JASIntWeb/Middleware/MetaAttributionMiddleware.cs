@@ -17,6 +17,11 @@ public sealed class MetaAttributionMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context)
     {
+        if (context.Request.Cookies["jas_cookie_consent"] != "accepted")
+        {
+            await next(context);
+            return;
+        }
         var request = context.Request;
         var response = context.Response;
         var query = request.Query;

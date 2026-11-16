@@ -1,0 +1,21 @@
+@using JASIntWeb.Persistence.Entities
+<section class="confidence-panel" aria-labelledby="fulfillment-title">
+    <div class="confidence-heading"><div><span class="section-eyebrow">Fulfillment</span><h2 id="fulfillment-title">@Status</h2></div><span class="confidence-status">Order progress</span></div>
+    @if (Status == OrderStatus.Cancelled)
+    {
+        <p>This order has been cancelled. Contact support about any payment already made.</p>
+    }
+    else
+    {
+        <ol class="order-progress" aria-label="Fulfillment steps">
+            @foreach (var step in Steps)
+            {
+                <li class="@((int)Status >= (int)step ? "is-complete" : "")" aria-current="@(Status == step ? "step" : null)"><span aria-hidden="true">@((int)step + 1)</span>@step</li>
+            }
+        </ol>
+    }
+</section>
+@code {
+    [Parameter] public OrderStatus Status { get; set; }
+    private static readonly OrderStatus[] Steps = [OrderStatus.Pending, OrderStatus.Processing, OrderStatus.InTransit, OrderStatus.Delivered];
+}

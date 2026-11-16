@@ -7,7 +7,7 @@
 @inject AppDbContext Db
 @inject NavigationManager Nav
 @inject IMetaConversionsApiService MetaApi
-@inject Microsoft.Extensions.Caching.Memory.IMemoryCache Cache
+@inject Microsoft.Extensions.Caching.Hybrid.HybridCache Cache
 
 <PageTitle>Meta Ads &amp; Conversions API Settings · JAS Admin</PageTitle>
 
@@ -221,7 +221,7 @@
     [SupplyParameterFromQuery(Name = "msg")]
     public string? TestMsgQuery { get; set; }
 
-    [SupplyParameterFromForm(FormName = "meta-ads-settings")]
+    [SupplyParameterFromForm(FormName = "meta-ads-settings", Name = "settings")]
     public DeliverySettings? SettingsInput { get; set; }
 
     private DeliverySettings? settings;
@@ -272,7 +272,7 @@
             existing.MetaTrackingEnabled = settings.MetaTrackingEnabled;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
-            DeliverySettingsService.InvalidateCache(Cache);
+            await DeliverySettingsService.InvalidateCacheAsync(Cache);
             Nav.NavigateTo("/admin/settings/meta-ads?saved=1");
         }
     }

@@ -7038,10 +7038,10 @@
   "inventoryTransactions": [
     {
       "id": 1,
-      "inventoryItemId": 1,
-      "quantityDelta": 50,
-      "type": "InitialStock",
-      "reason": "Initial showroom catalog stock",
+      "productVariantId": 1,
+      "quantityChange": 50,
+      "type": "Purchase",
+      "note": "Initial showroom catalog stock",
       "createdAt": "2026-09-01T08:00:00Z"
     }
   ],
@@ -7063,9 +7063,9 @@
     {
       "id": 1,
       "customerId": 1,
-      "recipientName": "Ziaul Hasan",
+      "customerName": "Ziaul Hasan",
       "phoneNumber": "01711465078",
-      "streetAddress": "House 12, Road 4, Sonadanga R/A",
+      "fullAddress": "House 12, Road 4, Sonadanga R/A",
       "city": "Khulna Sadar",
       "district": "Khulna",
       "isDefault": true
@@ -7073,9 +7073,9 @@
     {
       "id": 2,
       "customerId": null,
-      "recipientName": "Tanvir Ahmed",
+      "customerName": "Tanvir Ahmed",
       "phoneNumber": "01819234567",
-      "streetAddress": "Shibbari Moor, Commercial Building 2nd Floor",
+      "fullAddress": "Shibbari Moor, Commercial Building 2nd Floor",
       "city": "Khulna Sadar",
       "district": "Khulna",
       "isDefault": true
@@ -7083,9 +7083,9 @@
     {
       "id": 3,
       "customerId": 2,
-      "recipientName": "Rahim Chowdhury",
+      "customerName": "Rahim Chowdhury",
       "phoneNumber": "01912345678",
-      "streetAddress": "Dhanmondi 27, Road 16",
+      "fullAddress": "Dhanmondi 27, Road 16",
       "city": "Dhaka",
       "district": "Dhaka",
       "isDefault": true
@@ -7210,9 +7210,9 @@
       "id": 1,
       "orderId": 1,
       "amount": 13049,
-      "provider": "bKash",
+      "method": "Bkash",
       "status": "Completed",
-      "transactionReference": "TRX99882233",
+      "externalReference": "TRX99882233",
       "createdAt": "2026-09-11T10:05:00Z"
     },
     {
@@ -7221,16 +7221,16 @@
       "amount": 150,
       "provider": "Nagad",
       "status": "Pending",
-      "transactionReference": "TRX77665544",
+      "externalReference": "TRX77665544",
       "createdAt": "2026-09-12T10:05:00Z"
     },
     {
       "id": 3,
       "orderId": 3,
       "amount": 150,
-      "provider": "bKash",
+      "method": "Bkash",
       "status": "Completed",
-      "transactionReference": "TRX33445566",
+      "externalReference": "TRX33445566",
       "createdAt": "2026-09-13T10:05:00Z"
     }
   ],

@@ -2,7 +2,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
 @inject NavigationManager Nav
-@inject Microsoft.Extensions.Caching.Memory.IMemoryCache Cache
+@inject Microsoft.Extensions.Caching.Hybrid.HybridCache Cache
 
 <PageTitle>Delivery &amp; MFS Payment Settings · JAS Admin</PageTitle>
 
@@ -17,6 +17,11 @@
         <Icon Name="check" Class="size-5 text-emerald-600 shrink-0" />
         <span class="font-medium">Settings Updated!</span> Delivery fees and payment automation settings have been saved.
     </div>
+}
+
+@if (error is not null)
+{
+    <p class="form-error" role="alert">@error</p>
 }
 
 @if (settings is null)
@@ -105,12 +110,12 @@ else
         <!-- 3. Automated SMS Webhook Setup Guide -->
         <div class="pt-4 border-t border-slate-200">
             <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 mb-3">3. Automated SMS Webhook Verification</h3>
-            <div class="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-xs text-slate-700 space-y-2">
-                <p class="font-bold text-blue-900">How 100% Automated bKash Verification Works:</p>
-                <p>1. Install any free SMS Forwarder app on the Android phone with your bKash SIM.</p>
-                <p>2. Set target Webhook URL: <code class="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 font-bold text-blue-800">https://your-domain.com/api/webhooks/mfs-sms</code></p>
-                <p>3. Method: <strong>POST</strong> with JSON containing <code class="font-mono bg-white px-1">"message"</code> and <code class="font-mono bg-white px-1">"sender"</code>.</p>
-                <p>4. When an SMS arrives from bKash (16247) containing the Reference or TrxID, our server parses it and confirms the order in 3 seconds!</p>
+            <label for="webhook-secret" class="shop-label">Webhook secret
+                <InputText id="webhook-secret" type="password" autocomplete="new-password" @bind-Value="settings.SmsWebhookSecret" class="shop-input" maxlength="200" />
+            </label>
+            <p class="admin-help">Use a unique secret of at least 16 characters. Leave blank to disable automatic verification.</p>
+            <div class="confidence-notice">
+                Send HTTPS POST requests to <code>/api/webhooks/mfs-sms</code> with the exact <code>secret</code>, positive <code>amount</code>, <code>trxId</code>, and exact order <code>reference</code>. SMS text is also supported, but must include an amount and transaction ID. Ambiguous matches require manual review. Payment verification does not confirm fulfillment.
             </div>
         </div>
 
@@ -128,11 +133,12 @@ else
     [SupplyParameterFromQuery(Name = "saved")]
     public string? SavedQuery { get; set; }
 
-    [SupplyParameterFromForm(FormName = "delivery-settings")]
+    [SupplyParameterFromForm(FormName = "delivery-settings", Name = "settings")]
     public DeliverySettings? SettingsInput { get; set; }
 
     private DeliverySettings? settings;
     private bool saved;
+    private string? error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -168,6 +174,12 @@ else
 
     private async Task SaveSettings()
     {
+        error = null;
+        if (!string.IsNullOrWhiteSpace(settings?.SmsWebhookSecret) && settings.SmsWebhookSecret.Trim().Length < 16)
+        {
+            error = "Use a webhook secret of at least 16 characters, or leave it blank to disable verification.";
+            return;
+        }
         var existing = await Db.DeliverySettings.FirstOrDefaultAsync();
         if (existing != null && settings != null)
         {
@@ -181,9 +193,10 @@ else
             existing.BkashNumber = settings.BkashNumber;
             existing.NagadNumber = settings.NagadNumber;
             existing.BanglaQrImageUrl = settings.BanglaQrImageUrl;
+            existing.SmsWebhookSecret = string.IsNullOrWhiteSpace(settings.SmsWebhookSecret) ? null : settings.SmsWebhookSecret.Trim();
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
-            DeliverySettingsService.InvalidateCache(Cache);
+            await DeliverySettingsService.InvalidateCacheAsync(Cache);
             Nav.NavigateTo("/admin/settings/delivery?saved=1");
         }
     }

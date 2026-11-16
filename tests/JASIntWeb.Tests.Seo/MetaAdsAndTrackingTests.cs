@@ -140,6 +140,7 @@ public class MetaAdsAndTrackingTests
     public async Task MetaAttributionMiddleware_SetsFbcAndFbpCookies_WhenFbclidPresent()
     {
         var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = "jas_cookie_consent=accepted";
         context.Request.QueryString = new QueryString("?fbclid=IwAR12345DemoFbclid&utm_campaign=winter_gadgets&utm_medium=cpc");
 
         var middleware = new MetaAttributionMiddleware(_ => Task.CompletedTask);

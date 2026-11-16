@@ -1,0 +1,16 @@
+<section class="stock-alert-panel" aria-labelledby="stock-alert-title">
+    <span class="section-eyebrow">Get the next restock</span>
+    <h2 id="stock-alert-title">Email me when it’s available</h2>
+    <p>We’ll send an alert for this option after you confirm your email. An alert does not reserve stock.</p>
+    <form method="post" action="/stock-notifications" data-enhance="false" class="stock-alert-form">
+        <AntiforgeryToken />
+        <input type="hidden" name="variantId" value="@VariantId" />
+        <label for="stock-alert-email">Email address</label>
+        <input id="stock-alert-email" name="email" type="email" required maxlength="254" autocomplete="email" placeholder="you@example.com" class="shop-input" />
+        <button class="btn-primary" type="submit">Notify me</button>
+    </form>
+    <small>One stock alert. Unsubscribe at any time.</small>
+</section>
+@code {
+    [Parameter] public int VariantId { get; set; }
+}

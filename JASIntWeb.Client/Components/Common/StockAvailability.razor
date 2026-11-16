@@ -1,0 +1,7 @@
+<span class="stock-availability @(Quantity > 0 ? "is-available" : "is-unavailable")">
+    <span aria-hidden="true" class="stock-dot"></span>
+    @(Quantity <= 0 ? "Currently unavailable" : Quantity <= 5 ? $"Only {Quantity} available" : "In stock")
+</span>
+@code {
+    [Parameter] public int Quantity { get; set; }
+}

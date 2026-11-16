@@ -1,7 +1,6 @@
 @page "/checkout/payment/{Token:guid}"
 @page "/payment/{Token:guid}"
 @rendermode InteractiveServer
-@implements IDisposable
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Persistence
@@ -15,7 +14,7 @@
 
 <PageTitle>Complete Payment · JAS International</PageTitle>
 
-<div class="shop-container py-8 max-w-6xl mx-auto">
+<div class="shop-container payment-journey py-8 max-w-6xl mx-auto">
     <!-- Breadcrumb / Stepper -->
     <div class="mb-8">
         <div class="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-2">
@@ -55,6 +54,7 @@
     }
     else
     {
+        <PaymentSummary Order="order" />
         <div class="grid gap-8 lg:grid-cols-12 items-start">
             <!-- Left Column: Payment Options & bKash Form (lg:col-span-7) -->
             <section class="lg:col-span-7 space-y-6">
@@ -382,25 +382,7 @@
 
 @if (order != null && order.PaidAmount == 0)
 {
-    <script>
-        (function() {
-            const orderId = "@(order.Id)";
-            let sse;
-            try {
-                sse = new EventSource('/api/orders/' + encodeURIComponent(orderId) + '/sse');
-                sse.onmessage = function(e) {
-                    try {
-                        const data = JSON.parse(e.data);
-                        if (data && (data.isPaymentVerified || data.isCancelled)) {
-                            sse.close();
-                            window.location.href = '/order/' + (data.orderId || orderId);
-                        }
-                    } catch(err) {}
-                };
-            } catch(e) {}
-            window.addEventListener('beforeunload', () => { if (sse) sse.close(); });
-        })();
-    </script>
+    <div id="payment-verification-stream" data-order-id="@order.PublicToken" hidden></div>
 }
 
 @code
@@ -464,9 +446,9 @@
             if (order != null)
             {
                 // If order is already paid, redirect straight to confirmation page
-                if (order.PaidAmount > 0 || order.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered)
+                if (order.PaidAmount > 0 || order.Status == OrderStatus.Cancelled)
                 {
-                    Nav.NavigateTo($"/order/{order.Id}");
+                    Nav.NavigateTo($"/order/{order.PublicToken}");
                     return;
                 }
             }
@@ -479,63 +461,6 @@
         {
             isLoading = false;
         }
-    }
-
-    private CancellationTokenSource? pollCts;
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender && order != null && order.PaidAmount == 0)
-        {
-            StartPolling();
-        }
-    }
-
-    private void StartPolling()
-    {
-        pollCts = new CancellationTokenSource();
-        _ = Task.Run(async () =>
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2.5));
-            while (!pollCts.IsCancellationRequested && await timer.WaitForNextTickAsync(pollCts.Token))
-            {
-                try
-                {
-                    await using var scope = ScopeFactory.CreateAsyncScope();
-                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var status = await db.Orders.AsNoTracking()
-                        .Where(o => o.PublicToken == Token)
-                        .Select(o => new
-                        {
-                            o.PaidAmount,
-                            o.Status,
-                            IsVerified = o.PaidAmount > 0 && o.Payments.Any(p => p.Status == PaymentStatus.Completed)
-                        })
-                        .FirstOrDefaultAsync(pollCts.Token);
-
-                    if (status != null && (status.IsVerified || status.PaidAmount > 0 || status.Status is OrderStatus.Processing or OrderStatus.InTransit or OrderStatus.Delivered))
-                    {
-                        pollCts.Cancel();
-                        await InvokeAsync(() => Nav.NavigateTo($"/order/{order!.Id}"));
-                        break;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch
-                {
-                    // Retry on next periodic tick
-                }
-            }
-        }, pollCts.Token);
-    }
-
-    public void Dispose()
-    {
-        pollCts?.Cancel();
-        pollCts?.Dispose();
     }
 
     private void SetPaymentMode(PaymentModeOption mode)
@@ -621,7 +546,7 @@
             var req = new ConfirmPaymentRequest(pMode, senderPhoneNumber?.Trim(), transactionId?.Trim().ToUpperInvariant(), order.PaymentReferenceCode);
             await Shop.ConfirmPaymentAsync(order.PublicToken, req);
 
-            Nav.NavigateTo($"/payment-verification?orderid={order.Id}");
+            Nav.NavigateTo($"/payment-verification?token={order.PublicToken}");
         }
         catch (ShopException ex)
         {

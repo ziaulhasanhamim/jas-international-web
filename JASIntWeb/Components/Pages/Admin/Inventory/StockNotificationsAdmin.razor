@@ -1,0 +1,67 @@
+@page "/admin/stock-notifications"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "AdminOnly")]
+@layout AdminLayout
+@inject IDbContextFactory<AppDbContext> Database
+@inject JASIntWeb.Services.StockNotificationService Notifications
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using Microsoft.EntityFrameworkCore
+<PageTitle>Stock alerts · JAS Admin</PageTitle>
+<div class="space-y-6">
+    <AdminPageHeader Title="Back-in-stock alerts" Description="Confirmed requests, delivery progress, and retryable failures." />
+    @if (!Notifications.MailConfigured)
+    {
+        <div class="confidence-notice" role="alert">Email is not configured. Requests and delivery are paused. Configure your existing mail provider before enabling alerts.</div>
+    }
+    <nav class="confidence-tabs" aria-label="Filter stock alerts">
+        <a href="/admin/stock-notifications">All</a>
+        @foreach (var status in Enum.GetValues<StockNotificationStatus>())
+        {
+            <a href="@($"/admin/stock-notifications?status={status}")">@status</a>
+        }
+    </nav>
+    @if (rows.Count == 0)
+    {
+        <div class="confidence-panel"><h2>No requests yet</h2><p>Requests for sold-out variants will appear here.</p></div>
+    }
+    else
+    {
+        <div class="confidence-table-wrap">
+            <table class="confidence-table">
+                <thead><tr><th scope="col">Product / option</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Delivery</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr @key="row.Id"><td>@row.ProductVariant?.Product?.Name <small>@row.ProductVariant?.SKU</small></td><td>@row.Email</td><td>@row.Status</td><td>@(row.LastError ?? (row.NotificationSentAt?.ToString("dd MMM yyyy HH:mm") ?? "Awaiting next step"))</td><td>
+                            @if (row.Status == StockNotificationStatus.Failed)
+                            {
+                                <form method="post" action="@($"/api/admin/stock-notifications/{row.Id}/retry")" data-enhance="false"><AntiforgeryToken /><button class="btn-secondary" type="submit">Retry email</button></form>
+                            }
+                        </td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <nav class="confidence-tabs" aria-label="Pagination">
+            @if (page > 1) { <a href="@PageUrl(page - 1)">← Previous</a> }
+            <span>Page @(page) · @total requests</span>
+            @if (page * 50 < total) { <a href="@PageUrl(page + 1)">Next →</a> }
+        </nav>
+    }
+</div>
+@code {
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
+    private int page, total;
+    private List<StockNotification> rows = [];
+    private string PageUrl(int target) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/admin/stock-notifications", new Dictionary<string, string?> { ["page"] = target.ToString(), ["status"] = Status });
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = await Database.CreateDbContextAsync();
+        var query = db.StockNotifications.AsNoTracking();
+        if (Enum.TryParse<StockNotificationStatus>(Status, out var status)) query = query.Where(x => x.Status == status);
+        total = await query.CountAsync();
+        page = Math.Clamp(Page, 1, Math.Max(1, (int)Math.Ceiling(total / 50d)));
+        rows = await query.Include(x => x.ProductVariant).ThenInclude(v => v!.Product).OrderByDescending(x => x.CreatedAt).Skip((page - 1) * 50).Take(50).ToListAsync();
+    }
+}

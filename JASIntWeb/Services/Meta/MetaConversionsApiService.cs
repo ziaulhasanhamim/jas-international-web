@@ -68,12 +68,13 @@ public sealed partial class MetaConversionsApiService(
 
     public async Task<bool> EnqueuePurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null)
     {
+        if (!order.MarketingConsent) return false;
         try
         {
             var eventId = order.PublicToken.ToString();
             var eventSourceUrl = httpContext != null
-                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/order/{order.PublicToken}"
-                : $"https://www.jasinternational.com.bd/order/{order.PublicToken}";
+                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/checkout"
+                : $"https://www.jasinternational.com.bd/checkout";
 
             var customerName = order.DeliveryAddress?.CustomerName ?? request?.CustomerName ?? "";
             var (firstName, lastName) = SplitName(customerName);
@@ -152,6 +153,7 @@ public sealed partial class MetaConversionsApiService(
 
     public async Task<bool> EnqueueDeliveredEventAsync(Order order, HttpContext? httpContext = null)
     {
+        if (!order.MarketingConsent) return false;
         try
         {
             var eventId = $"deliv_{order.PublicToken}";
@@ -186,7 +188,7 @@ public sealed partial class MetaConversionsApiService(
             {
                 EventName = "OrderDelivered",
                 EventId = eventId,
-                EventSourceUrl = $"https://www.jasinternational.com.bd/order/{order.PublicToken}",
+                EventSourceUrl = $"https://www.jasinternational.com.bd/checkout",
                 EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 UserData = userData,
                 CustomData = customData
@@ -205,6 +207,7 @@ public sealed partial class MetaConversionsApiService(
 
     public async Task<bool> EnqueueCancelledEventAsync(Order order, HttpContext? httpContext = null)
     {
+        if (!order.MarketingConsent) return false;
         try
         {
             var eventId = $"cancel_{order.PublicToken}";
@@ -239,7 +242,7 @@ public sealed partial class MetaConversionsApiService(
             {
                 EventName = "OrderCancelled",
                 EventId = eventId,
-                EventSourceUrl = $"https://www.jasinternational.com.bd/order/{order.PublicToken}",
+                EventSourceUrl = $"https://www.jasinternational.com.bd/checkout",
                 EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 UserData = userData,
                 CustomData = customData
@@ -500,13 +503,6 @@ public sealed partial class MetaConversionsApiService(
 
     public static string? ResolveClientIp(HttpContext context)
     {
-        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            var first = forwarded.Split(',')[0].Trim();
-            if (!string.IsNullOrEmpty(first)) return first;
-        }
-
         return context.Connection.RemoteIpAddress?.ToString();
     }
 

@@ -2,44 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_only
+          POSTGRES_DB: jas_browser_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '11.0.x'
-          dotnet-quality: 'preview'
-
-      - name: Restore dependencies
-        run: dotnet restore JASIntWeb.sln
-
-      - name: Build solution
-        run: dotnet build JASIntWeb.sln --no-restore --configuration Release
-
-      - name: Run Unit Tests
-        run: dotnet run --project tests/JASIntWeb.Tests.Unit/JASIntWeb.Tests.Unit.csproj --no-build --configuration Release
-
-      - name: Run SEO & Meta Tests
-        run: dotnet run --project tests/JASIntWeb.Tests.Seo/JASIntWeb.Tests.Seo.csproj --no-build --configuration Release
-
-      - name: Run Integration Tests
-        run: dotnet run --project tests/JASIntWeb.Tests.Integration/JASIntWeb.Tests.Integration.csproj --no-build --configuration Release
-
-      - name: Create GitHub Release with Tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Generate and verify CSS
+        run: |
+          npm run css
+          git diff --exit-code -- JASIntWeb/wwwroot/css/output.css
+      - run: dotnet restore JASIntWeb.sln
+      - run: dotnet build JASIntWeb.sln --no-restore --configuration Release
+      - name: Unit tests
+        run: dotnet run --project tests/JASIntWeb.Tests.Unit --no-build --configuration Release
+      - name: SEO and Meta tests
+        run: dotnet run --project tests/JASIntWeb.Tests.Seo --no-build --configuration Release
+      - name: PostgreSQL integration tests
+        run: dotnet run --project tests/JASIntWeb.Tests.Integration --no-build --configuration Release
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests and isolated migration smoke test
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "v1.0.${{ github.run_number }}" --generate-notes
+          TEST_DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
+        run: npm run test:browser
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence
+          path: |
+            test-results/
+            tests/**/TestResults/
+          retention-days: 14
