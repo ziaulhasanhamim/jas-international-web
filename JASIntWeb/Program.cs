@@ -219,10 +219,10 @@ if (applyMigrations)
 if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:Enabled", true))
 {
     await app.Services.SeedTestDataAsync<AppDbContext>(Path.Combine(app.Environment.ContentRootPath, "data", "JasTestSeedData.json"));
+    await app.Services.SeedBrandsAsync();
+    await app.Services.SeedCommerceEnhancementsAsync();
 }
 await app.Services.SeedAdminAsync(builder.Configuration);
-await app.Services.SeedBrandsAsync();
-await app.Services.SeedCommerceEnhancementsAsync();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.Use(async (context, next) =>
 {

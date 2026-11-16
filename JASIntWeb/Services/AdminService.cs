@@ -849,28 +849,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Include(x => x.Products)
             .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
 
-        // If permanent or if already hidden, permanently delete the category and reassign all products
-        if (permanent || c.IsDeleted)
-        {
-            if (c.Products.Count > 0)
-            {
-                var uncategorized = await db.Categories.FirstOrDefaultAsync(x => x.Slug == "uncategorized");
-                if (uncategorized == null)
-                {
-                    uncategorized = new Category
-                    {
-                        Name = "Uncategorized",
-                        Slug = "uncategorized",
-                        IsDeleted = false
-                    };
-                    db.Categories.Add(uncategorized);
-                    await db.SaveChangesAsync();
-                }
+        var activeProductsCount = c.Products.Count(p => !p.IsDeleted);
 
-                foreach (var prod in c.Products)
-                {
-                    prod.CategoryId = uncategorized.Id;
-                }
+        // If permanent or if already hidden with no active products, perform permanent removal
+        if (permanent || (c.IsDeleted && activeProductsCount == 0))
+        {
+            if (activeProductsCount > 0)
+            {
+                throw new ShopException($"Cannot permanently delete '{c.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first, or click 'Hide' to remove this category from the storefront.");
             }
 
             // Re-parent any child categories so FK_Categories_Categories_ParentCategoryId restrict doesn't crash
@@ -943,36 +929,29 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     c.DeletedAt = null;
                     break;
                 case "delete":
-                    if (c.Products.Count > 0)
+                    if (!c.Products.Any(p => !p.IsDeleted))
                     {
-                        var uncategorized = await db.Categories.FirstOrDefaultAsync(x => x.Slug == "uncategorized");
-                        if (uncategorized == null)
+                        // Detach child categories to avoid FK restriction
+                        var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
+                        foreach (var child in childCategories)
                         {
-                            uncategorized = new Category
-                            {
-                                Name = "Uncategorized",
-                                Slug = "uncategorized",
-                                IsDeleted = false
-                            };
-                            db.Categories.Add(uncategorized);
-                            await db.SaveChangesAsync();
+                            child.ParentCategoryId = c.ParentCategoryId;
                         }
-                        foreach (var prod in c.Products)
+
+                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                        db.CategoryPlacements.RemoveRange(placements);
+                        db.Categories.Remove(c);
+                    }
+                    else
+                    {
+                        c.IsDeleted = true;
+                        c.DeletedAt = DateTimeOffset.UtcNow;
+                        var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
+                        foreach (var p in placements)
                         {
-                            prod.CategoryId = uncategorized.Id;
+                            p.IsActive = false;
                         }
                     }
-
-                    // Detach child categories to avoid FK restriction
-                    var childCategories = await db.Categories.Where(x => x.ParentCategoryId == c.Id).ToListAsync();
-                    foreach (var child in childCategories)
-                    {
-                        child.ParentCategoryId = c.ParentCategoryId;
-                    }
-
-                    var placements = await db.CategoryPlacements.Where(p => p.CategoryId == c.Id).ToListAsync();
-                    db.CategoryPlacements.RemoveRange(placements);
-                    db.Categories.Remove(c);
                     break;
             }
         }
@@ -1101,14 +1080,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task DeleteBrandAsync(int id, bool permanent = false)
     {
-        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
-        var brandProducts = await db.Products.Where(p => p.BrandId == id).ToListAsync();
-        foreach (var p in brandProducts)
+        var b = await db.Brands.Include(x => x.Products).SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        var activeProductsCount = b.Products.Count(p => !p.IsDeleted);
+        if (activeProductsCount > 0)
         {
-            p.BrandId = null;
+            throw new ShopException($"Cannot delete brand '{b.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first.");
         }
 
-        if (permanent)
+        if (permanent || b.IsDeleted)
         {
             db.Brands.Remove(b);
         }

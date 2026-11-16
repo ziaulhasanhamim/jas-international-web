@@ -159,7 +159,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task DeleteBrandAsync_Permanent_DeletesBrandAndDetachesProducts()
+    public async Task DeleteBrandAsync_WithActiveProducts_ThrowsShopException()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
@@ -174,7 +174,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
         await admin.SaveBrandAsync(brandForm);
         var brand = await db.Brands.FirstAsync(b => b.Slug == slug);
 
-        // Add a product linked to this brand
+        // Add an active product linked to this brand
         var category = await db.Categories.FirstAsync();
         var product = new JASIntWeb.Persistence.Entities.Product
         {
@@ -188,16 +188,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        // Delete brand permanently
-        await admin.DeleteBrandAsync(brand.Id, permanent: true);
-
-        // Verify brand is removed
-        var deletedBrand = await db.Brands.FindAsync(brand.Id);
-        await deletedBrand.Should().BeNull();
-
-        // Verify product still exists and brand was safely detached (BrandId == null)
-        var updatedProduct = await db.Products.FindAsync(product.Id);
-        await updatedProduct.Should().NotBeNull();
-        await updatedProduct!.BrandId.Should().BeNull();
+        // Attempting to delete brand with active products should throw ShopException!
+        await Assert.ThrowsAsync<ShopException>(() => admin.DeleteBrandAsync(brand.Id, permanent: true));
     }
 }

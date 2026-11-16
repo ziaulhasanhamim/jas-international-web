@@ -70,7 +70,7 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task DeleteCategoryAsync_WithActiveProducts_SafelyReassignsToUncategorizedAndDeletesPermanently()
+    public async Task DeleteCategoryAsync_WithActiveProducts_ThrowsShopException()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
@@ -92,19 +92,12 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         db.Products.Add(prod);
         await db.SaveChangesAsync();
 
-        // Delete category containing active products unconditionally
-        await admin.DeleteCategoryAsync(cat.Id, permanent: true);
+        // Attempting to permanently delete category containing active products should throw ShopException!
+        await Assert.ThrowsAsync<ShopException>(() => admin.DeleteCategoryAsync(cat.Id, permanent: true));
 
-        // Verify category is permanently deleted
+        // Category still exists
         var checkCat = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == cat.Id);
-        await checkCat.Should().BeNull();
-
-        // Verify product was safely reassigned to Uncategorized
-        var checkProd = await db.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == prod.Id);
-        await checkProd.Should().NotBeNull();
-        var uncategorized = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Slug == "uncategorized");
-        await uncategorized.Should().NotBeNull();
-        await checkProd!.CategoryId.Should().BeEqualTo(uncategorized!.Id);
+        await checkCat.Should().NotBeNull();
     }
 
     [Test]

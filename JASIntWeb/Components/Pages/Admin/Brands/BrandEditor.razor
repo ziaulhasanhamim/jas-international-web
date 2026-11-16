@@ -225,9 +225,9 @@ else
                     <a href="/admin/brands" class="shop-button-secondary">Cancel</a>
                 </div>
 
-                @if (Id != 0)
+                @if (Id != 0 && productCount == 0)
                 {
-                    <button type="submit" name="FormAction" value="delete" class="btn-danger !px-3 !py-2 text-xs cursor-pointer" onclick="return confirm('Are you sure you want to delete this brand? Any assigned products will remain in the catalog.');">
+                    <button type="submit" name="FormAction" value="delete" class="btn-danger !px-3 !py-2 text-xs cursor-pointer" onclick="return confirm('Are you sure you want to delete this brand?');">
                         Delete Brand
                     </button>
                 }
@@ -323,11 +323,11 @@ else
 
     private async Task Delete()
     {
-        if (Id == 0) return;
+        if (Id == 0 || productCount > 0) return;
         error = null;
         try
         {
-            await Session.RunAsync(s => s.DeleteBrandAsync(Id, permanent: true));
+            await Session.RunAsync(s => s.DeleteBrandAsync(Id));
             Nav.NavigateTo("/admin/brands");
         }
         catch (ShopException ex)
