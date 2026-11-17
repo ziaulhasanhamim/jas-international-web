@@ -10,6 +10,10 @@ public static class EndpointRouteBuilderExtensions
         endpoints.MapSeoEndpoints();
         endpoints.MapMetaFeedEndpoints();
         endpoints.MapAnalyticsEndpoints();
+        endpoints.MapAdminUploadEndpoints();
+        endpoints.MapPaymentWebhookEndpoints();
+        endpoints.MapAccountEndpoints();
+        endpoints.MapCustomerConfidenceEndpoints();
         return endpoints;
     }
 }

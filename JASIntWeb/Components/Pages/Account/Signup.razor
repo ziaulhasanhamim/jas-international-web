@@ -1,7 +1,6 @@
 @page "/account/signup"
 @attribute [ExcludeFromInteractiveRouting]
-@using System.Security.Claims
-@inject UserManager<User> Users
+@inject AccountRegistrationService Registration
 @inject SignInManager<User> SignIn
 @inject EmailVerificationService Verification
 @inject NavigationManager Navigation
@@ -72,7 +71,7 @@
                                        placeholder="••••••"
                                        autocomplete="one-time-code"
                                        class="field text-center font-mono text-2xl font-bold tracking-[0.4em] py-3 uppercase focus:tracking-[0.4em]" />
-                            <p class="text-[11px] text-slate-400 text-center mt-2">Code is valid for 15 minutes.</p>
+                            <p class="text-[11px] text-slate-400 text-center mt-2">Codes expire shortly. Request a new code if yours has expired.</p>
                         </div>
 
                         @{
@@ -223,106 +222,31 @@
     {
         error = null;
         notice = null;
-        var email = SignupInput!.Email.Trim();
-        var fullName = SignupInput.FullName.Trim();
-
-        var existing = await Users.FindByEmailAsync(email);
-        if (existing != null)
+        switch (await Registration.RegisterAsync(SignupInput!.Email, SignupInput.FullName, SignupInput.Password))
         {
-            if (existing.EmailConfirmed)
-            {
-                error = "An account with this email address already exists. Please sign in.";
-                return;
-            }
-
-            // User exists but was not confirmed; reset password and re-issue code
-            var resetToken = await Users.GeneratePasswordResetTokenAsync(existing);
-            var resetResult = await Users.ResetPasswordAsync(existing, resetToken, SignupInput.Password);
-            if (!resetResult.Succeeded)
-            {
-                error = string.Join(" ", resetResult.Errors.Select(e => e.Description));
-                return;
-            }
-
-            // Sync name claim
-            var existingClaims = await Users.GetClaimsAsync(existing);
-            var nameClaim = existingClaims.FirstOrDefault(c => c.Type == "name");
-            if (nameClaim != null)
-            {
-                await Users.RemoveClaimAsync(existing, nameClaim);
-            }
-            if (!string.IsNullOrWhiteSpace(fullName))
-            {
-                await Users.AddClaimAsync(existing, new Claim("name", fullName));
-            }
+            case VerificationRequired verification:
+                Navigation.NavigateTo($"/account/signup?step=verify&email={Uri.EscapeDataString(verification.Email)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}");
+                break;
+            case RegistrationRejected rejection:
+                error = rejection.Message;
+                break;
         }
-        else
-        {
-            var user = new User
-            {
-                UserName = email,
-                Email = email,
-                EmailConfirmed = false
-            };
-
-            var createResult = await Users.CreateAsync(user, SignupInput.Password);
-            if (!createResult.Succeeded)
-            {
-                error = string.Join(" ", createResult.Errors.Select(e => e.Description));
-                return;
-            }
-
-            if (!string.IsNullOrWhiteSpace(fullName))
-            {
-                await Users.AddClaimAsync(user, new Claim("name", fullName));
-            }
-        }
-
-        // Generate and dispatch verification code
-        await Verification.GenerateAndSendCodeAsync(email);
-
-        // Transition to verification step
-        Navigation.NavigateTo($"/account/signup?step=verify&email={Uri.EscapeDataString(email)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? "")}");
     }
 
     private async Task SubmitVerification()
     {
         error = null;
         notice = null;
-        var email = ActiveEmail;
-        var code = VerifyInput?.Code?.Trim() ?? "";
-
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(code))
+        switch (await Registration.VerifyAsync(ActiveEmail, VerifyInput?.Code?.Trim() ?? ""))
         {
-            error = "Please enter the 6-digit verification code.";
-            return;
+            case VerifiedAccount verified:
+                await SignIn.SignInAsync(verified.User, isPersistent: true);
+                Navigation.NavigateTo(AccountNavigation.SafeReturn(ReturnUrl), forceLoad: true);
+                break;
+            case RegistrationRejected rejection:
+                error = rejection.Message;
+                break;
         }
-
-        var isValid = await Verification.ValidateCodeAsync(email, code);
-        if (!isValid)
-        {
-            error = "Invalid or expired verification code. Please check the code or click Resend.";
-            return;
-        }
-
-        var user = await Users.FindByEmailAsync(email);
-        if (user == null)
-        {
-            error = "Account not found. Please sign up again.";
-            return;
-        }
-
-        user.EmailConfirmed = true;
-        var updateResult = await Users.UpdateAsync(user);
-        if (!updateResult.Succeeded)
-        {
-            error = string.Join(" ", updateResult.Errors.Select(e => e.Description));
-            return;
-        }
-
-        // Sign the newly verified user in
-        await SignIn.SignInAsync(user, isPersistent: true);
-        Navigation.NavigateTo(AccountNavigation.SafeReturn(ReturnUrl), forceLoad: true);
     }
 
     private async Task ResendCode()
@@ -331,8 +255,8 @@
         var email = ActiveEmail;
         if (!string.IsNullOrWhiteSpace(email))
         {
-            await Verification.GenerateAndSendCodeAsync(email);
-            notice = $"A fresh 6-digit verification code was sent to {email}.";
+            var (_, sent) = await Verification.GenerateAndSendCodeAsync(email);
+            notice = sent ? $"A fresh verification code was sent to {email}." : "Email delivery is unavailable. Please try again later.";
         }
     }
 }

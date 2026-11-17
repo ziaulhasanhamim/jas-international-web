@@ -23,13 +23,18 @@ public interface IMetaCapiQueue
 
 public sealed class MetaCapiQueue : IMetaCapiQueue
 {
-    private readonly Channel<MetaCapiEventPayload> _channel = Channel.CreateUnbounded<MetaCapiEventPayload>(new UnboundedChannelOptions
+    public const int Capacity = 10_000;
+
+    private readonly Channel<MetaCapiEventPayload> _channel = Channel.CreateBounded<MetaCapiEventPayload>(new BoundedChannelOptions(Capacity)
     {
+        FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
         SingleWriter = false
     });
 
-    public ValueTask EnqueueAsync(MetaCapiEventPayload payload) => _channel.Writer.WriteAsync(payload);
+    public ValueTask EnqueueAsync(MetaCapiEventPayload payload) => TryEnqueue(payload)
+        ? ValueTask.CompletedTask
+        : ValueTask.FromException(new InvalidOperationException("The Meta conversion queue is full."));
 
     public bool TryEnqueue(MetaCapiEventPayload payload) => _channel.Writer.TryWrite(payload);
 

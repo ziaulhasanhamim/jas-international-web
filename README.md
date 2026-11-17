@@ -66,7 +66,7 @@ dotnet ef database update --project JASIntWeb --startup-project JASIntWeb
 
 ## Forms and project organization
 
-Minimal APIs live in static classes under `JASIntWeb/Endpoints`. `CartEndpoints` defines named handlers such as `Add`, `Merge` and `Update`, while `HealthEndpoints` handles `/health`. Each class exposes a mapping extension on `IEndpointRouteBuilder`; `Program.cs` registers them together with `app.MapStoreEndpoints()`. Cart routes retain authentication and CSRF protection, and return JSON errors through `CartRequestMiddleware`.
+Minimal APIs live in static classes under `JASIntWeb/Endpoints`. `CartEndpoints` defines named handlers such as `Add`, `Merge` and `Update`, while `HealthEndpoints` handles `/health`. Each class exposes a mapping extension on `IEndpointRouteBuilder`; `Program.cs` registers them together with `app.MapStoreEndpoints()`. Cart writes validate antiforgery tokens; clients obtain them from `/api/cart/security`. API failures return safe JSON errors. Service registration and middleware setup live in focused `Services` extensions.
 
 Admin pages are grouped under `Components/Pages/Admin` into Dashboard, Products, Variants, Inventory, Categories, Attributes, Carousel, Orders and Customers. Add and edit pages keep their existing URLs and share the admin layout.
 
@@ -74,7 +74,7 @@ Forms initialize in `OnInitialized` or `OnInitializedAsync`. Posted models are p
 
 Parameter lifecycle events remain on interactive child components that receive changing data, such as the carousel and reorder editor.
 
-Products use reusable global attributes and values, with product-specific bindings controlling allowed options and their order. Variants reference those bindings. Customers can select any combination without another attribute changing automatically; unavailable combinations show N/A. Guest carts use local storage and signed-in carts use PostgreSQL.
+Products use reusable global attributes and values, with product-specific bindings controlling allowed options and their order. Variants reference those bindings. Customers can select any combination without another attribute changing automatically; unavailable combinations show N/A. Guest carts use a cookie reference and PostgreSQL; signed-in carts use the account identity.
 
 ## Admin sales metrics
 
@@ -97,7 +97,7 @@ The tests cover domain rules, cart behavior, order fulfillment, coupon calculati
 
 Password reset emails require `Mail:Host`, `Mail:Port`, `Mail:EnableSsl`, `Mail:From`, `Mail:Username` and `Mail:Password`. Configure `PublicBaseUrl` and `AllowedHosts` for your host. Environment variable names use double underscores, for example `Mail__Host`. Signup uses email/password with email-code verification. Local verification codes are shown only in Development when mail is not configured.
 
-For production, persist data-protection keys with `Hosting:DataProtectionPath` and configure trusted reverse proxies with `Hosting:KnownProxies` if needed. Apply migrations deliberately and keep development seeding disabled.
+Data-protection keys persist in PostgreSQL by default; `Hosting:DataProtectionPath` optionally selects a persistent shared directory. Configure trusted reverse proxies with `Hosting:KnownProxies`. Production startup does not apply migrations by default. See the [production runbook](docs/production-readiness.md) for migration, cookie, mail, proxy and release requirements.
 
 ---
 

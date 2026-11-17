@@ -77,19 +77,26 @@ export function showCartToast(message, type = 'success', action = { text: 'View 
             : 'bg-slate-900/95 text-white backdrop-blur-md shadow-slate-900/30'
     }`;
 
-    const icon = type === 'error' ? '⚠️' : '🛒';
-    let actionHtml = '';
+    const label = document.createElement('div');
+    label.className = 'flex items-center gap-2.5 min-w-0';
+    const icon = document.createElement('span');
+    icon.className = 'text-base shrink-0';
+    icon.textContent = type === 'error' ? '⚠️' : '🛒';
+    const text = document.createElement('span');
+    text.className = 'truncate';
+    text.textContent = message;
+    label.append(icon, text);
+    toast.append(label);
     if (action) {
-        actionHtml = `<a href="${action.href}" class="ml-auto inline-flex items-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 py-1 text-xs font-bold text-white transition active:scale-95 shrink-0">${action.text}</a>`;
+        const url = new URL(action.href, location.origin);
+        if (url.origin === location.origin) {
+            const link = document.createElement('a');
+            link.href = url.href;
+            link.textContent = action.text;
+            link.className = 'ml-auto inline-flex items-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 py-1 text-xs font-bold text-white transition active:scale-95 shrink-0';
+            toast.append(link);
+        }
     }
-
-    toast.innerHTML = `
-        <div class="flex items-center gap-2.5 min-w-0">
-            <span class="text-base shrink-0">${icon}</span>
-            <span class="truncate">${message}</span>
-        </div>
-        ${actionHtml}
-    `;
 
     container.appendChild(toast);
 
@@ -121,11 +128,15 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
             productId: Number(productId) || 0
         };
 
+        const securityResponse = await fetch('/api/cart/security', { credentials: 'same-origin', cache: 'no-store' });
+        if (!securityResponse.ok) throw new Error('Could not secure the cart request.');
+        const security = await securityResponse.json();
         const response = await fetch('/api/cart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': security.token
             },
             credentials: 'same-origin',
             body: JSON.stringify(payload)

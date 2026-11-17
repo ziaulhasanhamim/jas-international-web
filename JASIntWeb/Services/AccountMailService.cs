@@ -91,7 +91,6 @@ public sealed class AccountMailService(
     {
         if (!IsConfigured)
         {
-            Console.WriteLine($"[Mail] Not configured (Provider={Provider}, From={FromEmail}). Skipping plain text email to {to}.");
             log.LogInformation("Mail provider '{Provider}' not configured. Skipping plain text email to {To}.", Provider, to);
             return false;
         }
@@ -115,12 +114,10 @@ public sealed class AccountMailService(
                 message.ReplyToList.Add(new MailAddress(ReplyToEmail, ReplyToName));
             }
             await client.SendMailAsync(message);
-            Console.WriteLine($"[Mail:{Provider}] SUCCESS: Plain text email delivered to {to}!");
             return true;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[Mail:{Provider}] ERROR sending plain text email to {to}: {e.Message}");
             log.LogWarning("Account email failed: {Status}", e.Message);
             return false;
         }
@@ -130,7 +127,6 @@ public sealed class AccountMailService(
     {
         if (!IsConfigured)
         {
-            Console.WriteLine($"[Mail] Not configured (Provider={Provider}, From={FromEmail}). Skipping HTML email to {to}.");
             log.LogInformation("Mail provider '{Provider}' not configured. Skipping HTML email to {To}.", Provider, to);
             return false;
         }
@@ -153,8 +149,7 @@ public sealed class AccountMailService(
     {
         try
         {
-            Console.WriteLine($"[Mail:Brevo API] Dispatching '{subject}' to {to} from {DisplayName} <{FromEmail}>...");
-            var client = httpClientFactory.CreateClient("Brevo");
+            using var client = httpClientFactory.CreateClient("Brevo");
             using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
             req.Headers.Add("api-key", BrevoApiKey);
             req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -179,19 +174,16 @@ public sealed class AccountMailService(
             if (resp.IsSuccessStatusCode)
             {
                 var body = await resp.Content.ReadAsStringAsync();
-                Console.WriteLine($"[Mail:Brevo API] SUCCESS: Email successfully delivered to {to}! ({body})");
                 log.LogInformation("Email sent successfully to {To} via Brevo API.", to);
                 return true;
             }
 
             var err = await resp.Content.ReadAsStringAsync();
-            Console.WriteLine($"[Mail:Brevo API] FAILED ({resp.StatusCode}): {err}");
             log.LogWarning("Brevo API failed ({StatusCode}): {Body}", resp.StatusCode, err);
             return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Mail:Brevo API] EXCEPTION: {ex.Message}");
             log.LogError(ex, "Brevo API delivery exception");
             return false;
         }
@@ -201,18 +193,14 @@ public sealed class AccountMailService(
     {
         try
         {
-            Console.WriteLine($"[Mail:Brevo SMTP] Connecting to smtp-relay.brevo.com:587 to send '{subject}' to {to}...");
             using var client = CreateBrevoSmtpClient();
             using var message = CreateMultipartMessage(to, subject, htmlBody, plainText);
             await client.SendMailAsync(message);
-            Console.WriteLine($"[Mail:Brevo SMTP] SUCCESS: Email delivered to {to}!");
             log.LogInformation("Email sent successfully to {To} via Brevo SMTP.", to);
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Mail:Brevo SMTP] ERROR: {ex.Message}");
-            if (ex.InnerException != null) Console.WriteLine($"[Mail:Brevo SMTP] Inner: {ex.InnerException.Message}");
             log.LogWarning("Brevo SMTP failed: {Message}", ex.Message);
             return false;
         }
@@ -222,18 +210,14 @@ public sealed class AccountMailService(
     {
         try
         {
-            Console.WriteLine($"[Mail:SMTP] Connecting to {SmtpHost}:{SmtpPort} to send '{subject}' to {to}...");
             using var client = CreateSmtpClient();
             using var message = CreateMultipartMessage(to, subject, htmlBody, plainText);
             await client.SendMailAsync(message);
-            Console.WriteLine($"[Mail:SMTP] SUCCESS: Email successfully sent to {to}!");
             log.LogInformation("Email sent successfully to {To} for '{Subject}'", to, subject);
             return true;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[Mail:SMTP] ERROR sending email to {to}: {e.Message}");
-            if (e.InnerException != null) Console.WriteLine($"[Mail:SMTP] Inner: {e.InnerException.Message}");
             log.LogWarning("HTML email sending failed: {Message}", e.Message);
             return false;
         }
@@ -310,7 +294,7 @@ public sealed class AccountMailService(
         var subject = $"[JAS International] Verification Code: {code}";
         var sb = new StringBuilder();
         sb.Append("<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;'>");
-        
+
         // Header
         sb.Append("<div style='background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:32px 24px;text-align:center;color:#ffffff;'>");
         sb.Append("<h1 style='margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;'>JAS International</h1>");
@@ -401,7 +385,7 @@ public sealed class AccountMailService(
 
         var sb = new StringBuilder();
         sb.Append("<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;'>");
-        
+
         // Header
         sb.Append("<div style='background:linear-gradient(135deg,#059669,#0d9488);padding:32px 24px;text-align:center;color:#ffffff;'>");
         sb.Append("<h1 style='margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;'>JAS International</h1>");

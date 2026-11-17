@@ -1,10 +1,10 @@
 # Stage 1: Compile Tailwind CSS v4 assets
-FROM node:20-alpine AS tailwind-build
+FROM node:22-alpine AS tailwind-build
 WORKDIR /src
 
 # Copy package manifests and install dependencies
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy web source files required by Tailwind scanner
 COPY JASIntWeb ./JASIntWeb
@@ -18,6 +18,7 @@ FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 # Restore project dependencies
+COPY global.json Directory.Build.props ./
 COPY ["JASIntWeb/JASIntWeb.csproj", "JASIntWeb/"]
 COPY ["JASIntWeb.Client/JASIntWeb.Client.csproj", "JASIntWeb.Client/"]
 RUN dotnet restore "JASIntWeb/JASIntWeb.csproj"
@@ -39,9 +40,12 @@ WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV Database__ApplyMigrations=true
+ENV Database__ApplyMigrations=false
 ENV Seed__Enabled=false
 
 COPY --from=build /app/publish .
+
+RUN mkdir -p /app/wwwroot/uploads && chown -R $APP_UID:$APP_UID /app/wwwroot/uploads
+USER $APP_UID
 
 ENTRYPOINT ["dotnet", "JASIntWeb.dll"]

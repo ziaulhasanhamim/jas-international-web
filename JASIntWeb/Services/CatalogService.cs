@@ -216,10 +216,10 @@ public sealed class CatalogService(
                         .Select(i => i.QuantityOnHand - i.QuantityReserved)
                         .FirstOrDefault(),
                         Options = v.Options.Select(o => new
-                            {
-                                DefinitionCode = o.ProductAttributeOption!.ProductAttributeDefinition!.AttributeDefinition!.Code,
-                                Code = o.ProductAttributeOption.AttributeOption!.Code
-                            })
+                        {
+                            DefinitionCode = o.ProductAttributeOption!.ProductAttributeDefinition!.AttributeDefinition!.Code,
+                            Code = o.ProductAttributeOption.AttributeOption!.Code
+                        })
                         .ToList()
                     })
                     .ToListAsync(ct);
@@ -239,16 +239,9 @@ public sealed class CatalogService(
                 }
                 breadcrumbs.Add(p.Category);
                 return new ProductDetailsDto(p.Id, p.Name, p.Slug, p.Category.Name, p.Category.Slug, p.Description, p.Details, p.MainImageUrl,
-                    new[]
-                    {
-                        p.MainImageUrl
-                    }
-                    .Concat(p.Images)
-                    .Distinct()
-                    .ToList(), bindings,
-                    variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
-                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))
-                    .ToList(), breadcrumbs, p.BrandName, p.BrandSlug);
+                    [.. p.Images.Prepend(p.MainImageUrl).Distinct()], bindings,
+                    [.. variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
+                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))], breadcrumbs, p.BrandName, p.BrandSlug);
             },
             options: ProductOptions,
             tags: [TagCatalog, TagProducts, $"product:{normalizedSlug}"]);
@@ -476,14 +469,14 @@ public sealed class CatalogService(
                 (term.Length >= 3 && EF.Functions.TrigramsAreWordSimilar(term, p.Name)));
         }
         var priced = q.Select(p => new
-            {
-                Product = p,
-                Price = p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted)
+        {
+            Product = p,
+            Price = p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted)
                 .OrderByDescending(v => v.IsDefault)
                 .ThenBy(v => v.Id)
                 .Select(v => v.SellingPrice)
                 .First()
-            });
+        });
         if (min.HasValue)
         {
             priced = priced.Where(p => p.Price >= min.Value);

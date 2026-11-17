@@ -15,9 +15,15 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
 {
     private static CheckoutRequest Request(string? coupon = null) => new()
     {
-        RequestId = Guid.NewGuid(), CustomerName = "Test Customer", PhoneNumber = "01712345678",
-        District = "Khulna", City = "Khulna", Address = "Test address, Khulna", PaymentMethod = "COD",
-        Items = [new(1, 1)], CouponCode = coupon
+        RequestId = Guid.NewGuid(),
+        CustomerName = "Test Customer",
+        PhoneNumber = "01712345678",
+        District = "Khulna",
+        City = "Khulna",
+        Address = "Test address, Khulna",
+        PaymentMethod = "COD",
+        Items = [new(1, 1)],
+        CouponCode = coupon
     };
 
     private async Task<Order> CreateOrderAsync(int? userId = null)
@@ -161,7 +167,7 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
     public async Task Review_SubmittedByGuestIsPendingAndCannotClaimVerifiedPurchase()
     {
         using var client = AnonymousClient;
-        var response = await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string,string>
+        var response = await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string, string>
         { ["Name"] = "Guest Shopper", ["Email"] = "guest@example.test", ["Rating"] = "5", ["Comment"] = "A useful and detailed customer review.", ["IsVerifiedPurchase"] = "true" }));
         await response.IsSuccessStatusCode.Should().BeTrue();
         await using var scope = CreateScope();
@@ -176,7 +182,7 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         await using (var scope = CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Orders.Where(o => o.Id == order.Id).ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.Delivered));
         using var client = CustomerClient;
-        await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string,string>
+        await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string, string>
         { ["Name"] = "Actual Buyer", ["Rating"] = "4", ["Comment"] = "This review follows a delivered purchase." }));
         await using var verify = CreateScope();
         var review = await verify.ServiceProvider.GetRequiredService<AppDbContext>().ProductReviews.SingleAsync(r => r.CustomerName == "Actual Buyer");
@@ -236,7 +242,7 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         var html = await client.GetStringAsync("/admin/settings/delivery");
         var name = System.Text.RegularExpressions.Regex.Match(html, "name=\"([^\"]*SmsWebhookSecret)\"").Groups[1].Value;
         await string.IsNullOrEmpty(name).Should().BeFalse();
-        var fields = new Dictionary<string,string>();
+        var fields = new Dictionary<string, string>();
         foreach (System.Text.RegularExpressions.Match input in System.Text.RegularExpressions.Regex.Matches(html, "<input[^>]*>"))
         {
             var fieldName = System.Text.RegularExpressions.Regex.Match(input.Value, "name=\"([^\"]+)\"").Groups[1].Value;
@@ -249,6 +255,43 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Settings POST {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         var updated = await settings.GetSettingsAsync();
         await updated.SmsWebhookSecret.Should().BeEqualTo("new-unique-webhook-secret-for-tests");
+    }
+
+    [Test]
+    public async Task Webhook_ParsesFormSmsAmountsInvariantlyAndRejectsMalformedJson()
+    {
+        var order = await CreateOrderAsync();
+        await using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.DeliverySettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.SmsWebhookSecret, "parser-test-secret"));
+            await DeliverySettingsService.InvalidateCacheAsync(scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>());
+        }
+        using var client = AnonymousClient;
+        var invalid = await client.PostAsync("/api/webhooks/mfs-sms", new StringContent("{broken", System.Text.Encoding.UTF8, "application/json"));
+        await ((int)invalid.StatusCode).Should().BeEqualTo(400);
+        await (await invalid.Content.ReadAsStringAsync()).Contains("JsonException").Should().BeFalse();
+        var response = await client.PostAsync("/api/webhooks/mfs-sms", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["secret"] = "parser-test-secret",
+            ["sms"] = $"Received Tk 1,250.50 Reference: {order.PaymentReferenceCode} TrxID: FORM123456"
+        }));
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+        await using var verify = CreateScope();
+        var persisted = await verify.ServiceProvider.GetRequiredService<AppDbContext>().Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        await persisted.PaidAmount.Should().BeEqualTo(1250.50m);
+        await persisted.TransactionId.Should().BeEqualTo("FORM123456");
+    }
+
+    [Test]
+    public async Task ExternalLogin_RejectsUnconfiguredProviderAndSanitizesProviderErrors()
+    {
+        using var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await ((int)(await client.GetAsync("/account/external-login?provider=Unknown&returnUrl=https://evil.example")).StatusCode).Should().BeEqualTo(400);
+        var error = await client.GetAsync("/account/external-login-callback?remoteError=private-provider-error");
+        await ((int)error.StatusCode).Should().BeEqualTo(302);
+        await error.Headers.Location!.OriginalString.StartsWith("/account/login?").Should().BeTrue();
+        await error.Headers.Location.OriginalString.Contains("private-provider-error").Should().BeFalse();
     }
 
     private static async Task ExpectShopError(Func<Task<Order>> action)

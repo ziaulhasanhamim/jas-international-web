@@ -149,11 +149,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         for (var i = 0; i < images.Length; i++)
         {
             p.ProductImages.Add(new ProductImage
-                {
-                    ProductId = p.Id,
-                    ImageUrl = images[i],
-                    SortOrder = i
-                });
+            {
+                ProductId = p.Id,
+                ImageUrl = images[i],
+                SortOrder = i
+            });
         }
         await db.SaveChangesAsync();
 
@@ -318,11 +318,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         foreach (var o in options)
         {
             v.Options.Add(new()
-                {
-                    ProductId = input.ProductId,
-                    ProductAttributeDefinitionId = o.ProductAttributeDefinitionId,
-                    ProductAttributeOptionId = o.Id
-                });
+            {
+                ProductId = input.ProductId,
+                ProductAttributeDefinitionId = o.ProductAttributeDefinitionId,
+                ProductAttributeOptionId = o.Id
+            });
         }
         if (v.Id == 0)
         {
@@ -359,13 +359,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         if (delta != 0)
         {
             db.InventoryTransactions.Add(new()
-                {
-                    ProductVariantId = variantId,
-                    QuantityChange = delta,
-                    Type = InventoryTransactionType.Adjustment,
-                    ReferenceType = "AdminStock",
-                    Note = reason
-                });
+            {
+                ProductVariantId = variantId,
+                QuantityChange = delta,
+                Type = InventoryTransactionType.Adjustment,
+                ReferenceType = "AdminStock",
+                Note = reason
+            });
         }
     }
 
@@ -461,12 +461,12 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             foreach (var id in selected.Where(id => !binding.Options.Any(o => o.AttributeOptionId == id)))
             {
                 binding.Options.Add(new()
-                    {
-                        ProductId = input.ProductId,
-                        AttributeDefinitionId = row.AttributeDefinitionId,
-                        AttributeOptionId = id,
-                        SortOrder = binding.Options.Count
-                    });
+                {
+                    ProductId = input.ProductId,
+                    AttributeDefinitionId = row.AttributeDefinitionId,
+                    AttributeOptionId = id,
+                    SortOrder = binding.Options.Count
+                });
             }
         }
         foreach (var removed in current.Where(a => !wanted.Any(w => w.AttributeDefinitionId == a.AttributeDefinitionId)))
@@ -531,9 +531,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             {
                 throw new ShopException("Generate at most 100 combinations at a time. Select fewer values.");
             }
-            combinations = combinations.SelectMany(c => values.Select(v => v is null ? c.ToList() : c.Append(v)
-                    .ToList()))
-                .ToList();
+            combinations = [.. combinations.SelectMany(c => values.Select(v => v is null ? c.ToList() : [.. c, v]))];
         }
         var existing = (await db.ProductVariants.Where(v => v.ProductId == input.ProductId
                 && !v.IsDeleted)
@@ -563,21 +561,20 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 CostPrice = input.CostPrice,
                 IsActive = true,
                 IsDefault = needsDefault && count == 0,
-                Options = combination.Select(o => new ProductVariantOption
+                Options = [.. combination.Select(o => new ProductVariantOption
                     {
                         ProductId = input.ProductId,
                         ProductAttributeDefinitionId = o.ProductAttributeDefinitionId,
                         ProductAttributeOptionId = o.Id
-                    })
-                    .ToList()
+                    })]
             };
             db.ProductVariants.Add(variant);
             await db.SaveChangesAsync();
             db.InventoryItems.Add(new()
-                {
-                    ProductVariantId = variant.Id,
-                    QuantityOnHand = 0
-                });
+            {
+                ProductVariantId = variant.Id,
+                QuantityOnHand = 0
+            });
             count++;
         }
         await db.SaveChangesAsync();
@@ -641,14 +638,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     {
                         stock.QuantityOnHand -= item.Quantity;
                         db.InventoryTransactions.Add(new()
-                            {
-                                ProductVariantId = item.ProductVariantId,
-                                QuantityChange = -item.Quantity,
-                                Type = InventoryTransactionType.Sale,
-                                ReferenceType = "Order",
-                                ReferenceId = order.Id,
-                                Note = "Order delivered"
-                            });
+                        {
+                            ProductVariantId = item.ProductVariantId,
+                            QuantityChange = -item.Quantity,
+                            Type = InventoryTransactionType.Sale,
+                            ReferenceType = "Order",
+                            ReferenceId = order.Id,
+                            Note = "Order delivered"
+                        });
                     }
                 }
                 foreach (var payment in order.Payments.Where(p => p.Method == PaymentMethod.CashOnDelivery && p.Status == PaymentStatus.Pending))
@@ -1294,41 +1291,41 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         switch (kind)
         {
             case OrderableKind.ProductAttributes:
-            var attributes = await db.ProductAttributeDefinitions.Where(a => a.ProductId == scopeId).ToListAsync();
-            Same(attributes.Select(a => a.Id));
-            foreach (var a in attributes)
-            {
-                a.SortOrder = ids.IndexOf(a.Id);
-            }
-            break;
+                var attributes = await db.ProductAttributeDefinitions.Where(a => a.ProductId == scopeId).ToListAsync();
+                Same(attributes.Select(a => a.Id));
+                foreach (var a in attributes)
+                {
+                    a.SortOrder = ids.IndexOf(a.Id);
+                }
+                break;
             case OrderableKind.ProductOptions:
-            var options = await db.ProductAttributeOptions.Where(o => o.ProductAttributeDefinitionId == scopeId)
-                .ToListAsync();
-            Same(options.Select(o => o.Id));
-            foreach (var o in options)
-            {
-                o.SortOrder = ids.IndexOf(o.Id);
-            }
-            break;
+                var options = await db.ProductAttributeOptions.Where(o => o.ProductAttributeDefinitionId == scopeId)
+                    .ToListAsync();
+                Same(options.Select(o => o.Id));
+                foreach (var o in options)
+                {
+                    o.SortOrder = ids.IndexOf(o.Id);
+                }
+                break;
             case OrderableKind.Carousel:
-            var slides = await db.CarouselSlides.ToListAsync();
-            Same(slides.Select(s => s.Id));
-            foreach (var s in slides)
-            {
-                s.SortOrder = ids.IndexOf(s.Id);
-            }
-            break;
+                var slides = await db.CarouselSlides.ToListAsync();
+                Same(slides.Select(s => s.Id));
+                foreach (var s in slides)
+                {
+                    s.SortOrder = ids.IndexOf(s.Id);
+                }
+                break;
             case OrderableKind.FeaturedCategories:
-            var placements = await db.CategoryPlacements.Where(p => p.IsActive
-                && p.PlacementType == CategoryPlacementType.HomepageFeatured
-                && !p.Category!.IsDeleted)
-                .ToListAsync();
-            Same(placements.Select(p => p.Id));
-            foreach (var p in placements)
-            {
-                p.SortOrder = ids.IndexOf(p.Id);
-            }
-            break;
+                var placements = await db.CategoryPlacements.Where(p => p.IsActive
+                    && p.PlacementType == CategoryPlacementType.HomepageFeatured
+                    && !p.Category!.IsDeleted)
+                    .ToListAsync();
+                Same(placements.Select(p => p.Id));
+                foreach (var p in placements)
+                {
+                    p.SortOrder = ids.IndexOf(p.Id);
+                }
+                break;
             default: throw new ShopException("Unknown ordering list.");
         }
         await db.SaveChangesAsync();
@@ -1416,7 +1413,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     {
         Validate(input);
         var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
-        
+
         if (await users.HasPasswordAsync(user))
         {
             var removeResult = await users.RemovePasswordAsync(user);
@@ -1453,7 +1450,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             throw new ShopException("You cannot lock out your own administrator account.");
         }
         var user = await users.FindByIdAsync(userId.ToString()) ?? throw new ShopException("User not found.");
-        
+
         var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
         if (isLocked)
         {

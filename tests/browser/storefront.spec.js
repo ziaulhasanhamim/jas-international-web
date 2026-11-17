@@ -81,3 +81,30 @@ test('payment updates redirect with private token and polling survives SSE failu
   await page.waitForURL(`**/order/${token}`);
   await expect(page.locator('#fulfillment-title')).toBeVisible();
 });
+
+test('cart feedback treats server messages as text and rejects external action links', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const { showCartToast } = await import('/js/modules/cart.js');
+    showCartToast('<img src=x onerror="window.toastInjected=true">', 'error', { text: 'Unsafe', href: 'javascript:alert(1)' });
+  });
+  const toast = page.locator('#jas-toast-container');
+  await expect(toast).toContainText('<img src=x');
+  await expect(toast.locator('img, a')).toHaveCount(0);
+  expect(await page.evaluate(() => window.toastInjected)).toBeUndefined();
+});
+
+test('static signup confirms email before signing in', async ({ page }) => {
+  await page.goto('/account/signup');
+  await page.locator('input[autocomplete="name"]').fill('Browser Signup');
+  await page.locator('input[type="email"]').fill(`browser-${Date.now()}@example.test`);
+  await page.locator('input[type="password"]').fill('BrowserSignup123!');
+  await page.getByRole('button', { name: 'Create Account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Verify Your Email' })).toBeVisible();
+  const code = await page.locator('code').innerText();
+  expect(code).toMatch(/^\d{6}$/);
+  await page.locator('input[autocomplete="one-time-code"]').fill(code);
+  await page.getByRole('button', { name: 'Verify Code & Continue' }).click();
+  await page.waitForURL('**/cart');
+  await expect(page.locator('h1').first()).toBeVisible();
+});

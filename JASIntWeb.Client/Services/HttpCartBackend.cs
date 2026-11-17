@@ -15,6 +15,12 @@ public sealed class HttpCartBackend(IHttpClientFactory factory) : ICartBackend
         {
             request.Content = JsonContent.Create(body, body.GetType());
         }
+        if (method != HttpMethod.Get)
+        {
+            var security = await http.GetFromJsonAsync<AntiforgeryDto>("api/cart/security")
+                ?? throw new CommerceException("Refresh the page and try again.");
+            request.Headers.Add("X-CSRF-TOKEN", security.Token);
+        }
         using var response = await http.SendAsync(request);
         if (response.IsSuccessStatusCode)
         {

@@ -126,7 +126,7 @@ public sealed partial class MetaConversionsApiService(
                 ContentType = "product",
                 OrderId = order.Id.ToString(),
                 NumItems = order.Items?.Sum(i => i.Quantity) ?? 1,
-                ContentIds = items.Select(i => i.Id).ToList(),
+                ContentIds = [.. items.Select(i => i.Id)],
                 Contents = items
             };
 
@@ -348,13 +348,13 @@ public sealed partial class MetaConversionsApiService(
             var json = JsonSerializer.Serialize(requestBody, JsonOptions);
             using var client = httpClientFactory.CreateClient("MetaCAPI");
 
-            var url = $"https://graph.facebook.com/v19.0/{pixelId}/events?access_token={Uri.EscapeDataString(accessToken)}";
+            var url = MetaAdsOptions.EventsUrl(config["Meta:ApiVersion"], pixelId, accessToken);
             using var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             var responseContent = await response.Content.ReadAsStringAsync(ct);
 
             if (response.IsSuccessStatusCode)

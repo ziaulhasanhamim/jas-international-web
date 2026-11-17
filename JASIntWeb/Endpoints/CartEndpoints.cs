@@ -13,7 +13,7 @@ public static class CartEndpoints
 
     public static IEndpointRouteBuilder MapCartEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var cart = endpoints.MapGroup("/api/cart");
+        var cart = endpoints.MapGroup("/api/cart").AddEndpointFilter<CartAntiforgeryFilter>();
         cart.MapGet("/security", Security);
         cart.MapGet("/account", Account);
         cart.MapGet("/delivery-rates", Rates);
@@ -61,7 +61,7 @@ public static class CartEndpoints
             {
             }
             return Results.Redirect("/cart", false, false);
-        }).DisableAntiforgery();
+        }).DisableAntiforgery().AddEndpointFilter<CartAntiforgeryFilter>();
 
         endpoints.MapPost("/cart/add", async (
             HttpContext context,
@@ -80,23 +80,7 @@ public static class CartEndpoints
             {
             }
 
-            string target = "/";
-            if (!string.IsNullOrWhiteSpace(returnUrl))
-            {
-                if (returnUrl.StartsWith('/') && !returnUrl.StartsWith("//"))
-                {
-                    target = returnUrl;
-                }
-                else if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
-                {
-                    target = absUri.PathAndQuery;
-                }
-            }
-            else if (context.Request.Headers.TryGetValue("Referer", out var referer) &&
-                     Uri.TryCreate(referer.ToString(), UriKind.Absolute, out var refUri))
-            {
-                target = refUri.PathAndQuery;
-            }
+            var target = AccountNavigation.SafeReturn(returnUrl ?? "/");
 
             // Add to cart must NEVER redirect to /cart - user remains on current browsing page
             if (string.IsNullOrWhiteSpace(target) || target.StartsWith("/cart", StringComparison.OrdinalIgnoreCase))
@@ -111,8 +95,8 @@ public static class CartEndpoints
                 if (string.IsNullOrWhiteSpace(target)) target = "/";
             }
 
-            return Results.Redirect(target, false, false);
-        }).DisableAntiforgery();
+            return Results.LocalRedirect(target);
+        }).DisableAntiforgery().AddEndpointFilter<CartAntiforgeryFilter>();
 
         endpoints.MapPost("/cart/update", async (
             HttpContext context,
@@ -133,7 +117,7 @@ public static class CartEndpoints
                 }
             }
             return Results.Redirect("/cart", false, false);
-        }).DisableAntiforgery();
+        }).DisableAntiforgery().AddEndpointFilter<CartAntiforgeryFilter>();
 
         return endpoints;
     }
@@ -168,6 +152,7 @@ public static class CartEndpoints
             Path = "/",
             Expires = DateTimeOffset.UtcNow.AddDays(30),
             HttpOnly = false,
+            Secure = context.Request.IsHttps,
             SameSite = SameSiteMode.Lax,
             IsEssential = true
         });
