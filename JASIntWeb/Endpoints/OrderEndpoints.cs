@@ -19,6 +19,7 @@ public static class OrderEndpoints
     public static IEndpointRouteBuilder MapOrderEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/orders");
+        endpoints.MapGet("/api/orders/{id:int}/payment-status", GetPaymentStatus);
 
         group.MapPost("/device-status", async (DeviceOrdersQuery query, AppDbContext db) =>
         {
@@ -93,6 +94,20 @@ public static class OrderEndpoints
         });
 
         return endpoints;
+    }
+
+    private static async Task<IResult> GetPaymentStatus(int id, AppDbContext db)
+    {
+        var order = await db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == id);
+        if (order == null) return Results.NotFound();
+        return Results.Ok(new
+        {
+            id = order.Id,
+            status = order.Status.ToString(),
+            isPaid = order.PaidAmount > 0 && await db.Payments.AnyAsync(p => p.OrderId == id && p.Status == PaymentStatus.Completed),
+            paidAmount = order.PaidAmount,
+            trxId = order.TransactionId
+        });
     }
 
     private static async Task<OrderPaymentSseDto?> FetchStatusAsync(int id, IServiceScopeFactory factory, CancellationToken token)

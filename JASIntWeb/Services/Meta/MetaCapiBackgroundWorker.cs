@@ -38,17 +38,7 @@ public sealed class MetaCapiBackgroundWorker(
                 {
                     batch.Add(item);
 
-                    // Pull any additional available items up to 10
-                    while (batch.Count < 10 && queue.PendingCount > 0)
-                    {
-                        // We will drain what's immediately available
-                        break;
-                    }
-
-                    if (batch.Count >= 10)
-                    {
-                        break;
-                    }
+                    if (batch.Count == 10) break;
 
                     // Brief wait to allow batching if events arrive together
                     if (batch.Count > 0 && queue.PendingCount == 0)
@@ -128,23 +118,22 @@ public sealed class MetaCapiBackgroundWorker(
             try
             {
                 using var client = httpClientFactory.CreateClient("MetaCAPI");
-                var url = $"https://graph.facebook.com/v19.0/{pixelId}/events?access_token={Uri.EscapeDataString(accessToken)}";
+                var url = MetaAdsOptions.EventsUrl(config["Meta:ApiVersion"], pixelId, accessToken);
                 using var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
 
-                var response = await client.SendAsync(request, ct);
-                var body = await response.Content.ReadAsStringAsync(ct);
+                using var response = await client.SendAsync(request, ct);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    logger.LogInformation("Meta CAPI sent {Count} events successfully (attempt {Attempt}). Response: {Response}", batch.Count, attempt, body);
+                    logger.LogInformation("Sent {Count} Meta conversion events (attempt {Attempt}).", batch.Count, attempt);
                     success = true;
                 }
                 else
                 {
-                    logger.LogWarning("Meta CAPI HTTP {StatusCode} on attempt {Attempt}: {Response}", (int)response.StatusCode, attempt, body);
+                    logger.LogWarning("Meta CAPI returned HTTP {StatusCode} on attempt {Attempt}.", (int)response.StatusCode, attempt);
                     // If client error (4xx) other than rate limit (429), retrying the same payload won't help
                     if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500 && (int)response.StatusCode != 429)
                     {

@@ -9,3 +9,9 @@
 **/*.user
 **/*.log
 JASIntWeb/wwwroot/uploads/**
+
+.env*
+**/secrets.json
+test-results/
+playwright-report/
+docs/screenshots/

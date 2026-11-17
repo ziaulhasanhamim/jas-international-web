@@ -117,15 +117,14 @@ public sealed class ShoppingService(
                 .ToList()
             })
             .ToDictionaryAsync(v => v.Id);
-        return new(authenticated, normalized.Select(l =>
+        return new(authenticated, [.. normalized.Select(l =>
                 {
                     var v = variants.GetValueOrDefault(l.VariantId);
                     var available = v?.Available == true;
                     return new CartItemDto(l.VariantId, v?.Name ?? "Unavailable product", v?.Slug ?? "",
                         v?.MainImageUrl ?? "", v is null ? "" : string.Join(" / ", v.Options),
                         v?.SellingPrice ?? 0, l.Quantity, available ? v!.Stock : 0, available);
-                })
-            .ToList());
+                })]);
     }
 
     public async Task<int?> RecordLeadCartAsync(int? userId, string phone, string? name, string? email, List<CartItemDto> items, MetaAttributionDto? attr = null)
@@ -179,11 +178,11 @@ public sealed class ShoppingService(
                 UtmMedium = attr?.UtmMedium,
                 UtmCampaign = attr?.UtmCampaign,
                 LastActivityAt = DateTimeOffset.UtcNow,
-                Items = items.Select(i => new CartItem
+                Items = [.. items.Select(i => new CartItem
                 {
                     ProductVariantId = i.VariantId,
                     Quantity = i.Quantity
-                }).ToList()
+                })]
             };
 
             db.Carts.Add(newCart);
@@ -282,10 +281,10 @@ public sealed class ShoppingService(
                     throw new ShopException("A cart can contain at most 100 variants.");
                 }
                 cart.Items.Add(new CartItem
-                    {
-                        ProductVariantId = line.VariantId,
-                        Quantity = finalQuantity
-                    });
+                {
+                    ProductVariantId = line.VariantId,
+                    Quantity = finalQuantity
+                });
             }
             else
             {
@@ -329,10 +328,10 @@ public sealed class ShoppingService(
                         throw new ShopException("A cart can contain at most 100 variants.");
                     }
                     cart.Items.Add(new CartItem
-                        {
-                            ProductVariantId = line.VariantId,
-                            Quantity = quantity
-                        });
+                    {
+                        ProductVariantId = line.VariantId,
+                        Quantity = quantity
+                    });
                 }
                 else
                 {
@@ -340,10 +339,10 @@ public sealed class ShoppingService(
                 }
             }
             db.CartMergeReceipts.Add(new()
-                {
-                    UserId = userId,
-                    Token = request.Token
-                });
+            {
+                UserId = userId,
+                Token = request.Token
+            });
             await db.SaveChangesAsync();
         }
         await tx.CommitAsync();
@@ -399,7 +398,7 @@ public sealed class ShoppingService(
             cart = await ActiveCartAsync(null, userId.Value);
             if (cart.Items.Count > 0)
             {
-                request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+                request.Items = [.. cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity))];
             }
         }
         else
@@ -412,7 +411,7 @@ public sealed class ShoppingService(
                 cart = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.Token == cartToken.Value && c.Status == CartStatus.Active);
                 if (cart != null && cart.Items.Count > 0)
                 {
-                    request.Items = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
+                    request.Items = [.. cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity))];
                 }
             }
         }
@@ -581,7 +580,7 @@ public sealed class ShoppingService(
             MetaPurchaseSent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted",
             ClientIpAddress = clientIp,
             ClientUserAgent = clientUserAgent,
-            Items = summary.Items.Select(i => new OrderItem
+            Items = [.. summary.Items.Select(i => new OrderItem
                 {
                     ProductVariantId = i.VariantId,
                     ProductName = i.Name,
@@ -590,17 +589,16 @@ public sealed class ShoppingService(
                     UnitCost = unitCosts[i.VariantId],
                     Quantity = i.Quantity,
                     LineTotal = i.LineTotal
-                })
-                .ToList()
+                })]
         };
         order.Payments.Add(new Payment
-            {
-                OrderId = 0,
-                Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" || request.PaymentMethod == "Pending" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
-                Status = PaymentStatus.Pending,
-                Amount = 0m,
-                ExternalReference = request.TransactionId
-            });
+        {
+            OrderId = 0,
+            Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" || request.PaymentMethod == "Pending" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
+            Status = PaymentStatus.Pending,
+            Amount = 0m,
+            ExternalReference = request.TransactionId
+        });
         db.Orders.Add(order);
         db.OrderTimelineEvents.Add(new OrderTimelineEvent
         {

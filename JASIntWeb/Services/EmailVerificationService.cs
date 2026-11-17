@@ -1,10 +1,11 @@
-using System.Security.Cryptography;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace JASIntWeb.Services;
 
 public sealed class EmailVerificationService(
     HybridCache cache,
+    UserManager<User> users,
     IWebHostEnvironment environment,
     AccountMailService mailService,
     ILogger<EmailVerificationService> logger)
@@ -16,13 +17,16 @@ public sealed class EmailVerificationService(
     public async Task<(string Code, bool Sent)> GenerateAndSendCodeAsync(string email)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
-        // Generate a 6-digit numeric verification code (100000 - 999999)
-        var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-
-        // Store through HybridCache for 15 minutes
-        await cache.SetAsync(CacheKey(normalizedEmail), code, new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(15), LocalCacheExpiration = TimeSpan.FromMinutes(15) });
-
-        logger.LogInformation("[EmailVerification] Generated verification code for {Email}", normalizedEmail);
+        var user = await users.FindByEmailAsync(normalizedEmail);
+        if (user is null || user.EmailConfirmed) return ("", false);
+        // Identity derives the code from the shared account security stamp, so any instance can verify it.
+        var code = await users.GenerateUserTokenAsync(user, TokenOptions.DefaultEmailProvider, "Signup");
+        if (environment.IsDevelopment() && !mailService.IsConfigured)
+            await cache.SetAsync(CacheKey(normalizedEmail), code, new HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(9),
+                LocalCacheExpiration = TimeSpan.FromMinutes(9)
+            });
 
         var sent = false;
         try
@@ -44,20 +48,16 @@ public sealed class EmailVerificationService(
     public async Task<bool> ValidateCodeAsync(string email, string code)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(code)) return false;
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-        var key = CacheKey(normalizedEmail);
+        var user = await users.FindByEmailAsync(email.Trim());
+        if (user is null || user.EmailConfirmed
+            || !await users.VerifyUserTokenAsync(user, TokenOptions.DefaultEmailProvider, "Signup", code.Trim()))
+            return false;
 
-        var cachedCode = await cache.GetOrCreateAsync(key, _ => ValueTask.FromResult(""));
-        if (!string.IsNullOrWhiteSpace(cachedCode))
-        {
-            if (string.Equals(cachedCode.Trim(), code.Trim(), StringComparison.Ordinal))
-            {
-                await cache.RemoveAsync(key);
-                return true;
-            }
-        }
-
-        return false;
+        // The caller holds the account lock and transaction; rotating the stamp consumes the code.
+        var consumed = await users.UpdateSecurityStampAsync(user);
+        if (!consumed.Succeeded) return false;
+        await cache.RemoveAsync(CacheKey(email));
+        return true;
     }
 
     public async Task<string?> GetDevCodeAsync(string email)

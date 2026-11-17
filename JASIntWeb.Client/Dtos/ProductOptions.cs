@@ -6,7 +6,7 @@ public static class ProductOptions
     public static Dictionary<string, string> Selection(ProductDetailsDto product, IReadOnlyDictionary<string, string> requested)
     {
         var initial = product.Variants.FirstOrDefault(v => v.IsDefault) ?? product.Variants.FirstOrDefault();
-        var choices = initial is null ? new Dictionary<string, string>() : new Dictionary<string, string>(initial.Options);
+        Dictionary<string, string> choices = initial is null ? [] : new(initial.Options);
         foreach (var attribute in product.Attributes)
         {
             if (!requested.TryGetValue(attribute.Code, out var value))

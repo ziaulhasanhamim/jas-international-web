@@ -35,12 +35,19 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
       - name: Generate and verify CSS
         run: |
           npm run css
           git diff --exit-code -- JASIntWeb/wwwroot/css/output.css
       - run: dotnet restore JASIntWeb.sln
       - run: dotnet build JASIntWeb.sln --no-restore --configuration Release
+      - name: Verify EF model and migrations
+        env:
+          DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
+        run: |
+          dotnet tool install --tool-path "$RUNNER_TEMP/ef-tools" dotnet-ef --version 11.0.0
+          "$RUNNER_TEMP/ef-tools/dotnet-ef" migrations has-pending-model-changes --project JASIntWeb --configuration Release --no-build
       - name: Unit tests
         run: dotnet run --project tests/JASIntWeb.Tests.Unit --no-build --configuration Release
       - name: SEO and Meta tests
@@ -52,6 +59,21 @@ jobs:
         env:
           TEST_DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
         run: npm run test:browser
+      - name: Production container smoke test
+        run: |
+          docker build -t jas-ci .
+          test "$(docker run --rm --entrypoint id jas-ci -u)" != "0"
+          docker run --rm --entrypoint sh jas-ci -c 'touch /app/wwwroot/uploads/.write-check'
+          docker run -d --name jas-smoke --network host \
+            -e 'ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only' \
+            -e PORT=8080 -e Mail__Provider=Smtp -e Mail__Host= -e Mail__Smtp__Host= \
+            jas-ci
+          trap 'docker logs jas-smoke; docker rm -f jas-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8080/health/ready; then exit 0; fi
+            sleep 2
+          done
+          exit 1
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4

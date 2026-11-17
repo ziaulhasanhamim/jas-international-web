@@ -54,9 +54,9 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
     public async Task CustomerForms_RealAntiforgeryRejectsMissingToken()
     {
         using var client = Client(null);
-        var review = await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string,string> { ["Name"] = "Malicious review", ["Rating"] = "5", ["Comment"] = "This request has no security token." }));
+        var review = await client.PostAsync("/products/1/reviews", new FormUrlEncodedContent(new Dictionary<string, string> { ["Name"] = "Malicious review", ["Rating"] = "5", ["Comment"] = "This request has no security token." }));
         await ((int)review.StatusCode).Should().BeEqualTo(400);
-        var subscription = await client.PostAsync("/stock-notifications", new FormUrlEncodedContent(new Dictionary<string,string> { ["variantId"] = "1", ["email"] = "test@example.test" }));
+        var subscription = await client.PostAsync("/stock-notifications", new FormUrlEncodedContent(new Dictionary<string, string> { ["variantId"] = "1", ["email"] = "test@example.test" }));
         await ((int)subscription.StatusCode).Should().BeEqualTo(400);
     }
     [Test]
@@ -71,6 +71,39 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
         await ((int)(await admin.PostAsync("/api/admin/uploads/image", valid)).StatusCode).Should().BeEqualTo(200);
         using var oversized = new MultipartFormDataContent(); oversized.Add(new ByteArrayContent(new byte[5 * 1024 * 1024 + 1]), "file", "large.png");
         await ((int)(await admin.PostAsync("/api/admin/uploads/brand-logo", oversized)).StatusCode).Should().BeEqualTo(400);
+    }
+
+    [Test]
+    public async Task Cart_RealAntiforgeryRejectsMissingAndInvalidTokensAndAcceptsValidToken()
+    {
+        using var client = Client(null);
+        var line = new { variantId = 1, quantity = 1 };
+        await ((int)(await client.PostAsJsonAsync("/api/cart", line)).StatusCode).Should().BeEqualTo(400);
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", "invalid");
+        await ((int)(await client.PutAsJsonAsync("/api/cart", line)).StatusCode).Should().BeEqualTo(400);
+        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        var security = await client.GetFromJsonAsync<Security>("/api/cart/security");
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security!.Token);
+        await ((int)(await client.PostAsJsonAsync("/api/cart", line)).StatusCode).Should().BeEqualTo(200);
+        var cart = await client.GetStringAsync("/api/cart");
+        await cart.Contains("14500").Should().BeTrue();
+    }
+
+    [Test]
+    public async Task Health_LiveAndReadyExposeStatusWithoutConnectionDetails()
+    {
+        using var client = Client(null);
+        foreach (var path in new[] { "/health/live", "/health/ready", "/healthz" })
+        {
+            var response = await client.GetAsync(path);
+            await ((int)response.StatusCode).Should().BeEqualTo(200);
+            await response.Headers.CacheControl!.NoStore.Should().BeTrue();
+            var body = await response.Content.ReadAsStringAsync();
+            await body.Contains("healthy").Should().BeTrue();
+            await body.Contains("exception", StringComparison.OrdinalIgnoreCase).Should().BeFalse();
+            await body.Contains("description", StringComparison.OrdinalIgnoreCase).Should().BeFalse();
+            await body.Contains("Password", StringComparison.OrdinalIgnoreCase).Should().BeFalse();
+        }
     }
 
     private sealed record Security(string Token);

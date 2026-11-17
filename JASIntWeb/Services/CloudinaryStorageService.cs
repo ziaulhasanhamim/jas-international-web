@@ -101,11 +101,11 @@ public sealed class CloudinaryStorageService : IStorageService
                 Folder = "jas-storefront",
                 Overwrite = false,
                 UniqueFilename = true,
-                EagerTransforms = new List<Transformation>
-                {
+                EagerTransforms =
+                [
                     new Transformation().FetchFormat("avif").Quality("auto"),
                     new Transformation().FetchFormat("webp").Quality("auto")
-                },
+                ],
                 EagerAsync = true
             };
 

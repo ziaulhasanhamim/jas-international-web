@@ -16,7 +16,7 @@ public sealed class CanonicalHostAndRedirectMiddleware(RequestDelegate next)
 
         // 0. Bypass /health checks so internal container probes (Render, AWS, k8s, Docker)
         // and external monitors can verify service availability without 301 redirection.
-        if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+        if (request.Path.StartsWithSegments("/health") || path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

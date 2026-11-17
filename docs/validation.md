@@ -60,3 +60,46 @@ The extra local request is the shared confidence stylesheet. Moving order-tracki
 ## Screenshots
 
 [Desktop storefront](screenshots/home-desktop.png) · [Mobile storefront](screenshots/home-mobile.png) · [Desktop details](screenshots/details-desktop.png) · [Mobile details](screenshots/details-mobile.png)
+
+
+## v1.1.1 production readiness follow-up
+
+Validation uses isolated PostgreSQL databases and fake/test mail; production customer data and real customer messages are excluded.
+
+| Requirement | Evidence |
+| --- | --- |
+| Clean composition root and endpoint organization | `Program.cs` is 17 lines; upload, webhook, account and legacy payment-status routes are registered from `Endpoints`; Release build has no warnings or errors |
+| Exhaustive native unions without fallback cases | `FormReadResult`, `PaymentNotificationReadResult`, `RegistrationResult`, `VerificationResult`; compiler-validated switches in upload/webhook handlers and SSR signup |
+| Real cart CSRF validation | `Cart_RealAntiforgeryRejectsMissingAndInvalidTokensAndAcceptsValidToken` |
+| Upload authorization and CSRF retained | `Uploads_AnonymousAndCustomersCannotReachAdminStorage`, `Uploads_AdminNeedsRealAntiforgeryTokenAndValidImageContents`, `Uploads_RealTokenAllowsValidImageAndRejectsOversizedFiles` |
+| Distributed verification and replay/password preservation | `Signup_CodeWorksAcrossScopesAndCannotBeReplayedOrResetConfirmedAccount` |
+| Production mail configuration fails safely | `Signup_ProductionWithoutMailRejectsBeforeCreatingAccount` |
+| Serialized concurrent verification | `Signup_ConcurrentVerificationHasExactlyOneWinner` |
+| Verified provider email and safe failure redirects | `ExternalLogin_EmailMustBeExplicitlyVerified`, `ExternalLogin_RejectsUnconfiguredProviderAndSanitizesProviderErrors` |
+| Safe API errors and health responses | `ApiFailure_ReturnsTraceableProblemWithoutExceptionDetails`, `Health_LiveAndReadyExposeStatusWithoutConnectionDetails` |
+| PostgreSQL URL credentials, TLS, timeout and application name | `PostgresUrl_PreservesEscapedCredentialsAndExplicitTlsOptions`, `PostgresUrl_DefaultsToTlsAndStandardPort` |
+| Bounded nonblocking analytics queue | `ConversionQueue_RejectsOverflowWithoutBlockingAndRetainsQueuedEvents` |
+| SMS/form parsing and malformed JSON | `Webhook_ParsesFormSmsAmountsInvariantlyAndRejectsMalformedJson` |
+| Browser signup and text-only cart feedback | `static signup confirms email before signing in`, `cart feedback treats server messages as text and rejects external action links` in desktop and mobile Playwright projects |
+| Static SSR and enhanced navigation preserved | `hot routes render without Blazor circuits or WASM downloads`, `mobile and desktop product navigation preserves wishlist and adds one cart item`; no hot-route circuit/WASM requests |
+| HybridCache only | Source search finds no direct `IMemoryCache` or `AddMemoryCache` in application code |
+
+Commands run from the repository root:
+
+```bash
+npm run css
+npm audit --audit-level=high
+dotnet build JASIntWeb.sln --configuration Release --no-restore
+dotnet run --project tests/JASIntWeb.Tests.Unit --configuration Release --no-build
+dotnet run --project tests/JASIntWeb.Tests.Seo --configuration Release --no-build
+dotnet run --project tests/JASIntWeb.Tests.Integration --configuration Release --no-build
+# TEST_DB_URL points only to an isolated database
+npm run test:browser
+dotnet ef migrations has-pending-model-changes --project JASIntWeb --configuration Release --no-build
+dotnet package list --project JASIntWeb.sln --include-transitive --vulnerable --no-restore --format json
+docker build -t jas-production-review .
+```
+
+Results: **193 .NET tests passed** (60 Unit, 35 SEO, 98 PostgreSQL Integration), **16 browser tests passed**, zero skipped. npm audit reports zero vulnerabilities; the transitive NuGet vulnerability report lists no vulnerable packages. EF Core 11 reports no pending model changes. No schema migration is added in this patch.
+
+Production container validation checks the unprivileged UID, writable upload directory, production environment, database readiness, and disabled-by-default migrations on an isolated staging database. CI repeats container build/readiness checks and EF model validation before a tag can publish a release. Browser screenshots and network evidence remain available in the CI test-evidence artifact. See [production configuration and release procedure](production-readiness.md) for operator checks required in the actual hosting environment; no production deployment is part of this release.
