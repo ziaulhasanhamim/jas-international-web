@@ -366,13 +366,16 @@ else
 
         <!-- Specifications & Details -->
         <section class="mt-16 border-t border-slate-200 pt-10">
-            <div class="max-w-4xl">
+            <div class="@(relatedProducts.Count > 0 ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]" : "")">
+            <div class="min-w-0">
                 <h2 class="text-xl font-bold text-slate-900 mb-4">Detailed Specifications &amp; Features</h2>
                 <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
                     <div class="product-rich-specs text-slate-700">
                         @((MarkupString)product.Details)
                     </div>
                 </div>
+            </div>
+            <RelatedProducts Products="relatedProducts" CategorySlug="product.CategorySlug" />
             </div>
         </section>
 
@@ -511,19 +514,6 @@ else
             </div>
         </div>
 
-        <!-- Related Products Section (Gadget & Gear style slider) -->
-        @if (relatedProducts.Count > 0)
-        {
-            <div class="mt-16 border-t border-slate-200 pt-10">
-                <ProductSection
-                    Title="Similar &amp; Recommended Gadgets"
-                    Eyebrow="Explore more"
-                    Products="relatedProducts"
-                    ViewAllHref="@($"/category/{product.CategorySlug}")"
-                />
-            </div>
-        }
-
         <!-- Mobile Sticky Bottom Buy Bar (visible only on mobile md:hidden, above the 5-tab mobile bottom nav) -->
         @if (selected is { Stock: > 0 })
         {
@@ -624,8 +614,7 @@ else
         selected = ProductOptions.Match(product, choices);
         image = product.Images.ElementAtOrDefault(ImageIndex ?? 0) ?? product.MainImage;
 
-        var related = await Catalog.LatestAsync(product.CategorySlug, 8);
-        relatedProducts = related.Where(p => p.Id != product.Id).ToList();
+        relatedProducts = await Catalog.LatestAsync(product.CategorySlug, 4, product.Id);
 
         if (QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("review"))
             reviewSuccessMessage = "Thank you. Your review is awaiting moderation.";

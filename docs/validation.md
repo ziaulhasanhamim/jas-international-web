@@ -163,3 +163,12 @@ Existing .NET test commands above apply. Migration/model commands use EF tools *
 Take a backup first. Downgrading after independent values are created/edited is guarded against data loss. Restore the backup if rollback is required. Old editor clients must reload: legacy product-edit price/stock fields are ignored, and variant writes use revision-checked workspace commands. No real mail is needed for these checks.
 
 [Desktop workspace](screenshots/variant-workspace-desktop.png) · [Mobile workspace](screenshots/variant-workspace-mobile.png) · [Markdown preview](screenshots/variant-markdown-preview.png) · [Mobile cards](screenshots/variant-cards-mobile.png)
+
+## v1.2.1 direct purchase and related products
+
+| Requirement | Evidence |
+| --- | --- |
+| Configured cards buy the default variant and open the cart | `ConfiguredProductCard_BuysDefaultVariantAndRedirectsToCart` asserts the rendered action, redirect, cart variant and quantity |
+| Related products exclude current/hidden products before limiting and appear beside specifications | `RelatedProducts_ExcludeCurrentBeforeLimitAndRenderBesideSpecifications` verifies four matching results and a single recommendations section before reviews |
+
+Release build has zero warnings/errors. PostgreSQL integration suite: 120 passed, zero failed/skipped. Existing unit/SEO suites are repeated by CI. No schema migration or browser-test dependency is added.

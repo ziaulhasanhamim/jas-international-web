@@ -1,0 +1,19 @@
+@if (Products.Count > 0)
+{
+    <aside class="min-w-0" aria-labelledby="related-products-title">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <h2 id="related-products-title" class="text-xl font-bold text-slate-900">Related products</h2>
+            <a href="/category/@CategorySlug" class="text-xs font-semibold text-blue-700">View all →</a>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            @foreach (var item in Products)
+            {
+                <ProductCard @key="item.Id" Product="item" />
+            }
+        </div>
+    </aside>
+}
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProductSummaryDto> Products { get; set; } = [];
+    [Parameter, EditorRequired] public string CategorySlug { get; set; } = "";
+}
