@@ -202,20 +202,23 @@ To begin running Meta Ads and ranking on Google Bangladesh:
 
 ## Customer confidence and stock alerts
 
-See [release notes](RELEASE_NOTES.md) for the v1.1.0 migration and compatibility changes. All application cache consumers use `Microsoft.Extensions.Caching.Hybrid.HybridCache`. Settings and redirects are read asynchronously; admin changes await invalidation.
+See [release notes](RELEASE_NOTES.md) for current compatibility changes. All application cache consumers use `Microsoft.Extensions.Caching.Hybrid.HybridCache`. Settings and redirects are read asynchronously; admin changes await invalidation.
 
 Sold-out variants offer an SSR email-alert form. Requests stay pending until the recipient confirms via the emailed form. A database-backed worker checks availability every minute and processes up to 25 notifications per cycle. Failed sends retry with backoff, then appear as Failed in `/admin/stock-notifications` after five attempts. Administrators can retry after correcting mail configuration. Alerts never reserve stock.
 
-Run browser checks only against an isolated database: the test server applies migrations and seeds development fixtures. Never point `TEST_DB_URL` at production or a database you want to preserve.
+Run the .NET suites after building the Release solution:
 
 ```bash
 npm ci --ignore-scripts
 npm run css
 dotnet build JASIntWeb.sln --configuration Release
-npx playwright install chromium
-TEST_DB_URL='Host=localhost;Database=jas_browser_test;Username=postgres;Password=TEST_ONLY' npm run test:browser
+dotnet run --project tests/JASIntWeb.Tests.Unit --configuration Release --no-build
+dotnet run --project tests/JASIntWeb.Tests.Seo --configuration Release --no-build
+dotnet run --project tests/JASIntWeb.Tests.Integration --configuration Release --no-build
 ```
 
-Browser checks cover desktop/mobile rendering, static SSR hot paths, cart interactions, review moderation, consent, and release screenshots. Integration tests use PostgreSQL Testcontainers by default; an explicitly supplied `TEST_DB_URL` is reset destructively by the integration harness and must be disposable.
+Integration tests create their own disposable PostgreSQL database with Testcontainers; Docker must be running. An explicitly supplied `TEST_DB_URL` is reset destructively and must point only to a disposable test database.
+
+Carousel slides share an **8:3 aspect ratio** at full container width. Images use `object-contain` so different source proportions fit inside the same stable frame without cropping; surrounding space is expected for images that are not 8:3. Use matching 8:3 artwork for an edge-to-edge banner.
 
 CI validates PRs and main without publishing releases. Push a version tag after merging to run the release workflow; it repeats validation and publishes `RELEASE_NOTES.md` only after success. Production deployment and production migrations remain separate operations.

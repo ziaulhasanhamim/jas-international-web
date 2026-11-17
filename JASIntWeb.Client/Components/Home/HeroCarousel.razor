@@ -4,12 +4,12 @@
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
         <section
             data-carousel
-            class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 border border-slate-200/70 shadow-xs group select-none w-full touch-pan-y"
+            class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 border border-slate-200/70 shadow-xs group select-none aspect-[8/3] w-full touch-pan-y"
             aria-roledescription="carousel"
             aria-label="Featured promotions"
         >
-            <!-- Slide Stage -->
-            <div class="relative grid w-full overflow-hidden">
+            <!-- One fixed-ratio stage keeps every slide the same size; contain preserves the full artwork. -->
+            <div class="absolute inset-0 overflow-hidden">
                 @for (var i = 0; i < Slides.Count; i++)
                 {
                     var slide = Slides[i];
@@ -17,22 +17,22 @@
                     var targetUrl = string.IsNullOrWhiteSpace(slide.LinkUrl) ? "/products" : slide.LinkUrl;
                     <div
                         data-carousel-slide
-                        class="col-start-1 row-start-1 min-w-0 transition-opacity duration-700 ease-in-out
+                        class="absolute inset-0 transition-opacity duration-700 ease-in-out
                             @(active ? "opacity-100 z-10" : "pointer-events-none opacity-0 z-0")"
                         role="group"
                         aria-roledescription="slide"
                         aria-hidden="@(!active)"
                     >
                         <!-- Pure clean banner artwork without text clutter (Gadget & Gear style) -->
-                        <a href="@targetUrl" class="block w-full relative" title="@slide.ImageAlt">
+                        <a href="@targetUrl" class="block h-full w-full relative" title="@slide.ImageAlt">
                             <PictureImage
                                 Src="@slide.Image"
                                 Alt="@slide.ImageAlt"
                                 Loading="@(i == 0 ? "eager" : "lazy")"
                                 FetchPriority="@(i == 0 ? "high" : "low")"
                                 Decoding="async"
-                                PictureClass="block"
-                                Class="block w-full h-auto object-contain"
+                                PictureClass="block h-full w-full"
+                                Class="block h-full w-full object-contain"
                             />
                         </a>
                     </div>
