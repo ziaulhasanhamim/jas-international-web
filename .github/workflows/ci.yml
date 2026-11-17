@@ -43,6 +43,8 @@ jobs:
       - run: dotnet restore JASIntWeb.sln
       - run: dotnet build JASIntWeb.sln --no-restore --configuration Release
       - name: Verify EF model and migrations
+        env:
+          DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
         run: |
           dotnet tool install --tool-path "$RUNNER_TEMP/ef-tools" dotnet-ef --version 11.0.0
           "$RUNNER_TEMP/ef-tools/dotnet-ef" migrations has-pending-model-changes --project JASIntWeb --configuration Release --no-build
