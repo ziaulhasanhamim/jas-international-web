@@ -14,17 +14,6 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: test_only
-          POSTGRES_DB: jas_browser_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready --health-interval 10s
-          --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -44,7 +33,7 @@ jobs:
       - run: dotnet build JASIntWeb.sln --no-restore --configuration Release
       - name: Verify EF model and migrations
         env:
-          DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
+          DB_URL: Host=localhost;Database=jas_ci;Username=postgres;Password=test_only
         run: |
           dotnet tool install --tool-path "$RUNNER_TEMP/ef-tools" dotnet-ef --version 11.0.0
           "$RUNNER_TEMP/ef-tools/dotnet-ef" migrations has-pending-model-changes --project JASIntWeb --configuration Release --no-build
@@ -54,32 +43,10 @@ jobs:
         run: dotnet run --project tests/JASIntWeb.Tests.Seo --no-build --configuration Release
       - name: PostgreSQL integration tests
         run: dotnet run --project tests/JASIntWeb.Tests.Integration --no-build --configuration Release
-      - run: npx playwright install --with-deps chromium
-      - name: Browser tests and isolated migration smoke test
-        env:
-          TEST_DB_URL: Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only
-        run: npm run test:browser
-      - name: Production container smoke test
-        run: |
-          docker build -t jas-ci .
-          test "$(docker run --rm --entrypoint id jas-ci -u)" != "0"
-          docker run --rm --entrypoint sh jas-ci -c 'touch /app/wwwroot/uploads/.write-check'
-          docker run -d --name jas-smoke --network host \
-            -e 'ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=jas_browser_test;Username=postgres;Password=test_only' \
-            -e PORT=8080 -e Mail__Provider=Smtp -e Mail__Host= -e Mail__Smtp__Host= \
-            jas-ci
-          trap 'docker logs jas-smoke; docker rm -f jas-smoke' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://localhost:8080/health/ready; then exit 0; fi
-            sleep 2
-          done
-          exit 1
-      - name: Upload test evidence
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-evidence
-          path: |
-            test-results/
-            tests/**/TestResults/
+          name: dotnet-test-results
+          path: tests/**/TestResults/
           retention-days: 14

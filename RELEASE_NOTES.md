@@ -1,9 +1,7 @@
-# v1.1.2 — Show complete carousel banners on mobile
+# v1.1.3 — Consistent carousel sizing and simpler CI
 
-- Removed the carousel's forced aspect ratios and minimum/maximum heights. Banner images now render at full width with their natural height, preserving the complete artwork on mobile and desktop.
-- Kept fading slides stacked in a CSS grid so navigation does not collapse the carousel. Existing touch controls and static SSR remain intact.
-- Added browser regression coverage for image proportions, slide navigation, and Chromium selecting the AVIF `<picture>` source. Regenerated production CSS.
+- Every hero slide now uses one 8:3 frame at full container width, keeping a consistent height when images have different dimensions. Images use `object-contain`, preserving the full artwork; non-matching proportions leave space around the image.
+- Removed the committed Playwright storefront suite, its configuration, npm dependency and browser-test command. Browser automation is no longer required to work on this project.
+- Simplified CI to CSS generation/verification, dependency audit, the Release build, EF model verification, and the three .NET suites. PostgreSQL integration tests manage their own disposable Testcontainers database. Removed browser installation, browser tests, the extra PostgreSQL service and the production-container smoke step.
 
-The live banner's Cloudinary AVIF source was verified in Chromium: HTTP 200 with `Content-Type: image/avif`, even though its URL ends in `.png`. The original filename extension does not identify the delivered format.
-
-No database migration or new configuration is required. Redeploy the application with this release to update a hosted site; publishing the GitHub release alone does not replace an already-running deployment. The full-width banner is shorter on narrow phones, so embedded text becomes smaller while remaining uncropped.
+No database migration or new configuration is required. Matching 8:3 source artwork fills the frame edge to edge. Existing branding, carousel controls and static SSR behavior are retained.

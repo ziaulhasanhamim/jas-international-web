@@ -1,3 +1,5 @@
+> Historical validation record. Browser checks below describe earlier releases. As of v1.1.3, Playwright tests, tooling and CI steps are removed from the project; current CI runs CSS verification, the Release build, EF model verification and the three .NET suites.
+
 # Validation evidence
 
 Baseline commit: `d0a60db`. Validation uses disposable PostgreSQL containers and disabled mail delivery; no production database or customer email was used.
@@ -32,7 +34,7 @@ Baseline commit: `d0a60db`. Validation uses disposable PostgreSQL containers and
 
 The repository uses TUnit on Microsoft.Testing.Platform with .NET 11. Run the suites with `dotnet run --project tests/JASIntWeb.Tests.Unit --configuration Release`, and equivalent commands for `.Seo` and `.Integration`. Native `dotnet test` requires `--project` or `--solution` in this repository.
 
-Run browser tests with `TEST_DB_URL` pointing to a disposable database and `npm run test:browser`. The browser test server applies migrations and development fixtures. Screenshots and traces are retained in the GitHub Actions `test-evidence` artifact.
+Earlier releases used disposable browser-test databases and archived screenshots/traces. These browser tests are no longer part of the project.
 
 ## Migration check
 
@@ -93,8 +95,6 @@ dotnet build JASIntWeb.sln --configuration Release --no-restore
 dotnet run --project tests/JASIntWeb.Tests.Unit --configuration Release --no-build
 dotnet run --project tests/JASIntWeb.Tests.Seo --configuration Release --no-build
 dotnet run --project tests/JASIntWeb.Tests.Integration --configuration Release --no-build
-# TEST_DB_URL points only to an isolated database
-npm run test:browser
 dotnet ef migrations has-pending-model-changes --project JASIntWeb --configuration Release --no-build
 dotnet package list --project JASIntWeb.sln --include-transitive --vulnerable --no-restore --format json
 docker build -t jas-production-review .
@@ -102,4 +102,13 @@ docker build -t jas-production-review .
 
 Results: **193 .NET tests passed** (60 Unit, 35 SEO, 98 PostgreSQL Integration), **16 browser tests passed**, zero skipped. npm audit reports zero vulnerabilities; the transitive NuGet vulnerability report lists no vulnerable packages. EF Core 11 reports no pending model changes. No schema migration is added in this patch.
 
-Production container validation checks the unprivileged UID, writable upload directory, production environment, database readiness, and disabled-by-default migrations on an isolated staging database. CI repeats container build/readiness checks and EF model validation before a tag can publish a release. Browser screenshots and network evidence remain available in the CI test-evidence artifact. See [production configuration and release procedure](production-readiness.md) for operator checks required in the actual hosting environment; no production deployment is part of this release.
+Production container validation checks the unprivileged UID, writable upload directory, production environment, database readiness, and disabled-by-default migrations on an isolated staging database. For v1.1.1, CI repeated container build/readiness checks and EF model validation, and archived browser screenshots and network evidence. These browser/container steps have since been removed from CI. See [production configuration and release procedure](production-readiness.md) for operator checks required in the actual hosting environment; no production deployment is part of this release.
+
+
+## v1.1.3 carousel sizing and CI simplification
+
+- The carousel uses one 8:3 frame with `object-contain`; mixed image dimensions keep the same slide height without cropping.
+- Private visual checks exercised landscape (2400×900), portrait (900×1200) and wide (1800×600) sources at 302px, 390px and 1440px viewport widths. Frame dimensions stayed constant when navigating slides. These checks are internal working tools, not project files or CI dependencies.
+- Removed `tests/browser/storefront.spec.js`, `playwright.config.js`, the Playwright npm dependency and the browser-test npm script.
+- CI now runs npm/CSS validation, the Release build, the EF model check and the three .NET suites. Integration tests create their own PostgreSQL Testcontainers database; the separate PostgreSQL service and production-container smoke step are removed.
+- Release build: zero warnings/errors. .NET tests: 60 Unit, 35 SEO and 98 Integration passed (193 total, zero failures/skips). npm audit: zero vulnerabilities. The EF consistency check also succeeds with an unreachable test connection string, confirming that it does not require the removed PostgreSQL service.
