@@ -72,7 +72,7 @@ public static class AdminUploadEndpoints
     private static async Task<Results<Ok<UploadedImageResponse>, BadRequest<EndpointError>>> UploadSingleAsync(
         HttpContext context, IStorageService storage, IAntiforgery antiforgery, ILoggerFactory logs, int limit, CancellationToken ct)
     {
-        return (await FormRequestReader.ReadAsync(context, antiforgery, ct)) switch
+        return await FormRequestReader.ReadAsync(context, antiforgery, ct) switch
         {
             IFormCollection form => await StoreSingleAsync(form, storage, logs, limit, ct),
             EndpointError error => TypedResults.BadRequest(error)

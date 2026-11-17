@@ -32,7 +32,7 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -135,7 +135,7 @@
                     </ChildContent>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Product Name & Slug" Sortable="true" SortBy="@sortByName">
+                <TemplateColumn Title="Product Name & Slug" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product Name & Slug" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-3">
                         @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
                         {
@@ -152,10 +152,10 @@
                             <span class="text-xs text-slate-400 font-mono">/@context.Slug</span>
                         </div>
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <PropertyColumn Property="@(p => p.Category)" Title="Category" Sortable="true" />
-                <PropertyColumn Property="@(p => p.VariantCount)" Title="Variants" Sortable="true" Align="Align.Center" />
+                <PropertyColumn Property="@(p => p.Category)" Title="Category" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="Category" SortKey="Category" /></HeaderTemplate></PropertyColumn>
+                <PropertyColumn Property="@(p => p.VariantCount)" Title="Variants" Sortable="false" Align="Align.Center" ><HeaderTemplate><AdminSortHeader Label="Variants" SortKey="VariantCount" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Storefront Status" Align="Align.Center">
                     <button
@@ -243,7 +243,6 @@
     private IQueryable<AdminProductRow>? productsQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<AdminProductRow> sortByName = GridSort<AdminProductRow>.ByAscending(p => p.Name);
 
     private List<CategoryOption> _categories = [];
     private string? _toast;
@@ -333,8 +332,8 @@
         Page = Math.Max(1, Page);
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderBy(p => p.Name)
-            .ThenBy(p => p.Id)
+        var list = await AdminSorting.Apply(q.OrderBy(p => p.Name)
+            .ThenBy(p => p.Id), Nav, ("Name", p => p.Name), ("Category", p => p.Category!.Name), ("VariantCount", p => p.ProductVariants.Count(v => !v.IsDeleted)))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(p => new AdminProductRow(

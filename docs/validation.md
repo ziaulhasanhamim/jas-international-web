@@ -112,3 +112,23 @@ Production container validation checks the unprivileged UID, writable upload dir
 - Removed `tests/browser/storefront.spec.js`, `playwright.config.js`, the Playwright npm dependency and the browser-test npm script.
 - CI now runs npm/CSS validation, the Release build, the EF model check and the three .NET suites. Integration tests create their own PostgreSQL Testcontainers database; the separate PostgreSQL service and production-container smoke step are removed.
 - Release build: zero warnings/errors. .NET tests: 60 Unit, 35 SEO and 98 Integration passed (193 total, zero failures/skips). npm audit: zero vulnerabilities. The EF consistency check also succeeds with an unreachable test connection string, confirming that it does not require the removed PostgreSQL service.
+
+
+## v1.1.4 admin editors
+
+Validated against a disposable PostgreSQL database with a fake administrator and no customer email or production data. The Release build and trimmed publish both succeed with zero warnings/errors. **220 tests pass**: 80 Unit, 35 SEO and 105 PostgreSQL Integration, with zero failures/skips. EF reports no pending model changes; this release adds no migration. npm audit reports zero vulnerabilities.
+
+| Requirement | Evidence |
+| --- | --- |
+| Bounded category images, emoji and unsafe URL handling | `CategoryVisual_RecognizesImageLocationsWithoutTreatingEmojiOrScriptsAsImages`; `CategoryList_RendersImageAsThumbnailAndSortsGloballyBeforePaging` |
+| Live SEO rules and storage limits | `SeoPreview_UsesSameTitleAndDescriptionRulesAsStorefront`; `EditorValidation_GuidelinesDoNotReplaceStorageLimits`; private published-build typing checks on category, brand and product editors |
+| Current administrator identity and real CSRF protection | `CatalogApi_RequiresAdministratorAndCurrentSecurityStamp`; `CatalogApi_RechecksDatabaseRoleForAnAlreadyAuthenticatedAdministrator`; `CatalogApi_RealAntiforgeryRejectsMissingAndWrongTokenAndAcceptsCorrectToken` |
+| Persisted fields and public SEO output | `CatalogApi_CategoryAndBrandPersistEditorFieldsAndRejectMismatchedIds`; `CatalogApi_ProductPersistsMediaRichTextFlagsAndSimpleInventory` |
+| Invalid input and missing record handling | `CatalogApi_ValidatesInputsAndMissingRecordsWithoutWriting` |
+| Global sorting, stable ties and safe columns | `AdminSorting_WhitelistsColumnsAndSortsBeforePaginationWithStableTies`; `CategoryList_RendersImageAsThumbnailAndSortsGloballyBeforePaging` |
+| Interactive Auto works in both runtimes | Private checks against the trimmed publish exercise cold Server and warmed WebAssembly category editing, live counters, uploads, saves and validation-error correction/retry; brand preview/save and product rich-text persistence also pass |
+| Navigation and static routes | Private checks confirm existing slug preservation, changing editor IDs, sorting with filters, toast dismissal, and fresh home/catalog/detail visits without circuit or WebAssembly startup requests |
+
+The .NET test/build commands above remain valid. Published-build verification also ran `dotnet publish JASIntWeb/JASIntWeb.csproj --configuration Release --no-restore`. Private browser tools and their dependencies are excluded from the repository and CI.
+
+[Category list after the fix](screenshots/admin-categories-fixed.png) · [Live editor SEO preview](screenshots/admin-live-seo-preview.png)

@@ -1,0 +1,41 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<textarea @ref="element" class="shop-input min-h-[380px]" @bind="text" @bind:event="oninput" @bind:after="PlainChanged" aria-label="Rich product description HTML"></textarea>
+@if (unavailable) { <p class="admin-help">Rich editor unavailable. You can edit the HTML above.</p> }
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    private string text = "";
+    private string? previous;
+    protected override void OnParametersSet() { if (Value != previous) { text = Value; previous = Value; } }
+    private Task PlainChanged() => Changed(text);
+    private ElementReference element;
+    private IJSObjectReference? module;
+    private IJSObjectReference? editor;
+    private DotNetObjectReference<AdminRichText>? reference;
+    private bool disposed;
+    private bool unavailable;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "/js/modules/admin-rich-text.js");
+            if (disposed) return;
+            reference = DotNetObjectReference.Create(this);
+            editor = await module.InvokeAsync<IJSObjectReference>("create", element, reference);
+            if (disposed) await editor.InvokeVoidAsync("dispose");
+        }
+        catch (JSException) { if (!disposed) { unavailable = true; StateHasChanged(); } }
+        catch (JSDisconnectedException) { }
+    }
+    [JSInvokable] public Task Changed(string html) { text = html; previous = html; return disposed ? Task.CompletedTask : ValueChanged.InvokeAsync(html); }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        try { if (editor is not null) { await editor.InvokeVoidAsync("dispose"); await editor.DisposeAsync(); } if (module is not null) await module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        reference?.Dispose();
+    }
+}

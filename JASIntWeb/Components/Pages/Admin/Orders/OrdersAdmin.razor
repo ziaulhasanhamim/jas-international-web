@@ -22,7 +22,7 @@
             <Icon Name="check" Class="size-4 text-emerald-600" />
             @_toast
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -86,17 +86,17 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@ordersQuery" class="data-table">
-                <TemplateColumn Title="Order #" Sortable="true" SortBy="@sortById">
+                <TemplateColumn Title="Order #" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Order #" SortKey="Id" /></HeaderTemplate><ChildContent>
                     <a href="/admin/orders/@context.Id" class="font-bold text-blue-600 hover:underline">
                         #@context.Id
                     </a>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Date & Time" Sortable="true" SortBy="@sortByDate">
+                <TemplateColumn Title="Date & Time" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Date & Time" SortKey="CreatedAt" /></HeaderTemplate><ChildContent>
                     <span class="text-xs text-slate-500 whitespace-nowrap">
                         @context.CreatedAt.ToOffset(TimeSpan.FromHours(6)).ToString("dd MMM yyyy, hh:mm tt")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Customer Name">
                     <strong class="font-semibold text-slate-800 block text-xs">
@@ -113,7 +113,7 @@
                     </span>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByStatus">
+                <TemplateColumn Title="Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="Status" /></HeaderTemplate><ChildContent>
                     @switch (context.Status)
                     {
                         case OrderStatus.Pending:
@@ -135,7 +135,7 @@
                             <span class="badge badge-slate">@context.Status</span>
                             break;
                     }
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Payment">
                     @if (context.Status == OrderStatus.Cancelled)
@@ -184,7 +184,7 @@
                     }
                 </TemplateColumn>
 
-                <PropertyColumn Property="@(o => o.Total)" Title="Total Amount" Format="N0" Sortable="true" Align="Align.End" Class="text-right font-bold text-slate-900 tabular-nums" />
+                <PropertyColumn Property="@(o => o.Total)" Title="Total Amount" Format="N0" Sortable="false" Align="Align.End" Class="text-right font-bold text-slate-900 tabular-nums" ><HeaderTemplate><AdminSortHeader Label="Total Amount" SortKey="Total" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Action" Align="Align.End">
                     <a href="/admin/orders/@context.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -220,9 +220,6 @@
     private IQueryable<Order>? ordersQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<Order> sortById = GridSort<Order>.ByDescending(o => o.Id);
-    private GridSort<Order> sortByDate = GridSort<Order>.ByDescending(o => o.CreatedAt);
-    private GridSort<Order> sortByStatus = GridSort<Order>.ByAscending(o => o.Status);
 
     private int unconfirmedPaymentCount;
     private string? _toast;
@@ -293,8 +290,8 @@
         Page = Math.Max(1, Page);
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderByDescending(o => o.CreatedAt)
-            .ThenByDescending(o => o.Id)
+        var list = await AdminSorting.Apply(q.OrderByDescending(o => o.CreatedAt)
+            .ThenByDescending(o => o.Id), Nav, ("Id", o => o.Id), ("CreatedAt", o => o.CreatedAt), ("Status", o => o.Status), ("Total", o => o.Total))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync();

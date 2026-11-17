@@ -15,26 +15,7 @@
                       hover:-translate-y-1 hover:border-slate-300
                       hover:shadow-md"
             >
-                @if (category.IsIconUrl)
-                {
-                    <PictureImage
-                        Src="@category.Icon"
-                        Alt="@category.Name"
-                        Loading="lazy"
-                        Decoding="async"
-                        Width="48"
-                        Height="48"
-                        Class="mx-auto h-12 w-12 object-contain"
-                    />
-                }
-                else
-                {
-                    <span class="mx-auto flex h-12 w-12 items-center
-                    justify-center rounded-xl bg-mist text-xl
-                    transition group-hover:scale-110">
-                        @category.Icon
-                    </span>
-                }
+                <CategoryVisual Value="@category.Icon" />
                 <p class="mt-3 text-sm font-medium">@category.Name</p>
             </a>
         }

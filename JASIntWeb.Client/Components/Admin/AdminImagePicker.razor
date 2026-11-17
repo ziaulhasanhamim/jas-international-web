@@ -1,0 +1,38 @@
+@inject IAdminCatalogBackend Backend
+<div class="my-3 space-y-2 rounded-xl border border-slate-200 p-4">
+    <label class="shop-label">@Label
+        <input class="shop-input" value="@Value" @oninput="ChangedUrl" placeholder="@(Emoji ? "Image URL, local path, or emoji" : "Image URL or local path")" />
+    </label>
+    <div class="flex items-center gap-3">
+        <CategoryVisual Value="@Value" />
+        <InputFile OnChange="Upload" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@uploading" aria-label="@($"Upload {Label}")" />
+        <button type="button" class="btn-secondary" @onclick="Clear" disabled="@uploading">Remove</button>
+    </div>
+    @if (uploading) { <p role="status">Uploading image…</p> }
+    @if (message is not null) { <p class="form-error" role="alert">@message</p> }
+</div>
+@code {
+    [Parameter] public string Label { get; set; } = "Image";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback<bool> BusyChanged { get; set; }
+    [Parameter] public bool BrandLogo { get; set; }
+    [Parameter] public bool Emoji { get; set; }
+    private Task ChangedUrl(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private Task Clear() => ValueChanged.InvokeAsync(string.Empty);
+    private bool uploading;
+    private string? message;
+    private async Task Upload(InputFileChangeEventArgs args)
+    {
+        uploading = true; message = null; await BusyChanged.InvokeAsync(true);
+        try
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream((BrandLogo ? 5 : 10) * 1024 * 1024);
+            await ValueChanged.InvokeAsync(await Backend.UploadAsync(stream, file.Name, file.ContentType, BrandLogo));
+        }
+        catch (Exception failure) when (failure is AdminCatalogException or IOException or HttpRequestException)
+        { message = failure is AdminCatalogException known ? known.Message : "Upload failed. Check the file size and connection."; }
+        finally { uploading = false; await BusyChanged.InvokeAsync(false); }
+    }
+}

@@ -1,3 +1,4 @@
+@inject NavigationManager Nav
 @page "/admin/attributes/{AttributeId:int}/options"
 @using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
@@ -25,11 +26,11 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@optionsQuery" class="data-table">
-            <TemplateColumn Title="Display Value" Sortable="true" SortBy="@(GridSort<AttributeOption>.ByAscending(o => o.Value))">
+            <TemplateColumn Title="Display Value" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Display Value" SortKey="Value" /></HeaderTemplate><ChildContent>
                 <strong class="text-slate-900 block font-semibold text-xs">@context.Value</strong>
-            </TemplateColumn>
+            </ChildContent></TemplateColumn>
 
-            <PropertyColumn Property="@(o => o.Code)" Title="Code" Sortable="true" Class="font-mono text-xs text-slate-600" />
+            <PropertyColumn Property="@(o => o.Code)" Title="Code" Sortable="false" Class="font-mono text-xs text-slate-600" ><HeaderTemplate><AdminSortHeader Label="Code" SortKey="Code" /></HeaderTemplate></PropertyColumn>
 
             <TemplateColumn Title="Actions" Align="Align.End">
                 <a href="/admin/attributes/@AttributeId/options/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -63,7 +64,8 @@
         Page = Math.Max(1, Page);
         var q = Db.AttributeOptions.AsNoTracking().Where(o => o.AttributeDefinitionId == AttributeId).OrderBy(o => o.Value);
         totalFiltered = await q.CountAsync();
-        var list = await q.Skip((Page - 1) * PageSize).Take(PageSize).ToListAsync();
+        var list = await AdminSorting.Apply(q, Nav, ("Value", o => o.Value), ("Code", o => o.Code))
+            .Skip((Page - 1) * PageSize).Take(PageSize).ToListAsync();
         optionsQuery = list.AsQueryable();
     }
 }

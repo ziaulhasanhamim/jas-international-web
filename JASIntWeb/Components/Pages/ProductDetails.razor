@@ -23,8 +23,8 @@
 }
 else
 {
-    var pageTitle = Seo.BuildProductTitle(product.Name, product.BrandName);
-    var pageDesc = Seo.SanitizeDescription(product.Description ?? $"{product.Name} available at JAS International. Authentic tech gadgets with official warranty and nationwide delivery in Bangladesh.");
+    var pageTitle = string.IsNullOrWhiteSpace(product.MetaTitle) ? Seo.BuildProductTitle(product.Name, product.BrandName) : product.MetaTitle;
+    var pageDesc = Seo.SanitizeDescription(string.IsNullOrWhiteSpace(product.MetaDescription) ? AdminSeoText.ProductDescription(product.Name, product.Description) : product.MetaDescription);
     var canonical = $"/product/{product.Slug}";
     var selectedSku = selected?.Sku ?? product.Variants.FirstOrDefault()?.Sku ?? $"JAS-{product.Id}";
     var price = selected?.Price ?? 0m;
@@ -82,7 +82,7 @@ else
     <SeoHead Title="@pageTitle"
              Description="@pageDesc"
              CanonicalPath="@canonical"
-             OgImage="@product.MainImage"
+             OgImage="@(string.IsNullOrWhiteSpace(product.OgImageUrl) ? product.MainImage : product.OgImageUrl)"
              OgType="product"
              ProductPrice="@price"
              ProductCurrency="BDT"

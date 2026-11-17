@@ -18,7 +18,12 @@ public sealed record HomepageSectionDto(
 public sealed record ProductDetailsDto(int Id, string Name, string Slug, string Category, string CategorySlug,
     string? Description, string Details, string MainImage, List<string> Images,
     List<ProductAttributeDto> Attributes, List<ProductVariantDto> Variants, List<CategoryLinkDto> Breadcrumbs,
-    string? BrandName = null, string? BrandSlug = null);
+    string? BrandName = null, string? BrandSlug = null)
+{
+    public string? MetaTitle { get; init; }
+    public string? MetaDescription { get; init; }
+    public string? OgImageUrl { get; init; }
+}
 
 public sealed record BrandLinkDto(int Id, string Name, string Slug, string? LogoUrl = null, bool IsFeatured = false, int SortOrder = 0);
 
@@ -29,7 +34,12 @@ public sealed record AttributeOptionDto(int Id, string Code, string Value, int S
 public sealed record ProductVariantDto(int Id, string Sku, decimal Price, int Stock, bool IsDefault,
     Dictionary<string, string> Options);
 
-public sealed record CategoryLinkDto(int Id, string Name, string Slug, int? ParentId);
+public sealed record CategoryLinkDto(int Id, string Name, string Slug, int? ParentId)
+{
+    public string? MetaTitle { get; init; }
+    public string? MetaDescription { get; init; }
+    public string? OgImageUrl { get; init; }
+}
 
 public sealed record CarouselSlideDto(int Id, string? Eyebrow, string? Title, string? Copy,
     string Image, string ImageAlt, string? LinkUrl, string? LinkText)

@@ -1,3 +1,4 @@
+@inject NavigationManager Nav
 @page "/admin/carousel"
 @using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
@@ -27,20 +28,20 @@
                 <PictureImage Src="@context.ImageUrl" Alt="@context.ImageAlt" Class="h-14 w-28 object-cover rounded-lg border border-slate-200" Loading="lazy" Width="112" Height="56" />
             </TemplateColumn>
 
-            <TemplateColumn Title="Banner Title &amp; Target" Sortable="true" SortBy="@(GridSort<CarouselSlide>.ByAscending(s => s.Title ?? s.ImageAlt))">
+            <TemplateColumn Title="Banner Title &amp; Target" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Banner Title &amp; Target" SortKey="Title" /></HeaderTemplate><ChildContent>
                 <strong class="text-slate-900 block font-semibold text-xs sm:text-sm">@(context.Title ?? context.ImageAlt)</strong>
                 <span class="text-xs text-blue-600 hover:underline font-mono">@context.LinkUrl</span>
-            </TemplateColumn>
+            </ChildContent></TemplateColumn>
 
-            <TemplateColumn Title="Publish Status" Sortable="true" SortBy="@(GridSort<CarouselSlide>.ByAscending(s => s.IsActive))">
+            <TemplateColumn Title="Publish Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Publish Status" SortKey="IsActive" /></HeaderTemplate><ChildContent>
                 <span class="badge @(context.IsActive ? "badge-emerald" : "badge-slate")">
                     @(context.IsActive ? "Published Live" : "Hidden")
                 </span>
-            </TemplateColumn>
+            </ChildContent></TemplateColumn>
 
-            <TemplateColumn Title="Sort Order" Sortable="true" SortBy="@(GridSort<CarouselSlide>.ByAscending(s => s.SortOrder))">
+            <TemplateColumn Title="Sort Order" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Sort Order" SortKey="SortOrder" /></HeaderTemplate><ChildContent>
                 <span class="font-mono text-xs text-slate-600">#@context.SortOrder</span>
-            </TemplateColumn>
+            </ChildContent></TemplateColumn>
 
             <TemplateColumn Title="Actions" Align="Align.End">
                 <a href="/admin/carousel/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -69,9 +70,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        slidesList = await Db.CarouselSlides.AsNoTracking()
+        slidesList = await AdminSorting.Apply(Db.CarouselSlides.AsNoTracking()
             .OrderBy(s => s.SortOrder)
-            .ThenBy(s => s.Id)
+            .ThenBy(s => s.Id), Nav, ("Title", s => s.Title ?? s.ImageAlt), ("IsActive", s => s.IsActive), ("SortOrder", s => s.SortOrder))
             .ToListAsync();
         slidesQuery = slidesList.AsQueryable();
     }

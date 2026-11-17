@@ -11,7 +11,8 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
         headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
 
         var path = context.Request.Path;
-        if (path.StartsWithSegments("/account")
+        if (path.StartsWithSegments("/api/admin")
+            || path.StartsWithSegments("/account")
             || path.StartsWithSegments("/admin")
             || path.StartsWithSegments("/checkout")
             || path.StartsWithSegments("/order"))

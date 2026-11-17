@@ -24,7 +24,7 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -75,14 +75,14 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@inventoryQuery" class="data-table">
-                <TemplateColumn Title="Product &amp; Variant SKU" Sortable="true" SortBy="@sortByProduct">
+                <TemplateColumn Title="Product &amp; Variant SKU" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product &amp; Variant SKU" SortKey="ProductName" /></HeaderTemplate><ChildContent>
                     <div>
                         <strong class="text-slate-900 block font-semibold text-xs">@context.ProductName</strong>
                         <span class="font-mono text-2xs text-slate-400">SKU: @context.Sku</span>
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <PropertyColumn Property="@(i => i.OnHand)" Title="Physical On Hand" Sortable="true" Align="Align.Center" />
+                <PropertyColumn Property="@(i => i.OnHand)" Title="Physical On Hand" Sortable="false" Align="Align.Center" ><HeaderTemplate><AdminSortHeader Label="Physical On Hand" SortKey="OnHand" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Reserved for Orders" Align="Align.Center">
                     @if (context.Reserved > 0)
@@ -97,7 +97,7 @@
                     }
                 </TemplateColumn>
 
-                <TemplateColumn Title="Available to Sell" Sortable="true" SortBy="@sortByAvailable" Align="Align.Center">
+                <TemplateColumn Title="Available to Sell" Sortable="false" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Available to Sell" SortKey="Available" /></HeaderTemplate><ChildContent>
                     @{
                         var avail = context.OnHand - context.Reserved;
                     }
@@ -122,9 +122,9 @@
                             @avail in stock
                         </span>
                     }
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <PropertyColumn Property="@(i => i.Price)" Title="Selling Price" Format="N0" Sortable="true" Align="Align.End" />
+                <PropertyColumn Property="@(i => i.Price)" Title="Selling Price" Format="N0" Sortable="false" Align="Align.End" ><HeaderTemplate><AdminSortHeader Label="Selling Price" SortKey="Price" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Quick Operations" Align="Align.End">
                     <div class="flex items-center justify-end gap-1.5">
@@ -182,8 +182,6 @@
     private IQueryable<AdminVariantRow>? inventoryQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<AdminVariantRow> sortByProduct = GridSort<AdminVariantRow>.ByAscending(i => i.ProductName);
-    private GridSort<AdminVariantRow> sortByAvailable = GridSort<AdminVariantRow>.ByAscending(i => i.OnHand - i.Reserved);
 
     private string? _toast;
     private int _totalAll;
@@ -261,8 +259,8 @@
         Page = Math.Max(1, Page);
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
-            .ThenBy(i => i.Id)
+        var list = await AdminSorting.Apply(q.OrderBy(i => i.QuantityOnHand - i.QuantityReserved)
+            .ThenBy(i => i.Id), Nav, ("ProductName", i => i.ProductVariant!.Product!.Name), ("OnHand", i => i.QuantityOnHand), ("Available", i => i.QuantityOnHand - i.QuantityReserved), ("Price", i => i.ProductVariant!.SellingPrice))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(i => new AdminVariantRow(

@@ -1,3 +1,4 @@
+@inject NavigationManager Nav
 @page "/admin/attributes"
 @inject AppDbContext Db
 
@@ -22,15 +23,15 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@attributesQuery" class="data-table">
-            <TemplateColumn Title="Attribute Name" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Name))">
+            <TemplateColumn Title="Attribute Name" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Attribute Name" SortKey="Name" /></HeaderTemplate><ChildContent>
                 <strong class="text-slate-900 block font-semibold">@context.Name</strong>
-            </TemplateColumn>
-            <TemplateColumn Title="Identifier Code" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Code))">
+            </ChildContent></TemplateColumn>
+            <TemplateColumn Title="Identifier Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Identifier Code" SortKey="Code" /></HeaderTemplate><ChildContent>
                 <span class="font-mono text-xs text-slate-600">@context.Code</span>
-            </TemplateColumn>
-            <TemplateColumn Title="Measurement Unit" Sortable="true" SortBy="@(GridSort<AttributeDefinition>.ByAscending(a => a.Unit))">
+            </ChildContent></TemplateColumn>
+            <TemplateColumn Title="Measurement Unit" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Measurement Unit" SortKey="Unit" /></HeaderTemplate><ChildContent>
                 <span class="text-slate-600 text-xs">@(context.Unit ?? "—")</span>
-            </TemplateColumn>
+            </ChildContent></TemplateColumn>
             <TemplateColumn Title="Actions" Class="text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
                     <a href="/admin/attributes/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -63,7 +64,8 @@
         Page = Math.Max(1, Page);
         var q = Db.AttributeDefinitions.AsNoTracking().OrderBy(a => a.Name);
         totalFiltered = await q.CountAsync();
-        var list = await q.Skip((Page - 1) * PageSize).Take(PageSize).ToListAsync();
+        var list = await AdminSorting.Apply(q, Nav, ("Name", a => a.Name), ("Code", a => a.Code), ("Unit", a => a.Unit!))
+            .Skip((Page - 1) * PageSize).Take(PageSize).ToListAsync();
         attributesQuery = list.AsQueryable();
     }
 }

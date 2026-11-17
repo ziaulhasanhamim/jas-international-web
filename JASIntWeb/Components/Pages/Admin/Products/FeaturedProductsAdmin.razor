@@ -32,7 +32,7 @@
             <Icon Name="check" Class="size-4 text-emerald-600" />
             @_toast
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -82,7 +82,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@featuredProductsQuery" class="data-table">
-                <TemplateColumn Title="Product" Sortable="true" SortBy="@sortByName">
+                <TemplateColumn Title="Product" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-3">
                         <PictureImage
                             Src="@context.MainImageUrl"
@@ -97,7 +97,7 @@
                             <span class="font-mono text-[11px] text-slate-400">/@context.Slug</span>
                         </div>
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Category &amp; Brand">
                     <div class="space-y-0.5">
@@ -109,7 +109,7 @@
                     </div>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Pricing" Sortable="true" SortBy="@sortByPrice">
+                <TemplateColumn Title="Pricing" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Pricing" SortKey="Price" /></HeaderTemplate><ChildContent>
                     <div>
                         <span class="font-bold text-xs sm:text-sm text-slate-900">
                             Tk. @context.Price.ToString("N0")
@@ -124,7 +124,7 @@
                             </div>
                         }
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="⭐ Featured" Align="Align.Center">
                     <button
@@ -191,8 +191,6 @@
     private IQueryable<FeaturedProductItem>? featuredProductsQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<FeaturedProductItem> sortByName = GridSort<FeaturedProductItem>.ByAscending(p => p.Name);
-    private GridSort<FeaturedProductItem> sortByPrice = GridSort<FeaturedProductItem>.ByDescending(p => p.Price);
 
     private int _totalAll;
     private int _totalFeatured;
@@ -292,7 +290,7 @@
         totalFiltered = materialized.Count;
         Page = Math.Max(1, Page);
 
-        featuredProductsQuery = materialized
+        featuredProductsQuery = AdminSorting.Apply(materialized.AsQueryable(), Nav, ("Name", p => p.Name), ("Price", p => p.Price))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .AsQueryable();

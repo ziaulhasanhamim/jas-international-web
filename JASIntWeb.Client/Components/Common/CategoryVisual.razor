@@ -1,0 +1,15 @@
+<span class="inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100" aria-hidden="true">
+    @if (CategoryVisuals.IsImage(Value))
+    {
+        <img src="@ImageUrlHelper.GetAutoOptimizedUrl(Value)" alt="" width="40" height="40" class="size-full object-contain" loading="lazy" onerror="this.onerror=null;this.src='/jas-logo.png';" />
+    }
+    else if (CategoryVisuals.IsText(Value))
+    {
+        <span class="max-w-full truncate text-lg">@Value</span>
+    }
+    else
+    {
+        <Icon Name="box" Class="size-5 text-slate-400" />
+    }
+</span>
+@code { [Parameter] public string? Value { get; set; } }

@@ -222,3 +222,12 @@ Integration tests create their own disposable PostgreSQL database with Testconta
 Carousel slides share an **8:3 aspect ratio** at full container width. Images use `object-contain` so different source proportions fit inside the same stable frame without cropping; surrounding space is expected for images that are not 8:3. Use matching 8:3 artwork for an edge-to-edge banner.
 
 CI validates PRs and main without publishing releases. Push a version tag after merging to run the release workflow; it repeats validation and publishes `RELEASE_NOTES.md` only after success. Production deployment and production migrations remain separate operations.
+
+
+## Interactive admin editors
+
+Category, brand and product add/edit pages use Interactive Auto within their existing server-authorized admin layouts. A first visit can use server interactivity, with WebAssembly on later visits after the client bundle is cached. Storefront landing, catalog and detail pages remain static SSR.
+
+The three editors share live SEO previews and character guidance, stateful image uploads and protected backend contracts. Admin APIs under `/api/admin/categories`, `/api/admin/brands` and `/api/admin/products` require the Admin role, current database-backed session validation and antiforgery tokens for mutations. Meta title/description guidance remains 60/155 characters; stored-field limits remain 100/300.
+
+Static admin grids use sort links that preserve filters and sort before pagination. Notifications use a shared dismiss behavior. Browser checks remain private development tools; no browser-test dependencies or steps are added to the project or CI.

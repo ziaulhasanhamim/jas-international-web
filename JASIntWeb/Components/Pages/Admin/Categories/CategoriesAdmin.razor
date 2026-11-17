@@ -15,7 +15,7 @@
         <p class="text-sm text-slate-500 mt-1">Organize the catalog hierarchy into parent categories and subcategories using database-powered QuickGrid.</p>
     </div>
 
-    <div class="flex items-center gap-2.5">
+    <div class="flex min-w-0 items-center gap-2.5">
         <a href="/admin/categories/new" class="btn-primary shadow-xs">
             <Icon Name="plus" Class="size-4" />
             Add Category
@@ -30,7 +30,7 @@
             <Icon Name="check" Class="size-4 text-emerald-600" />
             @_toast
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -43,7 +43,7 @@
             <Icon Name="close" Class="size-4 text-rose-600" />
             @_error
         </span>
-        <button type="button" @onclick="() => _error = null" class="text-rose-600 hover:text-rose-950">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-rose-600 hover:text-rose-950">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -128,19 +128,14 @@
                     </ChildContent>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Category Name" Sortable="true" SortBy="@sortByName">
-                    <div class="flex items-center gap-2.5">
-                        @if (!string.IsNullOrWhiteSpace(context.Icon))
-                        {
-                            <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm">
-                                @context.Icon
-                            </span>
-                        }
+                <TemplateColumn Title="Category Name" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Category Name" SortKey="Name" /></HeaderTemplate><ChildContent>
+                    <div class="flex min-w-0 items-center gap-2.5">
+                        <CategoryVisual Value="@context.Icon" />
                         <strong class="text-slate-900 block font-semibold">@context.Name</strong>
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <PropertyColumn Property="@(c => c.Slug)" Title="URL Slug" Sortable="true" Class="font-mono text-xs text-slate-600" />
+                <PropertyColumn Property="@(c => c.Slug)" Title="URL Slug" Sortable="false" Class="font-mono text-xs text-slate-600" ><HeaderTemplate><AdminSortHeader Label="URL Slug" SortKey="Slug" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Hierarchy Level">
                     @if (string.IsNullOrEmpty(context.ParentCategoryName))
@@ -157,7 +152,7 @@
                     }
                 </TemplateColumn>
 
-                <PropertyColumn Property="@(c => c.ProductCount)" Title="Products" Sortable="true" />
+                <PropertyColumn Property="@(c => c.ProductCount)" Title="Products" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="Products" SortKey="ProductCount" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="Homepage Featured" Align="Align.Center">
                     <button
@@ -172,11 +167,11 @@
                     </button>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByDeleted">
+                <TemplateColumn Title="Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsDeleted" /></HeaderTemplate><ChildContent>
                     <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
                         @(context.IsDeleted ? "Hidden" : "Active")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Actions" Align="Align.End">
                     <div class="flex items-center justify-end gap-1.5">
@@ -200,7 +195,7 @@
                                 name="HardDeleteCategoryId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                onclick="return confirm('Permanently delete category \'@context.Name\'?');"
+                                onclick="return confirm('Permanently delete this category?');"
                                 title="Delete category"
                             >
                                 Delete
@@ -275,8 +270,6 @@
     );
 
     private IQueryable<AdminCategoryRow>? categoriesQuery;
-    private GridSort<AdminCategoryRow> sortByName = GridSort<AdminCategoryRow>.ByAscending(c => c.Name);
-    private GridSort<AdminCategoryRow> sortByDeleted = GridSort<AdminCategoryRow>.ByAscending(c => c.IsDeleted);
 
     private const int PageSize = 15;
     private int totalFiltered;
@@ -393,8 +386,8 @@
 
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
-            .ThenBy(c => c.Name)
+        var list = await AdminSorting.Apply(q.OrderBy(c => c.ParentCategoryId == null ? 0 : 1)
+            .ThenBy(c => c.Name), Nav, ("Name", c => c.Name), ("Slug", c => c.Slug), ("ProductCount", c => c.Products.Count(p => !p.IsDeleted)), ("IsDeleted", c => c.IsDeleted))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(c => new AdminCategoryRow(

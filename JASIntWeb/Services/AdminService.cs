@@ -713,7 +713,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
     }
 
-    public async Task SaveCategoryAsync(CategoryEditForm input)
+    public async Task<int> SaveCategoryAsync(CategoryEditForm input)
     {
         Validate(input);
         await using var tx = await db.Database.BeginTransactionAsync();
@@ -800,6 +800,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagCategories);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
+
+        return c.Id;
     }
 
     public async Task ToggleCategoryVisibilityAsync(int id)
@@ -998,7 +1000,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
     }
 
-    public async Task SaveBrandAsync(BrandEditForm input)
+    public async Task<int> SaveBrandAsync(BrandEditForm input)
     {
         Validate(input);
         await using var tx = await db.Database.BeginTransactionAsync();
@@ -1060,6 +1062,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await tx.CommitAsync();
         if (catalog != null) await catalog.InvalidateProductCacheAsync();
         await cache.RemoveByTagAsync(CatalogService.TagBrands);
+
+        return b.Id;
     }
 
     public async Task ToggleBrandFeaturedAsync(int id)

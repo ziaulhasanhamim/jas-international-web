@@ -1,0 +1,226 @@
+@inherits AdminEditorBase<ProductEditForm>
+<PageTitle>@(Id == 0 ? "Add product" : "Edit product") — JAS Admin</PageTitle>
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add product" : "Edit product")"
+    Description="Start with product information, then configure options, variants and stock."
+    ActionHref="/admin/products"
+    ActionText="Back to products"
+/>
+<ProductAdminTabs ProductId="Id" />
+@if (notFound)
+{
+    <p class="admin-empty">Product not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    @if (AccessDenied)
+    {
+        <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri).Insert(0, "/"))}")" class="btn-secondary">Sign in again</a>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Product name *
+                    <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" placeholder="e.g. JBL PartyBox 520 Wireless Speaker" />
+                </label>
+                <label class="shop-label">
+                    URL slug (auto-generated if empty)
+                    <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" placeholder="e.g. jbl-partybox-520-wireless-speaker" />
+                    <small>Customer-facing canonical URL: /product/[slug]</small>
+                </label>
+            </div>
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Category
+                    <InputSelect @bind-Value="Input!.CategoryId" class="shop-input">
+                        <option value="0">Select category</option>
+                        @foreach (var c in categories)
+                        {
+                            <option value="@c.Id">@CategoryName(c)</option>
+                        }
+                    </InputSelect>
+                </label>
+                <label class="shop-label">
+                    Brand (optional)
+                    <InputSelect @bind-Value="Input!.BrandId" class="shop-input">
+                        <option value="">No brand / generic</option>
+                        @foreach (var b in brands)
+                        {
+                            <option value="@b.Id">@b.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
+            <label class="shop-label">
+                Short overview / summary
+                <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input" rows="2" placeholder="Brief one or two sentence summary shown on product card and search snippets" ></textarea>
+            </label>
+
+            <AdminProductMedia Value="@(new AdminMediaValue(Input!.Image, Input.Images))" ValueChanged="MediaChanged" BusyChanged="UploadBusy" />
+            <!-- Rich Description & Specification Tables -->
+            <div class="mt-8 border-t border-slate-200/80 pt-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Rich Description &amp; Specifications</h3>
+                        <p class="text-xs text-slate-500">Add rich text, headings, bullet lists, and specification tables. You can also paste formatted specs from official brand pages or toggle code mode.</p>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-xs p-1">
+                    <AdminRichText @bind-Value="Input!.Details" />
+                </div>
+            </div>
+            <!-- Pricing, Inventory & Identification -->
+            <div class="mt-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <div class="mb-3">
+                    <h3 class="text-sm font-bold text-slate-900">Pricing, Inventory &amp; Stock Identification</h3>
+                    <p class="text-xs text-slate-500">Set base selling price and stock. For standard products without variant options, this immediately fulfills catalog and cart readiness.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="shop-label">
+                        Base Selling Price (৳)
+                        <InputNumber @bind-Value="Input!.BasePrice" class="shop-input" placeholder="e.g. 24999" />
+                        <small>Customer purchase price on the storefront.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Regular / Compare-At Price (৳)
+                        <InputNumber @bind-Value="Input!.CompareAtPrice" class="shop-input" placeholder="e.g. 28999" />
+                        <small>Higher original price (shows SAVE ৳ X discount badge).</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Cost / Buying Price (৳)
+                        <InputNumber @bind-Value="Input!.CostPrice" class="shop-input" placeholder="e.g. 21000" />
+                        <small>Supplier cost for profit &amp; margin calculation.</small>
+                    </label>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="shop-label">
+                        Initial Stock Quantity
+                        <InputNumber @bind-Value="Input!.InitialStock" class="shop-input" placeholder="e.g. 25" />
+                        <small>Available warehouse units on hand.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Inventory SKU (Stock Keeping Unit)
+                        <InputText @bind-Value="Input!.Sku" class="shop-input font-mono" placeholder="Leave empty for auto-SKU" />
+                        <small>Internal code for orders &amp; invoices.</small>
+                    </label>
+
+                    <label class="shop-label">
+                        Barcode (EAN-8 / Scannable)
+                        <InputText @bind-Value="Input!.Barcode" class="shop-input font-mono" placeholder="Leave empty for auto EAN-8" />
+                        <small>Hardware laser scanner barcode.</small>
+                    </label>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100">
+                    <label class="flex items-center gap-3 text-sm font-medium text-slate-800 cursor-pointer">
+                        <InputCheckbox @bind-Value="Input!.HasVariants" class="size-4 rounded text-blue-600 focus:ring-blue-500" />
+                        <span>This product has multiple variants (e.g. colors, storage capacity, sizes)</span>
+                    </label>
+                    @if (Input!.HasVariants)
+                    {
+                        <p class="text-xs text-blue-600 mt-1 pl-7">You will be redirected to the Variants tab to configure options and generate the variant matrix.</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Merchandising & Storefront Badges -->
+            <div class="mt-6 border-t border-slate-200/80 pt-6">
+                <h3 class="text-sm font-bold text-slate-900 mb-3">Merchandising &amp; Badges</h3>
+                <div class="space-y-2">
+                    <label class="check-label">
+                        <InputCheckbox @bind-Value="Input!.IsFeatured" />
+                        ⭐ Feature product on homepage highlights and recommendations
+                    </label>
+                    <label class="check-label">
+                        <InputCheckbox @bind-Value="Input!.IsNewArrival" />
+                        🏷️ Display red diagonal "NEW ARRIVAL" corner badge on product card
+                    </label>
+                </div>
+            </div>
+
+            <!-- Storefront Publishing Status -->
+            <div class="mt-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+                <label class="block text-sm font-bold text-slate-900 mb-1">Storefront Publication Status</label>
+                <p class="text-xs text-slate-500 mb-3">Choose whether this product is actively purchasable by customers or kept as an archived internal draft.</p>
+                <InputRadioGroup @bind-Value="Input!.Hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label class="relative flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition @(!Input!.Hidden ? "border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500" : "border-slate-200 hover:bg-slate-50")">
+                            <InputRadio Value="false" class="mt-0.5 size-4 text-emerald-600 focus:ring-emerald-500" />
+                            <div>
+                                <span class="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                                    <span class="size-2 rounded-full bg-emerald-500"></span>
+                                    Published (Live Storefront)
+                                </span>
+                                <p class="text-xs text-slate-600 mt-0.5">Active and purchasable by customers in catalog, category listings, and search results.</p>
+                            </div>
+                        </label>
+                        <label class="relative flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition @(Input!.Hidden ? "border-rose-500 bg-rose-50/60 ring-1 ring-rose-500" : "border-slate-200 hover:bg-slate-50")">
+                            <InputRadio Value="true" class="mt-0.5 size-4 text-rose-600 focus:ring-rose-500" />
+                            <div>
+                                <span class="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                                    <span class="size-2 rounded-full bg-rose-500"></span>
+                                    Archived (Hidden Draft)
+                                </span>
+                                <p class="text-xs text-slate-600 mt-0.5">Completely hidden from customer storefront and search. Safe for staging edits or discontinued products.</p>
+                            </div>
+                        </label>
+                    </div>
+                </InputRadioGroup>
+            </div>
+
+            <AdminSeoFields Kind="product" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl" Brand="@brands.FirstOrDefault(b => b.Id == Input.BrandId)?.Name" />
+            <label class="shop-label">Warranty information<InputText @bind-Value="Input!.WarrantyInfo" class="shop-input" /></label>
+            <label class="shop-label">Search synonyms<InputText @bind-Value="Input!.Synonyms" class="shop-input" /></label>
+            <label class="shop-label">Bangla name<InputText @bind-Value="Input!.BanglaName" class="shop-input" /></label>
+            <label class="shop-label">Bangla description<InputText @bind-Value="Input!.BanglaDescription" class="shop-input" /></label>
+            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
+            <div class="form-actions">
+                <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving product...">
+                    <span class="form-submit-spinner" hidden></span>
+                    <span>Save product</span>
+                </button>
+                <a href="/admin/products" class="shop-button-secondary">Cancel</a>
+            </div>
+        </fieldset>
+        </EditForm>
+    }
+}
+
+
+@code {
+    private bool slugEdited;
+    protected override Task<AdminEditorData<ProductEditForm>> LoadAsync() => Backend.ProductAsync(Id);
+    protected override Task<AdminSaveResult> SaveAsync(ProductEditForm input) => Backend.SaveProductAsync(input);
+    private void SlugChanged() => slugEdited = true;
+    private void NameChanged()
+    {
+        if (Id == 0 && !slugEdited) Input!.Slug = EditorSlug.FromName(Input.Name);
+    }
+    private List<CategoryLinkDto> categories => Snapshot?.Categories ?? [];
+    private List<BrandLinkDto> brands => Snapshot?.Brands ?? [];
+    private string CategoryName(CategoryLinkDto category) => category.ParentId is int parent ? (categories.FirstOrDefault(p => p.Id == parent)?.Name + " / " + category.Name) : category.Name;
+    private void MediaChanged(AdminMediaValue value)
+    {
+        Input!.Image = value.Cover; Input.Images = value.Gallery;
+        EditContext!.NotifyFieldChanged(EditContext.Field(nameof(Input.Image)));
+    }
+}

@@ -1,0 +1,118 @@
+@inherits AdminEditorBase<BrandEditForm>
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add Brand" : "Edit Brand")"
+    ActionHref="/admin/brands"
+    ActionText="Back to list"
+/>
+
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center gap-2" role="alert">
+            <Icon Name="alert" Class="size-4 shrink-0" />
+            <span>@error</span>
+        </div>
+    }
+
+    @if (AccessDenied)
+    {
+        <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri).Insert(0, "/"))}")" class="btn-secondary">Sign in again</a>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-xs text-rose-600 mb-3" />
+            <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
+
+            <label class="shop-label">
+                Brand name
+                <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" placeholder="e.g. Apple, Samsung, Anker" />
+            </label>
+
+            <label class="shop-label">
+                URL slug
+                <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" placeholder="e.g. apple, samsung, anker" />
+                <small>Dedicated canonical brand page: /brand/[slug]</small>
+            </label>
+
+            <AdminImagePicker Label="Brand logo" @bind-Value="Input!.LogoUrl" BrandLogo="true" BusyChanged="UploadBusy" />
+            <label class="shop-label">
+                Brief description (optional)
+                <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input min-h-[70px]" placeholder="Brief background about brand products" ></textarea>
+            </label>
+
+            <label class="shop-label">
+                Sort Order
+                <InputNumber @bind-Value="Input!.SortOrder" class="shop-input" />
+                <small>Lower numbers appear first on featured brand strips.</small>
+            </label>
+
+            <div class="space-y-2 pt-2">
+                <label class="check-label">
+                    <InputCheckbox @bind-Value="Input!.IsFeatured" />
+                    Feature this brand on the storefront homepage strip
+                </label>
+
+                <label class="check-label">
+                    <InputCheckbox @bind-Value="Input!.Hidden" />
+                    Hide brand from storefront filters
+                </label>
+            </div>
+
+            <AdminSeoFields Kind="brand" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl"  />
+            <label class="shop-label">Page introduction<textarea @bind="Input!.IntroText" @bind:event="oninput" class="shop-input" rows="2"></textarea></label>
+            <label class="shop-label">Bottom SEO copy<textarea @bind="Input!.BottomSeoCopy" @bind:event="oninput" class="shop-input font-mono" rows="4"></textarea></label>
+            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
+            <div class="form-actions mt-6 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving brand...">
+                        <span class="form-submit-spinner" hidden></span>
+                        <span>@(Id == 0 ? "Create Brand" : "Save Changes")</span>
+                    </button>
+                    <a href="/admin/brands" class="shop-button-secondary">Cancel</a>
+                </div>
+
+                @if (Id != 0 && productCount == 0)
+                {
+                    <button type="button" disabled="@Busy" @onclick="Delete" class="btn-danger">
+                        Delete Brand
+                    </button>
+                }
+            </div>
+        </fieldset>
+        </EditForm>
+    }
+}
+
+
+@code {
+    private bool slugEdited;
+    protected override Task<AdminEditorData<BrandEditForm>> LoadAsync() => Backend.BrandAsync(Id);
+    protected override Task<AdminSaveResult> SaveAsync(BrandEditForm input) => Backend.SaveBrandAsync(input);
+    private void SlugChanged() => slugEdited = true;
+    private void NameChanged()
+    {
+        if (Id == 0 && !slugEdited) Input!.Slug = EditorSlug.FromName(Input.Name);
+    }
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private int productCount => Snapshot?.ProductCount ?? 0;
+    private async Task Delete()
+    {
+        if (Busy) return;
+        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); Nav.NavigateTo("/admin/brands"); }
+        catch (AdminCatalogException failure) { error = failure.Message; }
+        catch (JSException) { error = "Confirmation could not be opened. Try again."; }
+        catch (HttpRequestException) { error = "Connection failed. Try again."; }
+        finally { saving = false; }
+    }
+}
