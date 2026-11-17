@@ -1,0 +1,3 @@
+@page "/admin/products/{Id:int}/seo"
+<JASIntWeb.Client.Components.Admin.ProductEditorForm Id="Id" ContentTab="true" @key="Id" @rendermode="InteractiveAuto" />
+@code { [Parameter] public int Id { get; set; } }

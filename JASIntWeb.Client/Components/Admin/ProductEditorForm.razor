@@ -27,10 +27,12 @@ else
     }
     else
     {
-        <EditForm EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+        <EditForm data-admin-draft data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
             <DataAnnotationsValidator />
             <ValidationSummary />
             <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
+            @if (!ContentTab)
+            {
             <div class="admin-form-grid">
                 <label class="shop-label">
                     Product name *
@@ -70,6 +72,9 @@ else
             </label>
 
             <AdminProductMedia Value="@(new AdminMediaValue(Input!.Image, Input.Images))" ValueChanged="MediaChanged" BusyChanged="UploadBusy" />
+            }
+            @if (ContentTab)
+            {
             <!-- Rich Description & Specification Tables -->
             <div class="mt-8 border-t border-slate-200/80 pt-6">
                 <div class="flex items-center justify-between mb-3">
@@ -80,68 +85,12 @@ else
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white shadow-xs p-1">
-                    <AdminRichText @bind-Value="Input!.Details" />
+                    <AdminRichText @bind-Value="Input!.Details" @bind-Value:after="MarkEdited" />
                 </div>
             </div>
-            <!-- Pricing, Inventory & Identification -->
-            <div class="mt-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                <div class="mb-3">
-                    <h3 class="text-sm font-bold text-slate-900">Pricing, Inventory &amp; Stock Identification</h3>
-                    <p class="text-xs text-slate-500">Set base selling price and stock. For standard products without variant options, this immediately fulfills catalog and cart readiness.</p>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <label class="shop-label">
-                        Base Selling Price (৳)
-                        <InputNumber @bind-Value="Input!.BasePrice" class="shop-input" placeholder="e.g. 24999" />
-                        <small>Customer purchase price on the storefront.</small>
-                    </label>
-
-                    <label class="shop-label">
-                        Regular / Compare-At Price (৳)
-                        <InputNumber @bind-Value="Input!.CompareAtPrice" class="shop-input" placeholder="e.g. 28999" />
-                        <small>Higher original price (shows SAVE ৳ X discount badge).</small>
-                    </label>
-
-                    <label class="shop-label">
-                        Cost / Buying Price (৳)
-                        <InputNumber @bind-Value="Input!.CostPrice" class="shop-input" placeholder="e.g. 21000" />
-                        <small>Supplier cost for profit &amp; margin calculation.</small>
-                    </label>
-                </div>
-
-                <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <label class="shop-label">
-                        Initial Stock Quantity
-                        <InputNumber @bind-Value="Input!.InitialStock" class="shop-input" placeholder="e.g. 25" />
-                        <small>Available warehouse units on hand.</small>
-                    </label>
-
-                    <label class="shop-label">
-                        Inventory SKU (Stock Keeping Unit)
-                        <InputText @bind-Value="Input!.Sku" class="shop-input font-mono" placeholder="Leave empty for auto-SKU" />
-                        <small>Internal code for orders &amp; invoices.</small>
-                    </label>
-
-                    <label class="shop-label">
-                        Barcode (EAN-8 / Scannable)
-                        <InputText @bind-Value="Input!.Barcode" class="shop-input font-mono" placeholder="Leave empty for auto EAN-8" />
-                        <small>Hardware laser scanner barcode.</small>
-                    </label>
-                </div>
-
-                <div class="mt-4 pt-3 border-t border-slate-100">
-                    <label class="flex items-center gap-3 text-sm font-medium text-slate-800 cursor-pointer">
-                        <InputCheckbox @bind-Value="Input!.HasVariants" class="size-4 rounded text-blue-600 focus:ring-blue-500" />
-                        <span>This product has multiple variants (e.g. colors, storage capacity, sizes)</span>
-                    </label>
-                    @if (Input!.HasVariants)
-                    {
-                        <p class="text-xs text-blue-600 mt-1 pl-7">You will be redirected to the Variants tab to configure options and generate the variant matrix.</p>
-                    }
-                </div>
-            </div>
-
+            }
+            @if (!ContentTab)
+            {
             <!-- Merchandising & Storefront Badges -->
             <div class="mt-6 border-t border-slate-200/80 pt-6">
                 <h3 class="text-sm font-bold text-slate-900 mb-3">Merchandising &amp; Badges</h3>
@@ -187,12 +136,16 @@ else
                 </InputRadioGroup>
             </div>
 
+            }
+            @if (ContentTab)
+            {
             <AdminSeoFields Kind="product" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl" Brand="@brands.FirstOrDefault(b => b.Id == Input.BrandId)?.Name" />
             <label class="shop-label">Warranty information<InputText @bind-Value="Input!.WarrantyInfo" class="shop-input" /></label>
             <label class="shop-label">Search synonyms<InputText @bind-Value="Input!.Synonyms" class="shop-input" /></label>
             <label class="shop-label">Bangla name<InputText @bind-Value="Input!.BanglaName" class="shop-input" /></label>
             <label class="shop-label">Bangla description<InputText @bind-Value="Input!.BanglaDescription" class="shop-input" /></label>
             <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
+            }
             <div class="form-actions">
                 <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving product...">
                     <span class="form-submit-spinner" hidden></span>
@@ -207,6 +160,7 @@ else
 
 
 @code {
+    [Parameter] public bool ContentTab { get; set; }
     private bool slugEdited;
     protected override Task<AdminEditorData<ProductEditForm>> LoadAsync() => Backend.ProductAsync(Id);
     protected override Task<AdminSaveResult> SaveAsync(ProductEditForm input) => Backend.SaveProductAsync(input);
@@ -220,6 +174,7 @@ else
     private string CategoryName(CategoryLinkDto category) => category.ParentId is int parent ? (categories.FirstOrDefault(p => p.Id == parent)?.Name + " / " + category.Name) : category.Name;
     private void MediaChanged(AdminMediaValue value)
     {
+        MarkEdited();
         Input!.Image = value.Cover; Input.Images = value.Gallery;
         EditContext!.NotifyFieldChanged(EditContext.Field(nameof(Input.Image)));
     }

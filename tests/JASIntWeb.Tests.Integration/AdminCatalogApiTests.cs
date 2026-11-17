@@ -70,7 +70,7 @@ public class AdminCatalogApiTests : JasIntegrationTestBase
         await ((int)(await client.GetAsync("/api/admin/brands/editor/999999")).StatusCode).Should().BeEqualTo(404);
     }
     [Test]
-    public async Task CatalogApi_ProductPersistsMediaRichTextFlagsAndSimpleInventory()
+    public async Task CatalogApi_ProductPersistsContentAndRequiresExplicitVariantActivation()
     {
         using var client = AdminClient;
         var form = new ProductEditForm { Name = "API Product", CategoryId = 1, Description = "A useful product", Details = "<p>Rich details &amp; warranty</p>", Image = "/jas-logo.png", Images = "/jas-og-card.png", BasePrice = 500, CostPrice = 200, InitialStock = 4, IsFeatured = true, IsNewArrival = false, MetaTitle = "API Product title", OgImageUrl = "/jas-og-card.png", WarrantyInfo = "Two years" };
@@ -83,8 +83,15 @@ public class AdminCatalogApiTests : JasIntegrationTestBase
         await loaded.Input.Details.Should().BeEqualTo(form.Details);
         await loaded.Input.IsFeatured.Should().BeTrue();
         await loaded.Input.IsNewArrival.Should().BeFalse();
-        await loaded.Input.InitialStock.Should().BeEqualTo(4);
+        await loaded.Input.InitialStock.Should().BeEqualTo(0);
         await loaded.Input.WarrantyInfo.Should().BeEqualTo("Two years");
+        var workspace = (await client.GetFromJsonAsync<ProductWorkspace>($"/api/admin/products/{result.Id}/workspace"))!;
+        workspace.Variants[0].Active = true; workspace.Variants[0].SellingPrice = 500;
+        await ((int)(await client.PutAsJsonAsync($"/api/admin/products/{result.Id}/workspace/variant", workspace.Variants[0])).StatusCode).Should().BeEqualTo(200);
+        loaded = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
+        loaded.Input.Hidden = false;
+        await ((int)(await client.PutAsJsonAsync($"/api/admin/products/{result.Id}", loaded.Input)).StatusCode).Should().BeEqualTo(200);
+        loaded = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
         var productPage=await client.GetStringAsync($"/product/{loaded.Input.Slug}");
         await productPage.Contains("<title>API Product title</title>").Should().BeTrue();
         await System.Text.RegularExpressions.Regex.Match(productPage, "<meta property=\"og:image\" content=\"([^\"]+)\"").Groups[1].Value.EndsWith("/jas-og-card.png").Should().BeTrue();

@@ -18,6 +18,7 @@ public interface IAdminCatalogBackend
     Task<AdminSaveResult> SaveCategoryAsync(CategoryEditForm input);
     Task<AdminSaveResult> SaveBrandAsync(BrandEditForm input);
     Task<AdminSaveResult> SaveProductAsync(ProductEditForm input);
+    Task<ContentPreview> PreviewContentAsync(string source);
     Task DeleteBrandAsync(int id);
     Task<string> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo);
 }

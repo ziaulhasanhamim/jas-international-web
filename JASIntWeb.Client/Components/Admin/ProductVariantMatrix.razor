@@ -1,0 +1,41 @@
+<section class="shop-panel mt-6">
+    <h3 class="admin-section-title">Variant pricing &amp; identification</h3>
+    <p class="admin-help">Save each row explicitly. Stock adjustments have a separate reason and history.</p>
+    @foreach (var variant in drafts)
+    {
+        <details class="variant-editor" id="@($"variant-{variant.Id}")" open="@(variant.Id == FocusVariantId)" @key="variant.Id">
+            <summary>@variant.Sku · ৳@variant.SellingPrice.ToString("N0") · @(variant.OnHand - variant.Reserved) available @(variant.Default ? "· Default" : "") @(variant.Archived ? "· Archived" : "")</summary>
+            <fieldset disabled="@(editingId != 0 && editingId != variant.Id)" @onchange="() => Editing(variant.Id)" @oninput="() => Editing(variant.Id)">
+            <div class="admin-form-grid mt-4">
+                <label class="shop-label">SKU<input class="shop-input" @bind="variant.Sku" maxlength="100" /></label>
+                <label class="shop-label">Barcode<input class="shop-input" @bind="variant.Barcode" maxlength="100" /></label>
+                <label class="shop-label">Selling price (৳)<input class="shop-input" type="number" min="0" step="0.01" @bind="variant.SellingPrice" /></label>
+                <label class="shop-label">Compare-at price (৳)<input class="shop-input" type="number" min="0" step="0.01" @bind="variant.CompareAtPrice" /></label>
+                <label class="shop-label">Cost price (৳)<input class="shop-input" type="number" min="0" step="0.01" @bind="variant.CostPrice" /></label>
+            </div>
+            <div class="form-actions">
+                <label class="check-label"><input type="checkbox" @bind="variant.Active" /> Active</label>
+                <label class="check-label"><input type="checkbox" @bind="variant.Default" /> Default</label>
+                <label class="check-label"><input type="checkbox" @bind="variant.Archived" /> Archived</label>
+                <button type="button" class="shop-button" disabled="@ConfigurationDirty" @onclick="() => SaveRow(variant)">Save variant</button>
+                <button type="button" class="shop-button-secondary" disabled="@(ConfigurationDirty || editingId != 0)" @onclick="() => Stock.InvokeAsync(variant)">Adjust stock</button>
+            </div>
+            </fieldset>
+            <p class="admin-help">On hand: @variant.OnHand · Reserved: @variant.Reserved · Available: @(variant.OnHand - variant.Reserved)</p>
+        </details>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public List<WorkspaceVariant> Variants { get; set; } = [];
+    [Parameter] public EventCallback<WorkspaceVariant> Changed { get; set; }
+    private int editingId;
+    private List<WorkspaceVariant>? previous;
+    private List<WorkspaceVariant> drafts = [];
+    protected override void OnParametersSet() { if (!ReferenceEquals(previous, Variants)) { previous = Variants; drafts = Variants.Select(row => row.Copy()).ToList(); editingId = 0; } }
+    private async Task Editing(int id) { editingId = id; await Changed.InvokeAsync(drafts.Single(row => row.Id == id).Copy()); }
+    private async Task SaveRow(WorkspaceVariant variant) { await Save.InvokeAsync(variant); }
+    [Parameter] public int FocusVariantId { get; set; }
+    [Parameter] public bool ConfigurationDirty { get; set; }
+    [Parameter] public EventCallback<WorkspaceVariant> Save { get; set; }
+    [Parameter] public EventCallback<WorkspaceVariant> Stock { get; set; }
+}

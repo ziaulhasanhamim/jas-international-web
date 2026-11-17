@@ -29,7 +29,7 @@ else
     }
     else
     {
-        <EditForm EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+        <EditForm data-admin-draft data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-xs text-rose-600 mb-3" />
             <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
@@ -70,8 +70,8 @@ else
             </div>
 
             <AdminSeoFields Kind="brand" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl"  />
-            <label class="shop-label">Page introduction<textarea @bind="Input!.IntroText" @bind:event="oninput" class="shop-input" rows="2"></textarea></label>
-            <label class="shop-label">Bottom SEO copy<textarea @bind="Input!.BottomSeoCopy" @bind:event="oninput" class="shop-input font-mono" rows="4"></textarea></label>
+            <AdminMarkdownEditor Label="Intro overview — above the product grid" @bind-Value="Input!.IntroText" />
+            <AdminMarkdownEditor Label="Buyer guide — below the product grid" @bind-Value="Input!.BottomSeoCopy" />
             <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
             <div class="form-actions mt-6 flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -109,7 +109,7 @@ else
     private async Task Delete()
     {
         if (Busy) return;
-        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); Nav.NavigateTo("/admin/brands"); }
+        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); HasUnsavedChanges = false; await JS.InvokeVoidAsync("jasAdminDrafts.clear"); Nav.NavigateTo("/admin/brands"); }
         catch (AdminCatalogException failure) { error = failure.Message; }
         catch (JSException) { error = "Confirmation could not be opened. Try again."; }
         catch (HttpRequestException) { error = "Connection failed. Try again."; }

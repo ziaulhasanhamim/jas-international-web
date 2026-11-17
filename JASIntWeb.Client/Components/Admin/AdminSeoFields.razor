@@ -1,15 +1,15 @@
 <section class="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" aria-label="Search engine optimization">
     <h3 class="text-sm font-bold text-slate-900">Search engine optimization</h3>
     <div class="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-4" data-seo-preview>
-        <p class="text-xs text-slate-500">Google search preview</p>
+        <p class="text-xs text-slate-500">Google search preview — approximate</p>
         <p class="break-all text-xs text-slate-600">@BaseUrl.TrimEnd('/') › @Kind › @Slug</p>
         <h4 class="text-base font-medium text-blue-800" data-seo-title>@PreviewTitle</h4>
         <p class="line-clamp-2 text-xs text-slate-600" data-seo-description>@PreviewDescription</p>
     </div>
-    <label class="shop-label">Custom meta title <span class="text-xs @((Title?.Length ?? 0) > 60 ? "text-amber-700" : "text-slate-500")" data-title-count>@(Title?.Length ?? 0) / 60 chars</span>
+    <label class="shop-label">Search title (browser tab and metadata) <span class="text-xs @((Title?.Length ?? 0) > 60 ? "text-amber-700" : "text-slate-500")" data-title-count>@(Title?.Length ?? 0) / 60 chars</span>
         <input name="MetaTitle" class="shop-input" value="@Title" @oninput="e => TitleChanged.InvokeAsync(e.Value?.ToString())" maxlength="100" />
     </label>
-    <label class="shop-label">Custom meta description <span class="text-xs @((Description?.Length ?? 0) > 155 ? "text-amber-700" : "text-slate-500")" data-description-count>@(Description?.Length ?? 0) / 155 chars</span>
+    <label class="shop-label">Search description (metadata, not page body) <span class="text-xs @((Description?.Length ?? 0) > 155 ? "text-amber-700" : "text-slate-500")" data-description-count>@(Description?.Length ?? 0) / 155 chars</span>
         <textarea name="MetaDescription" class="shop-input" @bind="descriptionText" @bind:event="oninput" @bind:after="DescriptionInput" maxlength="300"></textarea>
     </label>
     <p class="text-xs text-slate-500">60/155 are writing guidelines. Google may display a different snippet.</p>

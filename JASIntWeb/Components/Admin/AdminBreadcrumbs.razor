@@ -1,0 +1,12 @@
+@inject NavigationManager Nav
+<nav aria-label="Breadcrumb" class="admin-breadcrumbs">
+    <a href="/admin">Admin</a>
+    @if (Parent is { } parent) { <span aria-hidden="true">/</span><a href="@parent.Href">@parent.Name</a> }
+    @if (Path != "/admin") { <span aria-hidden="true">/</span><span aria-current="page">@Current</span> }
+</nav>
+@code {
+    private string Path => new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+    private string Current => string.Join(" ", Path.Split('/').Last().Split('-').Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
+    private (string Href, string Name)? Parent => Path.Split('/', StringSplitOptions.RemoveEmptyEntries) is ["admin", var section, .. var rest] && rest.Length > 0
+        ? section switch { "settings" => null, "products" => ("/admin/products", "Products"), "attributes" => ("/admin/attributes", "Attribute definitions"), "users" => ("/admin/users", "Customers"), _ => ($"/admin/{section}", char.ToUpperInvariant(section[0]) + section[1..]) } : null;
+}

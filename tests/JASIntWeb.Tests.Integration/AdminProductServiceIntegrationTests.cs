@@ -48,7 +48,7 @@ public class AdminProductServiceIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task SaveProductAsync_WithBasePriceAndStock_CreatesDefaultVariantWithAutoSkuAndBarcode()
+    public async Task SaveProductAsync_CreatesHiddenUnpricedVariantAndIgnoresLegacyStockFields()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
@@ -82,16 +82,16 @@ public class AdminProductServiceIntegrationTests : JasIntegrationTestBase
 
         var variant = await db.ProductVariants.AsNoTracking().FirstOrDefaultAsync(v => v.ProductId == productId);
         await variant.Should().NotBeNull();
-        await variant!.SellingPrice.Should().BeEqualTo(14500m);
-        await variant.CostPrice.Should().BeEqualTo(12000m);
+        await variant!.SellingPrice.Should().BeEqualTo(0m);
+        await variant.CostPrice.Should().BeEqualTo(0m);
         await variant.SKU.Should().NotBeEmpty();
-        await variant.Barcode.Should().NotBeEmpty();
+        await variant.Barcode.Should().BeNull();
         await variant.IsDefault.Should().BeTrue();
-        await variant.IsActive.Should().BeTrue();
+        await variant.IsActive.Should().BeFalse();
 
         var inventory = await db.InventoryItems.AsNoTracking().FirstOrDefaultAsync(i => i.ProductVariantId == variant.Id);
-        await inventory.Should().NotBeNull();
-        await inventory!.QuantityOnHand.Should().BeEqualTo(18);
+        await inventory.Should().BeNull();
+        await (await db.Products.SingleAsync(p => p.Id == productId)).IsDeleted.Should().BeTrue();
     }
 
     [Test]

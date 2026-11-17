@@ -74,7 +74,7 @@ Forms initialize in `OnInitialized` or `OnInitializedAsync`. Posted models are p
 
 Parameter lifecycle events remain on interactive child components that receive changing data, such as the carousel and reorder editor.
 
-Products use reusable global attributes and values, with product-specific bindings controlling allowed options and their order. Variants reference those bindings. Customers can select any combination without another attribute changing automatically; unavailable combinations show N/A. Guest carts use a cookie reference and PostgreSQL; signed-in carts use the account identity.
+Products use reusable attribute definitions and product-owned values. The global value library provides optional suggestions that are copied into a product; labels and ordering are then independent. Variants reference stable product-owned option IDs. Customers can select any combination without another attribute changing automatically; unavailable combinations show N/A. Guest carts use a cookie reference and PostgreSQL; signed-in carts use the account identity.
 
 ## Admin sales metrics
 
@@ -231,3 +231,14 @@ Category, brand and product add/edit pages use Interactive Auto within their exi
 The three editors share live SEO previews and character guidance, stateful image uploads and protected backend contracts. Admin APIs under `/api/admin/categories`, `/api/admin/brands` and `/api/admin/products` require the Admin role, current database-backed session validation and antiforgery tokens for mutations. Meta title/description guidance remains 60/155 characters; stored-field limits remain 100/300.
 
 Static admin grids use sort links that preserve filters and sort before pagination. Notifications use a shared dismiss behavior. Browser checks remain private development tools; no browser-test dependencies or steps are added to the project or CI.
+
+
+### Product workspace and content (v1.2)
+
+Create product details as a hidden draft, then open **Variants & stock**. Add attributes, type custom values or copy suggestions, map the existing variant, and save the configuration. Preview before generating missing combinations (maximum 100). New combinations are inactive and have no price or stock. Enter variant prices, identifiers and active/default state explicitly; use **Adjust stock** with a reason to record inventory changes. Finally publish from Details. Product-detail saves never change variant prices or inventory.
+
+The workspace uses product revisions to reject stale edits and existing inventory reservations to protect stock adjustments. IDs remain stable through option changes. Referenced values must be unmapped before removal; archived combinations retain their configuration and order history.
+
+Brand/category introductions and buyer guides accept Markdown or supported HTML, with a sanitized live preview. Introductions appear above the product grid; buyer guides appear below it. Meta title/description affect browser/search and sharing metadata, while the OG image affects sharing previews. Google may choose a different search snippet.
+
+See [v1.2 migration and validation evidence](docs/validation.md#v120-product-owned-variants-and-admin-workflows) and [release notes](RELEASE_NOTES.md) before upgrading. Browser checks remain private working tools, with no repository dependency or CI step.

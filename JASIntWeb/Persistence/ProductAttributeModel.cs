@@ -38,6 +38,10 @@ internal static class ProductAttributeModel
             });
         b.Entity<ProductAttributeOption>(e =>
             {
+                e.Property(x => x.Value).HasMaxLength(200);
+                e.Property(x => x.Code).HasMaxLength(120);
+                e.Property(x => x.NormalizedValue).HasMaxLength(200);
+                e.HasIndex(x => new { x.ProductAttributeDefinitionId, x.Code }).IsUnique();
                 e.HasAlternateKey(x => new
                     {
                         x.Id,
@@ -48,7 +52,7 @@ internal static class ProductAttributeModel
                 e.HasIndex(x => new
                     {
                         x.ProductAttributeDefinitionId,
-                        x.AttributeOptionId
+                        x.NormalizedValue
                     })
                 .IsUnique()
                 .HasDatabaseName("UX_ProductAttributeOptions_Value");

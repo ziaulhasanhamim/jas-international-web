@@ -3,6 +3,7 @@ namespace JASIntWeb.Client.Dtos;
 
 public sealed class ProductEditForm
 {
+    public long CatalogRevision { get; set; }
     public int Id { get; set; }
     [Required(ErrorMessage = "Product name is required"), StringLength(200)]
     public string Name { get; set; } = "";
@@ -40,7 +41,8 @@ public sealed class ProductEditForm
     [StringLength(200)]
     public string? WarrantyInfo { get; set; } = "1 Year Official Brand Warranty";
 
-    // Quick Simple Product Fields (for effortless single-screen creation)
+    // Legacy request fields are retained for old clients but ignored by product-detail saves.
+    // Use the variant workspace commands for all prices, identifiers and stock.
     [Range(0, 10000000)]
     public decimal? BasePrice { get; set; }
     [Range(0, 10000000)]

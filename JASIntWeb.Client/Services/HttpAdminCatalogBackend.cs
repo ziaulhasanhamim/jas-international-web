@@ -5,7 +5,7 @@ namespace JASIntWeb.Client.Services;
 
 public sealed class HttpAdminCatalogBackend(IHttpClientFactory factory) : IAdminCatalogBackend
 {
-    private async Task<T> Send<T>(HttpMethod method, string path, object? value = null, HttpContent? content = null)
+    public async Task<T> Send<T>(HttpMethod method, string path, object? value = null, HttpContent? content = null)
     {
         using var client = factory.CreateClient("Shop");
         using var request = new HttpRequestMessage(method, path);
@@ -43,5 +43,6 @@ public sealed class HttpAdminCatalogBackend(IHttpClientFactory factory) : IAdmin
         form.Add(file, "file", fileName);
         return (await Send<UploadedImage>(HttpMethod.Post, brandLogo ? "api/admin/uploads/brand-logo" : "api/admin/uploads/image", content: form)).Url;
     }
+    public Task<ContentPreview> PreviewContentAsync(string source) => Send<ContentPreview>(HttpMethod.Post, "api/admin/content/preview", new ContentPreviewRequest(source));
     private sealed record UploadedImage(string Url);
 }

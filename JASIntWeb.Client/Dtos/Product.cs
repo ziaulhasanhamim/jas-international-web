@@ -2,7 +2,7 @@ namespace JASIntWeb.Client.Dtos;
 
 public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal Price, string Category, string Image,
     int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,
-    decimal? OriginalPrice = null, decimal Rating = 0m, int ReviewCount = 0, bool IsNewArrival = false, bool IsFeatured = false);
+    decimal? OriginalPrice = null, decimal Rating = 0m, int ReviewCount = 0, bool IsNewArrival = false, bool IsFeatured = false, bool RequiresVariantSelection = false);
 
 public sealed record HomepageSectionDto(
     int Id,
@@ -32,10 +32,12 @@ public sealed record ProductAttributeDto(string Code, string Name, List<Attribut
 public sealed record AttributeOptionDto(int Id, string Code, string Value, int SortOrder);
 
 public sealed record ProductVariantDto(int Id, string Sku, decimal Price, int Stock, bool IsDefault,
-    Dictionary<string, string> Options);
+    Dictionary<string, string> Options, decimal? OriginalPrice = null);
 
 public sealed record CategoryLinkDto(int Id, string Name, string Slug, int? ParentId)
 {
+    public string? IntroText { get; init; }
+    public string? BottomSeoCopy { get; init; }
     public string? MetaTitle { get; init; }
     public string? MetaDescription { get; init; }
     public string? OgImageUrl { get; init; }

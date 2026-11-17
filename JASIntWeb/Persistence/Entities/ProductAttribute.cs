@@ -18,7 +18,10 @@ public sealed class ProductAttributeOption : Entity
     // These key parts enforce product/definition ownership through composite foreign keys.
     public int ProductId { get; set; }
     public int AttributeDefinitionId { get; set; }
-    public int AttributeOptionId { get; set; }
+    public int? AttributeOptionId { get; set; }
+    public string Value { get; set; } = "";
+    public string Code { get; set; } = "";
+    public string NormalizedValue { get; set; } = "";
     public AttributeOption? AttributeOption { get; set; }
     public int SortOrder { get; set; }
 }

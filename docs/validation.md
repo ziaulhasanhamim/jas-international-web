@@ -132,3 +132,34 @@ Validated against a disposable PostgreSQL database with a fake administrator and
 The .NET test/build commands above remain valid. Published-build verification also ran `dotnet publish JASIntWeb/JASIntWeb.csproj --configuration Release --no-restore`. Private browser tools and their dependencies are excluded from the repository and CI.
 
 [Category list after the fix](screenshots/admin-categories-fixed.png) · [Live editor SEO preview](screenshots/admin-live-seo-preview.png)
+
+
+## v1.2.0 product-owned variants and admin workflows
+
+Validation uses disposable PostgreSQL databases, seeded fixtures and a private administrator with mail disabled. Production customer data and customer emails are excluded. **236 tests passed**: 83 Unit, 35 SEO and 118 Integration; zero failures/skips. Release build and trimmed publish succeed; EF 11 reports no pending model changes and npm audit reports no vulnerabilities.
+
+| Requirement | Evidence |
+| --- | --- |
+| Migration preserves IDs, selections, inventory reservations and order history | `ProductOwnedMigration_PreservesIdentitiesSelectionsReservationsAndOrderSnapshots` migrates seeded records through the prior schema and forward again; the migration also applies to the isolated staging database |
+| Local values copy suggestions independently, with stable codes | `Workspace_ProductValuesAreIndependentSuggestionsAndPreserveVariantIdentity` |
+| Duplicate/foreign values and stale saves fail without partial writes | `Workspace_RejectsDuplicatesForeignOptionsAndStaleConfigurationWithoutPartialWrites` |
+| Required mappings and referenced values are protected | `Workspace_RequiresMappingsAndPreservesReferencedValuesOnFailure` |
+| Combination preview has no writes; generation is replay-safe and bounded | `Workspace_GenerationPreviewWritesNothingAndReplayCreatesNoDuplicates`; `Workspace_GenerationAcceptsOneHundredAndRejectsOneHundredOne` |
+| Concurrent saves have one winner; details cannot rewrite prices or stock | `Workspace_ConcurrentVariantEditsHaveOneWinnerAndDetailsCannotChangePriceOrStock`; `SaveProductAsync_CreatesHiddenUnpricedVariantAndIgnoresLegacyStockFields` |
+| Variant prices, SKU uniqueness and defaults are validated | `Workspace_RejectsInvalidPricesSkuReuseAndDefaultArchival`; `Workspace_VariantPriceFlowsToCatalogDetailsCartAndFeeds` |
+| Stock edits are explicit, reservation-safe and ledger-backed | `Workspace_StockAdjustmentsAreExplicitReservedSafeAndLedgerBacked` |
+| Administrator authorization and real antiforgery remain enforced | `Workspace_RequiresAdministratorAndRealAntiforgeryForMutationsAndPreview` |
+| Markdown and existing HTML are formatted safely; preview equals public output | `CatalogContent_RendersMarkdownAndExistingHtmlWithSafeFormatting`; `CatalogContent_RemovesScriptsHandlersUnsafeLinksAndEmbeds`; `CatalogContent_PreviewMatchesPublicBrandAndCategoryOutput` |
+| Stable attribute codes and Unicode value matching | `Workspace_UsedAttributeCodesCannotChangeSelectionUrls`; `ProductValues_NormalizeUnicodeWhitespaceAndCase` |
+| Cards, full admin navigation and both Auto runtimes | Private trimmed-publish checks: centered card titles, 28 admin navigation destinations, mobile menu, live Markdown, cold Server and warm WebAssembly custom values/generation/variant pricing, preserved identities and zero initial stock |
+| Drafts and static storefront | Private checks cover discard confirmation and retained drafts, successful saves, repeated navigation, and fresh home/catalog/details without circuit/WASM startup requests |
+
+Existing .NET test commands above apply. Migration/model commands use EF tools **11.0.0**. No browser test files, packages or CI steps are added.
+
+### Migration operations
+
+`20261117132551_ProductOwnedVariantOptions` backfills local option values/codes and per-variant compare-at prices without replacing identities. Product revisions start at zero. Foreign-key ownership constraints remain in force. The unique product-value and code indexes reject duplicates. Upgrading fails atomically if existing values cannot satisfy those constraints; resolve conflicting catalog data on staging before deployment. Do not bypass the indexes.
+
+Take a backup first. Downgrading after independent values are created/edited is guarded against data loss. Restore the backup if rollback is required. Old editor clients must reload: legacy product-edit price/stock fields are ignored, and variant writes use revision-checked workspace commands. No real mail is needed for these checks.
+
+[Desktop workspace](screenshots/variant-workspace-desktop.png) · [Mobile workspace](screenshots/variant-workspace-mobile.png) · [Markdown preview](screenshots/variant-markdown-preview.png) · [Mobile cards](screenshots/variant-cards-mobile.png)

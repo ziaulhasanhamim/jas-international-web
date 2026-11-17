@@ -1,3 +1,4 @@
+@inject JASIntWeb.Services.CatalogContentRenderer ContentRenderer
 @page "/products"
 @page "/category/{CategorySlug}"
 @attribute [StreamRendering]
@@ -95,6 +96,10 @@ else if (isCategory)
         </div>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(activeCategory?.IntroText))
+    {
+        <div class="catalog-content mb-6">@((MarkupString)ContentRenderer.Render(activeCategory.IntroText))</div>
+    }
     <div class="grid gap-8 lg:grid-cols-[240px_1fr] items-start">
         <!-- Desktop Sidebar Filter Column (hidden on mobile) -->
         <aside class="hidden lg:block space-y-6">
@@ -535,6 +540,11 @@ else if (isCategory)
             </div>
         </div>
     </div>
+    @if (!string.IsNullOrWhiteSpace(activeCategory?.BottomSeoCopy))
+    {
+        <section class="catalog-content shop-panel mt-8" aria-label="Category buyer guide">@((MarkupString)ContentRenderer.Render(activeCategory.BottomSeoCopy))</section>
+    }
+
 </div>
 
 @code
