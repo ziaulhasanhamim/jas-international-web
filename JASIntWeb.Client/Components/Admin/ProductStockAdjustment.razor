@@ -1,0 +1,18 @@
+<section @oninput="Changed" class="shop-panel mt-6" aria-label="Stock adjustment">
+    <h3 class="admin-section-title">Adjust stock — @Variant.Sku</h3>
+    <p class="admin-help">Current on hand: @Variant.OnHand · Reserved: @Variant.Reserved. This records an inventory adjustment.</p>
+    <label class="shop-label">New on-hand quantity<input class="shop-input" type="number" min="@Variant.Reserved" @bind="quantity" /></label>
+    <label class="shop-label">Reason<input class="shop-input" @bind="reason" maxlength="500" /></label>
+    <div class="form-actions"><button type="button" class="shop-button" @onclick="Submit">Record adjustment</button><button type="button" class="shop-button-secondary" @onclick="Cancel">Cancel</button></div>
+</section>
+@code {
+    [Parameter, EditorRequired] public WorkspaceVariant Variant { get; set; } = default!;
+    [Parameter] public EventCallback<WorkspaceStock> Save { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    private int quantity;
+    private string reason = "";
+    private int variantId;
+    protected override void OnParametersSet() { if (variantId != Variant.Id) { variantId = Variant.Id; quantity = Variant.OnHand; } }
+    private Task Submit() => Save.InvokeAsync(new(Variant.Revision, Variant.Id, Variant.OnHand, quantity, reason));
+}

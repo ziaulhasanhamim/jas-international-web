@@ -58,6 +58,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     public async Task<int> SaveProductAsync(ProductEditForm input)
     {
         Validate(input);
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        if (input.Id != 0) await LockProductAsync(input.Id);
         var p = input.Id == 0 ? new Product
         {
             Name = "",
@@ -68,6 +70,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         : (await db.Products.Include(p => p.ProductImages)
             .SingleOrDefaultAsync(p => p.Id == input.Id)) ?? throw new ShopException("Product not found. Return to the product list.");
+        if (input.Id != 0 && p.CatalogRevision != input.CatalogRevision) throw new ShopException("Product changed in another session. Reload before saving your draft.");
         p.Name = input.Name.Trim();
 
         // Auto-generate or normalize product slug
@@ -120,10 +123,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             p.BrandId = null;
         }
-        p.IsDeleted = input.Hidden;
+        if (input.Id != 0 && !input.Hidden && !await db.ProductVariants.AnyAsync(v => v.ProductId == p.Id && v.IsDefault && v.IsActive && !v.IsDeleted && v.SellingPrice > 0))
+            throw new ShopException("Configure an active default variant with a positive price before publishing.");
+        p.IsDeleted = input.Id == 0 || input.Hidden;
+        p.CatalogRevision++;
+
         p.IsFeatured = input.IsFeatured;
         p.IsNewArrival = input.IsNewArrival;
-        p.CompareAtPrice = input.CompareAtPrice;
+
         p.UpdatedAt = DateTimeOffset.UtcNow;
         if (!await db.Categories.AnyAsync(c => c.Id == p.CategoryId && !c.IsDeleted && (c.ParentCategory == null || !c.ParentCategory.IsDeleted)))
         {
@@ -157,75 +164,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
 
-        // Effortless single-screen product creation:
-        // Automatically create or update default variant when base price is provided
-        if (input.BasePrice.HasValue && input.BasePrice.Value > 0)
+        if (input.Id == 0)
         {
-            var defaultVariant = await db.ProductVariants.Include(v => v.Options)
-                .FirstOrDefaultAsync(v => v.ProductId == p.Id && !v.IsDeleted && (v.IsDefault || v.Options.Count == 0));
-
-            string? brandName = null;
-            if (p.BrandId.HasValue)
-            {
-                brandName = await db.Brands.Where(b => b.Id == p.BrandId.Value).Select(b => b.Name).FirstOrDefaultAsync();
-            }
-
-            var baseSku = !string.IsNullOrWhiteSpace(input.Sku)
-                ? input.Sku.Trim().ToUpperInvariant()
-                : SlugAndSkuGenerator.GenerateSku(p.Name, brandName);
-
-            var sku = baseSku;
-            var skuCounter = 2;
-            while (await db.ProductVariants.AnyAsync(x => x.SKU == sku && (defaultVariant == null || x.Id != defaultVariant.Id)))
-            {
-                sku = $"{baseSku}-{skuCounter++}";
-            }
-
-            var barcode = !string.IsNullOrWhiteSpace(input.Barcode)
-                ? input.Barcode.Trim()
-                : SlugAndSkuGenerator.GenerateEan8Barcode(p.Id);
-
-            var baseBarcode = barcode;
-            var bCounter = p.Id + 1000;
-            while (await db.ProductVariants.AnyAsync(x => x.Barcode == barcode && (defaultVariant == null || x.Id != defaultVariant.Id)))
-            {
-                barcode = SlugAndSkuGenerator.GenerateEan8Barcode(bCounter++);
-            }
-
-            if (defaultVariant == null)
-            {
-                defaultVariant = new ProductVariant
-                {
-                    ProductId = p.Id,
-                    SKU = sku,
-                    Barcode = barcode,
-                    SellingPrice = input.BasePrice.Value,
-                    CostPrice = input.CostPrice ?? (input.BasePrice.Value * 0.8m),
-                    IsActive = true,
-                    IsDefault = true,
-                    OptionSignature = ""
-                };
-                db.ProductVariants.Add(defaultVariant);
-                await db.SaveChangesAsync();
-            }
-            else
-            {
-                if (!string.IsNullOrWhiteSpace(input.Sku)) defaultVariant.SKU = sku;
-                if (!string.IsNullOrWhiteSpace(input.Barcode)) defaultVariant.Barcode = barcode;
-                defaultVariant.SellingPrice = input.BasePrice.Value;
-                if (input.CostPrice.HasValue) defaultVariant.CostPrice = input.CostPrice.Value;
-                defaultVariant.IsActive = true;
-                defaultVariant.IsDefault = true;
-                await db.SaveChangesAsync();
-            }
-
-            if (input.InitialStock.HasValue && input.InitialStock.Value >= 0)
-            {
-                await SetStockCoreAsync(defaultVariant.Id, input.InitialStock.Value, "Product creation initial stock");
-                await db.SaveChangesAsync();
-            }
+            db.ProductVariants.Add(new ProductVariant { ProductId = p.Id, SKU = $"JAS-{p.Id}-BASE", IsDefault = true, IsActive = false });
+            await db.SaveChangesAsync();
         }
 
+        await transaction.CommitAsync();
         await cache.RemoveByTagAsync(CatalogService.TagProducts);
         await cache.RemoveByTagAsync(CatalogService.TagSections);
         return p.Id;
@@ -450,7 +395,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 throw new ShopException("An active variant is missing this attribute. Add it as optional first, update the variants, then mark it required.");
             }
             binding.IsRequired = row.Required;
-            foreach (var removed in binding.Options.Where(o => !selected.Contains(o.AttributeOptionId)).ToList())
+            foreach (var removed in binding.Options.Where(o => (!o.AttributeOptionId.HasValue || !selected.Contains(o.AttributeOptionId.Value))).ToList())
             {
                 if (used.Contains(removed.Id))
                 {
@@ -465,6 +410,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     ProductId = input.ProductId,
                     AttributeDefinitionId = row.AttributeDefinitionId,
                     AttributeOptionId = id,
+                    Value = globalOptions[id].Value,
+                    Code = globalOptions[id].Code,
+                    NormalizedValue = globalOptions[id].Value.Trim().ToUpperInvariant(),
                     SortOrder = binding.Options.Count
                 });
             }
@@ -1160,6 +1108,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             throw new ShopException("Attribute code already exists.");
         }
+        if (a.Id != 0 && a.Code != code && await db.ProductAttributeDefinitions.AnyAsync(binding => binding.AttributeDefinitionId == a.Id))
+            throw new ShopException("This attribute code is used in product selection URLs and cannot be changed. Edit its display name instead.");
         a.Name = input.Name.Trim();
         a.Code = code;
         a.Unit = input.Unit?.Trim();
@@ -1168,6 +1118,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             db.AttributeDefinitions.Add(a);
         }
         await db.SaveChangesAsync();
+        if (catalog is not null) await catalog.InvalidateAllAsync();
         return a.Id;
     }
 

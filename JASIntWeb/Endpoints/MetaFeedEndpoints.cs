@@ -125,10 +125,10 @@ public static class MetaFeedEndpoints
                 item.Add(new XElement(G + "gtin", v.Barcode));
             }
 
-            if (prod.CompareAtPrice.HasValue && prod.CompareAtPrice.Value > v.SellingPrice)
+            if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
             {
                 item.Add(new XElement(G + "sale_price", $"{v.SellingPrice:0.00} BDT"));
-                item.SetElementValue(G + "price", $"{prod.CompareAtPrice.Value:0.00} BDT");
+                item.SetElementValue(G + "price", $"{v.CompareAtPrice.Value:0.00} BDT");
             }
 
             if (!string.IsNullOrWhiteSpace(prod.Category?.Name))
@@ -311,10 +311,10 @@ public static class MetaFeedEndpoints
                 item.Add(new XElement(G + "gtin", v.Barcode));
             }
 
-            if (prod.CompareAtPrice.HasValue && prod.CompareAtPrice.Value > v.SellingPrice)
+            if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
             {
                 item.Add(new XElement(G + "sale_price", $"{v.SellingPrice:0.00} BDT"));
-                item.SetElementValue(G + "price", $"{prod.CompareAtPrice.Value:0.00} BDT");
+                item.SetElementValue(G + "price", $"{v.CompareAtPrice.Value:0.00} BDT");
             }
 
             if (!string.IsNullOrWhiteSpace(prod.Category?.Name))

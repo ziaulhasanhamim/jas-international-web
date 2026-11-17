@@ -1,3 +1,4 @@
+using Microsoft.JSInterop;
 using JASIntWeb.Client.Contracts;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -16,6 +17,9 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
     protected EditContext? EditContext;
     private ValidationMessageStore? messages;
     private PersistingComponentStateSubscription? subscription;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    protected bool HasUnsavedChanges;
+    protected void MarkEdited() => HasUnsavedChanges = true;
     protected bool saving;
     protected bool AccessDenied;
     private int uploads;
@@ -55,6 +59,9 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
         try
         {
             var saved = await SaveAsync(Input);
+            HasUnsavedChanges = false;
+            try { await JS.InvokeVoidAsync("jasAdminDrafts.clear"); } catch (JSException) { }
+            await InvokeAsync(StateHasChanged);
             Nav.NavigateTo(saved.RedirectUrl);
         }
         catch (AdminCatalogException failure)

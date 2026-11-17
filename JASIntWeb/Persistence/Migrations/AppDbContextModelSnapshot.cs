@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261116211856_CustomerConfidenceAndStockNotifications";
+    public override string LastMigrationId => "20261117132551_ProductOwnedVariantOptions";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -1196,6 +1196,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("BrandId")
                     .HasColumnType("integer");
 
+                b.Property<long>("CatalogRevision")
+                    .HasColumnType("bigint");
+
                 b.Property<int>("CategoryId")
                     .HasColumnType("integer");
 
@@ -1344,8 +1347,18 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("AttributeDefinitionId")
                     .HasColumnType("integer");
 
-                b.Property<int>("AttributeOptionId")
+                b.Property<int?>("AttributeOptionId")
                     .HasColumnType("integer");
+
+                b.Property<string>("Code")
+                    .IsRequired()
+                    .HasMaxLength(120)
+                    .HasColumnType("character varying(120)");
+
+                b.Property<string>("NormalizedValue")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)");
 
                 b.Property<int>("ProductAttributeDefinitionId")
                     .HasColumnType("integer");
@@ -1356,6 +1369,11 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("SortOrder")
                     .HasColumnType("integer");
 
+                b.Property<string>("Value")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)");
+
                 b.HasKey("Id");
 
                 b.HasAlternateKey("Id", "ProductAttributeDefinitionId", "ProductId")
@@ -1364,7 +1382,10 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("AttributeOptionId", "AttributeDefinitionId")
                     .HasDatabaseName("IX_ProductOptions_GlobalOption");
 
-                b.HasIndex("ProductAttributeDefinitionId", "AttributeOptionId")
+                b.HasIndex("ProductAttributeDefinitionId", "Code")
+                    .IsUnique();
+
+                b.HasIndex("ProductAttributeDefinitionId", "NormalizedValue")
                     .IsUnique()
                     .HasDatabaseName("UX_ProductAttributeOptions_Value");
 
@@ -1473,6 +1494,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<string>("Barcode")
                     .HasColumnType("text");
+
+                b.Property<decimal?>("CompareAtPrice")
+                    .HasColumnType("numeric");
 
                 b.Property<decimal>("CostPrice")
                     .HasColumnType("numeric");
@@ -2195,7 +2219,6 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasForeignKey("AttributeOptionId", "AttributeDefinitionId")
                     .HasPrincipalKey("Id", "AttributeDefinitionId")
                     .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired()
                     .HasConstraintName("FK_ProductOptions_GlobalOption");
 
                 b.HasOne("JASIntWeb.Persistence.Entities.ProductAttributeDefinition", "ProductAttributeDefinition")

@@ -27,11 +27,12 @@
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
-    private bool IsActive => Matches(Prefix) || (AlternatePrefix is not null && Matches(AlternatePrefix));
+    [Parameter] public string[] Prefixes { get; set; } = [];
+    private bool IsActive => Prefixes.Length > 0 ? Prefixes.Any(Matches) : Matches(Prefix) || (AlternatePrefix is not null && Matches(AlternatePrefix));
 
     private bool Matches(string prefix)
     {
         var path = new Uri(Navigation.Uri).AbsolutePath;
-        return path == prefix || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase);
+        return path == prefix || (prefix != "/admin" && path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
     }
 }

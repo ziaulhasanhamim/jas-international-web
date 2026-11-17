@@ -1,0 +1,72 @@
+<section id="options" class="shop-panel">
+    <h3 class="admin-section-title">Product attributes &amp; values</h3>
+    <p class="admin-help">Suggested values are copied into this product. Editing them here never changes other products.</p>
+    <div class="form-actions">
+        <select class="shop-input" aria-label="Attribute to add" @bind="definitionId"><option value="0">Choose attribute</option>
+            @foreach (var suggestion in Suggestions.Where(s => !Rows.Any(a => a.DefinitionId == s.Id))) { <option value="@suggestion.Id">@suggestion.Name</option> }
+        </select>
+        <button type="button" class="shop-button-secondary" @onclick="AddAttribute">Add attribute</button>
+        <a href="/admin/attributes">Manage attribute definitions &amp; suggestions</a>
+    </div>
+    @foreach (var attribute in Rows)
+    {
+        <fieldset class="attribute-config" @key="attribute.DefinitionId">
+            <legend>@(attribute.Name)</legend>
+            <div class="form-actions">
+                <label class="check-label"><input type="checkbox" @bind="attribute.Required" @bind:after="Notify" /> Required on active variants</label>
+                <button type="button" class="shop-button-secondary" @onclick="() => MoveAttribute(attribute, -1)" disabled="@(Rows.IndexOf(attribute) == 0)">Move attribute up</button>
+                <button type="button" class="shop-button-secondary" @onclick="() => MoveAttribute(attribute, 1)" disabled="@(Rows.IndexOf(attribute) == Rows.Count - 1)">Move attribute down</button>
+                <button type="button" class="danger-button" disabled="@(attribute.Options.Any(o => UsedOptions.Contains(o.Id)))" title="Unmap values from variants before removing this attribute" @onclick="() => RemoveAttribute(attribute)">Remove attribute</button>
+            </div>
+            @foreach (var option in attribute.Options)
+            {
+                <div class="admin-option-row" @key="option.Id">
+                    <input class="shop-input" aria-label="@($"{attribute.Name} value")" @bind="option.Value" @bind:event="oninput" @bind:after="Notify" maxlength="200" />
+                    <small>@(string.IsNullOrEmpty(option.Code) ? "Stable code assigned on save" : option.Code)</small>
+                    <button type="button" class="shop-button-secondary" aria-label="Move value up" disabled="@(attribute.Options.IndexOf(option) == 0)" @onclick="() => MoveOption(attribute, option, -1)">↑</button>
+                    <button type="button" class="shop-button-secondary" aria-label="Move value down" disabled="@(attribute.Options.IndexOf(option) == attribute.Options.Count - 1)" @onclick="() => MoveOption(attribute, option, 1)">↓</button>
+                    <button type="button" class="shop-button-secondary" disabled="@UsedOptions.Contains(option.Id)" title="Unmap this value from variants before removing it" @onclick="() => RemoveOption(attribute, option)">Remove</button>
+                </div>
+            }
+            <div class="form-actions">
+                <button type="button" class="shop-button-secondary" @onclick="() => AddValue(attribute)">Add custom value</button>
+                <select class="shop-input" aria-label="@($"Suggested {attribute.Name} values")" value="0" @onchange="e => CopySuggestion(attribute, e)">
+                    <option value="0">Copy a suggested value…</option>
+                    @foreach (var value in Suggestions.First(s => s.Id == attribute.DefinitionId).Values) { <option value="@value.Id">@value.Value</option> }
+                </select>
+            </div>
+        </fieldset>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public List<WorkspaceAttribute> Attributes { get; set; } = [];
+    private List<WorkspaceAttribute> Rows = [];
+    private List<WorkspaceAttribute>? source;
+    protected override void OnParametersSet()
+    { if (!ReferenceEquals(source, Attributes)) { source = Attributes; Rows = Attributes.Select(row => row.Copy()).ToList(); } }
+    [Parameter, EditorRequired] public List<AttributeSuggestion> Suggestions { get; set; } = [];
+    [Parameter] public HashSet<int> UsedOptions { get; set; } = [];
+    [Parameter] public EventCallback<List<WorkspaceAttribute>> Changed { get; set; }
+    private int definitionId;
+    private int NextKey => Math.Min(-1, Rows.SelectMany(a => a.Options).Select(o => o.Id).DefaultIfEmpty(0).Min() - 1);
+    private Task Notify() => Changed.InvokeAsync(Rows.Select(row => row.Copy()).ToList());
+    private async Task AddAttribute()
+    {
+        var definition = Suggestions.FirstOrDefault(s => s.Id == definitionId);
+        if (definition is null || Rows.Any(a => a.DefinitionId == definitionId)) return;
+        Rows.Add(new() { DefinitionId = definition.Id, Name = definition.Name }); definitionId = 0; await Notify();
+    }
+    private async Task AddValue(WorkspaceAttribute attribute) { attribute.Options.Add(new() { Id = NextKey }); await Notify(); }
+    private async Task RemoveAttribute(WorkspaceAttribute attribute) { Rows.Remove(attribute); await Notify(); }
+    private async Task RemoveOption(WorkspaceAttribute attribute, WorkspaceOption option) { attribute.Options.Remove(option); await Notify(); }
+    private async Task MoveAttribute(WorkspaceAttribute attribute, int step) { Move(Rows, attribute, step); await Notify(); }
+    private async Task MoveOption(WorkspaceAttribute attribute, WorkspaceOption option, int step) { Move(attribute.Options, option, step); await Notify(); }
+    private static void Move<T>(List<T> values, T value, int step) { var old = values.IndexOf(value); var next = old + step; if (next < 0 || next >= values.Count) return; values.RemoveAt(old); values.Insert(next, value); }
+    private async Task CopySuggestion(WorkspaceAttribute attribute, ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var id)) return;
+        var suggestion = Suggestions.First(s => s.Id == attribute.DefinitionId).Values.FirstOrDefault(v => v.Id == id);
+        if (suggestion is null) return;
+        attribute.Options.Add(new() { Id = NextKey, SuggestionId = suggestion.Id, Value = suggestion.Value }); await Notify();
+    }
+}

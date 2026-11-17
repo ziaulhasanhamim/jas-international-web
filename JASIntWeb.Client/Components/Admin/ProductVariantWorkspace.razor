@@ -1,0 +1,92 @@
+@inherits AdminEditorBase<ProductWorkspace>
+@inject IAdminProductWorkspaceBackend Workspace
+@inject IJSRuntime JS
+<PageTitle>Variants &amp; stock — JAS Admin</PageTitle>
+<AdminPageHeader Title="Variants & stock" Description="Configure this product's own values, then manage each sellable combination." ActionHref="/admin/products" ActionText="Back to products" />
+<ProductAdminTabs ProductId="Id" />
+@if (error is not null) { <p class="form-error" role="alert">@error</p> }
+@if (Input is null) { <p class="admin-empty">@(notFound ? "Product not found." : "Loading workspace…")</p> }
+else
+{
+    <h2 class="admin-record-title">@Input.Name</h2>
+    <p class="admin-help">Product details never change price or stock. Save option mappings before editing prices. New combinations start inactive, unpriced and with zero stock.</p>
+    <fieldset data-admin-draft data-admin-dirty="@(dirty || variantDirty ? "true" : "false")" disabled="@Busy">
+        <fieldset disabled="@variantDirty">
+        <ProductAttributeConfiguration Attributes="Input.Attributes" Suggestions="Input.Suggestions" UsedOptions="@Input.Variants.SelectMany(v => v.Choices.Values).Where(id => id > 0).ToHashSet()" Changed="OptionsChanged" />
+        <section class="shop-panel mt-6">
+            <h3 class="admin-section-title">Map existing combinations</h3>
+            <p class="admin-help">Changing a value preserves the variant ID and its inventory. Archived combinations retain their historical configuration.</p>
+            <div class="table-scroll"><table class="shop-table"><thead><tr><th>Variant / SKU</th>@foreach (var attribute in Input.Attributes) { <th>@(attribute.Name)</th> }</tr></thead><tbody>
+            @foreach (var variant in Input.Variants)
+            {
+                <tr @key="variant.Id"><th>@variant.Sku @(variant.Archived ? "(archived)" : "")</th>
+                @foreach (var attribute in Input.Attributes)
+                {
+                    <td><select class="shop-input" aria-label="@($"{variant.Sku} {attribute.Name}")" disabled="@variant.Archived" value="@variant.Choices.GetValueOrDefault(attribute.DefinitionId)" @onchange="e => Select(variant, attribute.DefinitionId, e)">
+                        <option value="0">Choose value / not applicable</option>
+                        @foreach (var option in attribute.Options) { <option value="@option.Id">@option.Value</option> }
+                    </select></td>
+                }</tr>
+            }
+            </tbody></table></div>
+            <div class="form-actions"><button type="button" class="shop-button" @onclick="SaveConfiguration">Save options &amp; mappings</button></div>
+        </section>
+        <section id="generate" class="shop-panel mt-6">
+            <h3 class="admin-section-title">Generate missing combinations</h3>
+            <p class="admin-help">Save options first. Preview counts up to 100 combinations and writes nothing.</p>
+            <button type="button" class="shop-button-secondary" disabled="@dirty" @onclick="Preview">Preview combinations</button>
+            @if (preview is not null)
+            {
+                <p role="status">@preview.Total combinations; @preview.Missing missing.</p>
+                <button type="button" class="shop-button" disabled="@(dirty || preview.Missing == 0)" @onclick="Generate">Create @preview.Missing missing variants</button>
+            }
+        </section>
+        </fieldset>
+        <fieldset disabled="@(stockVariant is not null)">
+        <ProductVariantMatrix FocusVariantId="FocusVariantId" Changed="VariantChanged" Variants="Input.Variants" ConfigurationDirty="dirty" Save="SaveVariant" Stock="OpenStock" />
+        </fieldset>
+        @if (stockVariant is not null)
+        {
+            <ProductStockAdjustment Changed="() => variantDirty = true" Variant="stockVariant" Save="AdjustStock" Cancel="CloseStock" />
+        }
+    </fieldset>
+}
+@code {
+    [Parameter] public int FocusVariantId { get; set; }
+    private bool dirty;
+    private bool variantDirty;
+    private CombinationPreview? preview;
+    private WorkspaceVariant? stockVariant;
+    protected override async Task<AdminEditorData<ProductWorkspace>> LoadAsync() => new(await Workspace.LoadAsync(Id), [], [], 0, 0, "");
+    protected override Task<AdminSaveResult> SaveAsync(ProductWorkspace input) => throw new NotSupportedException("Use explicit workspace commands.");
+    private void OptionsChanged(List<WorkspaceAttribute> attributes) { Input = Input! with { Attributes = attributes }; MarkDirty(); }
+    private void VariantChanged(WorkspaceVariant variant) { var index = Input!.Variants.FindIndex(row => row.Id == variant.Id); Input.Variants[index] = variant; variantDirty = true; }
+    private void MarkDirty() { dirty = true; preview = null; }
+    private void Select(WorkspaceVariant variant, int definition, ChangeEventArgs args)
+    { variant.Choices[definition] = int.TryParse(args.Value?.ToString(), out var id) ? id : 0; MarkDirty(); }
+    private async Task Execute(Func<Task<ProductWorkspace>> action)
+    {
+        if (Busy) return;
+        saving = true; error = null;
+        try { Input = await action(); dirty = false; variantDirty = false; stockVariant = null; preview = null; await JS.InvokeVoidAsync("jasAdminDrafts.clear"); }
+        catch (AdminCatalogException failure) { error = failure.Message; AccessDenied = failure.Status is 401 or 403; }
+        catch (HttpRequestException) { error = "Connection failed. Your draft is retained. Try again."; }
+        catch (JSDisconnectedException) { error = "The operation completed. Reload to reconnect."; }
+        finally { saving = false; }
+    }
+    private Task SaveConfiguration() => Execute(() => Workspace.SaveConfigurationAsync(Id, new(Input!.Revision, Input.Attributes, Input.Variants)));
+    private async Task Preview()
+    {
+        if (Busy || dirty) return;
+        saving = true; error = null;
+        try { preview = await Workspace.PreviewAsync(Id, Input!.Revision); }
+        catch (AdminCatalogException failure) { error = failure.Message; }
+        catch (HttpRequestException) { error = "Connection failed. Try previewing again."; }
+        finally { saving = false; }
+    }
+    private Task Generate() => Execute(() => Workspace.GenerateAsync(Id, Input!.Revision));
+    private Task SaveVariant(WorkspaceVariant variant) => Execute(() => Workspace.SaveVariantAsync(Id, variant));
+    private void OpenStock(WorkspaceVariant variant) => stockVariant = variant;
+    private void CloseStock() { stockVariant = null; variantDirty = false; }
+    private Task AdjustStock(WorkspaceStock command) => Execute(() => Workspace.AdjustStockAsync(Id, command));
+}

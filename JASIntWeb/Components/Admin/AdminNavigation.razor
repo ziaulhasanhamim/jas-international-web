@@ -1,56 +1,26 @@
+@inject NavigationManager Navigation
 <nav aria-label="Main admin navigation" class="flex flex-col gap-1 px-3 py-4">
-    <NavLink href="/admin" Match="NavLinkMatch.All" class="nav-link">
-        <Icon Name="dashboard" Class="size-4" />
-        Dashboard
-    </NavLink>
-    <NavLink href="/admin/analytics" class="nav-link">
-        <Icon Name="history" Class="size-4" />
-        Sales &amp; Analytics
-    </NavLink>
-    <NavLink href="/admin/visitors" class="nav-link">
-        <Icon Name="eye" Class="size-4" />
-        Live Traffic &amp; Visitors
-    </NavLink>
-
-    <NavLink href="/admin/orders" class="nav-link">
-        <Icon Name="cart" Class="size-4" />
-        Orders
-    </NavLink>
-
-    <SidebarGroup Title="Marketing & Growth" IconName="chart" Prefix="/admin/marketing" AlternatePrefix="/admin/feeds">
-        <NavLink href="/admin/marketing" Match="NavLinkMatch.All">Meta Ads &amp; ROAS</NavLink>
-        <NavLink href="/admin/marketing/abandoned-carts">Abandoned Carts</NavLink>
-        <NavLink href="/admin/marketing/audiences">Custom Audiences</NavLink>
-        <NavLink href="/admin/feeds">Catalog Feeds</NavLink>
-    </SidebarGroup>
-
-    <SidebarGroup Title="Products & Catalog" IconName="box" Prefix="/admin/products" AlternatePrefix="/admin/inventory">
-        <NavLink href="/admin/products" Match="NavLinkMatch.All">All Products</NavLink>
-        <NavLink href="/admin/products/new">Add Product</NavLink>
-        <NavLink href="/admin/featured-products">Featured &amp; Badges</NavLink>
-        <NavLink href="/admin/brands">Brands &amp; Featured</NavLink>
-        <NavLink href="/admin/inventory">Stock Inventory</NavLink>
-        <NavLink href="/admin/stock-notifications">Back-in-stock Alerts</NavLink>
-        <NavLink href="/admin/categories">Categories</NavLink>
-        <NavLink href="/admin/attributes">Attribute Library</NavLink>
-    </SidebarGroup>
-
-    <SidebarGroup Title="Storefront Content" IconName="camera" Prefix="/admin/carousel" AlternatePrefix="/admin/homepage-sections">
-        <NavLink href="/admin/carousel" Match="NavLinkMatch.All">Hero Carousel</NavLink>
-        <NavLink href="/admin/promo-cards">Curated Promo Cards</NavLink>
-        <NavLink href="/admin/homepage-sections">Category Sections</NavLink>
-        <NavLink href="/admin/reviews">Customer Reviews</NavLink>
-    </SidebarGroup>
-
-    <SidebarGroup Title="Customers & Access" IconName="users" Prefix="/admin/users">
-        <NavLink href="/admin/users" Match="NavLinkMatch.All">Customer Accounts</NavLink>
-        <NavLink href="/admin/users/create">Add Account</NavLink>
-    </SidebarGroup>
-
-    <SidebarGroup Title="Promotions & Settings" IconName="credit-card" Prefix="/admin/coupons" AlternatePrefix="/admin/settings">
-        <NavLink href="/admin/coupons" Match="NavLinkMatch.All">Coupons &amp; Discounts</NavLink>
-        <NavLink href="/admin/seo">SEO &amp; Sitemaps</NavLink>
-        <NavLink href="/admin/settings/delivery">Delivery &amp; bKash Setup</NavLink>
-        <NavLink href="/admin/settings/meta-ads">Meta Ads &amp; Pixel</NavLink>
-    </SidebarGroup>
+    @foreach (var group in Groups)
+    {
+        <SidebarGroup Title="@group.Title" IconName="@group.Icon" Prefix="@group.Links[0].Href" Prefixes="@group.Links.Select(link => link.Href).ToArray()">
+            @foreach (var link in group.Links)
+            {
+                <a href="@link.Href" class="@(ActiveHref == link.Href ? "active" : null)" aria-current="@(ActiveHref == link.Href ? "page" : null)">@link.Label</a>
+            }
+        </SidebarGroup>
+    }
 </nav>
+@code {
+    private string? ActiveHref => Groups.SelectMany(group => group.Links).Where(link => new Uri(Navigation.Uri).AbsolutePath == link.Href || (link.Href != "/admin" && new Uri(Navigation.Uri).AbsolutePath.StartsWith(link.Href + "/", StringComparison.OrdinalIgnoreCase))).OrderByDescending(link => link.Href.Length).FirstOrDefault()?.Href;
+    private sealed record Link(string Href, string Label);
+    private sealed record Group(string Title, string Icon, Link[] Links);
+    private static readonly Group[] Groups = [
+        new("Dashboard", "dashboard", [new("/admin", "Overview"), new("/admin/analytics", "Sales & analytics"), new("/admin/visitors", "Live traffic")]),
+        new("Catalog", "box", [new("/admin/products", "Products"), new("/admin/products/new", "Add product"), new("/admin/categories", "Categories"), new("/admin/brands", "Brands"), new("/admin/attributes", "Attribute definitions & suggestions"), new("/admin/inventory", "Inventory"), new("/admin/stock-notifications", "Back-in-stock subscriptions")]),
+        new("Orders", "cart", [new("/admin/orders", "Orders & payments")]),
+        new("Customers", "users", [new("/admin/users", "Customer accounts"), new("/admin/users/create", "Add account"), new("/admin/reviews", "Review moderation")]),
+        new("Marketing", "chart", [new("/admin/marketing", "Meta Ads & ROAS"), new("/admin/marketing/abandoned-carts", "Abandoned carts"), new("/admin/marketing/audiences", "Audiences"), new("/admin/coupons", "Coupons"), new("/admin/feeds", "Catalog feeds")]),
+        new("Storefront Content", "camera", [new("/admin/carousel", "Hero carousel"), new("/admin/promo-cards", "Promo cards"), new("/admin/homepage-sections", "Homepage sections"), new("/admin/featured-products", "Featured products"), new("/admin/seo", "SEO & sitemaps")]),
+        new("Settings", "settings", [new("/admin/settings/delivery", "Delivery & payment configuration"), new("/admin/settings/meta-ads", "Pixel & Meta configuration")])
+    ];
+}

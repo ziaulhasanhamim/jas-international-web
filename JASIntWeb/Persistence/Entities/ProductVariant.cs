@@ -8,6 +8,7 @@ public class ProductVariant : SoftDeletableEntity
     public string OptionSignature { get; set; } = "";
     public string? Barcode { get; set; }
     public decimal SellingPrice { get; set; }
+    public decimal? CompareAtPrice { get; set; }
     public decimal CostPrice { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsDefault { get; set; } = true;

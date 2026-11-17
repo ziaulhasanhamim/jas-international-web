@@ -192,8 +192,12 @@ else
                 <!-- Price and SKU -->
                 <div class="mt-4 flex items-baseline gap-4">
                     <p class="font-display text-3xl font-extrabold text-blue-600">
-                        @(selected is { Stock: > 0 } ? "৳" + selected.Price.ToString("N0") : "N/A")
+                        @(selected is not null ? "৳" + selected.Price.ToString("N0") : "N/A")
                     </p>
+                    @if (selected?.OriginalPrice > selected?.Price)
+                    {
+                        <span class="text-sm text-slate-400 line-through">৳@selected.OriginalPrice.Value.ToString("N0")</span>
+                    }
                     @if (selected is not null)
                     {
                         <span class="text-xs text-slate-400 font-mono">SKU: @selected.Sku</span>

@@ -135,7 +135,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         {
             input = new()
             {
-                Hidden = false,
+                Hidden = true,
                 InitialStock = 10,
                 HasVariants = false
             };
@@ -162,6 +162,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         input = new()
         {
             Id = p.Id,
+            CatalogRevision = p.CatalogRevision,
             Name = p.Name,
             Slug = p.Slug,
             CategoryId = p.CategoryId,
@@ -211,7 +212,12 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
 
     public Task<AdminSaveResult> SaveCategoryAsync(CategoryEditForm input) => Save(input, service => service.SaveCategoryAsync(input), _ => "/admin/categories");
     public Task<AdminSaveResult> SaveBrandAsync(BrandEditForm input) => Save(input, service => service.SaveBrandAsync(input), _ => "/admin/brands");
-    public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => Save(input, service => service.SaveProductAsync(input), id => input.HasVariants ? $"/admin/products/{id}/variants" : "/admin/products");
+    public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => Save(input, service => service.SaveProductAsync(input), id => input.Id == 0 ? $"/admin/products/{id}/variants" : "/admin/products");
+    public Task<ContentPreview> PreviewContentAsync(string source) => Execute(_ =>
+    {
+        if (source is null || source.Length > 100_000) throw new AdminCatalogException(400, "Use at most 100,000 characters.");
+        return Task.FromResult(new ContentPreview(new CatalogContentRenderer().Render(source)));
+    });
     public async Task DeleteBrandAsync(int id) => await Execute(async service =>
     {
         await using var scope = scopes.CreateAsyncScope();

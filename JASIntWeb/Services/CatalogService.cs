@@ -109,7 +109,7 @@ public sealed class CatalogService(
                     && (c.ParentCategoryId == null || !c.ParentCategory!.IsDeleted))
                     .OrderBy(c => c.Name)
                     .ThenBy(c => c.Id)
-                    .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId) { MetaTitle = c.MetaTitle, MetaDescription = c.MetaDescription, OgImageUrl = c.OgImageUrl })
+                    .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId) { MetaTitle = c.MetaTitle, MetaDescription = c.MetaDescription, OgImageUrl = c.OgImageUrl, IntroText = c.IntroText, BottomSeoCopy = c.BottomSeoCopy })
                     .ToListAsync(ct);
             },
             options: LongLivedOptions,
@@ -214,6 +214,7 @@ public sealed class CatalogService(
                         v.Id,
                         v.SKU,
                         v.SellingPrice,
+                        v.CompareAtPrice,
                         v.IsDefault,
                         Stock = db.InventoryItems.Where(i => i.ProductVariantId == v.Id)
                         .Select(i => i.QuantityOnHand - i.QuantityReserved)
@@ -221,7 +222,7 @@ public sealed class CatalogService(
                         Options = v.Options.Select(o => new
                         {
                             DefinitionCode = o.ProductAttributeOption!.ProductAttributeDefinition!.AttributeDefinition!.Code,
-                            Code = o.ProductAttributeOption.AttributeOption!.Code
+                            Code = o.ProductAttributeOption.Code
                         })
                         .ToList()
                     })
@@ -232,7 +233,7 @@ public sealed class CatalogService(
                     .ThenBy(a => a.Id)
                     .Select(a => new ProductAttributeDto(a.AttributeDefinition!.Code, a.AttributeDefinition.Name,
                         a.Options.OrderBy(o => o.SortOrder).ThenBy(o => o.Id)
-                        .Select(o => new AttributeOptionDto(o.Id, o.AttributeOption!.Code, o.AttributeOption.Value, o.SortOrder))
+                        .Select(o => new AttributeOptionDto(o.Id, o.Code, o.Value, o.SortOrder))
                         .ToList(), a.IsRequired))
                     .ToListAsync(ct);
                 var breadcrumbs = new List<CategoryLinkDto>();
@@ -244,7 +245,7 @@ public sealed class CatalogService(
                 return new ProductDetailsDto(p.Id, p.Name, p.Slug, p.Category.Name, p.Category.Slug, p.Description, p.Details, p.MainImageUrl,
                     [.. p.Images.Prepend(p.MainImageUrl).Distinct()], bindings,
                     [.. variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
-                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))], breadcrumbs, p.BrandName, p.BrandSlug) { MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription, OgImageUrl = p.OgImageUrl };
+                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code), v.CompareAtPrice))], breadcrumbs, p.BrandName, p.BrandSlug) { MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription, OgImageUrl = p.OgImageUrl };
             },
             options: ProductOptions,
             tags: [TagCatalog, TagProducts, $"product:{normalizedSlug}"]);
@@ -320,11 +321,11 @@ public sealed class CatalogService(
                 .FirstOrDefault(),
                 p.Brand != null ? p.Brand.Name : null,
                 p.Brand != null ? p.Brand.Slug : null,
-                p.CompareAtPrice,
+                p.ProductVariants.Where(v => v.IsDefault && v.IsActive && !v.IsDeleted).Select(v => v.CompareAtPrice).FirstOrDefault(),
                 db.ProductReviews.Where(r => r.ProductId == p.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
                 db.ProductReviews.Count(r => r.ProductId == p.Id && r.IsApproved),
                 p.IsNewArrival,
-                p.IsFeatured))
+                p.IsFeatured, p.Attributes.Any()))
             .ToListAsync();
     }
 
@@ -515,11 +516,11 @@ public sealed class CatalogService(
                     .FirstOrDefault(),
                     p.Product.Brand != null ? p.Product.Brand.Name : null,
                     p.Product.Brand != null ? p.Product.Brand.Slug : null,
-                    p.Product.CompareAtPrice,
+                    p.Product.ProductVariants.Where(v => v.IsDefault && v.IsActive && !v.IsDeleted).Select(v => v.CompareAtPrice).FirstOrDefault(),
                     db.ProductReviews.Where(r => r.ProductId == p.Product.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
                     db.ProductReviews.Count(r => r.ProductId == p.Product.Id && r.IsApproved),
                     p.Product.IsNewArrival,
-                    p.Product.IsFeatured))
+                    p.Product.IsFeatured, p.Product.Attributes.Any()))
             .ToListAsync(), count);
     }
 }

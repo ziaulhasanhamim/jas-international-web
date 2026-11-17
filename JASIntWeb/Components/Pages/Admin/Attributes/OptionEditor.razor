@@ -5,7 +5,7 @@
 @inject NavigationManager Nav
 
 <AdminPageHeader
-    Title="@(Id == 0 ? "Add option" : "Edit option")"
+    Title="@(Id == 0 ? "Add suggested value" : "Edit suggested value")"
     ActionHref="@($"/admin/attributes/{AttributeId}/options")"
     ActionText="Back to list"
 />
@@ -48,7 +48,7 @@ else
                 <small>For example: blue or 256-gb. Display order is configured per product.</small>
             </label>
             <div class="form-actions">
-                <button type="submit" class="shop-button">Save option</button>
+                <button type="submit" class="shop-button">Save suggested value</button>
                 <a href="@($"/admin/attributes/{AttributeId}/options")" class="shop-button-secondary">Cancel</a>
             </div>
         </EditForm>

@@ -1,0 +1,47 @@
+@implements IDisposable
+@inject IAdminCatalogBackend Backend
+<label class="shop-label">@Label
+    <textarea class="shop-input" rows="@Rows" value="@Value" @oninput="Changed" maxlength="100000"></textarea>
+    <small>Markdown and supported HTML. This content is visible on the storefront.</small>
+</label>
+<details class="markdown-preview" open>
+    <summary>Rendered preview</summary>
+    @if (error is not null) { <p role="alert" class="form-error">@error</p> }
+    <div class="catalog-content">@((MarkupString)html)</div>
+</details>
+@code {
+    [Parameter] public string Label { get; set; } = "Content";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public int Rows { get; set; } = 6;
+    private string html = "";
+    private string? error;
+    private string? renderedSource;
+    private CancellationTokenSource? debounce;
+    private bool disposed;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (renderedSource != Value) await Preview(Value ?? "");
+    }
+    private async Task Changed(ChangeEventArgs args)
+    {
+        var source = args.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(source);
+        debounce?.Cancel(); debounce?.Dispose();
+        var current = debounce = new();
+        try { await Task.Delay(350, current.Token); if (!current.IsCancellationRequested) await Preview(source); }
+        catch (OperationCanceledException) { }
+    }
+    private async Task Preview(string source)
+    {
+        renderedSource = source;
+        try
+        {
+            var result = await Backend.PreviewContentAsync(source);
+            if (!disposed && renderedSource == source) { html = result.Html; error = null; }
+        }
+        catch (Exception failure) when (failure is AdminCatalogException or HttpRequestException)
+        { if (!disposed) error = "Preview unavailable. Your text is retained; retry after reconnecting."; }
+    }
+    public void Dispose() { disposed = true; debounce?.Cancel(); debounce?.Dispose(); }
+}

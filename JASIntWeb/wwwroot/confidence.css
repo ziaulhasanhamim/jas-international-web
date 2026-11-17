@@ -17,7 +17,7 @@ body{background:var(--canvas);color:var(--ink)}
 .order-progress{display:grid;grid-template-columns:repeat(4,1fr);list-style:none;padding:1rem 0 0;gap:.75rem}.order-progress li{display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:var(--muted);padding-top:.8rem;border-top:2px solid var(--line)}.order-progress li span{display:grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:50%;background:#f1f4f8;font-weight:650;flex-shrink:0}.order-progress li.is-complete{border-color:var(--action);color:var(--ink)}.order-progress li.is-complete span{background:#eaf0ff;color:var(--action)}
 .stock-alert-panel{max-width:48rem;margin:1.5rem 0;background:#fafbfe}.stock-alert-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.5rem .75rem}.stock-alert-form label{grid-column:1/-1;font-size:.75rem;font-weight:650}.stock-alert-form input{margin:0}.stock-alert-panel small{display:block;margin-top:.75rem;color:var(--muted);font-size:.7rem}
 .stock-availability{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;font-size:.7rem;font-weight:550;margin:.25rem 0 .75rem;color:#166044}.stock-dot{width:5px;height:5px;border-radius:50%;background:currentColor}.stock-availability.is-unavailable{color:var(--muted)}
-.product-new-label{position:absolute;z-index:10;left:.8rem;top:.8rem;background:#f0f4fb;color:#334155;padding:.3rem .55rem;border-radius:5px;font-size:.62rem;font-weight:650;letter-spacing:.03em}.product-card{border-radius:var(--radius-panel);border-color:var(--line);box-shadow:var(--shadow-panel)}.product-card:hover{transform:translateY(-2px);border-color:#b9c5d6;box-shadow:0 10px 24px -16px #18223045}.product-card>div:last-child{text-align:left}.product-card .text-center{text-align:left}
+.product-new-label{position:absolute;z-index:10;left:.8rem;top:.8rem;background:#f0f4fb;color:#334155;padding:.3rem .55rem;border-radius:5px;font-size:.62rem;font-weight:650;letter-spacing:.03em}.product-card{border-radius:var(--radius-panel);border-color:var(--line);box-shadow:var(--shadow-panel)}.product-card:hover{transform:translateY(-2px);border-color:#b9c5d6;box-shadow:0 10px 24px -16px #18223045}.product-card>div:last-child{text-align:center}.product-card .text-center{text-align:center}
 .product-card a[href^='/product/']{letter-spacing:-.015em}.product-card button[data-buy-now]{background:#1d4ed8;color:#fff;border-radius:9px;min-height:40px;box-shadow:none}.product-card button[data-buy-now]:disabled{background:#f1f4f8;color:#526172;opacity:1;border:1px solid var(--line)}
 .confidence-tabs{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.confidence-tabs a,.confidence-tabs>span{padding:.5rem .75rem;font-size:.8rem}.confidence-tabs a{border:1px solid var(--line);background:white;border-radius:8px}.confidence-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius-panel);background:white}.confidence-table{width:100%;border-collapse:collapse;text-align:left;font-size:.8rem}.confidence-table th{background:#f8fafc;color:var(--muted);font-size:.7rem;font-weight:650}.confidence-table th,.confidence-table td{padding:1rem;border-bottom:1px solid var(--line)}.confidence-table small{display:block;color:var(--muted);margin-top:.3rem}.confidence-notice{padding:1rem;border:1px solid #fde68a;border-radius:12px;background:#fffbeb;color:#854d0e;font-size:.875rem;line-height:1.6}
 .checkout-journey,.payment-journey,.tracking-journey{padding-top:2rem}.checkout-journey input,.payment-journey input{font-size:1rem}.checkout-journey .rounded-3xl,.payment-journey .rounded-3xl,.tracking-journey .rounded-3xl{border-radius:var(--radius-panel);box-shadow:var(--shadow-panel)}
@@ -26,3 +26,24 @@ body{background:var(--canvas);color:var(--ink)}
 @media(prefers-reduced-motion:reduce){.product-card:hover{transform:none}}
 
 .review-dialog{z-index:80}.review-dialog>[role=dialog]{max-height:calc(100dvh - 2rem);overflow-y:auto;overscroll-behavior:contain}
+
+/* Shared catalog content and admin workflow surfaces. */
+.catalog-content{font-size:.9rem;line-height:1.8;overflow-wrap:anywhere;color:#475569}
+.catalog-content :is(h2,h3,h4,h5,h6){font-weight:700;color:#0f172a;line-height:1.35;margin:1.4em 0 .6em}
+.catalog-content h2{font-size:1.4rem}.catalog-content h3{font-size:1.15rem}
+.catalog-content p{margin:.8em 0}.catalog-content :first-child{margin-top:0}.catalog-content :last-child{margin-bottom:0}
+.catalog-content ul{list-style:disc;padding-left:1.5em;margin:1em 0}.catalog-content ol{list-style:decimal;padding-left:1.5em;margin:1em 0}
+.catalog-content a{color:#1d4ed8;text-decoration:underline}.catalog-content table{display:block;overflow:auto;width:100%;border-collapse:collapse;margin:1em 0}
+.catalog-content :is(th,td){padding:.6rem .8rem;border:1px solid #e2e8f0;text-align:left}.catalog-content th{font-weight:700;background:#f8fafc}
+.catalog-content blockquote{border-left:3px solid #cbd5e1;padding-left:1rem}.catalog-content pre{overflow:auto;background:#f1f5f9;padding:1rem;border-radius:.5rem}
+.admin-shell :is(input,select,textarea,button,a):focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+.admin-breadcrumbs{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;font-size:.75rem;color:#64748b}.admin-breadcrumbs a{color:#1d4ed8}
+.admin-section-title{font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:.5rem}
+.admin-option-row{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:.75rem 0}.admin-option-row .shop-input{flex:1;min-width:140px}.admin-option-row small{color:#64748b;font-size:.75rem}
+.variant-editor,.markdown-preview{border:1px solid #e2e8f0;border-radius:.75rem;padding:1rem;margin-top:1rem;background:#fff}
+.variant-editor>summary,.markdown-preview>summary{cursor:pointer;font-size:.85rem;font-weight:600;color:#334155}.markdown-preview .catalog-content{margin-top:1rem}
+.admin-shell .table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.admin-shell .shop-panel{min-width:0}.admin-shell .form-actions{flex-wrap:wrap;gap:.75rem}
+.admin-shell fieldset[disabled]{opacity:.75}.admin-shell .form-error{overflow-wrap:anywhere}.admin-shell .form-actions :is(button,a){min-height:40px}
+@media(max-width:640px){.admin-shell .admin-form-grid{grid-template-columns:minmax(0,1fr)}.admin-shell .form-actions .shop-input{width:100%}.admin-shell .shop-panel{padding:1rem}.variant-editor{padding:.75rem}.admin-option-row .shop-button-secondary{padding:.5rem .65rem}}
+
+.admin-shell .shop-table select{min-width:160px}

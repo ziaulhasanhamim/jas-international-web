@@ -50,6 +50,13 @@ public static class JsonTestDataSeeder
         await db.SaveChangesAsync(ct);
         db.AddRange(data.ProductAttributeDefinitions);
         await db.SaveChangesAsync(ct);
+        foreach (var option in data.ProductAttributeOptions)
+        {
+            var source = data.AttributeOptions.Single(o => o.Id == option.AttributeOptionId);
+            option.Value = source.Value; option.Code = source.Code;
+            option.NormalizedValue = Services.ProductWorkspaceService.NormalizeValue(source.Value);
+        }
+        foreach (var variant in data.ProductVariants) variant.CompareAtPrice = data.Products.Single(p => p.Id == variant.ProductId).CompareAtPrice;
         db.AddRange(data.ProductAttributeOptions);
         await db.SaveChangesAsync(ct);
         db.AddRange(data.ProductImages);
@@ -495,20 +502,13 @@ public static class JsonTestDataSeeder
             await db.SaveChangesAsync(ct);
         }
 
-        var productsWithoutCompare = await db.Products.Include(p => p.ProductVariants).Where(p => p.CompareAtPrice == null).ToListAsync(ct);
-        if (productsWithoutCompare.Count > 0)
+        var variantsWithoutCompare = await db.ProductVariants.Where(v => v.CompareAtPrice == null && v.SellingPrice > 0).ToListAsync(ct);
+        foreach (var variant in variantsWithoutCompare)
         {
-            foreach (var p in productsWithoutCompare)
-            {
-                var price = p.ProductVariants.FirstOrDefault()?.SellingPrice ?? 0;
-                if (price > 0)
-                {
-                    p.CompareAtPrice = Math.Round((price * 1.08m) / 100m) * 100m;
-                    if (p.CompareAtPrice <= price) p.CompareAtPrice = price + 500m;
-                }
-            }
-            await db.SaveChangesAsync(ct);
+            variant.CompareAtPrice = Math.Round((variant.SellingPrice * 1.08m) / 100m) * 100m;
+            if (variant.CompareAtPrice <= variant.SellingPrice) variant.CompareAtPrice = variant.SellingPrice + 500m;
         }
+        if (variantsWithoutCompare.Count > 0) await db.SaveChangesAsync(ct);
 
         // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery
         var hasPlaceholders = await db.Products.AnyAsync(p => p.MainImageUrl != null && p.MainImageUrl.Contains("placehold.co"), ct);

@@ -1,3 +1,4 @@
+using JASIntWeb.Services;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
 using Microsoft.AspNetCore.Antiforgery;
@@ -8,6 +9,14 @@ public static class AdminCatalogEndpoints
     public static void MapAdminCatalogEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin").RequireAuthorization("AdminOnly").AddEndpointFilter<AdminCatalogFilter>();
+        group.MapPost("/content/preview", (ContentPreviewRequest input, IAdminCatalogBackend backend) => backend.PreviewContentAsync(input.Source));
+        var workspace = group.MapGroup("/products/{id:int}/workspace");
+        workspace.MapGet("", (int id, IAdminProductWorkspaceBackend backend) => backend.LoadAsync(id));
+        workspace.MapPut("/configuration", (int id, ProductConfiguration command, IAdminProductWorkspaceBackend backend) => backend.SaveConfigurationAsync(id, command));
+        workspace.MapPut("/variant", (int id, WorkspaceVariant command, IAdminProductWorkspaceBackend backend) => backend.SaveVariantAsync(id, command));
+        workspace.MapPost("/stock", (int id, WorkspaceStock command, IAdminProductWorkspaceBackend backend) => backend.AdjustStockAsync(id, command));
+        workspace.MapPost("/preview", (int id, WorkspaceRevision command, IAdminProductWorkspaceBackend backend) => backend.PreviewAsync(id, command.Revision));
+        workspace.MapPost("/generate", (int id, WorkspaceRevision command, IAdminProductWorkspaceBackend backend) => backend.GenerateAsync(id, command.Revision));
         group.MapGet("/categories/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.CategoryAsync(id));
         group.MapGet("/brands/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.BrandAsync(id));
         group.MapGet("/products/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.ProductAsync(id));
@@ -43,6 +52,7 @@ public sealed class AdminCatalogFilter(IAntiforgery antiforgery) : IEndpointFilt
             return await next(context);
         }
         catch (AntiforgeryValidationException) { return Results.BadRequest(new AdminCatalogError("Refresh the page and try again.")); }
+        catch (ShopException error) { return Results.Json(new AdminCatalogError(error.Message), statusCode: error.Message.Contains("session expired", StringComparison.OrdinalIgnoreCase) ? 401 : 409); }
         catch (AdminCatalogException error) { return Results.Json(new AdminCatalogError(error.Message, error.Errors), statusCode: error.Status); }
     }
 }

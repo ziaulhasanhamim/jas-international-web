@@ -113,7 +113,7 @@ public sealed class ShoppingService(
                 .FirstOrDefault(),
                 Options = v.Options.OrderBy(o => o.ProductAttributeOption!.ProductAttributeDefinition!.SortOrder)
                 .ThenBy(o => o.ProductAttributeDefinitionId)
-                .Select(o => o.ProductAttributeOption!.AttributeOption!.Value)
+                .Select(o => o.ProductAttributeOption!.Value)
                 .ToList()
             })
             .ToDictionaryAsync(v => v.Id);

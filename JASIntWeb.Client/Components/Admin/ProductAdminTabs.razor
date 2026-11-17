@@ -1,9 +1,9 @@
 @if (ProductId > 0)
 {
     <nav class="admin-tabs" aria-label="Product management">
-        <NavLink href="@($"/admin/products/{ProductId}/edit")">Product information</NavLink>
-        <NavLink href="@($"/admin/products/{ProductId}/attributes")">Attributes & options</NavLink>
+        <NavLink href="@($"/admin/products/{ProductId}/edit")">Details</NavLink>
         <NavLink href="@($"/admin/products/{ProductId}/variants")">Variants & stock</NavLink>
+        <NavLink href="@($"/admin/products/{ProductId}/seo")">Content &amp; SEO</NavLink>
     </nav>
 }
 

@@ -52,7 +52,7 @@
         </div>
 
         <!-- Title -->
-        <a href="/product/@Product.Slug" class="block font-bold text-slate-900 text-sm hover:text-blue-700 transition line-clamp-2 min-h-[2.5rem] leading-snug">
+        <a href="/product/@Product.Slug" class="block font-bold text-slate-900 text-sm hover:text-blue-700 transition line-clamp-2 h-[2.5rem] text-center leading-snug">
             @Product.Name
         </a>
 
@@ -79,6 +79,12 @@
 
         <!-- Buy Now Action (Direct JSON Request Body via Client JS) -->
         <div class="mt-auto pt-2 border-t border-slate-100">
+            @if (Product.RequiresVariantSelection)
+            {
+                <a href="/product/@Product.Slug" class="btn-primary w-full py-2 text-xs font-bold flex items-center justify-center">Choose options</a>
+            }
+            else
+            {
             <button
                 type="button"
                 data-buy-now
@@ -91,6 +97,8 @@
                 <Icon Name="cart" Class="size-3.5" />
                 <span>@(Product.DefaultVariantStock <= 0 ? "Out of Stock" : "Buy Now")</span>
             </button>
+            }
+
         </div>
     </div>
 </article>

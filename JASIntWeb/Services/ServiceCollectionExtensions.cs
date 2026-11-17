@@ -233,6 +233,9 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddScoped<SalesMetricsService>();
         builder.Services.AddScoped<AdminSession>();
         builder.Services.AddScoped<IAdminCatalogBackend, ServerAdminCatalogBackend>();
+        builder.Services.AddScoped<IAdminProductWorkspaceBackend, ServerAdminProductWorkspaceBackend>();
+        builder.Services.AddScoped<ProductWorkspaceService>();
+        builder.Services.AddSingleton<CatalogContentRenderer>();
         builder.Services.AddScoped<AccountMailService>();
         builder.Services.AddScoped<CouponService>();
         builder.Services.AddScoped<IStockNotificationMailTransport, StockNotificationMailTransport>();

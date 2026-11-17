@@ -2,6 +2,49 @@
 // Auto editors own their uploads, slugs and rich-text state in Blazor.
 (() => {
 "use strict";
+// A single delegated guard works with static enhanced navigation and Auto islands.
+if (!window.jasAdminDrafts) {
+    const dirty = new Set();
+    let leaving = false;
+    const roots = () => { for (const root of dirty) if (!root.isConnected) dirty.delete(root); return [...dirty]; };
+    const hasDraft = () => roots().length > 0 || document.querySelector('[data-admin-draft][data-admin-dirty="true"]') !== null;
+    const clear = () => { dirty.clear(); document.querySelectorAll('[data-admin-draft]').forEach(root => root.dataset.adminDirty = 'false'); leaving = false; };
+    window.jasAdminDrafts = { clear };
+    const changed = event => {
+        if (!(event.target instanceof Element)) return;
+        const root = event.target.closest('[data-admin-draft], form.admin-form');
+        if (root) { dirty.add(root); leaving = false; }
+    };
+    document.addEventListener('input', changed);
+    document.addEventListener('change', changed);
+    document.addEventListener('click', event => {
+        if (!(event.target instanceof Element) || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const link = event.target.closest('a[href]');
+        if (!link || link.target === '_blank' || link.hasAttribute('download') || !hasDraft()) return;
+        const target = new URL(link.href, location.href);
+        if (target.pathname === location.pathname && target.search === location.search) return;
+        if (!confirm('Leave this page and discard unsaved changes?')) { event.preventDefault(); event.stopImmediatePropagation(); }
+        else { leaving = true; setTimeout(() => { leaving = false; }, 1500); }
+    }, true);
+    document.addEventListener('submit', event => {
+        if (event.target instanceof HTMLFormElement && !event.target.hasAttribute('data-admin-draft')) clear();
+    });
+    window.addEventListener('beforeunload', event => { if (!leaving && hasDraft()) { event.preventDefault(); event.returnValue = ''; } });
+}
+if (!window.__jasAdminMenu) {
+    window.__jasAdminMenu = true;
+    const close = () => { const toggle = document.getElementById('mobile-nav-toggle'); if (toggle) toggle.checked = false; document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', 'false')); };
+    document.addEventListener('click', event => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest('[data-admin-menu]');
+        const toggle = document.getElementById('mobile-nav-toggle');
+        if (button && toggle) { toggle.checked = !toggle.checked; document.querySelectorAll('[data-admin-menu]').forEach(item => item.setAttribute('aria-expanded', String(toggle.checked))); }
+        if (event.target.closest('#admin-sidebar a')) close();
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+    document.addEventListener('change', event => { if (event.target instanceof HTMLInputElement && event.target.id === 'mobile-nav-toggle') document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', String(event.target.checked))); });
+}
+
 async function uploadSecurityHeaders() {
     const response = await fetch('/api/admin/uploads/security', { cache: 'no-store' });
     if (!response.ok) throw new Error('Please sign in as an administrator and try again.');
