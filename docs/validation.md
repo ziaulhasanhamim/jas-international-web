@@ -172,3 +172,5 @@ Take a backup first. Downgrading after independent values are created/edited is 
 | Related products exclude current/hidden products before limiting and appear beside specifications | `RelatedProducts_ExcludeCurrentBeforeLimitAndRenderBesideSpecifications` verifies four matching results and a single recommendations section before reviews |
 
 Release build has zero warnings/errors. PostgreSQL integration suite: 120 passed, zero failed/skipped. Existing unit/SEO suites are repeated by CI. No schema migration or browser-test dependency is added.
+
+CSS generation and native watch mode are checked from a clean checkout; npm audit reports zero vulnerabilities after removing the affected CLI watcher dependency.
