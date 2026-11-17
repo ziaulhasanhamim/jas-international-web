@@ -1,0 +1,26 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<label @ref="root" class="admin-dropzone @(Disabled ? "is-disabled" : "")">
+    @if (ChildContent is not null) { <span class="admin-dropzone-preview">@ChildContent</span> }
+    else { <Icon Name="camera" Class="size-6" /> }
+    <span class="admin-dropzone-copy"><strong>@(Multiple ? "Drag photos here" : "Drag a photo here")</strong><span>or click to browse</span><small>PNG, JPG, WebP, AVIF or GIF · @(Multiple ? "Up to 10 files, " : "")@MaxSizeMb MB each</small></span>
+    <InputFile class="admin-dropzone-input" OnChange="Selected" multiple="@Multiple" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@Disabled" aria-label="@($"Upload {Label}")" />
+</label>
+@code {
+    [Parameter] public string Label { get; set; } = "images";
+    [Parameter] public bool Multiple { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public int MaxSizeMb { get; set; } = 10;
+    [Parameter] public EventCallback<InputFileChangeEventArgs> Selected { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference root;
+    private AdminEditorInterop? interop;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { interop = new(JS); await interop.DropZoneAsync(root); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { /* Native browse remains usable if drag enhancement is unavailable. */ }
+    }
+    public async ValueTask DisposeAsync() { if (interop is not null) await interop.DisposeAsync(); }
+}

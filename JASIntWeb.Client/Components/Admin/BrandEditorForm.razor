@@ -32,13 +32,14 @@ else
                             </div>
                             <label class="shop-label">Brief description <span class="admin-optional">Optional</span>
                                 <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input" rows="3" placeholder="A short introduction to the brand and its products"></textarea>
+                                <small>Appears below the brand heading when no custom introduction is set. Also supplies the default SEO description.</small>
                             </label>
                         </section>
                         <details class="brand-editor-section brand-editor-disclosure">
                             <summary><span>Storefront content</span><span class="admin-optional">Optional</span></summary>
                             <p class="brand-section-description">Add an introduction and a buying guide to the public brand page.</p>
-                            <AdminMarkdownEditor Label="Introduction — above the products" @bind-Value="Input!.IntroText" />
-                            <AdminMarkdownEditor Label="Buyer guide — below the products" @bind-Value="Input!.BottomSeoCopy" />
+                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Introduction — above the products" @bind-Value="Input!.IntroText" @bind-Value:after="MarkEdited" />
+                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Buyer guide — below the products" @bind-Value="Input!.BottomSeoCopy" @bind-Value:after="MarkEdited" />
                         </details>
                         <details class="brand-editor-section brand-editor-disclosure">
                             <summary><span>Search &amp; social sharing</span><span class="admin-optional">Optional</span></summary>

@@ -23,4 +23,13 @@ public class CatalogContentTests
         await ProductWorkspaceService.NormalizeValue("  Ｂlack  ").Should().BeEqualTo("BLACK");
         await ProductWorkspaceService.NormalizeValue("Midnight Black").Should().NotBeEqualTo(ProductWorkspaceService.NormalizeValue("Matte Black"));
     }
+    [Test]
+    public async Task RichContent_PreservesSafeImagesAndRemovesDangerousImageSources()
+    {
+        var html = new CatalogContentRenderer().Render("<p><u>Underlined</u></p><img src='/uploads/genuine.png' alt='Genuine' width='320' onerror='alert(1)'><img src='javascript:alert(1)'><img src='data:image/svg+xml,unsafe'>");
+        await html.Contains("src=\"/uploads/genuine.png\"").Should().BeTrue();
+        await html.Contains("width=\"320\"").Should().BeTrue();
+        await html.Contains("<u>Underlined</u>").Should().BeTrue();
+        foreach (var forbidden in new[] { "onerror", "javascript:", "data:image" }) await html.Contains(forbidden).Should().BeFalse();
+    }
 }

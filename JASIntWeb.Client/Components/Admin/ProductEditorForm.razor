@@ -73,8 +73,7 @@ else
 
             <AdminProductMedia Value="@(new AdminMediaValue(Input!.Image, Input.Images))" ValueChanged="MediaChanged" BusyChanged="UploadBusy" />
             }
-            @if (ContentTab)
-            {
+            @* Available during creation and on both existing product tabs. *@
             <!-- Rich Description & Specification Tables -->
             <div class="mt-8 border-t border-slate-200/80 pt-6">
                 <div class="flex items-center justify-between mb-3">
@@ -85,10 +84,9 @@ else
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white shadow-xs p-1">
-                    <AdminRichText @bind-Value="Input!.Details" @bind-Value:after="MarkEdited" />
+                    <AdminRichText Label="Product description & specifications" Height="480" Specifications="true" Disabled="Busy" @bind-Value="Input!.Details" @bind-Value:after="DetailsChanged" />
                 </div>
             </div>
-            }
             @if (!ContentTab)
             {
             <!-- Merchandising & Storefront Badges -->
@@ -161,6 +159,7 @@ else
 
 @code {
     [Parameter] public bool ContentTab { get; set; }
+    private void DetailsChanged() { MarkEdited(); EditContext?.NotifyFieldChanged(EditContext.Field(nameof(ProductEditForm.Details))); }
     private bool slugEdited;
     protected override Task<AdminEditorData<ProductEditForm>> LoadAsync() => Backend.ProductAsync(Id);
     protected override Task<AdminSaveResult> SaveAsync(ProductEditForm input) => Backend.SaveProductAsync(input);

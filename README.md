@@ -239,6 +239,10 @@ Create product details as a hidden draft, then open **Variants & stock**. Add at
 
 The workspace uses product revisions to reject stale edits and existing inventory reservations to protect stock adjustments. IDs remain stable through option changes. Referenced values must be unmapped before removal; archived combinations retain their configuration and order history.
 
-Brand/category introductions and buyer guides accept Markdown or supported HTML, with a sanitized live preview. Introductions appear above the product grid; buyer guides appear below it. Meta title/description affect browser/search and sharing metadata, while the OG image affects sharing previews. Google may choose a different search snippet.
+Product descriptions and brand/category introductions and buyer guides use a rich-text toolbar for headings, emphasis, lists, links, images and tables. The required product description is available immediately when creating a product and on both existing product tabs. Existing Markdown is displayed as formatted content without changing stored source until edited. Public content is sanitized. Introductions appear above the product grid; buyer guides appear below it. Meta title/description affect browser/search and sharing metadata, while the OG image affects sharing previews. Google may choose a different search snippet.
+
+A brand’s **Brief description** is a short plain-text summary. It appears below the brand heading when the custom introduction is blank, and supplies the default SEO description when no custom meta description is set. A custom introduction changes the visible heading text; a custom meta description changes only search/sharing metadata.
+
+Drop photos anywhere inside the dashed upload area or browse. Product galleries support dragging thumbnails to reorder; the first image is the cover. Arrow buttons provide the same ordering controls for keyboard and touch users. Upload limits remain ten files per batch and 10 MB per product image; brand logos are limited to 5 MB.
 
 See [v1.2 migration and validation evidence](docs/validation.md#v120-product-owned-variants-and-admin-workflows) and [release notes](RELEASE_NOTES.md) before upgrading. Browser checks remain private working tools, with no repository dependency or CI step.

@@ -1,19 +1,21 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @inject IAdminCatalogBackend Backend
 <section class="my-5 space-y-3 rounded-xl border border-slate-200 p-4" aria-label="Product images">
     <h3 class="font-semibold">Product images</h3>
-    <p class="text-xs text-slate-500">First image is the cover. Drop files onto the file chooser or browse; up to 10 images, 10MB each.</p>
-    <InputFile OnChange="Upload" multiple accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@uploading" />
+    <p class="admin-help">The first image is the cover. Drag thumbnails to reorder, or use the arrow buttons.</p>
+    <AdminImageDropZone Label="Product images" Multiple="true" Disabled="uploading" Selected="Upload" />
     <div class="flex gap-2"><input class="shop-input" @bind="url" placeholder="Image URL or local path" aria-label="Add product image URL" /><button type="button" class="btn-secondary" @onclick="AddUrl" disabled="@uploading">Add URL</button></div>
     @if (error is not null) { <p class="form-error" role="alert">@error</p> }
     @if (uploading) { <p role="status">Uploading images…</p> }
-    <ol class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <ol @ref="galleryRoot" class="admin-media-gallery" data-uploading="@(uploading ? "true" : "false")">
         @for (var i = 0; i < images.Count; i++)
         {
             var index = i;
-            <li @key="images[index]" class="space-y-2 rounded-xl border border-slate-200 p-3">
-                <img src="@ImageUrlHelper.GetAutoOptimizedUrl(images[index])" alt="Product image @(index + 1)" class="h-24 w-full object-contain" />
-                <span class="text-xs">@(index == 0 ? "Cover" : $"Image {index + 1}")</span>
-                <div class="flex flex-wrap gap-1">
+            <li @key="images[index]" draggable="@(uploading ? "false" : "true")" data-media-key="@images[index]" data-media-index="@index" class="admin-media-item">
+                <img src="@ImageUrlHelper.GetAutoOptimizedUrl(images[index])" alt="Product image @(index + 1)" class="admin-media-thumbnail" draggable="false" />
+                <span class="admin-media-caption">@(index == 0 ? "Cover image" : $"Image {index + 1}") <span aria-hidden="true">⋮⋮</span></span>
+                <div class="admin-media-actions">
                     <button type="button" class="btn-secondary" disabled="@(uploading || index == 0)" @onclick="() => Move(index, -1)" aria-label="Move image @(index + 1) up">↑</button>
                     <button type="button" class="btn-secondary" disabled="@(uploading || index == images.Count - 1)" @onclick="() => Move(index, 1)" aria-label="Move image @(index + 1) down">↓</button>
                     <button type="button" class="btn-secondary" disabled="@uploading" @onclick="() => Remove(index)">Remove</button>
@@ -26,6 +28,25 @@
     [Parameter] public AdminMediaValue Value { get; set; } = new("", "");
     [Parameter] public EventCallback<AdminMediaValue> ValueChanged { get; set; }
     [Parameter] public EventCallback<bool> BusyChanged { get; set; }
+    private ElementReference galleryRoot;
+    private AdminEditorInterop? interop;
+    private DotNetObjectReference<AdminProductMedia>? reference;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { interop = new(JS); reference = DotNetObjectReference.Create(this); await interop.GalleryAsync(galleryRoot, reference); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { /* Arrow buttons remain available. */ }
+    }
+    [JSInvokable] public async Task Reorder(string key, int target)
+    {
+        if (uploading || target < 0 || target >= images.Count) return;
+        var from = images.IndexOf(key);
+        if (from < 0 || from == target) return;
+        images.RemoveAt(from); images.Insert(target, key);
+        await Changed(); StateHasChanged();
+    }
+    public async ValueTask DisposeAsync() { if (interop is not null) await interop.DisposeAsync(); reference?.Dispose(); }
     private AdminMediaValue? previous;
     private List<string> images = [];
     private string url = "";
@@ -49,8 +70,8 @@
         if (!images.Contains(url.Trim())) images.Add(url.Trim());
         url = ""; await Changed();
     }
-    private async Task Move(int index, int change) { (images[index], images[index + change]) = (images[index + change], images[index]); await Changed(); }
-    private async Task Remove(int index) { images.RemoveAt(index); await Changed(); }
+    private async Task Move(int index, int change) { if (uploading || index < 0 || index >= images.Count || index + change < 0 || index + change >= images.Count) return; (images[index], images[index + change]) = (images[index + change], images[index]); await Changed(); }
+    private async Task Remove(int index) { if (uploading || index < 0 || index >= images.Count) return; images.RemoveAt(index); await Changed(); }
     private async Task Upload(InputFileChangeEventArgs args)
     {
         uploading = true; error = null; await BusyChanged.InvokeAsync(true);
@@ -59,7 +80,8 @@
             foreach (var file in args.GetMultipleFiles(10))
             {
                 await using var stream = file.OpenReadStream(10 * 1024 * 1024);
-                images.Add(await Backend.UploadAsync(stream, file.Name, file.ContentType, false));
+                var uploaded = await Backend.UploadAsync(stream, file.Name, file.ContentType, false);
+                if (!images.Contains(uploaded)) images.Add(uploaded);
                 await Changed();
             }
         }

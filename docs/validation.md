@@ -188,3 +188,20 @@ CSS generation and native watch mode are checked from a clean checkout; npm audi
 Release build and trimmed publish succeed with zero warnings/errors. The PostgreSQL integration suite passes 122 tests with zero failures/skips. CI repeats the 83 Unit and 35 SEO tests as well. npm audit reports no vulnerabilities. No schema migration is added.
 
 [Desktop brands](screenshots/brand-list-desktop.png) · [Mobile brands](screenshots/brand-list-mobile.png) · [Desktop editor](screenshots/brand-editor-desktop.png) · [Mobile editor](screenshots/brand-editor-mobile.png)
+
+## v1.2.3 — Rich editors and photo workflows
+
+Validation uses isolated PostgreSQL and fixture content only, with mail, tracking and external image uploads disabled. No schema migration is needed.
+
+| Requirement | Evidence |
+|---|---|
+| Required product description available during creation | `ProductCreation_RequiredRichEditorAndDropUploadsArePresentOnMainForm` checks the rendered control, validation failure and persisted rich HTML. |
+| Brief brand summary placement and metadata precedence | `BrandSummary_FillsBlankIntroductionAndSeoUntilExplicitOverrides` checks blank-intro fallback and explicit public/meta overrides. |
+| Existing Markdown remains intact until edited | `RichEditor_PreparesLegacyMarkdownWithoutRewritingStoredSource`; private browser checks also open, blur and save the editor without changing its stored source. |
+| Formatted content and safe images survive | `BrandAndCategory_RichHtmlPersistsAndRendersSafeImages`, `RichContent_PreservesSafeImagesAndRemovesDangerousImageSources`; scripts, event handlers and unsafe image URLs remain stripped. |
+| Drag uploads, cover ordering and rich editing | Private published-app checks drop three actual PNG files, reorder the third to cover, save/reload product content, create a rich brand and save/reopen category content. |
+| Responsive behavior and lifecycle | Private 390/320px layout checks, repeated navigation cleanup, Server editing and repeated full-page navigation. Browser scripts remain outside the repository and CI. |
+
+Release build: zero warnings/errors. Unit: 84 passed; SEO: 35 passed; PostgreSQL integration: 126 passed. Total: **Passed: 245, Failed: 0, Skipped: 0**. Release publish with the existing client trimming settings, JavaScript syntax checks and npm dependency audit also pass. An additional whole-server trimming experiment completed with the framework’s existing reflection/Blazor warnings; full server trimming is not enabled for deployment. Existing strict authorization, antiforgery and upload validation tests run in the integration suite.
+
+Screenshots: [product description and dropped gallery](screenshots/v1.2.3-product-editor.png), [brand rich content](screenshots/v1.2.3-brand-editor.png), [mobile category editor](screenshots/v1.2.3-category-mobile.png).
