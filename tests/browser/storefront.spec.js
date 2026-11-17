@@ -108,3 +108,29 @@ test('static signup confirms email before signing in', async ({ page }) => {
   await page.waitForURL('**/cart');
   await expect(page.locator('h1').first()).toBeVisible();
 });
+
+test('hero preserves the entire image and Chromium selects the AVIF picture source', async ({ page }) => {
+  // Serve a checked-in image so source selection and geometry need no external CDN.
+  await page.route('https://images.unsplash.com/**', route => route.fulfill({
+    path: require('path').resolve('JASIntWeb/wwwroot/jas-og-card.avif'), contentType: 'image/avif'
+  }));
+  await page.goto('/');
+  const carousel = page.locator('[data-carousel]');
+  const images = carousel.locator('img');
+  expect(await images.count()).toBeGreaterThan(1);
+  for (const image of await images.all()) {
+    await expect.poll(() => image.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+    const dimensions = await image.evaluate(img => ({
+      width: img.getBoundingClientRect().width, height: img.getBoundingClientRect().height,
+      naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+      currentSrc: img.currentSrc, avif: img.closest('picture').querySelector('source[type="image/avif"]').srcset
+    }));
+    expect(Math.abs(dimensions.height - dimensions.width * dimensions.naturalHeight / dimensions.naturalWidth)).toBeLessThan(1);
+    expect(dimensions.currentSrc).toBe(dimensions.avif);
+    expect(new URL(dimensions.currentSrc).searchParams.get('fm')).toBe('avif');
+  }
+  const height = await carousel.evaluate(el => el.getBoundingClientRect().height);
+  await carousel.locator('[data-carousel-dot]').nth(1).click();
+  await expect(carousel.locator('[data-carousel-slide]').nth(1)).toHaveAttribute('aria-hidden', 'false');
+  expect(Math.abs(await carousel.evaluate(el => el.getBoundingClientRect().height) - height)).toBeLessThan(1);
+});
