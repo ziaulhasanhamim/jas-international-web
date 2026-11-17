@@ -26,6 +26,9 @@ else
     var pageTitle = !string.IsNullOrWhiteSpace(brand.MetaTitle) ? brand.MetaTitle : Seo.BuildBrandTitle(brand.Name);
     var metaDesc = !string.IsNullOrWhiteSpace(brand.MetaDescription) ? brand.MetaDescription : AdminSeoText.BrandDescription(brand.Name, brand.Description);
     var canonical = $"/brand/{brand.Slug}";
+    var introduction = !string.IsNullOrWhiteSpace(brand.IntroText) ? brand.IntroText
+        : !string.IsNullOrWhiteSpace(brand.Description) ? brand.Description
+        : $"Shop authentic {brand.Name} products with official brand warranty, nationwide cash on delivery, and showroom support in Khulna.";
 
     var crumbs = new (string Name, string Url)[]
     {
@@ -83,9 +86,9 @@ else
                         <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">
                             @brand.Name in Bangladesh
                         </h1>
-                        <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                            @((MarkupString)ContentRenderer.Render(brand.IntroText ?? brand.Description ?? $"Shop authentic {brand.Name} products with official brand warranty, nationwide cash on delivery, and showroom support in Khulna."))
-                        </p>
+                        <div class="catalog-content text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                            @((MarkupString)ContentRenderer.Render(introduction))
+                        </div>
                     </div>
                 </div>
 

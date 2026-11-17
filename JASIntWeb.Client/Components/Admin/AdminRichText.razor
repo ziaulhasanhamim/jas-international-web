@@ -1,41 +1,84 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-<textarea @ref="element" class="shop-input min-h-[380px]" @bind="text" @bind:event="oninput" @bind:after="PlainChanged" aria-label="Rich product description HTML"></textarea>
-@if (unavailable) { <p class="admin-help">Rich editor unavailable. You can edit the HTML above.</p> }
+@inject IAdminCatalogBackend Backend
+<div class="admin-rich-editor">
+    <p class="admin-rich-label">@Label</p>
+    <textarea @ref="element" class="shop-input" style="min-height:@(Height)px" @bind="text" @bind:event="oninput" @bind:after="PlainChanged" disabled="@(Disabled || conversionFailed)" aria-label="@Label"></textarea>
+    @if (unavailable) { <p class="admin-help" role="status">The formatting toolbar could not load. Your content is preserved; you can edit the HTML here.</p> }
+    @if (conversionFailed) { <p class="form-error" role="alert">Existing content could not be prepared for visual editing. Reload before making changes.</p> }
+</div>
 @code {
-    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Rich description";
+    [Parameter] public int Height { get; set; } = 320;
+    [Parameter] public bool Specifications { get; set; }
+    [Parameter] public bool ConvertLegacyContent { get; set; }
+    [Parameter] public bool Disabled { get; set; }
     private string text = "";
     private string? previous;
-    protected override void OnParametersSet() { if (Value != previous) { text = Value; previous = Value; } }
-    private Task PlainChanged() => Changed(text);
-    private ElementReference element;
-    private IJSObjectReference? module;
-    private IJSObjectReference? editor;
-    private DotNetObjectReference<AdminRichText>? reference;
+    private bool hasValue;
+    private bool pendingUpdate;
+    private bool? previousDisabled;
     private bool disposed;
     private bool unavailable;
+    private bool conversionFailed;
+    private ElementReference element;
+    private AdminEditorInterop? interop;
+    private DotNetObjectReference<AdminRichText>? reference;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (hasValue && Value == previous) return;
+        hasValue = true;
+        var source = previous = Value;
+        text = source ?? "";
+        if (ConvertLegacyContent && !string.IsNullOrWhiteSpace(source))
+        {
+            try
+            {
+                var converted = await Backend.PreviewContentAsync(source);
+                if (disposed || previous != source) return;
+                text = converted.Html;
+                conversionFailed = false;
+            }
+            catch (Exception error) when (error is AdminCatalogException or HttpRequestException)
+            { conversionFailed = true; }
+        }
+        pendingUpdate = true;
+    }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
         try
         {
-            module = await JS.InvokeAsync<IJSObjectReference>("import", "/js/modules/admin-rich-text.js");
-            if (disposed) return;
-            reference = DotNetObjectReference.Create(this);
-            editor = await module.InvokeAsync<IJSObjectReference>("create", element, reference);
-            if (disposed) await editor.InvokeVoidAsync("dispose");
+            if (firstRender)
+            {
+                interop = new(JS);
+                reference = DotNetObjectReference.Create(this);
+                await interop.RichTextAsync(element, reference, new(Height, Specifications, Disabled || conversionFailed, Label));
+            }
+            if (interop is not null && (pendingUpdate || previousDisabled != Disabled))
+            {
+                pendingUpdate = false; previousDisabled = Disabled;
+                await interop.UpdateRichTextAsync(text, Disabled || conversionFailed);
+            }
         }
-        catch (JSException) { if (!disposed) { unavailable = true; StateHasChanged(); } }
         catch (JSDisconnectedException) { }
+        catch (JSException) { if (!disposed) { unavailable = true; StateHasChanged(); } }
     }
-    [JSInvokable] public Task Changed(string html) { text = html; previous = html; return disposed ? Task.CompletedTask : ValueChanged.InvokeAsync(html); }
+    private Task PlainChanged() { pendingUpdate = true; return Changed(text); }
+    [JSInvokable] public Task Changed(string html)
+    {
+        if (disposed || Disabled || conversionFailed) return Task.CompletedTask;
+        text = previous = html;
+        return ValueChanged.InvokeAsync(html);
+    }
+    [JSInvokable] public void Unavailable()
+    { if (!disposed) { unavailable = true; StateHasChanged(); } }
     public async ValueTask DisposeAsync()
     {
         disposed = true;
-        try { if (editor is not null) { await editor.InvokeVoidAsync("dispose"); await editor.DisposeAsync(); } if (module is not null) await module.DisposeAsync(); }
-        catch (JSDisconnectedException) { }
-        catch (TaskCanceledException) { }
+        if (interop is not null) await interop.DisposeAsync();
         reference?.Dispose();
     }
 }
