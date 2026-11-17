@@ -174,3 +174,17 @@ Take a backup first. Downgrading after independent values are created/edited is 
 Release build has zero warnings/errors. PostgreSQL integration suite: 120 passed, zero failed/skipped. Existing unit/SEO suites are repeated by CI. No schema migration or browser-test dependency is added.
 
 CSS generation and native watch mode are checked from a clean checkout; npm audit reports zero vulnerabilities after removing the affected CLI watcher dependency.
+
+## v1.2.2 admin and brand UI
+
+| Requirement | Evidence |
+| --- | --- |
+| Readable list content, working filters and bounded pagination | `BrandList_UsesReadableContentAndPreservesFiltersAndPagination` |
+| Feature/visibility commands preserve current identity validation | `BrandList_ActionsRecheckSecurityStampBeforeChangingVisibility` |
+| Related-product category links resolve correctly | `RelatedProducts_ExcludeCurrentBeforeLimitAndRenderBesideSpecifications` |
+| Responsive shell, brand cards and editor | Private published-build checks at 320, 390, 768, 1024, 1280 and 1440 CSS pixels verify no document overflow and bounded header actions; desktop/mobile screenshots reviewed |
+| Editor controls | Private checks exercise brand creation, logo upload, live SEO, search and feature toggling against isolated PostgreSQL with a fake administrator and mail disabled |
+
+Release build and trimmed publish succeed with zero warnings/errors. The PostgreSQL integration suite passes 122 tests with zero failures/skips. CI repeats the 83 Unit and 35 SEO tests as well. npm audit reports no vulnerabilities. No schema migration is added.
+
+[Desktop brands](screenshots/brand-list-desktop.png) · [Mobile brands](screenshots/brand-list-mobile.png) · [Desktop editor](screenshots/brand-editor-desktop.png) · [Mobile editor](screenshots/brand-editor-mobile.png)

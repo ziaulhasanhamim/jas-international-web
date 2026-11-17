@@ -1,14 +1,29 @@
 @inject IAdminCatalogBackend Backend
-<div class="my-3 space-y-2 rounded-xl border border-slate-200 p-4">
-    <label class="shop-label">@Label
-        <input class="shop-input" value="@Value" @oninput="ChangedUrl" placeholder="@(Emoji ? "Image URL, local path, or emoji" : "Image URL or local path")" />
-    </label>
-    <div class="flex items-center gap-3">
-        <CategoryVisual Value="@Value" />
-        <InputFile OnChange="Upload" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@uploading" aria-label="@($"Upload {Label}")" />
-        <button type="button" class="btn-secondary" @onclick="Clear" disabled="@uploading">Remove</button>
+<div class="admin-image-picker">
+    <p class="admin-image-label">@Label</p>
+    <div class="admin-image-upload">
+        <div class="admin-image-preview"><CategoryVisual Value="@Value" /></div>
+        <div class="admin-image-upload-copy">
+            <label class="admin-file-button">
+                <Icon Name="camera" Class="size-4" />
+                <span>@(uploading ? "Uploading…" : BrandLogo ? "Upload logo" : "Upload image")</span>
+                <InputFile class="admin-file-input" OnChange="Upload" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@uploading" aria-label="@($"Upload {Label}")" />
+            </label>
+            <p class="admin-image-file-name">@(fileName ?? (string.IsNullOrWhiteSpace(Value) ? "No image selected" : "Image selected"))</p>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Value))
+        {
+            <button type="button" class="admin-image-remove" @onclick="Clear" disabled="@uploading" aria-label="@($"Remove {Label}")">Remove</button>
+        }
     </div>
-    @if (uploading) { <p role="status">Uploading image…</p> }
+    <p class="admin-help">PNG, JPG, WebP, AVIF or GIF · Up to @(BrandLogo ? "5" : "10") MB</p>
+    <details class="admin-image-url">
+        <summary>@(Emoji ? "Use an image URL or emoji" : "Use an image URL")</summary>
+        <label class="shop-label">@Label URL
+            <input class="shop-input" value="@Value" @oninput="ChangedUrl" placeholder="@(Emoji ? "https://… or an emoji" : "https://… or /uploads/…")" />
+        </label>
+    </details>
+    @if (uploading) { <p role="status" class="admin-help">Uploading image…</p> }
     @if (message is not null) { <p class="form-error" role="alert">@message</p> }
 </div>
 @code {
@@ -19,7 +34,8 @@
     [Parameter] public bool BrandLogo { get; set; }
     [Parameter] public bool Emoji { get; set; }
     private Task ChangedUrl(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
-    private Task Clear() => ValueChanged.InvokeAsync(string.Empty);
+    private Task Clear() { fileName = null; return ValueChanged.InvokeAsync(string.Empty); }
+    private string? fileName;
     private bool uploading;
     private string? message;
     private async Task Upload(InputFileChangeEventArgs args)
@@ -30,6 +46,7 @@
             var file = args.File;
             await using var stream = file.OpenReadStream((BrandLogo ? 5 : 10) * 1024 * 1024);
             await ValueChanged.InvokeAsync(await Backend.UploadAsync(stream, file.Name, file.ContentType, BrandLogo));
+            fileName = file.Name;
         }
         catch (Exception failure) when (failure is AdminCatalogException or IOException or HttpRequestException)
         { message = failure is AdminCatalogException known ? known.Message : "Upload failed. Check the file size and connection."; }

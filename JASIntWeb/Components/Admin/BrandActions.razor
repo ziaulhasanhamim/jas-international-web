@@ -1,0 +1,14 @@
+<div class="brand-row-actions">
+    <a href="/admin/brands/@Id/edit" class="btn-secondary" aria-label="Edit @Name">Edit</a>
+    <button type="submit" name="ToggleVisibilityId" value="@Id" class="brand-text-action" onclick="@(Hidden ? null : "return confirm('Hide this brand from the storefront?');")">@(Hidden ? "Restore" : "Hide")</button>
+    @if (ProductCount == 0)
+    {
+        <button type="submit" name="DeleteBrandId" value="@Id" class="brand-text-action is-danger" onclick="return confirm('Permanently delete this brand?');">Delete</button>
+    }
+</div>
+@code {
+    [Parameter] public int Id { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public bool Hidden { get; set; }
+    [Parameter] public int ProductCount { get; set; }
+}

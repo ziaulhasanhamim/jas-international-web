@@ -1,99 +1,72 @@
 @inherits AdminEditorBase<BrandEditForm>
-<AdminPageHeader
-    Title="@(Id == 0 ? "Add Brand" : "Edit Brand")"
-    ActionHref="/admin/brands"
-    ActionText="Back to list"
-/>
-
+<PageTitle>@(Id == 0 ? "Add brand" : "Edit brand") — JAS Admin</PageTitle>
+<AdminPageHeader Title="@(Id == 0 ? "Add brand" : "Edit brand")" Description="Set up the brand’s identity, storefront content and visibility." ActionHref="/admin/brands" ActionText="Back to brands" />
 @if (notFound)
 {
-    <p class="admin-empty">Record not found.</p>
+    <p class="admin-empty">Brand not found.</p>
 }
 else
 {
-    @if (error is not null)
-    {
-        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center gap-2" role="alert">
-            <Icon Name="alert" Class="size-4 shrink-0" />
-            <span>@error</span>
-        </div>
-    }
-
-    @if (AccessDenied)
-    {
-        <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri).Insert(0, "/"))}")" class="btn-secondary">Sign in again</a>
-    }
-    @if (Input is null)
-    {
-        <p class="admin-help">Loading form…</p>
-    }
+    @if (error is not null) { <p class="form-error" role="alert">@error</p> }
+    @if (AccessDenied) { <a href="/account/login?returnUrl=/admin/brands" class="btn-secondary">Sign in again</a> }
+    @if (Input is null) { <p class="admin-help">Loading brand…</p> }
     else
     {
-        <EditForm data-admin-draft data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+        <EditForm data-admin-draft data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="admin-form brand-editor">
             <DataAnnotationsValidator />
-            <ValidationSummary class="text-xs text-rose-600 mb-3" />
+            <ValidationSummary />
             <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
-
-            <label class="shop-label">
-                Brand name
-                <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" placeholder="e.g. Apple, Samsung, Anker" />
-            </label>
-
-            <label class="shop-label">
-                URL slug
-                <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" placeholder="e.g. apple, samsung, anker" />
-                <small>Dedicated canonical brand page: /brand/[slug]</small>
-            </label>
-
-            <AdminImagePicker Label="Brand logo" @bind-Value="Input!.LogoUrl" BrandLogo="true" BusyChanged="UploadBusy" />
-            <label class="shop-label">
-                Brief description (optional)
-                <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input min-h-[70px]" placeholder="Brief background about brand products" ></textarea>
-            </label>
-
-            <label class="shop-label">
-                Sort Order
-                <InputNumber @bind-Value="Input!.SortOrder" class="shop-input" />
-                <small>Lower numbers appear first on featured brand strips.</small>
-            </label>
-
-            <div class="space-y-2 pt-2">
-                <label class="check-label">
-                    <InputCheckbox @bind-Value="Input!.IsFeatured" />
-                    Feature this brand on the storefront homepage strip
-                </label>
-
-                <label class="check-label">
-                    <InputCheckbox @bind-Value="Input!.Hidden" />
-                    Hide brand from storefront filters
-                </label>
-            </div>
-
-            <AdminSeoFields Kind="brand" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl"  />
-            <AdminMarkdownEditor Label="Intro overview — above the product grid" @bind-Value="Input!.IntroText" />
-            <AdminMarkdownEditor Label="Buyer guide — below the product grid" @bind-Value="Input!.BottomSeoCopy" />
-            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
-            <div class="form-actions mt-6 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving brand...">
-                        <span class="form-submit-spinner" hidden></span>
-                        <span>@(Id == 0 ? "Create Brand" : "Save Changes")</span>
-                    </button>
-                    <a href="/admin/brands" class="shop-button-secondary">Cancel</a>
+                <div class="brand-editor-grid">
+                    <div class="brand-editor-main">
+                        <section class="brand-editor-section">
+                            <h2>Brand details</h2>
+                            <p class="brand-section-description">The name and summary customers see across your store.</p>
+                            <div class="admin-form-grid">
+                                <label class="shop-label">Brand name <span class="admin-required">Required</span>
+                                    <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" placeholder="e.g. realme" />
+                                </label>
+                                <label class="shop-label">URL slug
+                                    <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" placeholder="e.g. realme" />
+                                    <small>Storefront address: /brand/@(string.IsNullOrWhiteSpace(Input.Slug) ? "brand-name" : Input.Slug)</small>
+                                </label>
+                            </div>
+                            <label class="shop-label">Brief description <span class="admin-optional">Optional</span>
+                                <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input" rows="3" placeholder="A short introduction to the brand and its products"></textarea>
+                            </label>
+                        </section>
+                        <details class="brand-editor-section brand-editor-disclosure">
+                            <summary><span>Storefront content</span><span class="admin-optional">Optional</span></summary>
+                            <p class="brand-section-description">Add an introduction and a buying guide to the public brand page.</p>
+                            <AdminMarkdownEditor Label="Introduction — above the products" @bind-Value="Input!.IntroText" />
+                            <AdminMarkdownEditor Label="Buyer guide — below the products" @bind-Value="Input!.BottomSeoCopy" />
+                        </details>
+                        <details class="brand-editor-section brand-editor-disclosure">
+                            <summary><span>Search &amp; social sharing</span><span class="admin-optional">Optional</span></summary>
+                            <p class="brand-section-description">Customize search results and link previews. Leave blank to use the store’s defaults.</p>
+                            <AdminSeoFields Kind="brand" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl" />
+                            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
+                        </details>
+                    </div>
+                    <div class="brand-editor-sidebar">
+                        <section class="brand-editor-section">
+                            <AdminImagePicker Label="Brand logo" @bind-Value="Input!.LogoUrl" @bind-Value:after="MarkEdited" BrandLogo="true" BusyChanged="UploadBusy" />
+                        </section>
+                        <section class="brand-editor-section">
+                            <h2>Storefront visibility</h2>
+                            <label class="brand-setting"><InputCheckbox @bind-Value="Input!.IsFeatured" /><span><strong>Feature on homepage</strong><small>Show in the featured brand strip.</small></span></label>
+                            <label class="brand-setting"><InputCheckbox @bind-Value="Input!.Hidden" /><span><strong>Hide brand</strong><small>Remove from storefront filters.</small></span></label>
+                            <label class="shop-label">Display position<InputNumber @bind-Value="Input!.SortOrder" class="shop-input" /><small>Lower numbers appear first.</small></label>
+                        </section>
+                    </div>
                 </div>
-
-                @if (Id != 0 && productCount == 0)
-                {
-                    <button type="button" disabled="@Busy" @onclick="Delete" class="btn-danger">
-                        Delete Brand
-                    </button>
-                }
-            </div>
-        </fieldset>
+                <div class="brand-editor-actions">
+                    <div class="brand-save-actions"><button type="submit" disabled="@Busy" class="shop-button">@(saving ? "Saving…" : Id == 0 ? "Create brand" : "Save changes")</button><a href="/admin/brands" class="shop-button-secondary">Cancel</a></div>
+                    @if (Id != 0 && productCount == 0) { <button type="button" disabled="@Busy" @onclick="Delete" class="brand-text-action is-danger">Delete brand</button> }
+                </div>
+            </fieldset>
         </EditForm>
     }
 }
-
 
 @code {
     private bool slugEdited;

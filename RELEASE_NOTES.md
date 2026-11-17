@@ -1,8 +1,10 @@
-# v1.2.1 — Direct Buy Now and related-product sidebar
+# v1.2.2 — Admin layout and brand management polish
 
-- Product cards always offer Buy Now for the active default variant, including products with selectable options. A successful add opens the cart; unavailable defaults remain disabled.
-- Product details show up to four other visible products from the same category beside the specifications on desktop, and below them on smaller screens. The current product is excluded before applying the result limit.
-- CSS generation uses the same Tailwind compiler with Node’s built-in file watcher, removing the CLI watcher dependency affected by an unpatched picomatch advisory. Both existing npm commands are preserved.
-- Removed the duplicated bottom recommendations section. Product pages remain static SSR with the existing protected cart behavior.
+- Fixed a conflicting admin-shell flex rule that stretched the page and clipped right-side controls. The fixed sidebar and content area now keep independent, bounded widths.
+- Simplified admin headers, sidebar styling, back links and pagination. Removed technical implementation wording from the brand screen.
+- Brands use a compact desktop table and mobile cards, with readable identities, clear filters, search, homepage toggles and accessible actions. Out-of-range pagination is clamped safely.
+- The brand editor groups details, logo and visibility settings, with optional storefront content and SEO in expandable sections. Shared image controls now have a styled upload button, file guidance, preview and optional URL input.
+- Brand list commands recheck the current administrator security stamp. Featured-toggle accessibility states are explicit and safe.
+- Corrected the related-products “View all” category URL.
 
-No migration or configuration change is required. Related products appear when other published products exist in the category. Existing browser-free CI is unchanged.
+No database migration or configuration change is required. Existing URLs and publishing behavior are preserved. Public shopping pages retain static SSR. No browser-test dependency or CI step is added.

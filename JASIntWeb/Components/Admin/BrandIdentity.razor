@@ -1,0 +1,22 @@
+<div class="brand-identity">
+    <span class="brand-logo">
+        @if (!string.IsNullOrWhiteSpace(Logo))
+        {
+            <img src="@ImageUrlHelper.GetAutoOptimizedUrl(Logo)" alt="" width="40" height="40" loading="lazy" onerror="this.hidden=true;" />
+        }
+        else
+        {
+            <span aria-hidden="true">@Name[..Math.Min(2, Name.Length)].ToUpperInvariant()</span>
+        }
+    </span>
+    <div class="brand-identity-copy">
+        <a href="/admin/brands/@Id/edit">@Name</a>
+        <span>/brand/@Slug</span>
+    </div>
+</div>
+@code {
+    [Parameter] public int Id { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Slug { get; set; } = "";
+    [Parameter] public string? Logo { get; set; }
+}
