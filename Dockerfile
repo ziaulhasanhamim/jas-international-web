@@ -9,9 +9,10 @@ RUN npm ci --ignore-scripts
 # Copy web source files required by Tailwind scanner
 COPY JASIntWeb ./JASIntWeb
 COPY JASIntWeb.Client ./JASIntWeb.Client
+COPY scripts ./scripts
 
 # Generate minified output.css
-RUN npx @tailwindcss/cli -i ./JASIntWeb/wwwroot/css/input.css -o ./JASIntWeb/wwwroot/css/output.css --minify
+RUN npm run css
 
 # Stage 2: .NET SDK build & publish
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
