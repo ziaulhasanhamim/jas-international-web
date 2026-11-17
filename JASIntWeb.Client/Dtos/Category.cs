@@ -7,5 +7,5 @@ public sealed record CategoryDto(
 )
 {
     public string Href => $"/category/{NormalizedName}";
-    public bool IsIconUrl => Icon is not null && Icon.Contains('/');
+    public bool IsIconUrl => Services.CategoryVisuals.IsImage(Icon);
 }

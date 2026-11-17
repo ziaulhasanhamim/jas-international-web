@@ -4,6 +4,7 @@ public static class EndpointRouteBuilderExtensions
 {
     public static IEndpointRouteBuilder MapStoreEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapAdminCatalogEndpoints();
         endpoints.MapCartEndpoints();
         endpoints.MapOrderEndpoints();
         endpoints.MapHealthEndpoints();

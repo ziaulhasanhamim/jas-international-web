@@ -1,0 +1,97 @@
+@inherits AdminEditorBase<CategoryEditForm>
+<AdminPageHeader
+    Title="@(Id == 0 ? "Add category" : "Edit category")"
+    ActionHref="/admin/categories"
+    ActionText="Back to list"
+/>
+@if (notFound)
+{
+    <p class="admin-empty">Record not found.</p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <p role="alert" class="form-error">@error</p>
+    }
+    @if (AccessDenied)
+    {
+        <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri).Insert(0, "/"))}")" class="btn-secondary">Sign in again</a>
+    }
+    @if (Input is null)
+    {
+        <p class="admin-help">Loading form…</p>
+    }
+    else
+    {
+        <EditForm EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
+            <label class="shop-label">
+                Category name
+                <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" />
+            </label>
+            <label class="shop-label">
+                URL slug
+                <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" />
+            </label>
+
+            <!-- Category Icon / Visual Media -->
+            <AdminImagePicker Label="Category icon / image" @bind-Value="Input!.Icon" Emoji="true" BusyChanged="UploadBusy" />
+
+            <label class="shop-label mt-4">
+                <div class="flex items-center justify-between">
+                    <span>Parent category</span>
+                    @if (childCount > 0)
+                    {
+                        <span class="text-xs text-amber-600 font-semibold">Contains @childCount subcategories</span>
+                    }
+                </div>
+                <InputSelect @bind-Value="Input!.ParentId" class="shop-input">
+                    <option value="">Top-level category</option>
+                    @foreach (var p in parents)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+                <small>Select an existing top-level category to make this a subcategory, or choose "Top-level category".</small>
+            </label>
+            <label class="check-label">
+                <InputCheckbox @bind-Value="Input!.Hidden" />
+                Hide category and its products
+            </label>
+            <label class="check-label">
+                <InputCheckbox @bind-Value="Input!.Featured" />
+                Feature on homepage
+            </label>
+
+            <AdminSeoFields Kind="category" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@($"Browse authentic {Input.Name} gadgets with official warranty, nationwide delivery and Khulna showroom support.")" BaseUrl="@Snapshot!.PublicBaseUrl"  />
+            <label class="shop-label">Page introduction<textarea @bind="Input!.IntroText" @bind:event="oninput" class="shop-input" rows="2"></textarea></label>
+            <label class="shop-label">Bottom SEO copy<textarea @bind="Input!.BottomSeoCopy" @bind:event="oninput" class="shop-input font-mono" rows="4"></textarea></label>
+            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
+            <div class="form-actions">
+                <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving category...">
+                    <span class="form-submit-spinner" hidden></span>
+                    <span>Save category</span>
+                </button>
+                <a href="/admin/categories" class="shop-button-secondary">Cancel</a>
+            </div>
+        </fieldset>
+        </EditForm>
+    }
+}
+
+
+@code {
+    private bool slugEdited;
+    protected override Task<AdminEditorData<CategoryEditForm>> LoadAsync() => Backend.CategoryAsync(Id);
+    protected override Task<AdminSaveResult> SaveAsync(CategoryEditForm input) => Backend.SaveCategoryAsync(input);
+    private void SlugChanged() => slugEdited = true;
+    private void NameChanged()
+    {
+        if (Id == 0 && !slugEdited) Input!.Slug = EditorSlug.FromName(Input.Name);
+    }
+    private List<CategoryLinkDto> parents => Snapshot?.Categories ?? [];
+    private int childCount => Snapshot?.ChildCount ?? 0;
+}

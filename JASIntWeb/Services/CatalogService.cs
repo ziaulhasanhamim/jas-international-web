@@ -109,7 +109,7 @@ public sealed class CatalogService(
                     && (c.ParentCategoryId == null || !c.ParentCategory!.IsDeleted))
                     .OrderBy(c => c.Name)
                     .ThenBy(c => c.Id)
-                    .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId))
+                    .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId) { MetaTitle = c.MetaTitle, MetaDescription = c.MetaDescription, OgImageUrl = c.OgImageUrl })
                     .ToListAsync(ct);
             },
             options: LongLivedOptions,
@@ -191,6 +191,9 @@ public sealed class CatalogService(
                         x.Description,
                         x.Details,
                         x.MainImageUrl,
+                        x.MetaTitle,
+                        x.MetaDescription,
+                        x.OgImageUrl,
                         BrandName = x.Brand != null ? x.Brand.Name : null,
                         BrandSlug = x.Brand != null ? x.Brand.Slug : null,
                         Category = new CategoryLinkDto(x.CategoryId, x.Category!.Name, x.Category.Slug, x.Category.ParentCategoryId),
@@ -241,7 +244,7 @@ public sealed class CatalogService(
                 return new ProductDetailsDto(p.Id, p.Name, p.Slug, p.Category.Name, p.Category.Slug, p.Description, p.Details, p.MainImageUrl,
                     [.. p.Images.Prepend(p.MainImageUrl).Distinct()], bindings,
                     [.. variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
-                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))], breadcrumbs, p.BrandName, p.BrandSlug);
+                            v.Options.ToDictionary(o => o.DefinitionCode, o => o.Code)))], breadcrumbs, p.BrandName, p.BrandSlug) { MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription, OgImageUrl = p.OgImageUrl };
             },
             options: ProductOptions,
             tags: [TagCatalog, TagProducts, $"product:{normalizedSlug}"]);

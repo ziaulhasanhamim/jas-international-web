@@ -1,0 +1,13 @@
+@inject NavigationManager Navigation
+<a href="@Link" aria-label="@($"{Label}: sort {NextDirection}")" class="inline-flex items-center gap-1 hover:text-blue-700">
+    @Label <span aria-hidden="true">@(Active ? (Descending ? "↓" : "↑") : "↕")</span>
+</a>
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string SortKey { get; set; } = "";
+    private Microsoft.Extensions.Primitives.StringValues Sort => Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).GetValueOrDefault("sort");
+    private bool Active => string.Equals(Sort.ToString(), SortKey, StringComparison.OrdinalIgnoreCase);
+    private bool Descending => Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).GetValueOrDefault("direction") == "desc";
+    private string NextDirection => Active && !Descending ? "desc" : "asc";
+    private string Link => Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["sort"] = SortKey, ["direction"] = NextDirection, ["page"] = 1 });
+}

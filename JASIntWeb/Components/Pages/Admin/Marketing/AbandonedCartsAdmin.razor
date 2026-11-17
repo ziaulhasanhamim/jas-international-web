@@ -84,13 +84,13 @@
                     }
                 </TemplateColumn>
 
-                <TemplateColumn Title="Last Active" Sortable="true" SortBy="@sortByLastActive">
+                <TemplateColumn Title="Last Active" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Last Active" SortKey="LastActive" /></HeaderTemplate><ChildContent>
                     <span class="text-2xs text-slate-500 whitespace-nowrap">
                         @context.LastActive.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <PropertyColumn Property="@(c => c.Total)" Title="Cart Total" Format="N0" Sortable="true" Align="Align.End" Class="text-right font-bold text-slate-900 tabular-nums" />
+                <PropertyColumn Property="@(c => c.Total)" Title="Cart Total" Format="N0" Sortable="false" Align="Align.End" Class="text-right font-bold text-slate-900 tabular-nums" ><HeaderTemplate><AdminSortHeader Label="Cart Total" SortKey="Total" /></HeaderTemplate></PropertyColumn>
 
                 <TemplateColumn Title="1-Click Actions" Align="Align.Center">
                     @{
@@ -123,7 +123,6 @@
     private IQueryable<AbandonedCartDto>? cartsQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<AbandonedCartDto> sortByLastActive = GridSort<AbandonedCartDto>.ByDescending(c => c.LastActive);
 
     private decimal totalRecoverableValue = 0m;
     private int metaLeadCount = 0;
@@ -165,7 +164,7 @@
         metaLeadCount = abandonedCarts.Count(c => c.HasFbclid || c.UtmSource?.Contains("meta", StringComparison.OrdinalIgnoreCase) == true);
         totalFiltered = abandonedCarts.Count;
         Page = Math.Max(1, Page);
-        cartsQuery = abandonedCarts.Skip((Page - 1) * PageSize).Take(PageSize).AsQueryable();
+        cartsQuery = AdminSorting.Apply(abandonedCarts.AsQueryable(), Nav, ("LastActive", c => c.LastActive), ("Total", c => c.Total)).Skip((Page - 1) * PageSize).Take(PageSize).AsQueryable();
     }
 
     private static string GetWhatsAppRecoveryUrl(AbandonedCartDto c)

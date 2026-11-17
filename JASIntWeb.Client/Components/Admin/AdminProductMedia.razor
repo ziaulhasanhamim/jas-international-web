@@ -1,0 +1,70 @@
+@inject IAdminCatalogBackend Backend
+<section class="my-5 space-y-3 rounded-xl border border-slate-200 p-4" aria-label="Product images">
+    <h3 class="font-semibold">Product images</h3>
+    <p class="text-xs text-slate-500">First image is the cover. Drop files onto the file chooser or browse; up to 10 images, 10MB each.</p>
+    <InputFile OnChange="Upload" multiple accept="image/png,image/jpeg,image/webp,image/avif,image/gif" disabled="@uploading" />
+    <div class="flex gap-2"><input class="shop-input" @bind="url" placeholder="Image URL or local path" aria-label="Add product image URL" /><button type="button" class="btn-secondary" @onclick="AddUrl" disabled="@uploading">Add URL</button></div>
+    @if (error is not null) { <p class="form-error" role="alert">@error</p> }
+    @if (uploading) { <p role="status">Uploading images…</p> }
+    <ol class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        @for (var i = 0; i < images.Count; i++)
+        {
+            var index = i;
+            <li @key="images[index]" class="space-y-2 rounded-xl border border-slate-200 p-3">
+                <img src="@ImageUrlHelper.GetAutoOptimizedUrl(images[index])" alt="Product image @(index + 1)" class="h-24 w-full object-contain" />
+                <span class="text-xs">@(index == 0 ? "Cover" : $"Image {index + 1}")</span>
+                <div class="flex flex-wrap gap-1">
+                    <button type="button" class="btn-secondary" disabled="@(uploading || index == 0)" @onclick="() => Move(index, -1)" aria-label="Move image @(index + 1) up">↑</button>
+                    <button type="button" class="btn-secondary" disabled="@(uploading || index == images.Count - 1)" @onclick="() => Move(index, 1)" aria-label="Move image @(index + 1) down">↓</button>
+                    <button type="button" class="btn-secondary" disabled="@uploading" @onclick="() => Remove(index)">Remove</button>
+                </div>
+            </li>
+        }
+    </ol>
+</section>
+@code {
+    [Parameter] public AdminMediaValue Value { get; set; } = new("", "");
+    [Parameter] public EventCallback<AdminMediaValue> ValueChanged { get; set; }
+    [Parameter] public EventCallback<bool> BusyChanged { get; set; }
+    private AdminMediaValue? previous;
+    private List<string> images = [];
+    private string url = "";
+    private string? error;
+    private bool uploading;
+    protected override void OnParametersSet()
+    {
+        if (Value == previous) return;
+        previous = Value;
+        images = [.. Value.Gallery.Split('\n').Prepend(Value.Cover).Select(x => x.Trim()).Where(x => x.Length > 0).Distinct()];
+    }
+    private async Task Changed()
+    {
+        previous = new(images.FirstOrDefault() ?? "", string.Join('\n', images.Skip(1)));
+        await ValueChanged.InvokeAsync(previous);
+    }
+    private async Task AddUrl()
+    {
+        if (!CategoryVisuals.IsImage(url)) { error = "Enter an HTTP(S) image URL or a local path."; return; }
+        error = null;
+        if (!images.Contains(url.Trim())) images.Add(url.Trim());
+        url = ""; await Changed();
+    }
+    private async Task Move(int index, int change) { (images[index], images[index + change]) = (images[index + change], images[index]); await Changed(); }
+    private async Task Remove(int index) { images.RemoveAt(index); await Changed(); }
+    private async Task Upload(InputFileChangeEventArgs args)
+    {
+        uploading = true; error = null; await BusyChanged.InvokeAsync(true);
+        try
+        {
+            foreach (var file in args.GetMultipleFiles(10))
+            {
+                await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                images.Add(await Backend.UploadAsync(stream, file.Name, file.ContentType, false));
+                await Changed();
+            }
+        }
+        catch (Exception failure) when (failure is AdminCatalogException or IOException or HttpRequestException or InvalidOperationException)
+        { error = failure is AdminCatalogException known ? known.Message : "One or more images could not be uploaded. Check the file count, size and connection."; }
+        finally { uploading = false; await BusyChanged.InvokeAsync(false); }
+    }
+}

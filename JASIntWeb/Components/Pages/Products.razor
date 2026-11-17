@@ -25,8 +25,8 @@
     }
     else if (isCategory)
     {
-        seoTitle = Seo.BuildCategoryTitle(activeCategoryName ?? "Category");
-        seoDesc = $"Browse 100% authentic {activeCategoryName ?? "gadgets"} with official warranty, COD and nationwide delivery from JAS International.";
+        seoTitle = string.IsNullOrWhiteSpace(activeCategory?.MetaTitle) ? Seo.BuildCategoryTitle(activeCategoryName ?? "Category") : activeCategory.MetaTitle;
+        seoDesc = string.IsNullOrWhiteSpace(activeCategory?.MetaDescription) ? AdminSeoText.CategoryDescription(activeCategoryName ?? "gadgets") : activeCategory.MetaDescription;
         canonicalPath = $"/category/{CategorySlug!.ToLowerInvariant()}";
     }
     else
@@ -62,6 +62,7 @@
 
 <SeoHead Title="@seoTitle"
          Description="@seoDesc"
+         OgImage="@(!isSearch ? activeCategory?.OgImageUrl : null)"
          CanonicalPath="@canonicalPath"
          Robots="@robots"
          PrevUrl="@(Page > 1 ? (Page == 2 ? canonicalPath : $"{canonicalPath}?page={Page - 1}") : null)"
@@ -559,6 +560,7 @@ else if (isCategory)
     private List<BrandLinkDto> brands = [];
     private Dictionary<int, List<CategoryLinkDto>> children = [];
     private string? activeCategoryName;
+    private CategoryLinkDto? activeCategory;
     private int total;
 
     private string? ActiveBrandName => brands.FirstOrDefault(b => b.Slug == BrandSlug)?.Name ?? BrandSlug;
@@ -578,7 +580,8 @@ else if (isCategory)
 
             if (CategorySlug != null)
             {
-                activeCategoryName = categories.FirstOrDefault(c => c.Slug == CategorySlug)?.Name;
+                activeCategory = categories.FirstOrDefault(c => c.Slug == CategorySlug);
+                activeCategoryName = activeCategory?.Name;
             }
         }
         finally

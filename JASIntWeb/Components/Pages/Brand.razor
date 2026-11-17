@@ -23,7 +23,7 @@
 else
 {
     var pageTitle = !string.IsNullOrWhiteSpace(brand.MetaTitle) ? brand.MetaTitle : Seo.BuildBrandTitle(brand.Name);
-    var metaDesc = !string.IsNullOrWhiteSpace(brand.MetaDescription) ? brand.MetaDescription : (brand.Description ?? $"Browse 100% authentic {brand.Name} gadgets and accessories at JAS International. Official warranty and fast delivery across Bangladesh.");
+    var metaDesc = !string.IsNullOrWhiteSpace(brand.MetaDescription) ? brand.MetaDescription : AdminSeoText.BrandDescription(brand.Name, brand.Description);
     var canonical = $"/brand/{brand.Slug}";
 
     var crumbs = new (string Name, string Url)[]

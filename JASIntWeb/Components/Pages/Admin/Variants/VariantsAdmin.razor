@@ -1,3 +1,4 @@
+@inject NavigationManager Nav
 @page "/admin/products/{ProductId:int}/variants"
 @inject AppDbContext Db
 
@@ -33,16 +34,16 @@
         @if (variantsQuery is not null)
         {
             <QuickGrid Items="@variantsQuery" class="data-table">
-                <TemplateColumn Title="Variant / SKU" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Label))">
+                <TemplateColumn Title="Variant / SKU" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Variant / SKU" SortKey="Label" /></HeaderTemplate><ChildContent>
                     <strong class="text-slate-900 block font-semibold text-xs">@context.Label</strong>
                     <span class="font-mono text-[11px] text-slate-500 block">@context.Sku</span>
-                </TemplateColumn>
-                <TemplateColumn Title="Selling Price" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Price))">
+                </ChildContent></TemplateColumn>
+                <TemplateColumn Title="Selling Price" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Selling Price" SortKey="Price" /></HeaderTemplate><ChildContent>
                     <span class="font-bold text-slate-900 text-xs">৳@context.Price.ToString("N0")</span>
-                </TemplateColumn>
-                <PropertyColumn Property="@(r => r.OnHand)" Title="On hand" Sortable="true" />
-                <PropertyColumn Property="@(r => r.Reserved)" Title="Reserved" Sortable="true" />
-                <TemplateColumn Title="Available" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.OnHand - r.Reserved))">
+                </ChildContent></TemplateColumn>
+                <PropertyColumn Property="@(r => r.OnHand)" Title="On hand" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="On hand" SortKey="OnHand" /></HeaderTemplate></PropertyColumn>
+                <PropertyColumn Property="@(r => r.Reserved)" Title="Reserved" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="Reserved" SortKey="Reserved" /></HeaderTemplate></PropertyColumn>
+                <TemplateColumn Title="Available" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Available" SortKey="Available" /></HeaderTemplate><ChildContent>
                     @{
                         var avail = context.OnHand - context.Reserved;
                     }
@@ -58,8 +59,8 @@
                     {
                         <span class="badge badge-emerald">@avail in stock</span>
                     }
-                </TemplateColumn>
-                <TemplateColumn Title="Status" Sortable="true" SortBy="@(GridSort<AdminVariantRow>.ByAscending(r => r.Active))">
+                </ChildContent></TemplateColumn>
+                <TemplateColumn Title="Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="Active" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-1.5">
                         <span class="badge @(context.Active ? "badge-emerald" : "badge-slate")">
                             @(context.Active ? "Active" : "Inactive")
@@ -69,7 +70,7 @@
                             <span class="badge badge-blue">Default</span>
                         }
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
                 <TemplateColumn Title="Actions" Align="Align.End">
                     <div class="flex items-center justify-end gap-1.5">
                         <a href="/admin/products/@ProductId/variants/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
@@ -146,6 +147,6 @@
             .ToList();
         totalFiltered = rows.Count;
         Page = Math.Max(1, Page);
-        variantsQuery = rows.Skip((Page - 1) * PageSize).Take(PageSize).AsQueryable();
+        variantsQuery = AdminSorting.Apply(rows.AsQueryable(), Nav, ("Label", r => r.Label), ("Price", r => r.Price), ("OnHand", r => r.OnHand), ("Reserved", r => r.Reserved), ("Available", r => r.OnHand - r.Reserved), ("Active", r => r.Active)).Skip((Page - 1) * PageSize).Take(PageSize).AsQueryable();
     }
 }

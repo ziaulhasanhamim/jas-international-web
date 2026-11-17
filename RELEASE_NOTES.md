@@ -1,7 +1,10 @@
-# v1.1.3 — Consistent carousel sizing and simpler CI
+# v1.1.4 — Interactive admin editors and category rendering fixes
 
-- Every hero slide now uses one 8:3 frame at full container width, keeping a consistent height when images have different dimensions. Images use `object-contain`, preserving the full artwork; non-matching proportions leave space around the image.
-- Removed the committed Playwright storefront suite, its configuration, npm dependency and browser-test command. Browser automation is no longer required to work on this project.
-- Simplified CI to CSS generation/verification, dependency audit, the Release build, EF model verification, and the three .NET suites. PostgreSQL integration tests manage their own disposable Testcontainers database. Removed browser installation, browser tests, the extra PostgreSQL service and the production-container smoke step.
+- Category image URLs render as bounded thumbnails instead of overflowing table rows as text. Emoji icons remain supported, with safe placeholders for invalid or broken images.
+- Category, brand and product add/edit forms now use Interactive Auto, preserving existing URLs and server-authorized layouts. Shared SEO previews and character counters react while typing.
+- Uploads, gallery ordering, rich-text descriptions, checkboxes and conditional product fields use the same state as saving. New slugs follow the name until manually edited; existing slugs remain stable when names change.
+- Public category and product pages now honor saved SEO titles, descriptions and sharing images, using the same fallback rules as the live preview.
+- Added protected admin editor APIs with model validation, current security-stamp/role checks, real antiforgery protection and no-store responses. Errors retain entered form values.
+- Fixed inert admin table sorting and notification dismiss controls. Sort links preserve filters and sort before pagination. Removed obsolete JavaScript bindings from the converted editors.
 
-No database migration or new configuration is required. Matching 8:3 source artwork fills the frame edge to edge. Existing branding, carousel controls and static SSR behavior are retained.
+No schema migration or new configuration is required. Reload any already-open admin edit forms after upgrading. Landing, catalog and product-detail routes remain static SSR. Existing simplified .NET CI is retained; no browser testing tools or pipeline steps are added.

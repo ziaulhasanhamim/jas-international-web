@@ -28,7 +28,7 @@
             <Icon Name="check" Class="size-4 text-emerald-600" />
             @_toast
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -39,15 +39,15 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@couponsQuery" class="data-table">
-                <TemplateColumn Title="Coupon Code" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.Code))">
+                <TemplateColumn Title="Coupon Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Coupon Code" SortKey="Code" /></HeaderTemplate><ChildContent>
                     <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
                     @if (!string.IsNullOrEmpty(context.Description))
                     {
                         <span class="text-xs text-slate-400 block mt-0.5">@context.Description</span>
                     }
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Discount" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.DiscountValue))">
+                <TemplateColumn Title="Discount" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Discount" SortKey="DiscountValue" /></HeaderTemplate><ChildContent>
                     @switch (context.DiscountType)
                     {
                         case CouponDiscountType.Percentage:
@@ -60,27 +60,27 @@
                             <span class="text-emerald-600 font-semibold">Free Delivery</span>
                             break;
                     }
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Min. Spend" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.MinOrderAmount ?? 0))">
+                <TemplateColumn Title="Min. Spend" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Min. Spend" SortKey="MinOrderAmount" /></HeaderTemplate><ChildContent>
                     <span class="text-slate-600 text-xs">
                         @(context.MinOrderAmount.HasValue ? $"৳{context.MinOrderAmount.Value:N0}" : "No minimum")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Max. Cap" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.MaxDiscountAmount ?? 0))">
+                <TemplateColumn Title="Max. Cap" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Max. Cap" SortKey="MaxDiscountAmount" /></HeaderTemplate><ChildContent>
                     <span class="text-slate-600 text-xs">
                         @(context.MaxDiscountAmount.HasValue ? $"৳{context.MaxDiscountAmount.Value:N0}" : "—")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Usage" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.TimesUsed))">
+                <TemplateColumn Title="Usage" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Usage" SortKey="TimesUsed" /></HeaderTemplate><ChildContent>
                     <span class="text-slate-700 text-xs font-medium">
                         @context.TimesUsed @(context.UsageLimit.HasValue ? $"/ {context.UsageLimit.Value}" : "uses")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
-                <TemplateColumn Title="Status" Sortable="true" SortBy="@(GridSort<Coupon>.ByAscending(c => c.IsActive))">
+                <TemplateColumn Title="Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsActive" /></HeaderTemplate><ChildContent>
                     @{
                         var isExpired = context.ExpiryDate.HasValue && context.ExpiryDate.Value < DateTimeOffset.UtcNow;
                     }
@@ -96,7 +96,7 @@
                     {
                         <span class="badge badge-emerald">Active</span>
                     }
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Actions" Align="Align.End">
                     <div class="flex items-center justify-end gap-1.5">
@@ -148,7 +148,7 @@
         var q = Db.Coupons.AsNoTracking();
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderByDescending(c => c.CreatedAt)
+        var list = await AdminSorting.Apply(q.OrderByDescending(c => c.CreatedAt), Nav, ("Code", c => c.Code), ("DiscountValue", c => c.DiscountValue), ("MinOrderAmount", c => c.MinOrderAmount ?? 0), ("MaxDiscountAmount", c => c.MaxDiscountAmount ?? 0), ("TimesUsed", c => c.TimesUsed), ("IsActive", c => c.IsActive))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync();

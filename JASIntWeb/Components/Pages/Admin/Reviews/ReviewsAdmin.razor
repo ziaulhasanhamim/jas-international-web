@@ -23,7 +23,7 @@
             </span>
             <span class="font-medium">@_toast</span>
         </span>
-        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 p-1">
+        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950 p-1">
             <Icon Name="close" Class="size-3.5" />
         </button>
     </div>
@@ -104,7 +104,7 @@
                     </ChildContent>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Rating &amp; Title" Sortable="true" SortBy="@sortByRating">
+                <TemplateColumn Title="Rating &amp; Title" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Rating &amp; Title" SortKey="Rating" /></HeaderTemplate><ChildContent>
                     <div class="space-y-1">
                         <div class="flex items-center text-amber-400 text-xs">
                             @for (int i = 1; i <= 5; i++)
@@ -120,7 +120,7 @@
                             @context.CreatedAt.ToString("dd MMM yyyy")
                         </span>
                     </div>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Customer">
                     <div class="space-y-0.5">
@@ -152,11 +152,11 @@
                     </div>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Status" Sortable="true" SortBy="@sortByStatus" Align="Align.Center">
+                <TemplateColumn Title="Status" Sortable="false" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsApproved" /></HeaderTemplate><ChildContent>
                     <span class="badge @(context.IsApproved ? "badge-emerald" : "badge-amber") text-[11px]">
                         @(context.IsApproved ? "Approved Live" : "Pending")
                     </span>
-                </TemplateColumn>
+                </ChildContent></TemplateColumn>
 
                 <TemplateColumn Title="Actions" Align="Align.End">
                     <div class="flex items-center justify-end gap-1.5">
@@ -286,8 +286,6 @@
     private IQueryable<AdminReviewRow>? reviewsQuery;
     private const int PageSize = 20;
     private int totalFiltered;
-    private GridSort<AdminReviewRow> sortByRating = GridSort<AdminReviewRow>.ByDescending(r => r.Rating);
-    private GridSort<AdminReviewRow> sortByStatus = GridSort<AdminReviewRow>.ByAscending(r => r.IsApproved);
 
     private string? _toast;
     private int _totalAll;
@@ -422,7 +420,7 @@
         Page = Math.Max(1, Page);
         totalFiltered = await q.CountAsync();
 
-        var list = await q.OrderByDescending(r => r.CreatedAt)
+        var list = await AdminSorting.Apply(q.OrderByDescending(r => r.CreatedAt), Nav, ("Rating", r => r.Rating), ("IsApproved", r => r.IsApproved))
             .Skip((Page - 1) * PageSize)
             .Take(PageSize)
             .Select(r => new AdminReviewRow(

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
@@ -14,17 +15,17 @@ public sealed class TestAuthHandler(
 {
     public const string SchemeName = "TestAuth";
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (Context.Request.Headers.ContainsKey("X-Test-Anonymous"))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
 
         var userId = Context.Request.Headers["X-Test-UserId"].FirstOrDefault();
         if (string.IsNullOrEmpty(userId))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
 
         var role = Context.Request.Headers["X-Test-Role"].FirstOrDefault() ?? "Admin";
@@ -37,11 +38,16 @@ public sealed class TestAuthHandler(
             new(ClaimTypes.Role, role)
         };
 
+        var db = Context.RequestServices.GetRequiredService<JASIntWeb.Persistence.AppDbContext>();
+        var stamp = Context.Request.Headers["X-Test-SecurityStamp"].FirstOrDefault()
+            ?? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                db.Users.Where(user => user.Id == int.Parse(userId)).Select(user => user.SecurityStamp));
+        if (stamp is not null) claims.Add(new Claim("AspNet.Identity.SecurityStamp", stamp));
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, SchemeName);
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
