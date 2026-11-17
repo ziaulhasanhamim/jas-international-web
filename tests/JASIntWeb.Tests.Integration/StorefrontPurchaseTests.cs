@@ -66,5 +66,6 @@ public class StorefrontPurchaseTests : JasIntegrationTestBase
         var reviews = html.IndexOf("Customer Ratings", StringComparison.Ordinal);
         await (details >= 0 && recommendations > details && reviews > recommendations).Should().BeTrue();
         await Regex.Matches(html, "id=\"related-products-title\"").Count.Should().BeEqualTo(1);
+        await html[recommendations..reviews].Contains($"href=\"/category/{current.Category!.Slug}\"").Should().BeTrue();
     }
 }

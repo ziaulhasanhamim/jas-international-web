@@ -1,28 +1,14 @@
-<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
-    <div>
-        <p class="text-[10px] font-bold tracking-[0.16em] uppercase text-blue-600 mb-1">@(Eyebrow ?? "JAS ADMIN")</p>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">@Title</h1>
-        @if (!string.IsNullOrWhiteSpace(Description))
-        {
-            <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">@Description</p>
-        }
+<div class="admin-page-header">
+    <div class="admin-heading-copy">
+        @if (!string.IsNullOrWhiteSpace(Eyebrow)) { <p class="admin-heading-eyebrow">@Eyebrow</p> }
+        <h1>@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Description)) { <p class="admin-heading-description">@Description</p> }
     </div>
     @if (!string.IsNullOrWhiteSpace(ActionHref))
     {
-        <div class="flex items-center gap-2.5 shrink-0">
-            @if (!string.IsNullOrWhiteSpace(SecondaryActionHref))
-            {
-                <a href="@SecondaryActionHref" class="btn-secondary text-xs px-3.5 py-2 inline-flex items-center gap-1.5 shadow-2xs">
-                    <span>@SecondaryActionText</span>
-                </a>
-            }
-            <a href="@ActionHref" class="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 shadow-xs">
-                @if (ActionText.Contains("Add") || ActionText.Contains("Create") || ActionText.Contains("New"))
-                {
-                    <span class="text-sm leading-none font-bold">+</span>
-                }
-                <span>@ActionText.TrimStart('+', ' ')</span>
-            </a>
+        <div class="admin-heading-actions">
+            @if (!string.IsNullOrWhiteSpace(SecondaryActionHref)) { <a href="@SecondaryActionHref" class="btn-secondary">@SecondaryActionText</a> }
+            <a href="@ActionHref" class="@(ActionText.StartsWith("Back", StringComparison.OrdinalIgnoreCase) ? "btn-secondary" : "btn-primary")">@ActionText.TrimStart('+', ' ')</a>
         </div>
     }
 </div>

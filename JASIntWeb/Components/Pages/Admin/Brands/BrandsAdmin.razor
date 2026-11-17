@@ -1,184 +1,62 @@
 @page "/admin/brands"
-@layout AdminLayout
-@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
-@inject JASIntWeb.Services.AdminService AdminSvc
 @inject AdminSession Session
-@inject CatalogService Catalog
 @inject NavigationManager Nav
-
 <PageTitle>Brands · JAS Admin</PageTitle>
-
-<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <p class="eyebrow">CATALOG BRANDS</p>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Brands &amp; Featured Strips</h1>
-        <p class="text-sm text-slate-500 mt-1">
-            Manage gadget manufacturers, toggle which brands appear on the homepage featured brand strip, and configure logos with database QuickGrid.
-        </p>
-    </div>
-
-    <div class="flex items-center gap-2.5">
-        <a href="/admin/brands/new" class="btn-primary shadow-xs">
-            <Icon Name="plus" Class="size-4" />
-            Add Brand
-        </a>
-    </div>
-</div>
-
+<AdminPageHeader Title="Brands" Eyebrow="Catalog" Description="Manage brand pages, logos and homepage visibility." ActionHref="/admin/brands/new" ActionText="Add brand" />
 @if (!string.IsNullOrWhiteSpace(_toast))
 {
-    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
-        <span class="flex items-center gap-2">
-            <Icon Name="check" Class="size-4 text-emerald-600" />
-            @_toast
-        </span>
-        <button type="button" data-admin-dismiss aria-label="Dismiss notification" class="text-emerald-600 hover:text-emerald-950">
-            <Icon Name="close" Class="size-3.5" />
-        </button>
-    </div>
+    <div class="brand-notice @(toastIsError ? "is-error" : "")" role="status"><span>@_toast</span><button type="button" data-admin-dismiss aria-label="Dismiss notification"><Icon Name="close" Class="size-4" /></button></div>
 }
-
-<!-- Filters Bar -->
-<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
-    <div class="flex flex-wrap items-center gap-2">
-        <a
-            href="@FilterUrl("all")"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
-        >
-            All Brands (@totalAll)
-        </a>
-        <a
-            href="@FilterUrl("featured")"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition @(Filter == "featured" ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")"
-        >
-            ⭐ Featured on Homepage (@totalFeatured)
-        </a>
+<div class="brand-list-panel">
+    <div class="brand-list-toolbar">
+        <nav class="brand-filters" aria-label="Brand filters">
+            <a href="@FilterUrl("all")" aria-current="@(Filter == "all" ? "page" : null)">All brands <span>@totalAll</span></a>
+            <a href="@FilterUrl("featured")" aria-current="@(Filter == "featured" ? "page" : null)">Featured <span>@totalFeatured</span></a>
+        </nav>
+        <form method="get" data-enhance class="brand-search" role="search">
+            <input type="hidden" name="status" value="@Filter" />
+            <label class="sr-only" for="brand-search">Search brands</label>
+            <input id="brand-search" name="q" value="@Query" placeholder="Search brands…" />
+            <button type="submit" aria-label="Search brands"><Icon Name="search" Class="size-4" /></button>
+        </form>
     </div>
-
-    <form method="get" data-enhance class="relative w-64">
-        <input type="hidden" name="status" value="@Filter" />
-        <input
-            name="q"
-            value="@Query"
-            class="field pr-9 !py-1.5 text-xs"
-            placeholder="Search brands..."
-        />
-        <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
-            <Icon Name="search" Class="size-3.5" />
-        </button>
-    </form>
+    @if (Filter == "featured")
+    {
+        <p class="brand-list-hint">The homepage shows up to 10 featured brands, ordered by their display position.</p>
+    }
+    @if (totalFiltered == 0)
+    {
+        <div class="brand-empty"><Icon Name="box" Class="size-8" /><h2>@(string.IsNullOrEmpty(Query) ? "No brands here yet" : "No matching brands")</h2><p>@(string.IsNullOrEmpty(Query) ? "Add a brand to organize products and create its storefront page." : "Try another search or clear the current filters.")</p><a href="@(string.IsNullOrEmpty(Query) ? "/admin/brands/new" : "/admin/brands")" class="btn-secondary">@(string.IsNullOrEmpty(Query) ? "Add brand" : "Clear filters")</a></div>
+    }
+    else
+    {
+        <form method="post" @formname="brands-table-action" data-enhance>
+            <AntiforgeryToken />
+            <div class="table-scroll brands-desktop">
+                <QuickGrid Items="brandsQuery" class="data-table brand-table">
+                    <TemplateColumn Title="Brand"><HeaderTemplate><AdminSortHeader Label="Brand" SortKey="Name" /></HeaderTemplate><ChildContent><BrandIdentity Id="context.Id" Name="@context.Name" Slug="@context.Slug" Logo="@context.LogoUrl" /></ChildContent></TemplateColumn>
+                    <TemplateColumn Title="Homepage"><ChildContent><BrandFeaturedToggle Id="context.Id" Name="@context.Name" Featured="context.IsFeatured" /></ChildContent></TemplateColumn>
+                    <PropertyColumn Property="@(b => b.SortOrder)" Title="Position"><HeaderTemplate><AdminSortHeader Label="Position" SortKey="SortOrder" /></HeaderTemplate></PropertyColumn>
+                    <PropertyColumn Property="@(b => b.ProductCount)" Title="Products"><HeaderTemplate><AdminSortHeader Label="Products" SortKey="ProductCount" /></HeaderTemplate></PropertyColumn>
+                    <TemplateColumn Title="Status"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsDeleted" /></HeaderTemplate><ChildContent><span class="brand-status @(context.IsDeleted ? "is-hidden" : "")">@(context.IsDeleted ? "Hidden" : "Active")</span></ChildContent></TemplateColumn>
+                    <TemplateColumn Title="Actions" Align="Align.End"><ChildContent><BrandActions Id="context.Id" Name="@context.Name" Hidden="context.IsDeleted" ProductCount="context.ProductCount" /></ChildContent></TemplateColumn>
+                </QuickGrid>
+            </div>
+            <div class="brands-mobile">
+                @foreach (var brand in brandsQuery ?? Enumerable.Empty<AdminBrandRow>().AsQueryable())
+                {
+                    <article class="brand-mobile-card" @key="brand.Id">
+                        <div class="brand-mobile-heading"><BrandIdentity Id="brand.Id" Name="@brand.Name" Slug="@brand.Slug" Logo="@brand.LogoUrl" /><span class="brand-status @(brand.IsDeleted ? "is-hidden" : "")">@(brand.IsDeleted ? "Hidden" : "Active")</span></div>
+                        <div class="brand-mobile-meta"><BrandFeaturedToggle Id="brand.Id" Name="@brand.Name" Featured="brand.IsFeatured" /><span>@brand.ProductCount products · Position @brand.SortOrder</span></div>
+                        <BrandActions Id="brand.Id" Name="@brand.Name" Hidden="brand.IsDeleted" ProductCount="brand.ProductCount" />
+                    </article>
+                }
+            </div>
+        </form>
+        <div class="brand-list-pagination"><AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" /></div>
+    }
 </div>
-
-@if (Filter == "featured")
-{
-    <div class="mb-4 flex items-center gap-2.5 rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900">
-        <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[10px]">ℹ</span>
-        <span><strong>Homepage Display Limit:</strong> Up to 10 featured brands appear on the homepage featured ribbon, prioritized by <strong>Sort Order</strong> (lowest number first). Use the edit screen to change sort priority.</span>
-    </div>
-}
-
-<!-- Brands QuickGrid (Direct DB Query via EntityFrameworkAdapter) -->
-<form method="post" @formname="brands-table-action" data-enhance>
-    <AntiforgeryToken />
-    <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-        <div class="table-scroll">
-            <QuickGrid Items="@brandsQuery" class="data-table">
-                <TemplateColumn Title="Brand Name" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Brand Name" SortKey="Name" /></HeaderTemplate><ChildContent>
-                    <div class="flex items-center gap-3">
-                        @if (!string.IsNullOrEmpty(context.LogoUrl))
-                        {
-                            <PictureImage Src="@context.LogoUrl" Alt="@context.Name" Class="size-8 object-contain rounded-lg border border-slate-100 p-1 bg-white" Loading="lazy" Width="32" Height="32" />
-                        }
-                        else
-                        {
-                            <span class="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
-                                @context.Name[..Math.Min(2, context.Name.Length)].ToUpperInvariant()
-                            </span>
-                        }
-                        <div>
-                            <strong class="text-slate-900 block font-semibold">@context.Name</strong>
-                            @if (!string.IsNullOrEmpty(context.Description))
-                            {
-                                <span class="text-xs text-slate-400 truncate max-w-xs block">@context.Description</span>
-                            }
-                        </div>
-                    </div>
-                </ChildContent></TemplateColumn>
-
-                <PropertyColumn Property="@(b => b.Slug)" Title="Slug" Sortable="false" Class="font-mono text-xs text-slate-600" ><HeaderTemplate><AdminSortHeader Label="Slug" SortKey="Slug" /></HeaderTemplate></PropertyColumn>
-
-                <TemplateColumn Title="Homepage Strip" Align="Align.Center">
-                    <button
-                        type="submit"
-                        name="ToggleBrandId"
-                        value="@context.Id"
-                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsFeatured ? "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200")"
-                        title="Click to toggle homepage visibility"
-                    >
-                        <span class="size-1.5 rounded-full @(context.IsFeatured ? "bg-indigo-600" : "bg-slate-400")"></span>
-                        @(context.IsFeatured ? "⭐ Featured" : "Standard")
-                    </button>
-                </TemplateColumn>
-
-                <PropertyColumn Property="@(b => b.SortOrder)" Title="Sort Order" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="Sort Order" SortKey="SortOrder" /></HeaderTemplate></PropertyColumn>
-                <PropertyColumn Property="@(b => b.ProductCount)" Title="Products" Sortable="false" ><HeaderTemplate><AdminSortHeader Label="Products" SortKey="ProductCount" /></HeaderTemplate></PropertyColumn>
-
-                <TemplateColumn Title="Status" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsDeleted" /></HeaderTemplate><ChildContent>
-                    <span class="badge @(context.IsDeleted ? "badge-rose" : "badge-emerald")">
-                        @(context.IsDeleted ? "Archived" : "Active")
-                    </span>
-                </ChildContent></TemplateColumn>
-
-                <TemplateColumn Title="Actions" Align="Align.End">
-                    <div class="flex items-center justify-end gap-1.5">
-                        <a href="/admin/brands/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
-                            Edit
-                        </a>
-                        <button
-                            type="submit"
-                            name="ToggleVisibilityId"
-                            value="@context.Id"
-                            class="btn-secondary !px-2.5 !py-1 text-xs @(context.IsDeleted ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-700 hover:bg-amber-50") cursor-pointer"
-                            onclick="@(context.IsDeleted ? "" : "return confirm('Hide this brand from catalog?');")"
-                            title="@(context.IsDeleted ? "Restore brand" : "Hide brand")"
-                        >
-                            @(context.IsDeleted ? "Restore" : "Hide")
-                        </button>
-                        @if (context.ProductCount == 0)
-                        {
-                            <button
-                                type="submit"
-                                name="DeleteBrandId"
-                                value="@context.Id"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                onclick="return confirm('Permanently delete this brand?');"
-                                title="Delete brand"
-                            >
-                                Delete
-                            </button>
-                        }
-                        else
-                        {
-                            <button
-                                type="button"
-                                class="btn-secondary !px-2.5 !py-1 text-xs text-slate-300 cursor-not-allowed select-none"
-                                title="Cannot delete: Brand has @context.ProductCount products."
-                                disabled
-                            >
-                                Delete
-                            </button>
-                        }
-                    </div>
-                </TemplateColumn>
-            </QuickGrid>
-        </div>
-
-        <div class="p-4 border-t border-slate-200/90 flex items-center justify-between">
-            <AdminPagination Total="totalFiltered" Page="Page" Size="PageSize" />
-        </div>
-    </div>
-</form>
 
 @code {
     [SupplyParameterFromQuery(Name = "status")]
@@ -216,6 +94,7 @@
     private int totalFiltered;
 
     private string? _toast;
+    private bool toastIsError;
     private int totalAll;
     private int totalFeatured;
 
@@ -233,34 +112,36 @@
         {
             if (ToggleBrandId > 0)
             {
-                await AdminSvc.ToggleBrandFeaturedAsync(ToggleBrandId);
+                await Session.RunAsync(service => service.ToggleBrandFeaturedAsync(ToggleBrandId));
                 _toast = "Brand homepage featured status updated.";
                 ToggleBrandId = 0;
             }
             else if (ToggleVisibilityId > 0)
             {
-                await AdminSvc.ToggleBrandVisibilityAsync(ToggleVisibilityId);
+                await Session.RunAsync(service => service.ToggleBrandVisibilityAsync(ToggleVisibilityId));
                 _toast = "Brand visibility updated.";
                 ToggleVisibilityId = 0;
             }
             else if (DeleteBrandId > 0)
             {
-                await AdminSvc.DeleteBrandAsync(DeleteBrandId, permanent: true);
+                await Session.RunAsync(service => service.DeleteBrandAsync(DeleteBrandId, permanent: true));
                 _toast = "Brand permanently deleted. Any assigned products remain safely in the catalog.";
                 DeleteBrandId = 0;
             }
 
             await LoadBrands();
         }
-        catch (Exception ex)
+        catch (ShopException ex)
         {
             _toast = ex.Message;
+            toastIsError = true;
             await LoadBrands();
         }
     }
 
     private async Task LoadBrands()
     {
+        Filter = Filter == "featured" ? "featured" : "all";
         totalAll = await Db.Brands.CountAsync();
         totalFeatured = await Db.Brands.CountAsync(b => b.IsFeatured);
 
@@ -279,6 +160,7 @@
 
         Page = Math.Max(1, Page);
         totalFiltered = await q.CountAsync();
+        Page = Math.Clamp(Page, 1, Math.Max(1, (int)Math.Ceiling(totalFiltered / (double)PageSize)));
 
         var list = await AdminSorting.Apply(q.OrderBy(b => b.SortOrder)
             .ThenBy(b => b.Name), Nav, ("Name", b => b.Name), ("Slug", b => b.Slug), ("SortOrder", b => b.SortOrder), ("ProductCount", b => b.Products.Count(p => !p.IsDeleted)), ("IsDeleted", b => b.IsDeleted))
