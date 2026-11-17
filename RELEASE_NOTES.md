@@ -1,15 +1,9 @@
-# v1.1.1 — Production readiness and readable endpoints
+# v1.1.2 — Show complete carousel banners on mobile
 
-- Reduced `Program.cs` to the composition root; moved upload, payment webhook, account and legacy payment-status handlers into the existing endpoint folder.
-- Added native C# 15 result unions with exhaustive switches and modern collection expressions; grouped service registration and middleware setup.
-- Protected cart writes with antiforgery validation and updated browser/WASM clients. Cart toast messages render safely as text.
-- Serialized signup and confirmation in PostgreSQL, made verification codes work across app instances, blocked replay, required confirmed email, and hardened Google linking, lockout and return URLs.
-- Added sanitized API errors, separate live/ready health probes, bounded analytics enqueueing and provider request timeouts.
-- Production migration execution now requires explicit configuration. Failed migrations stop startup. Docker runs without root, excludes local secrets, and includes generated CSS.
-- Updated the vulnerable source-map build dependency. CI audits npm dependencies and smoke-tests the production container.
+- Removed the carousel's forced aspect ratios and minimum/maximum heights. Banner images now render at full width with their natural height, preserving the complete artwork on mobile and desktop.
+- Kept fading slides stacked in a CSS grid so navigation does not collapse the carousel. Existing touch controls and static SSR remain intact.
+- Added browser regression coverage for image proportions, slide navigation, and Chromium selecting the AVIF `<picture>` source. Regenerated production CSS.
 
-No new schema migration in this patch. Apply existing migrations separately before normal production boot; keep `Database__ApplyMigrations=false` on application replicas. Data-protection keys persist in PostgreSQL unless a shared directory is configured. Set HTTPS, trusted proxies, allowed hosts, real mail and storage credentials using the production runbook.
+The live banner's Cloudinary AVIF source was verified in Chromium: HTTP 200 with `Content-Type: image/avif`, even though its URL ends in `.png`. The original filename extension does not identify the delivered format.
 
-Compatibility carried forward from v1.1.0: guest order links use the private GUID token; numeric IDs require the order owner or an administrator. Payment webhooks require a configured non-demo secret, positive amount, transaction ID and exact unambiguous order reference. Missing configuration disables webhook verification. Fulfillment progresses independently of payment verification.
-
-Validation evidence and operator requirements: [production runbook](docs/production-readiness.md) and [validation record](docs/validation.md). Publishing this release does not deploy production.
+No database migration or new configuration is required. Redeploy the application with this release to update a hosted site; publishing the GitHub release alone does not replace an already-running deployment. The full-width banner is shorter on narrow phones, so embedded text becomes smaller while remaining uncropped.
