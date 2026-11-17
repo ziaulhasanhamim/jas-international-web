@@ -300,10 +300,11 @@ public sealed class CatalogService(
     }
 
     // Homepage sections don't need COUNT queries. Prices and stock remain live, never cached.
-    public async Task<List<ProductSummaryDto>> LatestAsync(string? category, int take = 4)
+    public async Task<List<ProductSummaryDto>> LatestAsync(string? category, int take = 4, int? excludeProductId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var q = await InCategoryAsync(VisibleProducts(db), category);
+        if (excludeProductId.HasValue) q = q.Where(p => p.Id != excludeProductId.Value);
         return await q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id).Take(Math.Clamp(take, 1, 24))
             .Select(p => new ProductSummaryDto(p.Id, p.Name, p.Slug,
                 p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault)
