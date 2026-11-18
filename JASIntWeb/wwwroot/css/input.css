@@ -1,7 +1,8 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 
 @source "../../Components";
 @source "../../../JASIntWeb.Client/Components";
+@source "../js";
 
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
