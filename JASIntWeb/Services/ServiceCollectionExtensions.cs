@@ -248,6 +248,8 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddScoped<AccountRegistrationService>();
         builder.Services.AddSingleton<CourierLogisticsService>();
         builder.Services.AddSingleton<IImageOptimizerService, ImageOptimizerService>();
-        builder.Services.AddSingleton<IStorageService, CloudinaryStorageService>();
+        builder.Services.AddSingleton(S3StorageOptions.Read(builder.Configuration));
+        builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(services => services.GetRequiredService<S3StorageOptions>().CreateClient());
+        builder.Services.AddSingleton<IStorageService, S3StorageService>();
     }
 }

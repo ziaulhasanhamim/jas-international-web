@@ -1,5 +1,6 @@
 using System.Xml;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 using ImageMagick;
 
 namespace JASIntWeb.Services;
@@ -25,7 +26,7 @@ public static class ImageUploadValidator
                 if (attribute.Name.LocalName.StartsWith("on", StringComparison.OrdinalIgnoreCase)
                     || attribute.Name.LocalName.Equals("style", StringComparison.OrdinalIgnoreCase)
                     || (attribute.Name.LocalName == "href" && !value.StartsWith('#'))
-                    || (value.Contains("url(", StringComparison.OrdinalIgnoreCase) && !value.StartsWith("url(#", StringComparison.OrdinalIgnoreCase)))
+                    || (Regex.Matches(value, @"url\(([^)]*)\)", RegexOptions.IgnoreCase).Any(match => !match.Groups[1].Value.Trim(' ', '\'', '"').StartsWith('#'))))
                     throw new InvalidDataException("Unsupported SVG content.");
             }
             bytes = System.Text.Encoding.UTF8.GetBytes(svg.ToString());

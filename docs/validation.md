@@ -205,3 +205,23 @@ Validation uses isolated PostgreSQL and fixture content only, with mail, trackin
 Release build: zero warnings/errors. Unit: 84 passed; SEO: 35 passed; PostgreSQL integration: 126 passed. Total: **Passed: 245, Failed: 0, Skipped: 0**. Release publish with the existing client trimming settings, JavaScript syntax checks and npm dependency audit also pass. An additional whole-server trimming experiment completed with the framework’s existing reflection/Blazor warnings; full server trimming is not enabled for deployment. Existing strict authorization, antiforgery and upload validation tests run in the integration suite.
 
 Screenshots: [product description and dropped gallery](screenshots/v1.2.3-product-editor.png), [brand rich content](screenshots/v1.2.3-brand-editor.png), [mobile category editor](screenshots/v1.2.3-category-mobile.png).
+
+## v1.3.0 — Neon / S3 media migration
+
+| Requirement | Evidence |
+|---|---|
+| Static formats, alpha and dimensions | `StaticConversion_ProducesOnlyModernFormatsAndPreservesTransparency`, `Conversion_DownsizesAndRejectsExcessiveFrames` |
+| Animated WebP and safe vectors | `AnimatedConversion_PreservesFramesTimingAndLoopsWithoutAvif`, `SvgConversion_RasterizesSafeVectorsAndRejectsExternalPaintUrls` |
+| S3 object lifecycle, provider portability and safe failures | `S3Upload_WritesPairWithContentTypesAndImmutableCaching`, `S3Upload_PartialFailureCleansPairAndMissingConfigDoesNotWrite`, `S3Animation_WritesOnlyWebpAndDeletesOnlyOwnedObjects`, `S3Configuration_SupportsNeonEndpointAndNativeAwsRegion` |
+| Browser image contracts | `ManagedImages_StaticPairAndAnimatedWebpOnly`, `PictureImageComponent_RendersStaticAvifWithWebpAndAnimationWithoutPhantomAvif` renders actual component HTML |
+| Migration semantics and preservation | `MigrationUrls_RemoveNegotiationButPreserveVisualTransformsAndHtml`, `Migration_PreservesInventoryReservationsAndOrderSnapshotsAcrossReplayAndRollback`, `MigrationCheckpoint_CancellationPreservesBackupAndRetryRetainsChecksums` |
+| Database boundaries and stale edits | `Migration_ConcurrentEditAbortsWholeTransactionAndWrongDatabaseIsRejected`, `Migration_UnverifiedAssetsAndNonMediaFieldsAreRejected` |
+| Private cache invalidation | `MediaCacheInvalidation_RequiresAdminAndRealAntiforgery` |
+
+Local suites: **87 unit + 35 SEO + 130 PostgreSQL integration = 252 passed, 0 failed, 0 skipped**. Release build has zero warnings/errors; standard Release publish with existing client trimming succeeds. NuGet and npm report no known vulnerabilities.
+
+Actual Neon SDK uploads and anonymous byte/type checks passed on an isolated storage branch. Private browser checks exercised real protected static and animated uploads, AVIF selection, WebP-only animation, cache invalidation, a 390px product view and public static SSR without a Blazor circuit. Browser tooling remains outside the repository and CI.
+
+Production import inventory: **79 source images, 158 copied/verified objects, 15 catalog/content reference fields**. The manifest holds exact-value backups, source/destination checksums and the production database fingerprint outside tracked files. Only catalog/content fields are read; testing uses an isolated database with fake mail. Production URL application is gated on the deployed pipeline header and followed by cache invalidation and public smoke checks. No EF schema migration is needed.
+
+[Desktop fixture](screenshots/v1.3.0-neon-desktop.png) · [Mobile fixture](screenshots/v1.3.0-neon-mobile.png). The newly-created media project's unused PostgreSQL compute was removed; object storage remains accessible independently.

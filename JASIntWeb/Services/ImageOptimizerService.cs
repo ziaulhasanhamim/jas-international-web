@@ -2,108 +2,55 @@ using ImageMagick;
 
 namespace JASIntWeb.Services;
 
-public sealed class ImageOptimizerService : IImageOptimizerService
+public sealed class ImageOptimizerService(ILogger<ImageOptimizerService> logger) : IImageOptimizerService
 {
-    private readonly ILogger<ImageOptimizerService> _logger;
-
-    public ImageOptimizerService(ILogger<ImageOptimizerService> logger)
+    private static readonly SemaphoreSlim Encoders = new(2);
+    public async Task<OptimizedImageSet> OptimizeImageAsync(Stream inputStream, string originalFileName,
+        string? contentType = null, CancellationToken ct = default)
     {
-        _logger = logger;
+        using var buffer = new MemoryStream();
+        await inputStream.CopyToAsync(buffer, ct);
+        if (buffer.Length is 0 or > 10 * 1024 * 1024) throw new InvalidDataException("Invalid image size.");
+        await Encoders.WaitAsync(ct);
+        try { return await Task.Run(() => Convert(buffer.ToArray(), ct), ct); }
+        finally { Encoders.Release(); }
     }
 
-    public async Task<OptimizedImageSet> OptimizeImageAsync(
-        Stream inputStream,
-        string originalFileName,
-        string? contentType = null,
-        CancellationToken ct = default)
+    private OptimizedImageSet Convert(byte[] bytes, CancellationToken ct)
     {
-        var originalExt = Path.GetExtension(originalFileName).ToLowerInvariant();
-        if (originalExt == ".svg" || contentType == "image/svg+xml")
+        // Ping all frames before decoding, so compressed animations cannot bypass the pixel budget.
+        using var headers = new MagickImageCollection();
+        headers.Ping(bytes);
+        if (headers.Count is 0 or > 100 || headers.Any(frame => frame.Width > 12000 || frame.Height > 12000 || (long)frame.Width * frame.Height > 40_000_000)
+            || headers.Count * headers.Max(frame => (long)Math.Max(frame.Width, frame.Page.Width)) * headers.Max(frame => (long)Math.Max(frame.Height, frame.Page.Height)) > 100_000_000)
+            throw new InvalidDataException("Image exceeds the frame or pixel limit.");
+        ct.ThrowIfCancellationRequested();
+        using var frames = new MagickImageCollection(bytes);
+        if (frames.Count > 1)
         {
-            throw new NotSupportedException("SVG images are vector assets and do not require raster optimization.");
-        }
-
-        using var memoryStream = new MemoryStream();
-        await inputStream.CopyToAsync(memoryStream, ct);
-        memoryStream.Position = 0;
-
-        return await Task.Run(() =>
-        {
+            // Coalescing reconstructs partial GIF frames before resizing while retaining timing and loops.
+            frames.Coalesce();
+            foreach (var frame in frames) Prepare(frame, 90);
             ct.ThrowIfCancellationRequested();
+            var webp = frames.ToByteArray(MagickFormat.WebP);
+            logger.LogInformation("Converted animated image: {Frames} frames, {Bytes} WebP bytes", frames.Count, webp.Length);
+            return new(webp, null, (int)frames[0].Width, (int)frames[0].Height);
+        }
+        var image = frames[0];
+        Prepare(image, 82);
+        var webpBytes = image.ToByteArray(MagickFormat.WebP);
+        ct.ThrowIfCancellationRequested();
+        image.Quality = 75;
+        var avifBytes = image.ToByteArray(MagickFormat.Avif);
+        logger.LogInformation("Converted static image: {Width}x{Height}, WebP {WebpBytes} bytes, AVIF {AvifBytes} bytes", image.Width, image.Height, webpBytes.Length, avifBytes.Length);
+        return new(webpBytes, avifBytes, (int)image.Width, (int)image.Height);
+    }
 
-            using var image = new MagickImage(memoryStream);
-
-            // Auto-orient based on EXIF tags (e.g. photos taken vertically on smartphones)
-            image.AutoOrient();
-
-            // Downscale oversized images (keep aspect ratio, max 2048x2048 for high-res e-commerce)
-            const int maxDimension = 2048;
-            if (image.Width > maxDimension || image.Height > maxDimension)
-            {
-                var geometry = new MagickGeometry(maxDimension, maxDimension)
-                {
-                    IgnoreAspectRatio = false,
-                    Greater = true
-                };
-                image.Resize(geometry);
-            }
-
-            // Strip metadata profiles (GPS, camera tags, thumbnails) to shrink payload
-            image.Strip();
-
-            var originalExt = Path.GetExtension(originalFileName).ToLowerInvariant();
-            var hasAlpha = image.HasAlpha;
-
-            // 1. Generate WebP
-            using var webpImage = image.Clone();
-            webpImage.Format = MagickFormat.WebP;
-            webpImage.Quality = 82;
-            var webpBytes = webpImage.ToByteArray();
-
-            // 2. Generate AVIF (Next-Gen high compression)
-            using var avifImage = image.Clone();
-            avifImage.Format = MagickFormat.Avif;
-            avifImage.Quality = 75;
-            var avifBytes = avifImage.ToByteArray();
-
-            // 3. Generate Optimized Primary Fallback
-            string primaryExt;
-            string primaryContentType;
-
-            if (hasAlpha || originalExt == ".png")
-            {
-                image.Format = MagickFormat.Png;
-                image.Quality = 90;
-                primaryExt = ".png";
-                primaryContentType = "image/png";
-            }
-            else
-            {
-                image.Format = MagickFormat.Jpeg;
-                image.Quality = 85;
-                primaryExt = ".jpg";
-                primaryContentType = "image/jpeg";
-            }
-
-            var primaryBytes = image.ToByteArray();
-
-            _logger.LogInformation(
-                "Optimized image '{FileName}' ({Width}x{Height}): Fallback {FallbackKB:F1}KB, WebP {WebpKB:F1}KB, AVIF {AvifKB:F1}KB",
-                originalFileName,
-                image.Width,
-                image.Height,
-                primaryBytes.Length / 1024.0,
-                webpBytes.Length / 1024.0,
-                avifBytes.Length / 1024.0);
-
-            return new OptimizedImageSet(
-                PrimaryBytes: primaryBytes,
-                PrimaryExtension: primaryExt,
-                PrimaryContentType: primaryContentType,
-                WebpBytes: webpBytes,
-                AvifBytes: avifBytes,
-                Width: (int)image.Width,
-                Height: (int)image.Height);
-        }, ct);
+    private static void Prepare(IMagickImage<byte> image, uint quality)
+    {
+        image.AutoOrient();
+        image.Resize(new MagickGeometry(2048, 2048) { Greater = true, IgnoreAspectRatio = false });
+        image.Strip();
+        image.Quality = quality;
     }
 }

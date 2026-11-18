@@ -6,7 +6,7 @@ namespace JASIntWeb.Tests.Unit;
 public class AdminEditorTests
 {
     [Test]
-    [Arguments("https://res.cloudinary.com/store/image.png", true)]
+    [Arguments("https://media.example.test/image.webp", true)]
     [Arguments("/uploads/category.png", true)]
     [Arguments("⌚", false)]
     [Arguments("javascript:alert(1)", false)]

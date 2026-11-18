@@ -119,9 +119,9 @@ JAS International is engineered for maximum search engine domination on Google B
   - `Product`: with variant SKUs, GTIN barcodes, price valid until, BDT currency, delivery fees (৳80 Khulna / ৳130 outside), 7-day return policy, and genuine aggregate ratings.
   - `BreadcrumbList`, `Store` (LocalBusiness with Khulna showroom coordinates), `Organization`, `WebSite` with SearchAction, and `FAQPage`.
 - **Core Web Vitals & Next-Gen Image Optimization:**
-  - **AVIF & WebP Pipeline:** All static assets and runtime uploads are automatically compressed into next-gen **AVIF** and **WebP** formats alongside standard fallbacks.
-  - **Storefront `<picture>` Tags:** Reusable `<PictureImage>` Blazor component delivers `<picture><source type="image/avif" /><source type="image/webp" /><img /></picture>` across all product cards, product details, carousel hero banners, category tiles, brand showcases, and brand logos.
-  - **Automated Upload Compression:** `IImageOptimizerService` automatically strips camera metadata, auto-orients smartphone uploads, normalizes dimensions, and outputs optimized primary, WebP, and AVIF bytes.
+  - **AVIF & WebP Pipeline:** Static runtime uploads are stored only as **AVIF** and **WebP**; animations retain timing/loops in WebP only. Bundled static assets remain unchanged.
+  - **Storefront `<picture>` Tags:** Reusable `<PictureImage>` Blazor component delivers `<picture><source type="image/avif" /><img src="…webp" /></picture>` across all product cards, product details, carousel hero banners, category tiles, brand showcases, and brand logos.
+  - **Automated Upload Compression:** `IImageOptimizerService` automatically strips camera metadata, auto-orients smartphone uploads, normalizes dimensions, and outputs WebP/AVIF pairs for static images or animated WebP. No original/third fallback is stored.
   - **Static Asset Reduction:** Brand logo shrunk from 506 KB down to 53 KB PNG, with companion 11 KB WebP and 10 KB AVIF (a ~98% weight reduction for instant mobile page loads).
   - **TinyMCE Isolation:** TinyMCE and `admin-editor.js` load exclusively on Admin routes, eliminating heavy scripts from public visitor and Googlebot payloads.
 
@@ -246,3 +246,8 @@ A brand’s **Brief description** is a short plain-text summary. It appears belo
 Drop photos anywhere inside the dashed upload area or browse. Product galleries support dragging thumbnails to reorder; the first image is the cover. Arrow buttons provide the same ordering controls for keyboard and touch users. Upload limits remain ten files per batch and 10 MB per product image; brand logos are limited to 5 MB.
 
 See [v1.2 migration and validation evidence](docs/validation.md#v120-product-owned-variants-and-admin-workflows) and [release notes](RELEASE_NOTES.md) before upgrading. Browser checks remain private working tools, with no repository dependency or CI step.
+
+
+## Neon / S3 uploads
+
+Configure the S3 endpoint, bucket, public base URL and server-only AWS credentials described in [media storage and migration](docs/media-storage.md). Uploads use `AWSSDK.S3`; changing to AWS S3 later requires configuration and an object/URL migration, with no adapter rewrite. Public shopping remains static SSR.
