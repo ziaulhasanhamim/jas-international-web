@@ -182,7 +182,9 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Thana = "Dhanmondi",
             City = "Dhanmondi",
             Address = "Test address",
-            PaymentMethod = "Pending",
+            PaymentMethod = "BkashAdvance",
+            SenderPhoneNumber = "01712345678",
+            TransactionId = "TRX123456",
             Items = [new CartLineRequest(1, 1)]
         };
 
@@ -207,5 +209,123 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
         var activeCart = await db.Carts.AsNoTracking().SingleOrDefaultAsync(c => c.Token == newCart.Token!.Value);
         await activeCart.Should().NotBeNull();
         await activeCart!.Status.Should().BeEqualTo(CartStatus.Active);
+    }
+
+    [Test]
+    public async Task CheckoutAsync_WithPendingPaymentMethod_ThrowsShopException()
+    {
+        await using var scope = CreateScope();
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+
+        var token = Guid.CreateVersion7();
+        await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+
+        var checkoutRequest = new CheckoutRequest
+        {
+            RequestId = Guid.NewGuid(),
+            CartToken = token,
+            CustomerName = "Pending Test",
+            PhoneNumber = "01712345678",
+            District = "Dhaka",
+            Thana = "Dhanmondi",
+            City = "Dhanmondi",
+            Address = "Test address",
+            PaymentMethod = "Pending",
+            Items = [new CartLineRequest(1, 1)]
+        };
+
+        var ex = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, checkoutRequest));
+        await ex!.Message.Should().Contain("valid payment method");
+    }
+
+    [Test]
+    public async Task CheckoutAsync_WithBkash_MissingTransactionIdOrSenderPhone_ThrowsShopException()
+    {
+        await using var scope = CreateScope();
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+
+        var token = Guid.CreateVersion7();
+        await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+
+        var missingTrx = new CheckoutRequest
+        {
+            RequestId = Guid.NewGuid(),
+            CartToken = token,
+            CustomerName = "Missing Trx",
+            PhoneNumber = "01712345678",
+            District = "Dhaka",
+            Thana = "Dhanmondi",
+            City = "Dhanmondi",
+            Address = "Test address",
+            PaymentMethod = "BkashAdvance",
+            SenderPhoneNumber = "01712345678",
+            TransactionId = null,
+            Items = [new CartLineRequest(1, 1)]
+        };
+
+        var exTrx = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, missingTrx));
+        await exTrx!.Message.Should().Contain("Transaction ID");
+
+        var missingPhone = new CheckoutRequest
+        {
+            RequestId = Guid.NewGuid(),
+            CartToken = token,
+            CustomerName = "Missing Phone",
+            PhoneNumber = "01712345678",
+            District = "Dhaka",
+            Thana = "Dhanmondi",
+            City = "Dhanmondi",
+            Address = "Test address",
+            PaymentMethod = "BkashAdvance",
+            SenderPhoneNumber = "",
+            TransactionId = "TRX123456",
+            Items = [new CartLineRequest(1, 1)]
+        };
+
+        var exPhone = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, missingPhone));
+        await exPhone!.Message.Should().Contain("sender phone number");
+    }
+
+    [Test]
+    public async Task CheckoutAsync_WithValidBkash_PersistsPaymentDetailsAndReservesStock()
+    {
+        await using var scope = CreateScope();
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var token = Guid.CreateVersion7();
+        await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+
+        var checkoutRequest = new CheckoutRequest
+        {
+            RequestId = Guid.NewGuid(),
+            CartToken = token,
+            CustomerName = "Valid Bkash Customer",
+            PhoneNumber = "01712345678",
+            District = "Dhaka",
+            Thana = "Dhanmondi",
+            City = "Dhanmondi",
+            Address = "Test Road 10",
+            PaymentMethod = "BkashAdvance",
+            ReferenceCode = "JAS9999",
+            SenderPhoneNumber = "01812345678",
+            TransactionId = "9K88ABCXYZ",
+            Items = [new CartLineRequest(1, 1)]
+        };
+
+        var result = await shop.CheckoutAsync(null, checkoutRequest);
+        await result.Should().NotBeNull();
+
+        var order = await db.Orders
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.Id == result.OrderId);
+
+        await order.Should().NotBeNull();
+        await order!.PaymentReferenceCode.Should().BeEqualTo("JAS9999");
+        await order.SenderPhoneNumber.Should().BeEqualTo("01812345678");
+        await order.TransactionId.Should().BeEqualTo("9K88ABCXYZ");
+        await order.Payments.Count.Should().BeEqualTo(1);
+        await order.Payments.First().Method.Should().BeEqualTo(PaymentMethod.Bkash);
+        await order.Payments.First().ExternalReference.Should().BeEqualTo("9K88ABCXYZ");
     }
 }

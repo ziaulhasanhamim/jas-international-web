@@ -470,6 +470,10 @@ public sealed class ShoppingService(
                 throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
             }
         }
+        else
+        {
+            throw new ShopException("A valid payment method and payment details are required to place an order.");
+        }
         var summary = await ResolveAsync(request.Items, userId.HasValue);
         if (summary.Items.Any(i => !i.IsAvailable))
         {
@@ -544,7 +548,9 @@ public sealed class ShoppingService(
             if (u != null) address.Email = u.Email;
         }
 
-        var refCode = $"JAS{Random.Shared.Next(1000, 9999)}";
+        var refCode = !string.IsNullOrWhiteSpace(request.ReferenceCode)
+            ? request.ReferenceCode.Trim()
+            : $"JAS{Random.Shared.Next(1000, 9999)}";
 
         // Extract Meta Ads and marketing attribution
         var httpContext = httpContextAccessor?.HttpContext;
@@ -624,10 +630,10 @@ public sealed class ShoppingService(
         order.Payments.Add(new Payment
         {
             OrderId = 0,
-            Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" || request.PaymentMethod == "Pending" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
+            Method = request.PaymentMethod == "BkashAdvance" || request.PaymentMethod == "FullPayment" ? PaymentMethod.Bkash : PaymentMethod.CashOnDelivery,
             Status = PaymentStatus.Pending,
             Amount = 0m,
-            ExternalReference = request.TransactionId
+            ExternalReference = request.TransactionId?.Trim().ToUpperInvariant()
         });
         db.Orders.Add(order);
         db.OrderTimelineEvents.Add(new OrderTimelineEvent

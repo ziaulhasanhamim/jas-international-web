@@ -32,6 +32,7 @@ public static class OrderEndpoints
 
             var orders = await db.Orders.AsNoTracking()
                 .Where(o => validTokens.Contains(o.PublicToken))
+                .Where(o => !(o.Payments.Any(p => p.Method == PaymentMethod.Bkash) && string.IsNullOrEmpty(o.TransactionId) && o.PaidAmount == 0))
                 .OrderByDescending(o => o.CreatedAt)
                 .Select(o => new DeviceOrderDto(
                     o.Id,

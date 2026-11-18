@@ -265,13 +265,13 @@
 
     private async Task LoadOrdersAsync()
     {
-        unconfirmedPaymentCount = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+        unconfirmedPaymentCount = await Db.Orders.CountAsync(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && !string.IsNullOrEmpty(o.TransactionId));
 
         var q = Db.Orders.AsNoTracking().Include(o => o.DeliveryAddress).AsQueryable();
 
         if (PaymentFilter == "unconfirmed" || Status == "unconfirmed_payment")
         {
-            q = q.Where(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && (!string.IsNullOrEmpty(o.TransactionId) || o.Payments.Any(p => p.Method == PaymentMethod.Bkash)));
+            q = q.Where(o => o.Status != OrderStatus.Cancelled && o.PaidAmount == 0 && !string.IsNullOrEmpty(o.TransactionId));
         }
         else if (Enum.TryParse<OrderStatus>(Status, out var status))
         {

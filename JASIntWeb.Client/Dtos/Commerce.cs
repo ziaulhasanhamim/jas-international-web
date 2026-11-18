@@ -39,6 +39,7 @@ public sealed class CheckoutRequest
     public string City { get; set; } = "Khulna";
     public string? CouponCode { get; set; }
     public string PaymentMethod { get; set; } = "COD";
+    public string? ReferenceCode { get; set; }
     public string? SenderPhoneNumber { get; set; }
     public string? TransactionId { get; set; }
     public string? Fbclid { get; set; }
