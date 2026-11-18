@@ -225,3 +225,8 @@ Actual Neon SDK uploads and anonymous byte/type checks passed on an isolated sto
 Production import inventory: **79 source images, 158 copied/verified objects, 15 catalog/content reference fields**. The manifest holds exact-value backups, source/destination checksums and the production database fingerprint outside tracked files. Only catalog/content fields are read; testing uses an isolated database with fake mail. Production URL application is gated on the deployed pipeline header and followed by cache invalidation and public smoke checks. No EF schema migration is needed.
 
 [Desktop fixture](screenshots/v1.3.0-neon-desktop.png) · [Mobile fixture](screenshots/v1.3.0-neon-mobile.png). The newly-created media project's unused PostgreSQL compute was removed; object storage remains accessible independently.
+
+
+## v1.3.1 — Media output-cache completion
+
+`MediaCacheInvalidation_RefreshesPreviouslyCachedCatalogFeed` warms an actual public feed, changes a fixture image in PostgreSQL, confirms the response remains cached, and verifies protected invalidation exposes the new URL. This complements the real-antiforgery test. The complete local suites total 253 passing tests (87 unit, 35 SEO, 131 integration). Production v1.3.0 cutover updated all 15 media fields; live home/catalog/product/category checks selected Neon AVIF with zero Cloudinary requests and no public Blazor circuit/WASM startup.

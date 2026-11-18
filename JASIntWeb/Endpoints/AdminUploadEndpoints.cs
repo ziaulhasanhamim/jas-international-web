@@ -21,7 +21,7 @@ public static class AdminUploadEndpoints
     }
 
     private static async Task<Results<NoContent, BadRequest<EndpointError>>> InvalidateMediaCacheAsync(HttpContext context, IAntiforgery antiforgery,
-        CatalogService catalog, Microsoft.Extensions.Caching.Hybrid.HybridCache cache, CancellationToken ct)
+        CatalogService catalog, Microsoft.Extensions.Caching.Hybrid.HybridCache cache, Microsoft.AspNetCore.OutputCaching.IOutputCacheStore output, CancellationToken ct)
     {
         context.Response.Headers.CacheControl = "no-store";
         return (await FormRequestReader.ReadAsync(context, antiforgery, ct)) switch
@@ -33,6 +33,7 @@ public static class AdminUploadEndpoints
         {
             await catalog.InvalidateAllAsync();
             await DeliverySettingsService.InvalidateCacheAsync(cache);
+            await output.EvictByTagAsync("catalog", ct);
             return TypedResults.NoContent();
         }
     }
