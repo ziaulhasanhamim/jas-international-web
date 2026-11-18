@@ -20,11 +20,15 @@ public class RichEditorRegressionTests : JasIntegrationTestBase
         await labels.Contains("Product description & specifications").Should().BeTrue();
         await html.Contains("Drag photos here").Should().BeTrue();
         await html.Contains("Drag thumbnails to reorder").Should().BeTrue();
-        var draft = new ProductEditorDraft { Information = new() { Name = "Rich product fixture", CategoryId = 1, Details = "<h2>Features</h2><p><strong>Useful</strong> details.</p>" } };
+        var draft = new ProductEditorDraft { Information = new() { Name = "Rich product fixture", CategoryId = 1, Description = "Visible saved summary", BanglaDescription = "Visible saved translation", Details = "<h2>Features</h2><p><strong>Useful</strong> details.</p>" } };
         var valid = await client.PostAsJsonAsync("/api/admin/product-editor", new EditorSave(Guid.NewGuid(), draft));
         await ((int)valid.StatusCode).Should().BeEqualTo(200);
         var saved = (await valid.Content.ReadFromJsonAsync<EditorCommit>())!;
         await saved.Editor!.Draft.Information.Details.Should().BeEqualTo(draft.Information.Details);
+        var savedHtml = await client.GetStringAsync($"/admin/products/{saved.Receipt.ProductId}/edit");
+        var textareas = Regex.Matches(savedHtml, "<textarea[^>]*>([\\s\\S]*?)</textarea>").Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value)).ToList();
+        await textareas.Contains("Visible saved summary").Should().BeTrue();
+        await textareas.Contains("Visible saved translation").Should().BeTrue();
     }
 
     [Test]

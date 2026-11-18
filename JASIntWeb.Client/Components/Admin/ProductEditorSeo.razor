@@ -6,7 +6,7 @@
     <label class="shop-label">Warranty information<input class="shop-input" value="@Information.WarrantyInfo" @oninput="e => Patch(i => i.WarrantyInfo = e.Value?.ToString())" /></label>
     <label class="shop-label">Search synonyms<input class="shop-input" value="@Information.Synonyms" @oninput="e => Patch(i => i.Synonyms = e.Value?.ToString())" /></label>
     <label class="shop-label">Bangla name<input class="shop-input" value="@Information.BanglaName" @oninput="e => Patch(i => i.BanglaName = e.Value?.ToString())" /></label>
-    <label class="shop-label">Bangla description<textarea class="shop-input" value="@Information.BanglaDescription" @oninput="e => Patch(i => i.BanglaDescription = e.Value?.ToString())"></textarea></label>
+    <label class="shop-label">Bangla description<textarea class="shop-input" @bind:get="Information.BanglaDescription" @bind:set="value => Patch(i => i.BanglaDescription = value)" @bind:event="oninput"></textarea></label>
     <AdminImagePicker Label="Social sharing image" Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
 </section>
 @code {

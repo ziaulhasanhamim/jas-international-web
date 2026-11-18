@@ -3,13 +3,13 @@
 <section class="shop-panel editor-section">
     <h2>Options &amp; value data</h2>
     <p class="admin-help">Add the values this product uses. Values and extra fields belong to this product; suggestions are copied, never linked.</p>
-    <div class="form-actions"><select class="shop-input" aria-label="Attribute to add" @bind="definition"><option value="0">Choose axis</option>
+    <div class="form-actions"><select class="shop-input" aria-label="Attribute to add" @bind="definition"><option value="0">Choose attribute</option>
         @foreach (var template in Templates.Where(t => !Attributes.Any(a => a.DefinitionId == t.Id && !a.Retired))) { <option value="@template.Id">@template.Name</option> }
     </select><button type="button" class="shop-button-secondary" @onclick="Add">Add attribute</button><a href="/admin/attributes" target="_blank">Manage definitions &amp; suggestions ↗</a><button type="button" class="brand-text-action" @onclick="RefreshTemplates">Refresh suggestions</button></div>
     @foreach (var axis in Attributes)
     {
         var id = axis.DefinitionId;
-        <details class="editor-axis" open="@(!axis.Retired)" @key="id">
+        <details class="editor-attribute" open="@(!axis.Retired)" @key="id">
             <summary>@axis.Name @(axis.Retired ? "· Retired" : $"· {axis.Options.Count(o => !o.Retired)} values")</summary>
             <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@axis.Required" @onchange="@(e => Patch(id, a => a.Required = (bool)e.Value!))" /> Selection required</label>
                 <button type="button" class="brand-text-action" @onclick="@(() => Patch(id, a => a.Retired = !a.Retired))">@(axis.Retired ? "Restore attribute" : "Retire attribute")</button>

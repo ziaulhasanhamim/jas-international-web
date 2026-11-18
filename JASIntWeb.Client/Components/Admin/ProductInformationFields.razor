@@ -13,7 +13,7 @@
             @foreach (var brand in Brands) { <option value="@brand.Id">@brand.Name</option> }
         </select></label>
     </div>
-    <label class="shop-label">Short overview<textarea class="shop-input" rows="3" value="@Information.Description" @oninput="e => Patch(i => i.Description = Text(e))"></textarea></label>
+    <label class="shop-label">Short overview<textarea class="shop-input" rows="3" @bind:get="Information.Description" @bind:set="value => Patch(i => i.Description = value)" @bind:event="oninput"></textarea></label>
     <AdminProductMedia Value="@(new(Information.Image, Information.Images))" ValueChanged="Media" BusyChanged="UploadBusy" />
     <AdminRichText Label="Product description & specifications" Height="400" Specifications="true" Disabled="Disabled" Value="@Information.Details" ValueChanged="value => Patch(i => i.Details = value)" />
     <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@Information.Featured" @onchange="e => Patch(i => i.Featured = (bool)e.Value!)" /> Feature on homepage</label>

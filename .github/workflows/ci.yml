@@ -43,6 +43,8 @@ jobs:
         run: dotnet run --project tests/JASIntWeb.Tests.Seo --no-build --configuration Release
       - name: PostgreSQL integration tests
         run: dotnet run --project tests/JASIntWeb.Tests.Integration --no-build --configuration Release
+      - name: Release publish (including WebAssembly trimming)
+        run: dotnet publish JASIntWeb/JASIntWeb.csproj --no-restore --configuration Release --output "${{ runner.temp }}/publish"
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
