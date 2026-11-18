@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using JASIntWeb.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using JASIntWeb.Tests.Integration.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -121,6 +124,30 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
         var response = await admin.PostAsync(path, new FormUrlEncodedContent([]));
         await ((int)response.StatusCode).Should().BeEqualTo(204);
         await response.Headers.CacheControl!.NoStore.Should().BeTrue();
+    }
+
+    [Test]
+    [Arguments("/feeds/meta.xml")]
+    [Arguments("/sitemap-products.xml")]
+    public async Task MediaCacheInvalidation_RefreshesPreviouslyCachedCatalogOutputs(string feed)
+    {
+        const string oldImage = "https://media.example.test/old.webp";
+        const string newImage = "https://media.example.test/new.webp";
+        await using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Products.Where(p => p.Id == 1).ExecuteUpdateAsync(update => update.SetProperty(p => p.MainImageUrl, oldImage));
+        using var guest = Client(null); using var admin = Client("Admin");
+        var security = await admin.GetFromJsonAsync<Security>("/api/admin/uploads/security");
+        admin.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security!.Token);
+        await admin.PostAsync("/api/admin/uploads/cache/invalidate", new FormUrlEncodedContent([]));
+        await (await guest.GetStringAsync(feed)).Contains(oldImage).Should().BeTrue();
+        await db.Products.Where(p => p.Id == 1).ExecuteUpdateAsync(update => update.SetProperty(p => p.MainImageUrl, newImage));
+        // Prove a cached response exists, then prove the protected command actually evicts it.
+        await (await guest.GetStringAsync(feed)).Contains(oldImage).Should().BeTrue();
+        await ((int)(await admin.PostAsync("/api/admin/uploads/cache/invalidate", new FormUrlEncodedContent([]))).StatusCode).Should().BeEqualTo(204);
+        var refreshed = await guest.GetStringAsync(feed);
+        await refreshed.Contains(newImage).Should().BeTrue();
+        await refreshed.Contains(oldImage).Should().BeFalse();
     }
 
     private sealed record Security(string Token);

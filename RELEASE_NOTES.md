@@ -1,3 +1,10 @@
+# v1.3.1 — Complete media cache invalidation
+
+- Media cache invalidation now evicts catalog, sitemap and static-page output-cache entries as well as HybridCache entries, keeping previously cached product feeds and image sitemaps current after URL migrations.
+- Added PostgreSQL/HTTP regressions that warm a feed and product image sitemap, change their image URL, confirm the old cached responses, then verify protected invalidation refreshes them.
+
+The production migration is complete: 79 images copied as 158 verified objects, 15 production web fields updated, and live storefront checks show AVIF loading with no Cloudinary requests. Development/POS databases and legacy source files remain unchanged. No schema/configuration migration is required beyond v1.3.0.
+
 # v1.3.0 — Neon / S3 media storage
 
 - Replaced the Cloudinary service/package with AWSSDK.S3 and portable endpoint, region, bucket and public URL configuration.
