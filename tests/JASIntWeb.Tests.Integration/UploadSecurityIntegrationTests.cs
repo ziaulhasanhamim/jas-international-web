@@ -127,7 +127,9 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task MediaCacheInvalidation_RefreshesPreviouslyCachedCatalogFeed()
+    [Arguments("/feeds/meta.xml")]
+    [Arguments("/sitemap-products.xml")]
+    public async Task MediaCacheInvalidation_RefreshesPreviouslyCachedCatalogOutputs(string feed)
     {
         const string oldImage = "https://media.example.test/old.webp";
         const string newImage = "https://media.example.test/new.webp";
@@ -138,7 +140,6 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
         var security = await admin.GetFromJsonAsync<Security>("/api/admin/uploads/security");
         admin.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security!.Token);
         await admin.PostAsync("/api/admin/uploads/cache/invalidate", new FormUrlEncodedContent([]));
-        const string feed = "/feeds/meta.xml";
         await (await guest.GetStringAsync(feed)).Contains(oldImage).Should().BeTrue();
         await db.Products.Where(p => p.Id == 1).ExecuteUpdateAsync(update => update.SetProperty(p => p.MainImageUrl, newImage));
         // Prove a cached response exists, then prove the protected command actually evicts it.

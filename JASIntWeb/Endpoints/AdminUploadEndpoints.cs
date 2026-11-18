@@ -33,7 +33,8 @@ public static class AdminUploadEndpoints
         {
             await catalog.InvalidateAllAsync();
             await DeliverySettingsService.InvalidateCacheAsync(cache);
-            await output.EvictByTagAsync("catalog", ct);
+            foreach (var tag in new[] { "catalog", "seo", "static-content" })
+                await output.EvictByTagAsync(tag, ct);
             return TypedResults.NoContent();
         }
     }

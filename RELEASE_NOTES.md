@@ -1,7 +1,7 @@
 # v1.3.1 — Complete media cache invalidation
 
-- Media cache invalidation now evicts catalog output-cache entries as well as HybridCache entries, keeping previously cached product feeds current after URL migrations.
-- Added a PostgreSQL/HTTP regression that warms a feed, changes its image URL, confirms the old cached response, then verifies the protected invalidation refreshes it.
+- Media cache invalidation now evicts catalog, sitemap and static-page output-cache entries as well as HybridCache entries, keeping previously cached product feeds and image sitemaps current after URL migrations.
+- Added PostgreSQL/HTTP regressions that warm a feed and product image sitemap, change their image URL, confirm the old cached responses, then verify protected invalidation refreshes them.
 
 The production migration is complete: 79 images copied as 158 verified objects, 15 production web fields updated, and live storefront checks show AVIF loading with no Cloudinary requests. Development/POS databases and legacy source files remain unchanged. No schema/configuration migration is required beyond v1.3.0.
 
