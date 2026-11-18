@@ -1,3 +1,13 @@
+# v1.3.0 — Neon / S3 media storage
+
+- Replaced the Cloudinary service/package with AWSSDK.S3 and portable endpoint, region, bucket and public URL configuration.
+- Static uploads store AVIF + WebP only; animations preserve timing/loops in WebP. Removed original/PNG/JPEG and local-disk fallbacks. Safe SVG input is rasterized.
+- Added bounded conversion, immutable object caching, partial-upload cleanup, paired deletion and managed-image-only URL resolution.
+- Added resumable, checksum-verified catalog migration with exact-value updates, concurrency protection, rollback backups and protected cache invalidation.
+- Removed legacy credentials from current test code. Rotate the old source API key because it remains present in Git history.
+
+Production media is provisioned in jas-media-store (AWS Singapore). All 79 source images are copied as 158 verified modern-format objects; cutover affects the production web database only. Development/POS data and original source files remain unchanged. No EF schema migration is needed. Configure the documented storage secrets before the storage-aware build becomes live. See docs/media-storage.md for cutover, rollback and AWS migration instructions.
+
 # v1.2.3 — Rich content editing and drag-and-drop media
 
 - Restored the required rich-text description on the main product form, including new products. Formatting includes headings, lists, tables, links, images and a product specifications template.

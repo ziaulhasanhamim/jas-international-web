@@ -106,5 +106,22 @@ public class UploadSecurityIntegrationTests : JasIntegrationTestBase
         }
     }
 
+    [Test]
+    public async Task MediaCacheInvalidation_RequiresAdminAndRealAntiforgery()
+    {
+        const string path = "/api/admin/uploads/cache/invalidate";
+        using var anonymous = Client(null); using var customer = Client("Customer"); using var admin = Client("Admin");
+        var denied = await anonymous.PostAsync(path, new FormUrlEncodedContent([]));
+        await ((int)denied.StatusCode is 302 or 401 or 403).Should().BeTrue();
+        var customerDenied = await customer.PostAsync(path, new FormUrlEncodedContent([]));
+        await ((int)customerDenied.StatusCode is 302 or 401 or 403).Should().BeTrue();
+        await ((int)(await admin.PostAsync(path, new FormUrlEncodedContent([]))).StatusCode).Should().BeEqualTo(400);
+        var security = await admin.GetFromJsonAsync<Security>("/api/admin/uploads/security");
+        admin.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security!.Token);
+        var response = await admin.PostAsync(path, new FormUrlEncodedContent([]));
+        await ((int)response.StatusCode).Should().BeEqualTo(204);
+        await response.Headers.CacheControl!.NoStore.Should().BeTrue();
+    }
+
     private sealed record Security(string Token);
 }

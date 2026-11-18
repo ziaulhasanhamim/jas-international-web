@@ -1,197 +1,198 @@
+using System.Net;
+using Amazon.S3;
+using Amazon.S3.Model;
+using ImageMagick;
 using JASIntWeb.Client.Services;
 using JASIntWeb.Services;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
+using JASIntWeb.Services.MediaMigration;
 using Microsoft.Extensions.Logging.Abstractions;
-using ImageMagick;
+using NSubstitute;
 
 namespace JASIntWeb.Tests.Unit;
 
-public class ImageCompressionAndPictureTests : IDisposable
+public class ImageCompressionAndPictureTests
 {
-    private readonly string _tempWebRoot;
+    private const string Base = "https://media.example.test/jas-media";
+    private const string Id = "0123456789abcdef0123456789abcdef";
+    private static S3StorageOptions Options() => new() { Bucket = "jas-media", PublicBaseUrl = Base, EndpointUrl = "https://storage.example.test" };
+    private static ImageOptimizerService Optimizer() => new(NullLogger<ImageOptimizerService>.Instance);
 
-    public ImageCompressionAndPictureTests()
+    [Test]
+    public async Task ManagedImages_StaticPairAndAnimatedWebpOnly()
     {
-        _tempWebRoot = Path.Combine(Path.GetTempPath(), "jas_test_webroot_" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_tempWebRoot);
+        var url = $"{Base}/images/static/{Id}.webp";
+        await ImageUrlHelper.GetAvifUrl(url).Should().BeEqualTo(url.Replace(".webp", ".avif"));
+        await ImageUrlHelper.GetAutoOptimizedUrl(url.Replace(".webp", ".avif")).Should().BeEqualTo(url);
+        await ImageUrlHelper.GetAvifUrl(url.Replace("/static/", "/animated/")).Should().BeNull();
+        await ImageUrlHelper.GetAvifUrl("https://external.example.test/photo.png").Should().BeNull();
+        await ImageUrlHelper.GetAvifUrl("/jas-logo.png").Should().BeNull();
+        await ImageUrlHelper.GetAvifUrl(url + "?signed=1").Should().BeNull();
     }
 
-    public void Dispose()
+    [Test]
+    public async Task StaticConversion_ProducesOnlyModernFormatsAndPreservesTransparency()
     {
-        if (Directory.Exists(_tempWebRoot))
+        using var image = new MagickImage(MagickColors.Transparent, 80, 40);
+        using var stream = new MemoryStream(image.ToByteArray(MagickFormat.Png));
+        var result = await Optimizer().OptimizeImageAsync(stream, "alpha.png");
+        using var webp = new MagickImage(result.WebpBytes);
+        using var avif = new MagickImage(result.AvifBytes!);
+        await webp.Format.Should().BeEqualTo(MagickFormat.WebP);
+        await avif.Format.Should().BeEqualTo(MagickFormat.Avif);
+        await webp.HasAlpha.Should().BeTrue();
+        await avif.HasAlpha.Should().BeTrue();
+        await result.Width.Should().BeEqualTo(80);
+        await result.Height.Should().BeEqualTo(40);
+        await result.IsAnimated.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task AnimatedConversion_PreservesFramesTimingAndLoopsWithoutAvif()
+    {
+        using var input = new MagickImageCollection();
+        input.Add(new MagickImage(MagickColors.Red, 24, 24) { AnimationDelay = 15, AnimationIterations = 3 });
+        input.Add(new MagickImage(MagickColors.Blue, 24, 24) { AnimationDelay = 25, AnimationIterations = 3 });
+        using var stream = new MemoryStream(input.ToByteArray(MagickFormat.Gif));
+        var result = await Optimizer().OptimizeImageAsync(stream, "animation.gif");
+        using var output = new MagickImageCollection(result.WebpBytes);
+        await result.AvifBytes.Should().BeNull();
+        await output.Count.Should().BeEqualTo(2);
+        await output[0].AnimationDelay.Should().BeEqualTo(15u);
+        await output[1].AnimationDelay.Should().BeEqualTo(25u);
+        await output[0].AnimationIterations.Should().BeEqualTo(3u);
+    }
+
+    [Test]
+    public async Task Conversion_DownsizesAndRejectsExcessiveFrames()
+    {
+        using var image = new MagickImage(MagickColors.Green, 2400, 1200);
+        using var stream = new MemoryStream(image.ToByteArray(MagickFormat.Png));
+        var result = await Optimizer().OptimizeImageAsync(stream, "large.png");
+        await result.Width.Should().BeEqualTo(2048);
+        await result.Height.Should().BeEqualTo(1024);
+        using var frames = new MagickImageCollection();
+        for (var i = 0; i < 101; i++) frames.Add(new MagickImage(i % 2 == 0 ? MagickColors.Red : MagickColors.Blue, 2, 2) { AnimationDelay = 1 });
+        using var animation = new MemoryStream(frames.ToByteArray(MagickFormat.Gif));
+        await Assert.ThrowsAsync<InvalidDataException>(() => Optimizer().OptimizeImageAsync(animation, "too-many.gif"));
+    }
+
+    [Test]
+    public async Task S3Upload_WritesPairWithContentTypesAndImmutableCaching()
+    {
+        var client = Substitute.For<IAmazonS3>();
+        List<(string Key, string Type, string Cache)> puts = [];
+        client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            try { Directory.Delete(_tempWebRoot, true); } catch { /* ignore */ }
+            var request = call.Arg<PutObjectRequest>(); puts.Add((request.Key, request.ContentType, request.Headers.CacheControl));
+            return Task.FromResult(new PutObjectResponse { HttpStatusCode = HttpStatusCode.OK });
+        });
+        var optimizer = Substitute.For<IImageOptimizerService>();
+        optimizer.OptimizeImageAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new OptimizedImageSet([1, 2], [3, 4], 1, 1));
+        var storage = new S3StorageService(client, Options(), optimizer, NullLogger<S3StorageService>.Instance);
+        var url = await storage.UploadAssetAsync(new MemoryStream([1]), "x.png", "image/png", Id);
+        await url.Should().BeEqualTo($"{Base}/images/static/{Id}.webp");
+        await puts.Count.Should().BeEqualTo(2);
+        await puts[0].Type.Should().BeEqualTo("image/webp");
+        await puts[1].Type.Should().BeEqualTo("image/avif");
+        await puts.All(put => put.Cache.Contains("immutable") && !put.Key.EndsWith(".png")).Should().BeTrue();
+        await storage.DeleteFileAsync(url);
+        await client.Received(2).DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>());
+        await storage.DeleteFileAsync("https://foreign.example.test/" + Id + ".webp");
+        await client.Received(2).DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task S3Upload_PartialFailureCleansPairAndMissingConfigDoesNotWrite()
+    {
+        var client = Substitute.For<IAmazonS3>();
+        var optimizer = Substitute.For<IImageOptimizerService>();
+        optimizer.OptimizeImageAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new OptimizedImageSet([1], [2], 1, 1));
+        client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>()).Returns(call =>
+            call.Arg<PutObjectRequest>().Key.EndsWith(".avif") ? Task.FromException<PutObjectResponse>(new AmazonS3Exception("Fake failure")) : Task.FromResult(new PutObjectResponse()));
+        var storage = new S3StorageService(client, Options(), optimizer, NullLogger<S3StorageService>.Instance);
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => storage.UploadAssetAsync(new MemoryStream([1]), "x.png", "image/png", Id));
+        await client.Received(2).DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>());
+        var missing = new S3StorageService(client, new(), optimizer, NullLogger<S3StorageService>.Instance);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => missing.UploadFileAsync(new MemoryStream([1]), "x.png", "image/png"));
+        await client.Received(2).PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task SvgConversion_RasterizesSafeVectorsAndRejectsExternalPaintUrls()
+    {
+        var client = Substitute.For<IAmazonS3>();
+        List<string> types = [];
+        client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>()).Returns(call =>
+        { types.Add(call.Arg<PutObjectRequest>().ContentType); return Task.FromResult(new PutObjectResponse()); });
+        var storage = new S3StorageService(client, Options(), Optimizer(), NullLogger<S3StorageService>.Instance);
+        const string safe = "<svg xmlns='http://www.w3.org/2000/svg' width='40' height='20'><rect width='40' height='20' fill='blue'/></svg>";
+        await ImageUploadValidator.UploadAsync(storage, new MemoryStream(System.Text.Encoding.UTF8.GetBytes(safe)), "logo.svg", "image/svg+xml", default);
+        await string.Join(",", types).Should().BeEqualTo("image/webp,image/avif");
+        var unsafeSvg = safe.Replace("fill='blue'", "fill='url(#local) url(https://external.example.test/image)'");
+        await Assert.ThrowsAsync<InvalidDataException>(() => ImageUploadValidator.UploadAsync(storage, new MemoryStream(System.Text.Encoding.UTF8.GetBytes(unsafeSvg)), "logo.svg", "image/svg+xml", default));
+        await types.Count.Should().BeEqualTo(2);
+    }
+
+    [Test]
+    public async Task S3Animation_WritesOnlyWebpAndDeletesOnlyOwnedObjects()
+    {
+        var client = Substitute.For<IAmazonS3>();
+        var optimizer = Substitute.For<IImageOptimizerService>();
+        optimizer.OptimizeImageAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new OptimizedImageSet([1], null, 1, 1));
+        var storage = new S3StorageService(client, Options(), optimizer, NullLogger<S3StorageService>.Instance);
+        var url = await storage.UploadAssetAsync(new MemoryStream([1]), "x.gif", "image/gif", Id);
+        await url.Should().BeEqualTo($"{Base}/images/animated/{Id}.webp");
+        await client.Received(1).PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>());
+        await storage.DeleteFileAsync(url);
+        await client.Received(1).DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task S3Configuration_SupportsNeonEndpointAndNativeAwsRegion()
+    {
+        var options = Options(); options.AccessKeyId = "fixture"; options.SecretAccessKey = "fixture";
+        using var neon = options.CreateClient();
+        await ((AmazonS3Config)neon.Config).ForcePathStyle.Should().BeTrue();
+        await ((AmazonS3Config)neon.Config).ServiceURL.Should().BeEqualTo(options.EndpointUrl + "/");
+        options.EndpointUrl = null; options.ForcePathStyle = false;
+        using var aws = options.CreateClient();
+        await ((AmazonS3Config)aws.Config).RegionEndpoint.SystemName.Should().BeEqualTo("ap-southeast-1");
+        await ((AmazonS3Config)aws.Config).ForcePathStyle.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task MigrationCheckpoint_CancellationPreservesBackupAndRetryRetainsChecksums()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "jas-media-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "manifest.json");
+        try
+        {
+            var manifest = new MediaMigrationManifest { DatabaseFingerprint = "fixture", DestinationBaseUrl = Base,
+                Assets = [new() { SourceUrl = "https://legacy.example.test/a.png", Identity = Id, DestinationUrl = NewUrl(), VerifiedObjects = new() { [NewUrl()] = "checksum" } }] };
+            await MediaMigrationManifest.SaveAsync(path, manifest, default);
+            manifest.Applied = true;
+            await Assert.ThrowsAsync<OperationCanceledException>(() => MediaMigrationManifest.SaveAsync(path, manifest, new CancellationToken(true)));
+            var original = System.Text.Json.JsonSerializer.Deserialize<MediaMigrationManifest>(await File.ReadAllTextAsync(path))!;
+            await original.Applied.Should().BeFalse();
+            await MediaMigrationManifest.SaveAsync(path, manifest, default);
+            var resumed = System.Text.Json.JsonSerializer.Deserialize<MediaMigrationManifest>(await File.ReadAllTextAsync(path))!;
+            await resumed.Assets[0].VerifiedObjects[NewUrl()].Should().BeEqualTo("checksum");
+            await resumed.Applied.Should().BeTrue();
+            if (!OperatingSystem.IsWindows()) await File.GetUnixFileMode(path).Should().BeEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
+        finally { Directory.Delete(directory, true); }
+        static string NewUrl() => $"{Base}/images/static/{Id}.webp";
     }
 
     [Test]
-    public async Task CloudinaryStorageService_ParsesCloudinaryUrlCorrectly()
+    public async Task MigrationUrls_RemoveNegotiationButPreserveVisualTransformsAndHtml()
     {
-        var inMemory = new Dictionary<string, string?>
-        {
-            ["CLOUDINARY_URL"] = "cloudinary://885657851225788:Y05Cs76XObWlxs4b_DcjAuo4Pdo@ziaulhasanhamim"
-        };
-        var config = new ConfigurationBuilder().AddInMemoryCollection(inMemory).Build();
-        var envMock = new TestWebHostEnvironment { WebRootPath = _tempWebRoot };
-        var optimizer = new ImageOptimizerService(NullLogger<ImageOptimizerService>.Instance);
-        var storage = new CloudinaryStorageService(config, envMock, optimizer, NullLogger<CloudinaryStorageService>.Instance);
-
-        await storage.IsConfigured.Should().BeTrue();
-
-        using var testImage = new MagickImage(MagickColors.ForestGreen, 50, 50);
-        using var stream = new MemoryStream();
-        testImage.Write(stream, MagickFormat.Jpeg);
-        stream.Position = 0;
-
-        var uploadedUrl = await storage.UploadFileAsync(stream, "test_earbuds.jpg", "image/jpeg");
-        Console.WriteLine($"UPLOADED URL: {uploadedUrl}");
-        await uploadedUrl.Should().Contain("cloudinary.com");
-    }
-
-    [Test]
-    public async Task ImageUrlHelper_ResolvesLocalAvifAndWebpUrls()
-    {
-        const string input = "/uploads/products/202611/earbuds_a1b2c3d4.jpg";
-
-        var avif = ImageUrlHelper.GetAvifUrl(input);
-        var webp = ImageUrlHelper.GetWebpUrl(input);
-
-        await avif.Should().BeEqualTo("/uploads/products/202611/earbuds_a1b2c3d4.avif");
-        await webp.Should().BeEqualTo("/uploads/products/202611/earbuds_a1b2c3d4.webp");
-    }
-
-    [Test]
-    public async Task ImageUrlHelper_ResolvesCloudinaryAvifAndWebpUrls()
-    {
-        const string input = "https://res.cloudinary.com/jasint/image/upload/v1700000000/jas-storefront/202611/earbuds.jpg";
-
-        var avif = ImageUrlHelper.GetAvifUrl(input);
-        var webp = ImageUrlHelper.GetWebpUrl(input);
-        var auto = ImageUrlHelper.GetAutoOptimizedUrl(input);
-
-        await avif.Should().NotBeNull();
-        await avif!.Contains("/upload/f_avif,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-
-        await webp.Should().NotBeNull();
-        await webp!.Contains("/upload/f_webp,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-
-        await auto.Contains("/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-    }
-
-    [Test]
-    public async Task ImageUrlHelper_PreservesAndSwapsTransformationsForCloudinaryAutoUrls()
-    {
-        const string inputWithAuto = "https://res.cloudinary.com/jasint/image/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg";
-
-        var avif = ImageUrlHelper.GetAvifUrl(inputWithAuto);
-        var webp = ImageUrlHelper.GetWebpUrl(inputWithAuto);
-        var auto = ImageUrlHelper.GetAutoOptimizedUrl(inputWithAuto);
-
-        await avif.Should().NotBeNull();
-        await avif!.Contains("/upload/f_avif,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-
-        await webp.Should().NotBeNull();
-        await webp!.Contains("/upload/f_webp,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-
-        await auto.Contains("/upload/f_auto,q_auto/v1700000000/jas-storefront/202611/earbuds.jpg").Should().BeTrue();
-    }
-
-    [Test]
-    public async Task ImageUrlHelper_ResolvesUnsplashAvifAndWebpUrls()
-    {
-        const string input = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80";
-
-        var avif = ImageUrlHelper.GetAvifUrl(input);
-        var webp = ImageUrlHelper.GetWebpUrl(input);
-
-        await avif.Should().NotBeNull();
-        await avif!.Contains("fm=avif").Should().BeTrue();
-
-        await webp.Should().NotBeNull();
-        await webp!.Contains("fm=webp").Should().BeTrue();
-    }
-
-    [Test]
-    public async Task ImageUrlHelper_IgnoresSvgAndDataUris()
-    {
-        await ImageUrlHelper.IsVectorOrDataUri("/icons/cart.svg").Should().BeTrue();
-        await ImageUrlHelper.IsVectorOrDataUri("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==").Should().BeTrue();
-
-        await ImageUrlHelper.GetAvifUrl("/icons/cart.svg").Should().BeNull();
-        await ImageUrlHelper.GetWebpUrl("/icons/cart.svg").Should().BeNull();
-        await ImageUrlHelper.GetAvifUrl("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==").Should().BeNull();
-    }
-
-    [Test]
-    public async Task ImageOptimizerService_GeneratesValidWebpAndAvifPayloads()
-    {
-        var optimizer = new ImageOptimizerService(NullLogger<ImageOptimizerService>.Instance);
-
-        // Generate synthetic PNG test image
-        using var testImage = new MagickImage(MagickColors.DodgerBlue, 200, 200);
-        using var stream = new MemoryStream();
-        testImage.Write(stream, MagickFormat.Png);
-        stream.Position = 0;
-
-        var result = await optimizer.OptimizeImageAsync(stream, "sample-product.png", "image/png");
-
-        await result.Should().NotBeNull();
-        await (result.PrimaryBytes.Length > 0).Should().BeTrue();
-        await (result.WebpBytes.Length > 0).Should().BeTrue();
-        await (result.AvifBytes.Length > 0).Should().BeTrue();
-        await result.Width.Should().BeEqualTo(200);
-        await result.Height.Should().BeEqualTo(200);
-
-        // Verify that the generated bytes are valid Magick images in their respective formats
-        using var readWebp = new MagickImage(result.WebpBytes);
-        await (readWebp.Format == MagickFormat.WebP).Should().BeTrue();
-
-        using var readAvif = new MagickImage(result.AvifBytes);
-        await (readAvif.Format == MagickFormat.Avif).Should().BeTrue();
-    }
-
-    [Test]
-    public async Task CloudinaryStorageService_LocalFallback_SavesAndDeletesAllThreeFormats()
-    {
-        var config = new ConfigurationBuilder().Build();
-        var envMock = new TestWebHostEnvironment { WebRootPath = _tempWebRoot };
-        var optimizer = new ImageOptimizerService(NullLogger<ImageOptimizerService>.Instance);
-        var storage = new CloudinaryStorageService(config, envMock, optimizer, NullLogger<CloudinaryStorageService>.Instance);
-
-        using var testImage = new MagickImage(MagickColors.ForestGreen, 150, 150);
-        using var stream = new MemoryStream();
-        testImage.Write(stream, MagickFormat.Jpeg);
-        stream.Position = 0;
-
-        var uploadedUrl = await storage.UploadFileAsync(stream, "test_earbuds.jpg", "image/jpeg");
-        await uploadedUrl.StartsWith("/uploads/products/").Should().BeTrue();
-
-        var primaryRelative = uploadedUrl.TrimStart('/');
-        var primaryDiskPath = Path.Combine(_tempWebRoot, primaryRelative.Replace('/', Path.DirectorySeparatorChar));
-        var webpDiskPath = Path.ChangeExtension(primaryDiskPath, ".webp");
-        var avifDiskPath = Path.ChangeExtension(primaryDiskPath, ".avif");
-
-        // Verify that primary, .webp, and .avif were all automatically generated and written to disk
-        await File.Exists(primaryDiskPath).Should().BeTrue();
-        await File.Exists(webpDiskPath).Should().BeTrue();
-        await File.Exists(avifDiskPath).Should().BeTrue();
-
-        // Now test deletion of the image set
-        await storage.DeleteFileAsync(uploadedUrl);
-
-        await File.Exists(primaryDiskPath).Should().BeFalse();
-        await File.Exists(webpDiskPath).Should().BeFalse();
-        await File.Exists(avifDiskPath).Should().BeFalse();
-    }
-
-    private sealed class TestWebHostEnvironment : IWebHostEnvironment
-    {
-        public string WebRootPath { get; set; } = "";
-        public Microsoft.Extensions.FileProviders.IFileProvider WebRootFileProvider { get; set; } = default!;
-        public string EnvironmentName { get; set; } = "Development";
-        public string ApplicationName { get; set; } = "JASIntWeb";
-        public string ContentRootPath { get; set; } = "";
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = default!;
+        const string source = "https://res.cloudinary.com/store/image/upload/f_auto,q_auto/c_fill,w_300/v123/jas-storefront/photo.png";
+        const string canonical = "https://res.cloudinary.com/store/image/upload/c_fill,w_300/v123/jas-storefront/photo.png";
+        await LegacyMediaUrls.Canonical(source).Should().BeEqualTo(canonical);
+        var destination = $"{Base}/images/static/{Id}.webp";
+        await LegacyMediaUrls.Replace($"<p>Text</p><img src=\"{source}\">", new Dictionary<string, string> { [canonical] = destination }).Should().BeEqualTo($"<p>Text</p><img src=\"{destination}\">");
+        await Assert.ThrowsAsync<InvalidDataException>(() => Task.FromResult(LegacyMediaUrls.Replace(source, new Dictionary<string, string>())));
     }
 }

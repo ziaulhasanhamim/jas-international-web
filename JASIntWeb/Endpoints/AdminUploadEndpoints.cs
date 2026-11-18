@@ -17,6 +17,24 @@ public static class AdminUploadEndpoints
         uploads.MapPost("/product-images", UploadProductImages);
         uploads.MapPost("/brand-logo", UploadBrandLogo);
         uploads.MapPost("/image", UploadImage);
+        uploads.MapPost("/cache/invalidate", InvalidateMediaCacheAsync);
+    }
+
+    private static async Task<Results<NoContent, BadRequest<EndpointError>>> InvalidateMediaCacheAsync(HttpContext context, IAntiforgery antiforgery,
+        CatalogService catalog, Microsoft.Extensions.Caching.Hybrid.HybridCache cache, CancellationToken ct)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        return (await FormRequestReader.ReadAsync(context, antiforgery, ct)) switch
+        {
+            IFormCollection form => await Clear(),
+            EndpointError error => TypedResults.BadRequest(error)
+        };
+        async Task<NoContent> Clear()
+        {
+            await catalog.InvalidateAllAsync();
+            await DeliverySettingsService.InvalidateCacheAsync(cache);
+            return TypedResults.NoContent();
+        }
     }
 
     private static Ok<UploadSecurityResponse> Security(HttpContext context, IAntiforgery antiforgery)

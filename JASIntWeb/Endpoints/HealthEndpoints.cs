@@ -19,6 +19,8 @@ public static class HealthEndpoints
     private static Task WriteResponseAsync(HttpContext context, HealthReport report)
     {
         context.Response.Headers.CacheControl = "no-store";
+        if (context.RequestServices.GetRequiredService<JASIntWeb.Services.S3StorageOptions>().IsConfigured)
+            context.Response.Headers["X-Media-Pipeline"] = "s3-avif-webp-v1";
         if (HttpMethods.IsHead(context.Request.Method)) return Task.CompletedTask;
 
         // Public probes expose status, never connection strings or exception details.

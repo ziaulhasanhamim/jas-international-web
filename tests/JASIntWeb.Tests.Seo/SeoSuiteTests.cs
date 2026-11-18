@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -355,23 +356,11 @@ public class SeoSuiteTests
     [Test]
     public async Task ImageUrlHelper_ResolvesAllSupportedCdnPatterns()
     {
-        // Local upload
-        var localAvif = ImageUrlHelper.GetAvifUrl("/uploads/products/202611/headphone.jpg");
-        var localWebp = ImageUrlHelper.GetWebpUrl("/uploads/products/202611/headphone.jpg");
-        await localAvif.Should().BeEqualTo("/uploads/products/202611/headphone.avif");
-        await localWebp.Should().BeEqualTo("/uploads/products/202611/headphone.webp");
+        const string url = "https://media.example.test/jas-media/images/static/0123456789abcdef0123456789abcdef.webp";
+        await ImageUrlHelper.GetAvifUrl(url).Should().BeEqualTo(url.Replace(".webp", ".avif"));
+        await ImageUrlHelper.GetWebpUrl(url).Should().BeEqualTo(url);
+        await ImageUrlHelper.GetAvifUrl("https://external.example.test/photo.jpg").Should().BeNull();
 
-        // Cloudinary CDN
-        var cloudAvif = ImageUrlHelper.GetAvifUrl("https://res.cloudinary.com/jasint/image/upload/v1234/gadget.png");
-        var cloudWebp = ImageUrlHelper.GetWebpUrl("https://res.cloudinary.com/jasint/image/upload/v1234/gadget.png");
-        await cloudAvif!.Contains("/upload/f_avif,q_auto/v1234/gadget.png").Should().BeTrue();
-        await cloudWebp!.Contains("/upload/f_webp,q_auto/v1234/gadget.png").Should().BeTrue();
-
-        // Unsplash CDN
-        var unsplashAvif = ImageUrlHelper.GetAvifUrl("https://images.unsplash.com/photo-1234?w=800");
-        var unsplashWebp = ImageUrlHelper.GetWebpUrl("https://images.unsplash.com/photo-1234?w=800");
-        await unsplashAvif!.Contains("fm=avif").Should().BeTrue();
-        await unsplashWebp!.Contains("fm=webp").Should().BeTrue();
     }
 
     [Test]
@@ -427,18 +416,23 @@ public class SeoSuiteTests
     }
 
     [Test]
-    public async Task PictureImageComponent_EmitsPictureWithAvifAndWebpSources()
+    public async Task PictureImageComponent_RendersStaticAvifWithWebpAndAnimationWithoutPhantomAvif()
     {
-        var repoRoot = GetRepositoryRoot();
-        var componentPath = Path.Combine(repoRoot, "JASIntWeb.Client", "Components", "Common", "PictureImage.razor");
-        var componentContent = await File.ReadAllTextAsync(componentPath);
-
-        await componentContent.Should().Contain("<picture");
-        await componentContent.Should().Contain("type=\"image/avif\"");
-        await componentContent.Should().Contain("type=\"image/webp\"");
-        await componentContent.Should().Contain("<img");
-        await componentContent.Should().Contain("loading=\"@Loading\"");
-        await componentContent.Should().Contain("decoding=\"@Decoding\"");
+        await using var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new Microsoft.AspNetCore.Components.Web.HtmlRenderer(services, services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>());
+        const string url = "https://media.example.test/jas-media/images/static/0123456789abcdef0123456789abcdef.webp";
+        async Task<string> Render(string source) => await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var component = await renderer.RenderComponentAsync<JASIntWeb.Client.Components.Common.PictureImage>(Microsoft.AspNetCore.Components.ParameterView.FromDictionary(new Dictionary<string, object?> { ["Src"] = source, ["Alt"] = "Fixture" }));
+            return component.ToHtmlString();
+        });
+        var html = await Render(url);
+        await html.Should().Contain($"srcset=\"{url.Replace(".webp", ".avif")}\"");
+        await html.Should().Contain($"src=\"{url}\"");
+        await html.Should().Contain("alt=\"Fixture\"");
+        var animated = await Render(url.Replace("/static/", "/animated/"));
+        await animated.Contains("image/avif").Should().BeFalse();
+        await animated.Should().Contain($"src=\"{url.Replace("/static/", "/animated/")}\"");
     }
 
     [Test]
