@@ -14,6 +14,14 @@ export function getCartToken() {
 }
 
 /**
+ * Clears the cart cookie and resets cart badges.
+ */
+export function clearCartToken() {
+    document.cookie = 'jas_cart_id=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+    updateCartBadges(0);
+}
+
+/**
  * Updates all cart badge elements across the page with the latest count.
  * @param {number} count
  */
@@ -144,6 +152,9 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
 
         if (response.ok) {
             const cart = await response.json();
+            if (cart?.token) {
+                document.cookie = `jas_cart_id=${encodeURIComponent(cart.token)}; path=/; max-age=2592000; SameSite=Lax`;
+            }
             const totalCount = cart.itemCount ?? (Array.isArray(cart.items) ? cart.items.reduce((s, x) => s + (x.quantity || 0), 0) : 1);
             updateCartBadges(totalCount);
             showCartToast('Added to your shopping cart!', 'success');
@@ -275,6 +286,7 @@ export function initCart() {
 // Expose callbacks globally on window for Blazor Interop and inline handlers
 if (typeof window !== 'undefined') {
     window.jasGetCartToken = getCartToken;
+    window.jasClearCartCookie = clearCartToken;
     window.jasUpdateCartBadge = updateCartBadges;
     window.jasUpdateCartCount = updateCartBadges;
     window.jasRefreshCart = refreshCartBadge;

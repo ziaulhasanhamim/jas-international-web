@@ -161,4 +161,51 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
 
         await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, checkoutRequest));
     }
+
+    [Test]
+    public async Task AfterCheckout_AddingToCartOrGettingCart_WorksWithoutException()
+    {
+        await using var scope = CreateScope();
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var token = Guid.CreateVersion7();
+        await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+
+        var checkoutRequest = new CheckoutRequest
+        {
+            RequestId = Guid.NewGuid(),
+            CartToken = token,
+            CustomerName = "Test Customer",
+            PhoneNumber = "01712345678",
+            District = "Dhaka",
+            Thana = "Dhanmondi",
+            City = "Dhanmondi",
+            Address = "Test address",
+            PaymentMethod = "Pending",
+            Items = [new CartLineRequest(1, 1)]
+        };
+
+        var result = await shop.CheckoutAsync(null, checkoutRequest);
+        await result.Should().NotBeNull();
+
+        // 1. Getting cart after checkout returns empty cart without throwing DbUpdateException
+        var cartAfterCheckout = await shop.GetCartAsync(token, null);
+        await cartAfterCheckout.Items.Count.Should().BeEqualTo(0);
+
+        // 2. Adding to cart after checkout generates a fresh active cart and succeeds
+        var newCart = await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+        await newCart.Items.Count.Should().BeEqualTo(1);
+        await newCart.Token.HasValue.Should().BeTrue();
+        await newCart.Token!.Value.Should().NotBeEqualTo(token);
+
+        // 3. Verify in database: converted cart remains intact and new active cart exists
+        var convertedCart = await db.Carts.AsNoTracking().SingleOrDefaultAsync(c => c.Token == token);
+        await convertedCart.Should().NotBeNull();
+        await convertedCart!.Status.Should().BeEqualTo(CartStatus.Converted);
+
+        var activeCart = await db.Carts.AsNoTracking().SingleOrDefaultAsync(c => c.Token == newCart.Token!.Value);
+        await activeCart.Should().NotBeNull();
+        await activeCart!.Status.Should().BeEqualTo(CartStatus.Active);
+    }
 }

@@ -11,7 +11,7 @@ public sealed record CartItemDto(int VariantId, string Name, string Slug, string
     public decimal LineTotal => Price * Quantity;
 }
 
-public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items)
+public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items, Guid? Token = null)
 {
     public decimal Subtotal => Items.Sum(x => x.LineTotal);
     public int ItemCount => Items.Sum(x => x.Quantity);

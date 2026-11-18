@@ -124,3 +124,10 @@ test('Successful shared Buy Now restores its button and does not reload the docu
     assert.equal(browser.navigations.length, 1);
     assert.deepEqual(browser.reloads, []);
 });
+
+test('clearCartToken expires cookie and resets badges', () => {
+    const browser = createBrowser();
+    browser.context.document.cookie = 'jas_cart_id=abc-123';
+    browser.context.clearCartToken();
+    assert.ok(browser.context.document.cookie.includes('max-age=0'));
+});

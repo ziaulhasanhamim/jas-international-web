@@ -57,9 +57,10 @@ public sealed class ShoppingService(
             return cart;
         }
 
+        var canUseToken = token.HasValue && token.Value != Guid.Empty && !await db.Carts.AnyAsync(c => c.Token == token.Value);
         cart = new Cart
         {
-            Token = (token.HasValue && token.Value != Guid.Empty) ? token.Value : Guid.CreateVersion7(),
+            Token = canUseToken ? token!.Value : Guid.CreateVersion7(),
             UserId = userId,
             Status = CartStatus.Active,
             LastActivityAt = DateTimeOffset.UtcNow,
@@ -198,9 +199,38 @@ public sealed class ShoppingService(
 
     public async Task<CartDto> GetCartAsync(Guid? token, int? userId)
     {
-        var cart = await ActiveCartAsync(token, userId);
+        Cart? cart = null;
+
+        if (userId.HasValue)
+        {
+            cart = await db.Carts.Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.UserId == userId.Value && c.Status == CartStatus.Active);
+
+            if (cart is null && token.HasValue && token.Value != Guid.Empty)
+            {
+                cart = await db.Carts.Include(c => c.Items)
+                    .FirstOrDefaultAsync(c => c.Token == token.Value && c.Status == CartStatus.Active);
+                if (cart != null)
+                {
+                    cart.UserId = userId.Value;
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+        else if (token.HasValue && token.Value != Guid.Empty)
+        {
+            cart = await db.Carts.Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.Token == token.Value && c.Status == CartStatus.Active);
+        }
+
+        if (cart is null)
+        {
+            return new CartDto(userId.HasValue, []);
+        }
+
         var lines = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
-        return await ResolveAsync(lines, userId.HasValue);
+        var resolved = await ResolveAsync(lines, userId.HasValue);
+        return resolved with { Token = cart.Token };
     }
 
     public Task<CartDto> GetCartAsync(int userId) => GetCartAsync(null, userId);

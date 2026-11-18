@@ -95,9 +95,14 @@ public sealed class ServerCartBackend(
             }
         }
         var cart = await shop.ChangeAsync(token, id, line, add);
-        if (!_circuitCartToken.HasValue)
+        if (cart.Token.HasValue && _circuitCartToken != cart.Token)
         {
-            _circuitCartToken = token;
+            _circuitCartToken = cart.Token;
+            var httpContext = httpContextAccessor.HttpContext;
+            if (httpContext != null && !httpContext.Response.HasStarted)
+            {
+                CartEndpoints.SetCartCookie(httpContext, cart.Token.Value);
+            }
         }
         return cart;
     });

@@ -613,6 +613,7 @@
             var checkoutRequest = new CheckoutRequest
             {
                 RequestId = checkoutToken,
+                CartToken = Cart.State?.Cart?.Token,
                 CustomerName = customerName.Trim(),
                 PhoneNumber = phoneNumber.Trim(),
                 Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
@@ -653,6 +654,15 @@
 
             try
             {
+                await JS.InvokeVoidAsync("window.jasClearCartCookie");
+            }
+            catch
+            {
+                // ignore
+            }
+
+            try
+            {
                 await JS.InvokeVoidAsync("window.jasRecordGuestOrder", result.OrderId, result.PublicToken.ToString(), result.Total);
             }
             catch
@@ -669,7 +679,8 @@
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            Console.WriteLine($"[Checkout] Unexpected error during checkout: {ex}");
+            error = "An unexpected error occurred while placing your order. Please try again.";
             isSubmitting = false;
         }
     }

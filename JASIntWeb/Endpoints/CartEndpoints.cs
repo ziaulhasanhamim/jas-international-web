@@ -185,6 +185,10 @@ public static class CartEndpoints
             try
             {
                 var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
+                if (cart.Token.HasValue && cart.Token.Value != token)
+                {
+                    SetCartCookie(context, cart.Token.Value);
+                }
                 return cart.Items.Sum(i => i.Quantity);
             }
             catch (ShopException)
@@ -211,7 +215,12 @@ public static class CartEndpoints
         {
             return new CartDto(false, []);
         }
-        return await shop.GetCartAsync(token, userId);
+        var cart = await shop.GetCartAsync(token, userId);
+        if (cart.Token.HasValue && (!token.HasValue || cart.Token.Value != token.Value))
+        {
+            SetCartCookie(context, cart.Token.Value);
+        }
+        return cart;
     }
 
     public static Task<CartDto> Resolve([FromBody] List<CartLineRequest> items, ShoppingService shop) =>
@@ -254,6 +263,10 @@ public static class CartEndpoints
         try
         {
             var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, line.Quantity, line.ProductId), true);
+            if (cart.Token.HasValue && cart.Token.Value != token)
+            {
+                SetCartCookie(context, cart.Token.Value);
+            }
             return Results.Ok(cart);
         }
         catch (ShopException ex)
@@ -272,6 +285,10 @@ public static class CartEndpoints
         try
         {
             var cart = await shop.ChangeAsync(token, userId, line, false);
+            if (cart.Token.HasValue && cart.Token.Value != token)
+            {
+                SetCartCookie(context, cart.Token.Value);
+            }
             return Results.Ok(cart);
         }
         catch (ShopException ex)
