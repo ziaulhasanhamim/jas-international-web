@@ -25,7 +25,9 @@ public class ImageCompressionAndPictureTests
         await ImageUrlHelper.GetAutoOptimizedUrl(url.Replace(".webp", ".avif")).Should().BeEqualTo(url);
         await ImageUrlHelper.GetAvifUrl(url.Replace("/static/", "/animated/")).Should().BeNull();
         await ImageUrlHelper.GetAvifUrl("https://external.example.test/photo.png").Should().BeNull();
-        await ImageUrlHelper.GetAvifUrl("/jas-logo.png").Should().BeNull();
+        await ImageUrlHelper.GetAvifUrl("/jas-logo.png").Should().BeEqualTo("/jas-logo.avif");
+        await ImageUrlHelper.GetAutoOptimizedUrl("/jas-logo.png").Should().BeEqualTo("/jas-logo.webp");
+        await ImageUrlHelper.GetAvifUrl("/uploads/legacy.png").Should().BeNull();
         await ImageUrlHelper.GetAvifUrl(url + "?signed=1").Should().BeNull();
     }
 
