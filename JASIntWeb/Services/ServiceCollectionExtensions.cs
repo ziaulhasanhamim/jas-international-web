@@ -5,6 +5,7 @@ using JASIntWeb.Services.Analytics;
 using JASIntWeb.Services.Meta;
 using JASIntWeb.Services.Seo;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
@@ -113,6 +114,7 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddScoped<ICartBackend, ServerCartBackend>();
         builder.Services.AddQuickGridEntityFrameworkAdapter();
         builder.Services.AddRazorComponents()
+            .RegisterPersistentService<CartService>(RenderMode.InteractiveAuto)
             .AddInteractiveServerComponents(options =>
             {
                 options.DetailedErrors = builder.Environment.IsDevelopment();

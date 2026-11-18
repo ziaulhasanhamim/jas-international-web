@@ -52,7 +52,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await Cart.RefreshAsync();
+        await Cart.InitializeAsync();
         if (Cart.Error is null)
         {
             token = await Cart.CheckoutTokenAsync();

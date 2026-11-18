@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=high
+      - name: Cart navigation tests
+        run: node --test tests/javascript/*.test.mjs
       - name: Generate and verify CSS
         run: |
           npm run css

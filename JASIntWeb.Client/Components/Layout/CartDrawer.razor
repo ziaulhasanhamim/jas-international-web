@@ -41,7 +41,16 @@
 
             <!-- Items -->
             <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                @if (Cart.Items.Count == 0)
+                @if (!Cart.IsInitialized || Cart.IsBusy && !Cart.HasCart)
+                {
+                    <p role="status">Loading your cart…</p>
+                }
+                else if (!Cart.HasCart && Cart.Error is not null)
+                {
+                    <p role="alert">@Cart.Error</p>
+                    <button type="button" @onclick="Cart.RefreshAsync">Retry</button>
+                }
+                else if (Cart.Items.Count == 0)
                 {
                     <div class="py-16 text-center">
                         <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-3">
@@ -71,7 +80,7 @@
                                     
                                     <!-- Stepper in Drawer -->
                                     <div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                                        <button class="size-6 rounded bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center justify-center transition disabled:opacity-40" @onclick="() => Change(item, item.Quantity - 1)">−</button>
+                                        <button class="size-6 rounded bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center justify-center transition disabled:opacity-40" disabled="@Cart.IsBusy" @onclick="() => Change(item, item.Quantity - 1)">−</button>
                                         <span class="w-6 text-center text-xs font-bold text-slate-800 tabular-nums">
                                             @if (isPending)
                                             {
@@ -82,7 +91,7 @@
                                                 @item.Quantity
                                             }
                                         </span>
-                                        <button disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)" class="size-6 rounded bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center justify-center transition disabled:opacity-40" @onclick="() => Change(item, item.Quantity + 1)">+</button>
+                                        <button disabled="@(Cart.IsBusy || item.Quantity >= item.Stock || item.Quantity >= 99)" class="size-6 rounded bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center justify-center transition disabled:opacity-40" @onclick="() => Change(item, item.Quantity + 1)">+</button>
                                     </div>
                                 </div>
                             </div>
@@ -90,6 +99,11 @@
                     }
                 }
             </div>
+
+            @if (Cart.HasCart && Cart.Error is not null)
+            {
+                <p role="alert" class="px-6 py-3 text-sm text-red-700">@Cart.Error</p>
+            }
 
             <!-- Footer -->
             @if (Cart.Items.Count > 0)
@@ -119,6 +133,16 @@
     private int? pendingVariantId;
 
     protected override void OnInitialized() => Cart.OnChange += Changed;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open) await Cart.InitializeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open) await Cart.SynchronizeBadgeAsync();
+    }
 
     private void Changed() => _ = InvokeAsync(StateHasChanged);
 

@@ -1,105 +1,91 @@
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace JASIntWeb.Client.Services;
 
+// One snapshot is transferred from prerendering to either interactive runtime.
+public sealed record CartState(CartDto? Cart, string? Error = null);
+
 public sealed class CartService(IJSRuntime js, ICartBackend backend)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
-    public IReadOnlyList<CartItemDto> Items { get; private set; } = [];
-    public bool IsAuthenticated { get; private set; }
-    public string? Error { get; private set; }
-    public int ItemCount => Items.Sum(i => i.Quantity);
-    public decimal Total => Items.Sum(i => i.LineTotal);
+
+    [PersistentState(AllowUpdates = true)]
+    public CartState? State { get; set; }
+
+    public IReadOnlyList<CartItemDto> Items => State?.Cart?.Items ?? [];
+    public bool IsAuthenticated => State?.Cart?.IsAuthenticated ?? false;
+    public string? Error => State?.Error;
+    public bool IsInitialized => State is not null;
+    public bool HasCart => State?.Cart is not null;
+    public bool IsBusy { get; private set; }
+    public int ItemCount => State?.Cart?.ItemCount ?? 0;
+    public decimal Total => State?.Cart?.Subtotal ?? 0;
     public event Action? OnChange;
 
-    private async Task RunAsync(Func<Task> action)
-    {
-        await gate.WaitAsync();
-        try
-        {
-            Error = null;
-            await action();
-        }
-        catch (Exception e) when (e is JSException or CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
-        {
-            Error = e is HttpRequestException or TaskCanceledException ? "Connection interrupted. Please try again." : e.Message;
-        }
-        finally
-        {
-            gate.Release();
-            OnChange?.Invoke();
-            _ = UpdateDomBadgeAsync();
-        }
-    }
+    // Check inside the gate so concurrent consumers share one initial load,
+    // including an empty cart or a failed load that requires an explicit retry.
+    public Task InitializeAsync() => RunAsync(backend.GetAsync, initializeOnly: true, syncBadge: false);
 
-    private void Apply(CartDto cart)
-    {
-        Items = cart.Items;
-        IsAuthenticated = cart.IsAuthenticated;
-        Error = null;
-    }
-
-    private async ValueTask UpdateDomBadgeAsync()
-    {
-        try
-        {
-            await js.InvokeVoidAsync("window.jasUpdateCartBadge", ItemCount);
-        }
-        catch
-        {
-            try
-            {
-                await js.InvokeVoidAsync("window.jasUpdateCartCount", ItemCount);
-            }
-            catch
-            {
-            }
-        }
-    }
-
-    public Task InitializeAsync() => RefreshAsync();
-
-    public Task RefreshAsync() => RunAsync(async () =>
-    {
-        var cart = await backend.GetAsync();
-        Apply(cart);
-    });
+    public Task RefreshAsync() => RunAsync(backend.GetAsync);
 
     public Task AddAsync(int variantId, int quantity = 1) => ChangeAsync(variantId, quantity, true);
 
     public Task SetQuantityAsync(int variantId, int quantity) => ChangeAsync(variantId, quantity, false);
 
-    private Task ChangeAsync(int variantId, int quantity, bool add) => RunAsync(async () =>
+    private Task ChangeAsync(int variantId, int quantity, bool add) =>
+        RunAsync(() => backend.ChangeAsync(new CartLineRequest(variantId, quantity), add));
+
+    private async Task RunAsync(Func<Task<CartDto>> action, bool initializeOnly = false, bool syncBadge = true)
     {
-        // Optimistic in-memory update for fast UI response
-        var existing = Items.FirstOrDefault(i => i.VariantId == variantId);
-        if (existing != null)
+        await gate.WaitAsync();
+        try
         {
-            var nextQty = add ? existing.Quantity + quantity : quantity;
-            if (nextQty <= 0)
-            {
-                Items = Items.Where(i => i.VariantId != variantId).ToList();
-            }
-            else
-            {
-                var updated = existing with { Quantity = nextQty };
-                Items = Items.Select(i => i.VariantId == variantId ? updated : i).ToList();
-            }
+            if (initializeOnly && IsInitialized) return;
+
+            IsBusy = true;
+            if (State is not null) State = State with { Error = null };
             OnChange?.Invoke();
-            _ = UpdateDomBadgeAsync();
+            try
+            {
+                // Keep the last confirmed cart visible until the server accepts the change.
+                State = new CartState(await action());
+            }
+            catch (Exception e) when (e is CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+            {
+                var message = e is HttpRequestException or TaskCanceledException
+                    ? "Connection interrupted. Please try again."
+                    : e.Message;
+                State = new CartState(State?.Cart, message);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+            gate.Release();
+            OnChange?.Invoke();
         }
 
-        var result = await backend.ChangeAsync(new CartLineRequest(variantId, quantity), add);
-        Apply(result);
-    });
+        if (syncBadge) await SynchronizeBadgeAsync();
+    }
+
+    // Called after interactive rendering, never as part of prerender initialization.
+    public async ValueTask SynchronizeBadgeAsync()
+    {
+        if (!HasCart) return;
+        try
+        {
+            await js.InvokeVoidAsync("window.jasUpdateCartBadge", ItemCount);
+        }
+        catch (Exception e) when (e is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            // Badge enhancement must not affect a successful cart operation.
+        }
+    }
 
     public Task<Guid> CheckoutTokenAsync() => Task.FromResult(Guid.NewGuid());
 
-    public Task CompleteCheckoutAsync(Guid checkoutToken) => RunAsync(async () =>
-    {
-        var cart = await backend.GetAsync();
-        Apply(cart);
-    });
+    public Task CompleteCheckoutAsync(Guid checkoutToken) => RefreshAsync();
 }

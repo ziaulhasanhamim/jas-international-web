@@ -166,7 +166,7 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
 
 /**
  * Adds item to cart and navigates directly to /cart.
- * Navigating via standard location.assign guarantees window scrolls to top (0,0).
+ * Uses Blazor enhanced navigation to preserve the running application.
  * @param {number} variantId
  * @param {number} quantity
  * @param {number} [productId=0]
@@ -174,7 +174,11 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
 export async function buyNow(variantId, quantity = 1, productId = 0) {
     const result = await addToCart(variantId, quantity, productId);
     if (result.success) {
-        window.location.assign('/cart');
+        if (typeof window.Blazor?.navigateTo === 'function') {
+            window.Blazor.navigateTo('/cart', { forceLoad: false });
+        } else {
+            window.location.assign('/cart');
+        }
     }
 }
 
@@ -258,7 +262,7 @@ export function initCart() {
 
                 try {
                     await buyNow(variantId, qty, productId);
-                } catch {
+                } finally {
                     buyBtn.disabled = false;
                     buyBtn.innerHTML = origHtml;
                 }

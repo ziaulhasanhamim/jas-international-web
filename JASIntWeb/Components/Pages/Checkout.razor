@@ -41,6 +41,13 @@
             <span>Loading your cart and delivery rates…</span>
         </div>
     }
+    else if (!Cart.HasCart && Cart.Error is not null)
+    {
+        <div role="alert" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            @Cart.Error
+            <button type="button" class="ml-3 underline" disabled="@Cart.IsBusy" @onclick="Cart.RefreshAsync">Retry</button>
+        </div>
+    }
     else if (Cart.Items.Count == 0)
     {
         <div class="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-xs">
@@ -397,7 +404,7 @@
 
         try
         {
-            await Cart.RefreshAsync();
+            await Cart.InitializeAsync();
 
             // Pre-fill user address if authenticated
             if (AuthStateTask != null)
@@ -450,6 +457,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender) await Cart.SynchronizeBadgeAsync();
         if (firstRender && string.IsNullOrWhiteSpace(couponInput))
         {
             try

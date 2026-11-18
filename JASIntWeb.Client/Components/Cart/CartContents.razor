@@ -1,6 +1,5 @@
 @implements IDisposable
 @inject CartService Cart
-@inject NavigationManager Nav
 
 <div class="space-y-6">
     <div class="flex items-center justify-between mb-6 sm:mb-8">
@@ -22,6 +21,10 @@
             <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
             <span>Loading your cart…</span>
         </div>
+    }
+    else if (!Cart.HasCart && Cart.Error is not null)
+    {
+        <p class="text-sm text-slate-600">Your cart could not be loaded. Please try again.</p>
     }
     else if (Cart.Items.Count == 0)
     {
@@ -89,6 +92,7 @@
                         <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
                             <button
                                 type="button"
+                                disabled="@Cart.IsBusy"
                                 @onclick="() => Change(item, item.Quantity - 1)"
                                 class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
                                 aria-label="Decrease quantity"
@@ -107,7 +111,7 @@
                             </span>
                             <button
                                 type="button"
-                                disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)"
+                                disabled="@(Cart.IsBusy || item.Quantity >= item.Stock || item.Quantity >= 99)"
                                 @onclick="() => Change(item, item.Quantity + 1)"
                                 class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
                                 aria-label="Increase quantity"
@@ -121,6 +125,7 @@
                             <strong class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums min-w-[70px]">৳@item.LineTotal.ToString("N0")</strong>
                             <button
                                 type="button"
+                                disabled="@Cart.IsBusy"
                                 @onclick="() => Change(item, 0)"
                                 class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
                                 title="Remove item"
@@ -151,6 +156,7 @@
     {
         <div role="alert" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700 shadow-xs">
             @Cart.Error
+            <button type="button" class="ml-3 underline" disabled="@Cart.IsBusy" @onclick="Cart.RefreshAsync">Retry</button>
         </div>
     }
 </div>
@@ -163,8 +169,13 @@
     protected override async Task OnInitializedAsync()
     {
         Cart.OnChange += Changed;
-        await Cart.RefreshAsync();
+        await Cart.InitializeAsync();
         ready = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Cart.SynchronizeBadgeAsync();
     }
 
     private void Changed() => _ = InvokeAsync(StateHasChanged);

@@ -6,7 +6,7 @@ import { initConsent } from './modules/consent.js';
  */
 
 import { initWishlist } from './modules/wishlist.js';
-import { initCart, syncCartBadges } from './modules/cart.js';
+import { initCart } from './modules/cart.js';
 import { initGallery, switchMainImage } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
 
@@ -24,7 +24,6 @@ class AppOrchestrator {
         initConsent();
         initWishlist();
         initCart();
-        syncCartBadges();
         initGallery();
         initReviews();
 
@@ -58,7 +57,6 @@ class AppOrchestrator {
             initConsent();
             initWishlist();
             initCart();
-            syncCartBadges();
             initGallery();
             initReviews();
             JAS?.Carousel?.init();
