@@ -11,6 +11,7 @@ public sealed record CartState(CartDto? Cart, string? Error = null);
 public sealed class CartService(IJSRuntime js, ICartBackend backend)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
+    private CartDto? _confirmedCart;
 
     [PersistentState(AllowUpdates = true)]
     public CartState? State { get; set; }
@@ -25,18 +26,74 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
     public decimal Total => State?.Cart?.Subtotal ?? 0;
     public event Action? OnChange;
 
-    // Check inside the gate so concurrent consumers share one initial load,
-    // including an empty cart or a failed load that requires an explicit retry.
     public Task InitializeAsync() => RunAsync(backend.GetAsync, initializeOnly: true, syncBadge: false);
 
     public Task RefreshAsync() => RunAsync(backend.GetAsync);
 
-    public Task AddAsync(int variantId, int quantity = 1) => ChangeAsync(variantId, quantity, true);
+    public Task AddAsync(int variantId, int quantity = 1) => ChangeAsync(variantId, quantity, add: true);
 
-    public Task SetQuantityAsync(int variantId, int quantity) => ChangeAsync(variantId, quantity, false);
+    public Task SetQuantityAsync(int variantId, int quantity) => ChangeAsync(variantId, quantity, add: false);
 
-    private Task ChangeAsync(int variantId, int quantity, bool add) =>
-        RunAsync(() => backend.ChangeAsync(new CartLineRequest(variantId, quantity), add));
+    private async Task ChangeAsync(int variantId, int quantity, bool add)
+    {
+        var clamped = Math.Clamp(quantity, 0, 99);
+        var currentCart = State?.Cart;
+
+        // 1. Instant optimistic UI update (0ms perceived latency)
+        if (currentCart is not null)
+        {
+            _confirmedCart ??= currentCart;
+            var existingItem = currentCart.Items.FirstOrDefault(i => i.VariantId == variantId);
+            if (existingItem != null)
+            {
+                var targetQuantity = add ? Math.Clamp(existingItem.Quantity + clamped, 0, 99) : clamped;
+                List<CartItemDto> updatedItems;
+                if (targetQuantity == 0)
+                {
+                    updatedItems = currentCart.Items.Where(i => i.VariantId != variantId).ToList();
+                }
+                else
+                {
+                    updatedItems = currentCart.Items.Select(i => i.VariantId == variantId
+                        ? i with { Quantity = targetQuantity }
+                        : i).ToList();
+                }
+
+                State = new CartState(currentCart with { Items = updatedItems }, null);
+                OnChange?.Invoke();
+            }
+        }
+
+        // 2. Dispatch to backend with authoritative reconciliation & error rollback
+        await gate.WaitAsync();
+        try
+        {
+            IsBusy = true;
+            try
+            {
+                var result = await backend.ChangeAsync(new CartLineRequest(variantId, clamped), add);
+                _confirmedCart = result;
+                State = new CartState(result, null);
+            }
+            catch (Exception e) when (e is CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+            {
+                var message = e is HttpRequestException or TaskCanceledException
+                    ? "Connection interrupted. Please try again."
+                    : e.Message;
+
+                // Roll back to last confirmed server cart on failure
+                var rollbackCart = _confirmedCart ?? currentCart;
+                State = new CartState(rollbackCart, message);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+            gate.Release();
+            OnChange?.Invoke();
+            await SynchronizeBadgeAsync();
+        }
+    }
 
     private async Task RunAsync(Func<Task<CartDto>> action, bool initializeOnly = false, bool syncBadge = true)
     {
@@ -50,15 +107,16 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             OnChange?.Invoke();
             try
             {
-                // Keep the last confirmed cart visible until the server accepts the change.
-                State = new CartState(await action());
+                var cart = await action();
+                _confirmedCart = cart;
+                State = new CartState(cart);
             }
             catch (Exception e) when (e is CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
             {
                 var message = e is HttpRequestException or TaskCanceledException
                     ? "Connection interrupted. Please try again."
                     : e.Message;
-                State = new CartState(State?.Cart, message);
+                State = new CartState(State?.Cart ?? _confirmedCart, message);
             }
         }
         finally

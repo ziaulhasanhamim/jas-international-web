@@ -1,5 +1,7 @@
+@using Microsoft.Extensions.DependencyInjection
 @implements IDisposable
 @inject CartService Cart
+@inject IServiceProvider Services
 
 <div class="space-y-6">
     <div class="flex items-center justify-between mb-6 sm:mb-8">
@@ -15,7 +17,7 @@
         }
     </div>
 
-    @if (!ready)
+    @if (!ready && !Cart.HasCart)
     {
         <div class="p-8 text-center text-slate-500 flex items-center justify-center gap-2">
             <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
@@ -69,7 +71,6 @@
         <div class="space-y-3">
             @foreach (var item in Cart.Items)
             {
-                var isPending = pendingVariantId == item.VariantId;
                 <article
                     @key="item.VariantId"
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs transition hover:border-slate-300"
@@ -88,11 +89,11 @@
                     </div>
 
                     <div class="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        <!-- Stepper Buttons -->
+                        <!-- Stepper Buttons (Instant Optimistic Feedback) -->
                         <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
                             <button
                                 type="button"
-                                disabled="@Cart.IsBusy"
+                                disabled="@(item.Quantity <= 0)"
                                 @onclick="() => Change(item, item.Quantity - 1)"
                                 class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
                                 aria-label="Decrease quantity"
@@ -100,18 +101,11 @@
                                 −
                             </button>
                             <span class="w-8 text-center text-xs font-bold text-slate-800 tabular-nums">
-                                @if (isPending)
-                                {
-                                    <span class="inline-block size-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
-                                }
-                                else
-                                {
-                                    @item.Quantity
-                                }
+                                @item.Quantity
                             </span>
                             <button
                                 type="button"
-                                disabled="@(Cart.IsBusy || item.Quantity >= item.Stock || item.Quantity >= 99)"
+                                disabled="@(item.Quantity >= item.Stock || item.Quantity >= 99)"
                                 @onclick="() => Change(item, item.Quantity + 1)"
                                 class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 disabled:opacity-40 cursor-pointer"
                                 aria-label="Increase quantity"
@@ -125,7 +119,6 @@
                             <strong class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums min-w-[70px]">৳@item.LineTotal.ToString("N0")</strong>
                             <button
                                 type="button"
-                                disabled="@Cart.IsBusy"
                                 @onclick="() => Change(item, 0)"
                                 class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
                                 title="Remove item"
@@ -164,12 +157,41 @@
 @code
 {
     private bool ready;
-    private int? pendingVariantId;
+    private PersistingComponentStateSubscription? persistingSubscription;
+    private PersistentComponentState? ApplicationState => Services.GetService<PersistentComponentState>();
 
     protected override async Task OnInitializedAsync()
     {
         Cart.OnChange += Changed;
-        await Cart.InitializeAsync();
+
+        var appState = ApplicationState;
+        if (appState != null)
+        {
+            if (appState.TryTakeFromJson<CartDto>("cart_snapshot", out var restoredCart) && restoredCart != null)
+            {
+                Cart.State = new CartState(restoredCart);
+                ready = true;
+            }
+
+            persistingSubscription = appState.RegisterOnPersisting(() =>
+            {
+                if (Cart.HasCart && Cart.State?.Cart != null)
+                {
+                    appState.PersistAsJson("cart_snapshot", Cart.State.Cart);
+                }
+                return Task.CompletedTask;
+            }, new Microsoft.AspNetCore.Components.Web.InteractiveAutoRenderMode());
+        }
+
+        if (Cart.HasCart)
+        {
+            ready = true;
+        }
+
+        if (!Cart.IsInitialized)
+        {
+            await Cart.InitializeAsync();
+        }
         ready = true;
     }
 
@@ -182,18 +204,19 @@
 
     private async Task Change(CartItemDto item, int quantity)
     {
-        pendingVariantId = item.VariantId;
-        StateHasChanged();
         try
         {
             await Cart.SetQuantityAsync(item.VariantId, quantity);
         }
-        finally
+        catch
         {
-            pendingVariantId = null;
-            StateHasChanged();
+            // Error captured in Cart.Error and displayed in alert
         }
     }
 
-    public void Dispose() => Cart.OnChange -= Changed;
+    public void Dispose()
+    {
+        Cart.OnChange -= Changed;
+        persistingSubscription?.Dispose();
+    }
 }

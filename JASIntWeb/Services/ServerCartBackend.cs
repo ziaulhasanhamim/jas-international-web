@@ -35,7 +35,7 @@ public sealed class ServerCartBackend(
             }
         }
 
-        if (!token.HasValue)
+        if (!token.HasValue && httpContext == null)
         {
             try
             {

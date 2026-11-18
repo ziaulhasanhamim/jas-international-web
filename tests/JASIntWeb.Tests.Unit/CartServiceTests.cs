@@ -160,7 +160,7 @@ public class CartServiceTests
         var service = new CartService(Substitute.For<IJSRuntime>(), backend) { State = new(Cart()) };
         var update = service.SetQuantityAsync(7, 5);
         await service.IsBusy.Should().BeTrue();
-        await service.ItemCount.Should().BeEqualTo(2);
+        await service.ItemCount.Should().BeEqualTo(5); // Optimistically updated
         pending.SetException(new CommerceException("Insufficient stock."));
         await update;
         await service.Items.Single().Quantity.Should().BeEqualTo(2);
