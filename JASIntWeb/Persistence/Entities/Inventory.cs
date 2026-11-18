@@ -11,6 +11,7 @@ public enum InventoryTransactionType
 
 public class InventoryItem : Entity
 {
+    public uint Version { get; set; }
     public int ProductVariantId { get; set; }
     public ProductVariant? ProductVariant { get; set; }
     public int QuantityOnHand { get; set; }

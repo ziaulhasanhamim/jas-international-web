@@ -1,0 +1,63 @@
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<section class="shop-panel editor-section">
+    <h2>Options &amp; value data</h2>
+    <p class="admin-help">Add the values this product uses. Values and extra fields belong to this product; suggestions are copied, never linked.</p>
+    <div class="form-actions"><select class="shop-input" aria-label="Attribute to add" @bind="definition"><option value="0">Choose attribute</option>
+        @foreach (var template in Templates.Where(t => !Attributes.Any(a => a.DefinitionId == t.Id && !a.Retired))) { <option value="@template.Id">@template.Name</option> }
+    </select><button type="button" class="shop-button-secondary" @onclick="Add">Add attribute</button><a href="/admin/attributes" target="_blank">Manage definitions &amp; suggestions ↗</a><button type="button" class="brand-text-action" @onclick="RefreshTemplates">Refresh suggestions</button></div>
+    @foreach (var axis in Attributes)
+    {
+        var id = axis.DefinitionId;
+        <details class="editor-attribute" open="@(!axis.Retired)" @key="id">
+            <summary>@axis.Name @(axis.Retired ? "· Retired" : $"· {axis.Options.Count(o => !o.Retired)} values")</summary>
+            <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@axis.Required" @onchange="@(e => Patch(id, a => a.Required = (bool)e.Value!))" /> Selection required</label>
+                <button type="button" class="brand-text-action" @onclick="@(() => Patch(id, a => a.Retired = !a.Retired))">@(axis.Retired ? "Restore attribute" : "Retire attribute")</button>
+                <button type="button" class="brand-text-action" @onclick="@(() => Move.InvokeAsync((id, -1)))">Move up</button><button type="button" class="brand-text-action" @onclick="@(() => Move.InvokeAsync((id, 1)))">Move down</button></div>
+            <ProductMetadataSchema Fields="axis.Fields" SwatchField="@axis.SwatchField" Changed="@(fields => Patch(id, a => a.Fields = fields))" SwatchChanged="@(key => Patch(id, a => a.SwatchField = key))" />
+            @foreach (var option in axis.Options)
+            {
+                var key = option.ClientId;
+                <div class="editor-option-card" @key="key">
+                    <label class="shop-label">@axis.Name value<input class="shop-input" value="@option.Value" maxlength="200" @oninput="@(e => Patch(id, a => Find(a, key).Value = e.Value?.ToString() ?? ""))" /></label>
+                    @if (!string.IsNullOrEmpty(option.Code)) { <small class="admin-help">Selection code: @option.Code</small> }
+                    <ProductMetadataValues Fields="axis.Fields" Values="option.Metadata" Changed="@(change => Patch(id, a => Find(a, key).Metadata[change.Key] = change.Value))" />
+                    <div class="form-actions"><button type="button" class="brand-text-action" @onclick="@(() => Patch(id, a => { if (Find(a, key).Id == 0) a.Options.Remove(Find(a, key)); else Find(a, key).Retired = !Find(a, key).Retired; }))">@(option.Id == 0 ? "Remove unsaved value" : option.Retired ? "Restore value" : "Retire value")</button>
+                    <button type="button" class="brand-text-action" @onclick="@(() => MoveValue(id, key, -1))">Move up</button><button type="button" class="brand-text-action" @onclick="@(() => MoveValue(id, key, 1))">Move down</button>
+                    @if (option.Retired) { <span class="admin-help">Retired — historical selections are preserved.</span> }</div>
+                </div>
+            }
+            <div class="form-actions"><button type="button" class="shop-button-secondary" disabled="@(axis.Options.Count(o => !o.Retired) >= 100)" @onclick="@(() => Patch(id, a => a.Options.Add(new())))">Add custom value</button>
+            <select class="shop-input" aria-label="@($"Suggested {axis.Name} values")" value="0" @onchange="@(e => Suggest(id, e))"><option value="0">Copy suggested value…</option>
+                @foreach (var suggestion in Templates.FirstOrDefault(t => t.Id == id)?.Suggestions ?? []) { <option value="@suggestion.SuggestionId">@suggestion.Value</option> }
+            </select></div>
+        </details>
+    }
+</section>
+@code {
+    [Parameter] public List<EditorAttribute> Attributes { get; set; } = [];
+    [Parameter] public List<EditorAttributeTemplate> Templates { get; set; } = [];
+    [Parameter] public EventCallback<AttributePatch> Changed { get; set; }
+    [Parameter] public EventCallback<EditorAttribute> Added { get; set; }
+    [Parameter] public EventCallback<(int Id, int Step)> Move { get; set; }
+    [Parameter] public EventCallback RefreshTemplates { get; set; }
+    private int definition;
+    private Task Patch(int id, Action<EditorAttribute> update) => Changed.InvokeAsync(new(id, update));
+    private static EditorOption Find(EditorAttribute a, Guid key) => a.Options.Single(o => o.ClientId == key);
+    private async Task Add()
+    {
+        var template = Templates.FirstOrDefault(t => t.Id == definition); if (template is null) return;
+        await Added.InvokeAsync(new() { DefinitionId = template.Id, Name = template.Name, Fields = ProductEditorRules.Copy(template.Fields), SwatchField = template.SwatchField }); definition = 0;
+    }
+    private Task Suggest(int id, ChangeEventArgs e)
+    {
+        var source = Templates.First(t => t.Id == id).Suggestions.FirstOrDefault(o => o.SuggestionId == (int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0));
+        if (source is null) return Task.CompletedTask;
+        var option = ProductEditorRules.Copy(source); option.ClientId = Guid.NewGuid(); option.Id = 0; option.Code = "";
+        var schema = Attributes.Single(a => a.DefinitionId == id).Fields.Select(f => f.Key).ToHashSet();
+        option.Metadata = option.Metadata.Where(pair => schema.Contains(pair.Key)).ToDictionary();
+        return Patch(id, a => a.Options.Add(option));
+    }
+    private Task MoveValue(int id, Guid key, int step) => Patch(id, a =>
+    { var index = a.Options.FindIndex(o => o.ClientId == key); var next = index + step; if (next < 0 || next >= a.Options.Count) return; var option = a.Options[index]; a.Options.RemoveAt(index); a.Options.Insert(next, option); });
+}

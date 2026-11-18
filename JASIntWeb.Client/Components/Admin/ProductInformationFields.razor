@@ -1,0 +1,32 @@
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<section class="shop-panel editor-section">
+    <h2>Product details</h2>
+    <p class="admin-help">A name and category are enough for a draft. Add the remaining information before publishing.</p>
+    <div class="admin-form-grid">
+        <label class="shop-label">Product name *<input class="shop-input" value="@Information.Name" maxlength="200" @oninput="e => Patch(i => i.Name = Text(e))" /></label>
+        <label class="shop-label">URL slug<input class="shop-input" value="@Information.Slug" @oninput="e => Patch(i => i.Slug = Text(e))" placeholder="Generated from the name if empty" /></label>
+        <label class="shop-label">Category *<select class="shop-input" value="@Information.CategoryId" @onchange="e => Patch(i => i.CategoryId = int.TryParse(Text(e), out var id) ? id : 0)"><option value="0">Select category</option>
+            @foreach (var category in Categories) { <option value="@category.Id">@category.Name</option> }
+        </select></label>
+        <label class="shop-label">Brand<select class="shop-input" value="@Information.BrandId" @onchange="e => Patch(i => i.BrandId = int.TryParse(Text(e), out var id) ? id : null)"><option value="">No brand / generic</option>
+            @foreach (var brand in Brands) { <option value="@brand.Id">@brand.Name</option> }
+        </select></label>
+    </div>
+    <label class="shop-label">Short overview<textarea class="shop-input" rows="3" @bind:get="Information.Description" @bind:set="value => Patch(i => i.Description = value)" @bind:event="oninput"></textarea></label>
+    <AdminProductMedia Value="@(new(Information.Image, Information.Images))" ValueChanged="Media" BusyChanged="UploadBusy" />
+    <AdminRichText Label="Product description & specifications" Height="400" Specifications="true" Disabled="Disabled" Value="@Information.Details" ValueChanged="value => Patch(i => i.Details = value)" />
+    <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@Information.Featured" @onchange="e => Patch(i => i.Featured = (bool)e.Value!)" /> Feature on homepage</label>
+    <label class="check-label"><input type="checkbox" checked="@Information.NewArrival" @onchange="e => Patch(i => i.NewArrival = (bool)e.Value!)" /> New arrival</label></div>
+</section>
+@code {
+    [Parameter] public ProductInformation Information { get; set; } = new();
+    [Parameter] public List<JASIntWeb.Client.Dtos.CategoryLinkDto> Categories { get; set; } = [];
+    [Parameter] public List<JASIntWeb.Client.Dtos.BrandLinkDto> Brands { get; set; } = [];
+    [Parameter] public EventCallback<InformationPatch> Changed { get; set; }
+    [Parameter] public EventCallback<bool> UploadBusy { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private Task Patch(Action<ProductInformation> update) => Changed.InvokeAsync(new(update));
+    private Task Media(AdminMediaValue value) => Patch(i => { i.Image = value.Cover; i.Images = value.Gallery; });
+    private static string Text(ChangeEventArgs args) => args.Value?.ToString() ?? "";
+}

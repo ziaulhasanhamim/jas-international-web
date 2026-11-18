@@ -1,0 +1,45 @@
+@using JASIntWeb.Client.Contracts
+<section class="editor-schema">
+    <div class="editor-inline-heading"><h4>Extra value fields</h4><button type="button" class="shop-button-secondary" @onclick="Add" disabled="@(Fields.Count >= 16)">Add field</button><button type="button" class="shop-button-secondary" @onclick="Color">Add color swatch</button></div>
+    <p class="admin-help">Optional data attached to each value. Saved keys and types must be cleared from all values before changing them.</p>
+    @foreach (var field in Fields)
+    {
+        var original = field;
+        <div class="editor-schema-row" @key="field.Key">
+            <label class="shop-label">Field key<input class="shop-input" value="@field.Key" maxlength="64" @onchange="@(e => Replace(original, original with { Key = e.Value?.ToString() ?? "" }))" /></label>
+            <label class="shop-label">Label<input class="shop-input" value="@field.Label" maxlength="80" @oninput="@(e => Replace(original, original with { Label = e.Value?.ToString() ?? "" }))" /></label>
+            <label class="shop-label">Type<select class="shop-input" value="@field.Kind" @onchange="@(e => Replace(original, original with { Kind = Enum.Parse<ValueFieldKind>(e.Value!.ToString()!) }))">
+                @foreach (var kind in Enum.GetValues<ValueFieldKind>()) { <option value="@kind">@kind</option> }
+            </select></label>
+            <button type="button" class="brand-text-action is-danger" @onclick="@(() => Remove(original))">Remove field</button>
+        </div>
+    }
+    <label class="shop-label">Storefront presentation<select class="shop-input" value="@(SwatchField ?? "")" @onchange="@(e => SwatchChanged.InvokeAsync(e.Value?.ToString()))"><option value="">Text labels</option>
+        @foreach (var field in Fields.Where(f => f.Kind == ValueFieldKind.HexColor)) { <option value="@field.Key">Color swatch: @field.Label</option> }
+    </select></label>
+</section>
+@code {
+    [Parameter] public List<ValueField> Fields { get; set; } = [];
+    [Parameter] public string? SwatchField { get; set; }
+    [Parameter] public EventCallback<List<ValueField>> Changed { get; set; }
+    [Parameter] public EventCallback<string?> SwatchChanged { get; set; }
+    private Task Replace(ValueField old, ValueField next) => Changed.InvokeAsync(Fields.Select(f => f == old ? next : f).ToList());
+    private Task Remove(ValueField field) => Changed.InvokeAsync(Fields.Where(f => f != field).ToList());
+    private Task Add()
+    {
+        var n = 1; while (Fields.Any(f => f.Key == $"field_{n}")) n++;
+        return Changed.InvokeAsync([.. Fields, new($"field_{n}", "New field", ValueFieldKind.Text)]);
+    }
+    private async Task Color()
+    {
+        var field = Fields.FirstOrDefault(f => f.Kind == ValueFieldKind.HexColor);
+        if (field is null)
+        {
+            if (Fields.Count >= 16) return;
+            var key = Fields.Any(f => f.Key == "hex_color") ? "swatch_color" : "hex_color";
+            field = new(key, "Swatch color", ValueFieldKind.HexColor);
+            await Changed.InvokeAsync([.. Fields, field]);
+        }
+        await SwatchChanged.InvokeAsync(field.Key);
+    }
+}

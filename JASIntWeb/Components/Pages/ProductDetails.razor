@@ -26,7 +26,7 @@ else
     var pageTitle = string.IsNullOrWhiteSpace(product.MetaTitle) ? Seo.BuildProductTitle(product.Name, product.BrandName) : product.MetaTitle;
     var pageDesc = Seo.SanitizeDescription(string.IsNullOrWhiteSpace(product.MetaDescription) ? AdminSeoText.ProductDescription(product.Name, product.Description) : product.MetaDescription);
     var canonical = $"/product/{product.Slug}";
-    var selectedSku = selected?.Sku ?? product.Variants.FirstOrDefault()?.Sku ?? $"JAS-{product.Id}";
+    var selectedSku = selected?.Sku ?? "N/A";
     var price = selected?.Price ?? 0m;
     var inStock = selected is { Stock: > 0 };
 
@@ -49,7 +49,7 @@ else
 
     var productFaqs = new (string Q, string A)[]
     {
-        ($"What is the price of {product.Name} in Bangladesh?", $"{product.Name} is currently available at JAS International for ৳{price:N0} with official brand warranty."),
+        ($"What is the price of {product.Name} in Bangladesh?", selected is null ? "Select an available option combination to see its price." : $"{product.Name} is currently available at JAS International for ৳{price:N0} with official brand warranty."),
         ($"Is {product.Name} authentic with official warranty?", "Yes, 100% genuine and authentic product directly sourced, backed by our official brand warranty and 7-day replacement guarantee."),
         ("What are the delivery charges and delivery times?", "Delivery fee is ৳80 within Khulna (1-2 days) and ৳130 for outside Khulna across all 64 districts of Bangladesh (2-4 days)."),
         ("Is Cash on Delivery (COD) available?", "Yes, Cash on Delivery is available across Bangladesh. You can inspect your package upon delivery.")
@@ -79,22 +79,26 @@ else
         JsonLdBuilder.BuildFaq(productFaqs)
     };
 
+    if (selected is null) jsonLdList.RemoveAt(1);
+
     <SeoHead Title="@pageTitle"
              Description="@pageDesc"
              CanonicalPath="@canonical"
              OgImage="@(string.IsNullOrWhiteSpace(product.OgImageUrl) ? product.MainImage : product.OgImageUrl)"
              OgType="product"
-             ProductPrice="@price"
+             ProductPrice="@(selected?.Price)"
              ProductCurrency="BDT"
              ProductAvailability="@(inStock ? "in stock" : "out of stock")"
              ProductBrand="@product.BrandName"
-             ProductRetailerItemId="@selectedSku"
+             ProductRetailerItemId="@(selected?.Sku)"
              JsonLd="jsonLdList" />
 
     <HeadContent>
         <link rel="preload" as="image" href="@Seo.BuildAbsoluteUrl(product.MainImage)" fetchpriority="high" />
     </HeadContent>
 
+    @if (selected is not null)
+    {
     <div data-meta-event="ViewContent"
          data-content-id="@selectedSku"
          data-content-name="@product.Name"
@@ -102,6 +106,7 @@ else
          data-value="@price"
          data-currency="BDT"
          hidden></div>
+    }
     <div class="shop-container py-6">
         <!-- Breadcrumb Navigation -->
         <nav aria-label="Breadcrumb" class="mb-6 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -198,10 +203,7 @@ else
                     {
                         <span class="text-sm text-slate-400 line-through">৳@selected.OriginalPrice.Value.ToString("N0")</span>
                     }
-                    @if (selected is not null)
-                    {
-                        <span class="text-xs text-slate-400 font-mono">SKU: @selected.Sku</span>
-                    }
+                    <span class="text-xs text-slate-400 font-mono">SKU: @selectedSku</span>
                 </div>
 
                 <p class="mt-4 text-sm text-slate-600 leading-relaxed">@product.Description</p>
@@ -221,6 +223,7 @@ else
                                     aria-current="@(active ? "true" : "false")"
                                     class="rounded-xl border px-3.5 py-2 text-xs font-semibold transition select-none cursor-pointer @(active ? "border-blue-600 bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/20" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50")"
                                 >
+                                    @if (option.SwatchHex is not null) { <span class="product-value-swatch" style="@($"background-color:{option.SwatchHex}")" aria-hidden="true"></span> }
                                     @option.Value
                                 </a>
                             }
@@ -245,11 +248,11 @@ else
                     @if (selected is null || selected.Stock <= 0)
                     {
                         <div role="status" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 leading-relaxed mb-4">
-                            <strong>Combination Unavailable:</strong>
+                            <strong>Out of stock:</strong>
                             @(selected is null ? "This specific option combination is not in stock. Please select another variant above." : "This item is currently sold out. Check back soon or contact our showroom.")
                         </div>
                         <button type="button" disabled class="btn-primary w-full opacity-50 cursor-not-allowed">
-                            Currently Unavailable
+                            Out of stock
                         </button>
                     }
                     else

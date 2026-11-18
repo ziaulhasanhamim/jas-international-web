@@ -5,27 +5,27 @@ namespace JASIntWeb.Client.Services;
 
 public sealed class HttpAdminCatalogBackend(IHttpClientFactory factory) : IAdminCatalogBackend
 {
-    public async Task<T> Send<T>(HttpMethod method, string path, object? value = null, HttpContent? content = null)
+    public async Task<T> Send<T>(HttpMethod method, string path, object? value = null, HttpContent? content = null, CancellationToken ct = default)
     {
         using var client = factory.CreateClient("Shop");
         using var request = new HttpRequestMessage(method, path);
         request.Content = content ?? (value is null ? null : JsonContent.Create(value, value.GetType()));
         if (method != HttpMethod.Get)
         {
-            using var secured = await client.GetAsync("api/admin/uploads/security");
+            using var secured = await client.GetAsync("api/admin/uploads/security", ct);
             if (!secured.IsSuccessStatusCode) throw new AdminCatalogException((int)secured.StatusCode, "Your administrator session expired. Sign in again.");
-            var security = await secured.Content.ReadFromJsonAsync<AntiforgeryDto>()
+            var security = await secured.Content.ReadFromJsonAsync<AntiforgeryDto>(ct)
                 ?? throw new AdminCatalogException(401, "Your session expired. Sign in again.");
             request.Headers.Add("X-CSRF-TOKEN", security.Token);
         }
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
         {
             AdminCatalogError? error = null;
-            try { error = await response.Content.ReadFromJsonAsync<AdminCatalogError>(); } catch (System.Text.Json.JsonException) { }
+            try { error = await response.Content.ReadFromJsonAsync<AdminCatalogError>(ct); } catch (System.Text.Json.JsonException) { }
             throw new AdminCatalogException((int)response.StatusCode, error?.Message ?? "The request failed. Your changes have not been discarded.", error?.Errors);
         }
-        return await response.Content.ReadFromJsonAsync<T>() ?? throw new AdminCatalogException(500, "The server returned an empty response.");
+        return await response.Content.ReadFromJsonAsync<T>(ct) ?? throw new AdminCatalogException(500, "The server returned an empty response.");
     }
     public Task<AdminEditorData<CategoryEditForm>> CategoryAsync(int id) => Send<AdminEditorData<CategoryEditForm>>(HttpMethod.Get, $"api/admin/categories/editor/{id}");
     public Task<AdminEditorData<BrandEditForm>> BrandAsync(int id) => Send<AdminEditorData<BrandEditForm>>(HttpMethod.Get, $"api/admin/brands/editor/{id}");

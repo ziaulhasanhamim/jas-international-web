@@ -2,6 +2,7 @@
 @page "/admin/products/{Id:int}/edit"
 @page "/admin/products/{Id:int}"
 
-<JASIntWeb.Client.Components.Admin.ProductEditorForm Id="Id" @key="Id" @rendermode="InteractiveAuto" />
+<JASIntWeb.Client.Components.Admin.ProductEditorForm Id="Id" InitialTab="@(Tab ?? "details")" @key="Id" @rendermode="InteractiveAuto" />
 
-@code { [Parameter] public int Id { get; set; } }
+@code { [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; } }

@@ -70,39 +70,11 @@ public class AdminCatalogApiTests : JasIntegrationTestBase
         await ((int)(await client.GetAsync("/api/admin/brands/editor/999999")).StatusCode).Should().BeEqualTo(404);
     }
     [Test]
-    public async Task CatalogApi_ProductPersistsContentAndRequiresExplicitVariantActivation()
+    public async Task CatalogApi_ProductLegacySavesAreRetired()
     {
         using var client = AdminClient;
-        var form = new ProductEditForm { Name = "API Product", CategoryId = 1, Description = "A useful product", Details = "<p>Rich details &amp; warranty</p>", Image = "/jas-logo.png", Images = "/jas-og-card.png", BasePrice = 500, CostPrice = 200, InitialStock = 4, IsFeatured = true, IsNewArrival = false, MetaTitle = "API Product title", OgImageUrl = "/jas-og-card.png", WarrantyInfo = "Two years" };
-        var response = await client.PostAsJsonAsync("/api/admin/products", form);
-        await ((int)response.StatusCode).Should().BeEqualTo(201);
-        var result = (await response.Content.ReadFromJsonAsync<AdminSaveResult>())!;
-        var loaded = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
-        await loaded.Input.Image.Should().BeEqualTo(form.Image);
-        await loaded.Input.Images.Should().BeEqualTo(form.Images);
-        await loaded.Input.Details.Should().BeEqualTo(form.Details);
-        await loaded.Input.IsFeatured.Should().BeTrue();
-        await loaded.Input.IsNewArrival.Should().BeFalse();
-        await loaded.Input.InitialStock.Should().BeEqualTo(0);
-        await loaded.Input.WarrantyInfo.Should().BeEqualTo("Two years");
-        var workspace = (await client.GetFromJsonAsync<ProductWorkspace>($"/api/admin/products/{result.Id}/workspace"))!;
-        workspace.Variants[0].Active = true; workspace.Variants[0].SellingPrice = 500;
-        await ((int)(await client.PutAsJsonAsync($"/api/admin/products/{result.Id}/workspace/variant", workspace.Variants[0])).StatusCode).Should().BeEqualTo(200);
-        loaded = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
-        loaded.Input.Hidden = false;
-        await ((int)(await client.PutAsJsonAsync($"/api/admin/products/{result.Id}", loaded.Input)).StatusCode).Should().BeEqualTo(200);
-        loaded = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
-        var productPage=await client.GetStringAsync($"/product/{loaded.Input.Slug}");
-        await productPage.Contains("<title>API Product title</title>").Should().BeTrue();
-        await System.Text.RegularExpressions.Regex.Match(productPage, "<meta property=\"og:image\" content=\"([^\"]+)\"").Groups[1].Value.EndsWith("/jas-og-card.png").Should().BeTrue();
-        loaded.Input.Details = "<p>Updated rich text</p>";
-        loaded.Input.Image = "/jas-og-card.png";
-                loaded.Input.Hidden = true;
-        await ((int)(await client.PutAsJsonAsync($"/api/admin/products/{result.Id}", loaded.Input)).StatusCode).Should().BeEqualTo(200);
-        var updated = (await client.GetFromJsonAsync<AdminEditorData<ProductEditForm>>($"/api/admin/products/editor/{result.Id}"))!;
-        await updated.Input.Details.Should().BeEqualTo("<p>Updated rich text</p>");
-        await updated.Input.Image.Should().BeEqualTo("/jas-og-card.png");
-        await updated.Input.Hidden.Should().BeTrue();
+        await ((int)(await client.PostAsJsonAsync("/api/admin/products", new ProductEditForm { Name = "Old contract" })).StatusCode).Should().BeEqualTo(410);
+        await ((int)(await client.PutAsJsonAsync("/api/admin/products/1", new ProductEditForm { Id = 1 })).StatusCode).Should().BeEqualTo(410);
     }
     [Test]
     public async Task CatalogApi_RechecksDatabaseRoleForAnAlreadyAuthenticatedAdministrator()

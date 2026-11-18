@@ -3,5 +3,5 @@
 @code {
     [Parameter] public int ProductId { get; set; }
     [Parameter] public int Id { get; set; }
-    protected override void OnInitialized() => Nav.NavigateTo($"/admin/products/{ProductId}/variants#options", replace: true);
+    protected override void OnInitialized() => Nav.NavigateTo($"/admin/products/{ProductId}/edit?tab=options", replace: true);
 }

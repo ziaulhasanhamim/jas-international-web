@@ -1,6 +1,6 @@
 # JAS International
 
-Blazor Web App using .NET 11, PostgreSQL, EF Core and ASP.NET Core Identity. The storefront and admin forms use static SSR with enhanced navigation. Landing, catalog and product-detail routes stay static SSR with small JavaScript modules. Checkout/payment retain their existing Interactive Server modes; do not introduce active Blazor circuits or WASM startup on the hot storefront routes.
+Blazor Web App using .NET 11, PostgreSQL, EF Core and ASP.NET Core Identity. Public shopping pages use static SSR with enhanced navigation; stateful admin editors use Interactive Auto. Landing, catalog and product-detail routes stay static SSR with small JavaScript modules. Checkout/payment retain their existing Interactive Server modes; do not introduce active Blazor circuits or WASM startup on the hot storefront routes.
 
 ## Development setup
 
@@ -75,6 +75,32 @@ Forms initialize in `OnInitialized` or `OnInitializedAsync`. Posted models are p
 Parameter lifecycle events remain on interactive child components that receive changing data, such as the carousel and reorder editor.
 
 Products use reusable attribute definitions and product-owned values. The global value library provides optional suggestions that are copied into a product; labels and ordering are then independent. Variants reference stable product-owned option IDs. Customers can select any combination without another attribute changing automatically; unavailable combinations show N/A. Guest carts use a cookie reference and PostgreSQL; signed-in carts use the account identity.
+
+## Unified product editor (v1.4.0)
+
+Open `/admin/products/new` or `/admin/products/{id}/edit`. Details, Options, Variants and Content & SEO share one draft and **Save product** action. A name and visible category are sufficient to save a Draft; publishing also requires a cover image, description and one active default variant with a positive price. Stock may be zero. Rich text and drag/drop images remain available.
+
+Options belong to the product. Global definitions and suggested values are templates copied when selected. Optional value fields support Text, Number, Yes/No and `#RRGGBB` color; choose a hex field as the storefront swatch. Keys/types cannot change or disappear while populated. Clear affected data explicitly first. Renaming labels or changing metadata preserves option codes, combinations and SKUs. Technical specifications belong in the rich description.
+
+Preview combinations without saving, filter by values, and select only combinations that exist. Each page shows at most 50 rows, including Existing, Missing and Archived states. Nothing is selected automatically. Only checked Missing rows are staged; archived matches require explicit restoration. Products support 100 non-archived variants, including inactive rows. Legacy over-limit products can be edited or reduced, but cannot add/restore variants until within the limit. Map existing rows explicitly when changing options; inventory is never copied across combinations.
+
+Blank variant SKUs become `JAS-{TITLE}-{OPTION-VALUES}-{SHORT-ID}` (or `BASE` for standard variants), within 100 characters. Existing/manual SKUs stay stable. **Regenerate SKU** clears it and shows a preview; the next save explicitly replaces the identifier. Uniqueness is case-insensitive after trimming and includes archived variants. Stock for new variants can be entered once as opening stock. Existing inventory uses a separate adjustment with quantity, reason and movement preview; PostgreSQL `xmin` protects it against stale stock/reservation changes independently of catalog revisions.
+
+All editor API calls under `/api/admin/product-editor` require a current administrator session; writes require real antiforgery tokens and responses use `no-store`. Product and stock commands include operation IDs. Receipts commit with data, making replay safe. After an uncertain response, check operation status before retrying the same request. A confirmed save whose refresh fails requires a reload, rather than resubmitting new rows. Validation, conflict and session failures retain the draft; download it or review the latest revision before discarding it.
+
+Legacy product edit/attribute/generator/variant URLs lead into the editor. Old product POST/PUT and workspace mutation contracts return 410 **editor updated**; reload older open tabs after upgrading. Brand/category APIs remain compatible.
+
+### Product editor migration and rollout
+
+`20261118122633_ProductEditorV2` adds JSONB schemas/value data, retirement flags, transactional operation receipts and a stored normalized-SKU unique index. Inventory uses PostgreSQL's existing `xmin` system column; no inventory quantities or historic IDs are rewritten. Existing schemas backfill to `[]`, metadata to `{}` and retired flags to false. Back up the database and apply the migration on staging first. Check collisions before rollout:
+
+```sql
+SELECT upper(btrim("SKU")) AS normalized_sku, array_agg("Id") AS variant_ids
+FROM "ProductVariants"
+GROUP BY upper(btrim("SKU")) HAVING count(*) > 1;
+```
+
+Resolve collisions explicitly, including archived rows. The migration stops with an actionable error instead of renaming identifiers. Receipt payloads are hashed; receipts contain operation/result identifiers, not the full product draft. Browser checks are private tooling and are not required in the repository or CI. Publishing the GitHub release uses the existing tag-driven validation workflow; Render retains its configured deployment behavior.
 
 ## Admin sales metrics
 

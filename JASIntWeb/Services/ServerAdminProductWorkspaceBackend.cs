@@ -20,9 +20,9 @@ public sealed class ServerAdminProductWorkspaceBackend(AdminSession session, ISe
         }
     }
     public Task<ProductWorkspace> LoadAsync(int productId) => Execute(service => service.LoadAsync(productId));
-    public Task<ProductWorkspace> SaveConfigurationAsync(int productId, ProductConfiguration command) => Execute(service => service.SaveConfigurationAsync(productId, command));
-    public Task<ProductWorkspace> SaveVariantAsync(int productId, WorkspaceVariant command) => Execute(service => service.SaveVariantAsync(productId, command));
-    public Task<ProductWorkspace> AdjustStockAsync(int productId, WorkspaceStock command) => Execute(service => service.AdjustStockAsync(productId, command));
-    public Task<CombinationPreview> PreviewAsync(int productId, long revision) => Execute(service => service.PreviewAsync(productId, revision));
-    public Task<ProductWorkspace> GenerateAsync(int productId, long revision) => Execute(service => service.GenerateAsync(productId, revision));
+    public Task<ProductWorkspace> SaveConfigurationAsync(int productId, ProductConfiguration command) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
+    public Task<ProductWorkspace> SaveVariantAsync(int productId, WorkspaceVariant command) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
+    public Task<ProductWorkspace> AdjustStockAsync(int productId, WorkspaceStock command) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
+    public Task<CombinationPreview> PreviewAsync(int productId, long revision) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
+    public Task<ProductWorkspace> GenerateAsync(int productId, long revision) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
 }

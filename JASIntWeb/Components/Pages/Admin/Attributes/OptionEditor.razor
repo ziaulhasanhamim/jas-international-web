@@ -55,6 +55,8 @@ else
     }
 }
 
+@if (Id > 0) { <JASIntWeb.Client.Components.Admin.AttributeMetadataEditor Id="Id" Suggestion="true" @key="Id" @rendermode="InteractiveAuto" /> }
+
 @code
 {
     [Parameter]

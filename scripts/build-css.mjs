@@ -18,6 +18,7 @@ async function build() {
         const compiler = await compile(await readFile(input, 'utf8'), {
             base: dirname(input), from: input, onDependency() {},
         });
+        // Explicit @source folders exclude build outputs and keep CI/local generation identical.
         const sources = compiler.root === 'none' ? [] : [{ ...(compiler.root ?? { base: root, pattern: '**/*' }), negated: false }];
         const scanner = new Scanner({ sources: [...sources, ...compiler.sources] });
         const css = compiler.build(scanner.scan());

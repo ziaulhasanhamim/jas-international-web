@@ -212,7 +212,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
 
     public Task<AdminSaveResult> SaveCategoryAsync(CategoryEditForm input) => Save(input, service => service.SaveCategoryAsync(input), _ => "/admin/categories");
     public Task<AdminSaveResult> SaveBrandAsync(BrandEditForm input) => Save(input, service => service.SaveBrandAsync(input), _ => "/admin/brands");
-    public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => Save(input, service => service.SaveProductAsync(input), id => input.Id == 0 ? $"/admin/products/{id}/variants" : "/admin/products");
+    public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
     public Task<ContentPreview> PreviewContentAsync(string source) => Execute(_ =>
     {
         if (source is null || source.Length > 100_000) throw new AdminCatalogException(400, "Use at most 100,000 characters.");

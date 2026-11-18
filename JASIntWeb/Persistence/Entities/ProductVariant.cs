@@ -4,6 +4,7 @@ public class ProductVariant : SoftDeletableEntity
 {
     public int ProductId { get; set; }
     public Product? Product { get; set; }
+    public string NormalizedSku { get; private set; } = "";
     public required string SKU { get; set; }
     public string OptionSignature { get; set; } = "";
     public string? Barcode { get; set; }
