@@ -27,7 +27,7 @@ else
 {
     <form @onsubmit="Save" @onsubmit:preventDefault novalidate>
         <fieldset disabled="@(Disabled || uncertain || stockVariant is not null)">
-            <div class="editor-savebar"><label class="shop-label">Status<select class="shop-input" value="@state.Draft.Information.Hidden" @onchange="e => Change(d => d.Information.Hidden = bool.Parse(e.Value!.ToString()!))"><option value="true">Draft</option><option value="false">Published</option></select></label>
+            <div class="editor-savebar"><label class="shop-label">Status<select class="shop-input" value="@(state.Draft.Information.Hidden ? "true" : "false")" @onchange="e => Change(d => d.Information.Hidden = bool.Parse(e.Value!.ToString()!))"><option value="true">Draft</option><option value="false">Published</option></select></label>
             <span class="admin-help">@(state.Dirty ? "Unsaved changes" : state.Draft.Id == 0 ? "New draft" : "Saved")</span><button type="submit" class="shop-button">@(state.Phase == EditorPhase.Saving ? "Saving…" : "Save product")</button></div>
             <nav class="admin-tabs product-editor-tabs" aria-label="Product editor sections">@foreach (var section in sections) { <button type="button" aria-current="@(tab == section.Key ? "page" : null)" @onclick="() => tab = section.Key">@section.Value</button> }</nav>
             <div hidden="@(tab != "details")"><ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" /></div>
