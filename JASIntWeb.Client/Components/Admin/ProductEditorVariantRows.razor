@@ -1,0 +1,55 @@
+@using System.Globalization
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<section class="shop-panel editor-section" aria-label="Variant rows">
+    <div class="editor-inline-heading"><h2>Variants &amp; pricing</h2><span>@Draft.Variants.Count(v => !v.Archived)/100 current</span>
+    @if (!Draft.Attributes.Any(a => !a.Retired) && !Draft.Variants.Any(v => !v.Archived)) { <button type="button" class="shop-button-secondary" @onclick="Standard">Add standard variant</button> }</div>
+    <p class="admin-help">Blank SKUs are generated on save. Existing prices and stock change only when you edit them explicitly.</p>
+    <label class="check-label"><input type="checkbox" @bind="showArchived" /> Show archived variants</label>
+    @foreach (var variant in Draft.Variants.Where(v => showArchived || !v.Archived))
+    {
+        var key = variant.ClientId;
+        <details class="variant-editor editor-variant" open="@(variant.Id == 0 || Draft.Variants.Count(v => !v.Archived) == 1)" @key="key">
+            <summary>@Label(variant) · @(variant.Archived ? "Archived" : variant.Active ? "Active" : "Inactive") @(variant.Default ? "· Default" : "")</summary>
+            <fieldset disabled="@variant.Archived">
+            <div class="admin-form-grid">
+                @foreach (var axis in Draft.Attributes.Where(a => !a.Retired))
+                {
+                    var definition = axis.DefinitionId;
+                    <label class="shop-label">@axis.Name<select class="shop-input" value="@variant.Choices.GetValueOrDefault(definition)" @onchange="@(e => Patch(key, v => { if (Guid.TryParse(e.Value?.ToString(), out var option)) v.Choices[definition] = option; else v.Choices.Remove(definition); }))"><option value="@Guid.Empty">@(axis.Required ? "Choose value" : "Not applicable")</option>
+                        @foreach (var option in axis.Options) { <option value="@option.ClientId" disabled="@option.Retired">@option.Value @(option.Retired ? "(retired)" : "")</option> }
+                    </select></label>
+                }
+                <label class="shop-label">SKU<input class="shop-input" value="@variant.Sku" maxlength="100" placeholder="Generate automatically on save" @oninput="@(e => Patch(key, v => v.Sku = Text(e)))" /><small>@(string.IsNullOrWhiteSpace(variant.Sku) ? "Preview: " + ProductEditorRules.AutoSku(Draft, variant) : "Kept stable when titles or labels change")</small></label>
+                <label class="shop-label">Barcode<input class="shop-input" value="@variant.Barcode" maxlength="100" @oninput="@(e => Patch(key, v => v.Barcode = Text(e)))" /></label>
+                <label class="shop-label">Selling price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.Price)" @oninput="@(e => Patch(key, v => v.Price = Decimal(e)))" /></label>
+                <label class="shop-label">Compare-at price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.CompareAt)" @oninput="@(e => Patch(key, v => v.CompareAt = Decimal(e)))" /></label>
+                <label class="shop-label">Cost price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.Cost)" @oninput="@(e => Patch(key, v => v.Cost = Decimal(e)))" /></label>
+                @if (variant.Id == 0) { <label class="shop-label">Opening stock<input class="shop-input" type="number" min="0" value="@variant.OpeningStock" @oninput="@(e => Patch(key, v => v.OpeningStock = int.TryParse(Text(e), out var q) ? q : 0))" /><small>Recorded once as an initial inventory movement.</small></label> }
+            </div>
+            <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@variant.Active" @onchange="@(e => Patch(key, v => v.Active = (bool)e.Value!))" /> Active</label>
+            <label class="check-label"><input type="checkbox" checked="@variant.Default" @onchange="@(e => Default.InvokeAsync(((bool)e.Value!, key)))" /> Default</label>
+            <button type="button" class="brand-text-action" @onclick="@(() => Patch(key, v => v.Sku = ""))">Regenerate SKU</button>
+            @if (variant.Id > 0) { <button type="button" class="shop-button-secondary" @onclick="@(() => Stock.InvokeAsync(key))">Adjust stock</button> }
+            </div></fieldset>
+            <p class="admin-help">On hand @variant.OnHand · Reserved @variant.Reserved · Available @(variant.OnHand - variant.Reserved)</p>
+            <button type="button" class="brand-text-action is-danger" disabled="@(!variant.Archived && variant.Id > 0 && (variant.OnHand > 0 || variant.Reserved > 0))" @onclick="@(() => Archive.InvokeAsync(key))">@(variant.Id == 0 ? "Remove unsaved variant" : variant.Archived ? "Restore variant" : "Archive variant")</button>
+            @if (Errors.TryGetValue($"Variants.{key:N}", out var errors)) { <p class="form-error" role="alert">@string.Join(" ", errors)</p> }
+        </details>
+    }
+</section>
+@code {
+    [Parameter] public ProductEditorDraft Draft { get; set; } = new();
+    [Parameter] public Dictionary<string, string[]> Errors { get; set; } = [];
+    [Parameter] public EventCallback<VariantPatch> Changed { get; set; }
+    [Parameter] public EventCallback<(bool Selected, Guid Key)> Default { get; set; }
+    [Parameter] public EventCallback<Guid> Stock { get; set; }
+    [Parameter] public EventCallback<Guid> Archive { get; set; }
+    [Parameter] public EventCallback Standard { get; set; }
+    private bool showArchived;
+    private Task Patch(Guid key, Action<EditorVariant> update) => Changed.InvokeAsync(new(key, update));
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+    private static decimal? Decimal(ChangeEventArgs e) => decimal.TryParse(Text(e), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : null;
+    private static string Number(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
+    private string Label(EditorVariant variant) => string.Join(" / ", Draft.Attributes.Select(a => a.Options.FirstOrDefault(o => o.ClientId == variant.Choices.GetValueOrDefault(a.DefinitionId))?.Value).Where(v => !string.IsNullOrEmpty(v))) is { Length: > 0 } label ? label : "Standard variant";
+}

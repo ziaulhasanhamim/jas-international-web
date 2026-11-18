@@ -9,6 +9,7 @@ namespace JASIntWeb.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 : IdentityDbContext<User, IdentityRole<int>, int>(options), IDataProtectionKeyContext
 {
+    public DbSet<ProductEditorReceipt> ProductEditorReceipts => Set<ProductEditorReceipt>();
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
@@ -46,6 +47,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.Entity<ProductEditorReceipt>(e => { e.HasKey(r => new { r.ActorId, r.OperationId }); e.Property(r => r.ResultJson).HasColumnType("jsonb"); });
+        builder.Entity<InventoryItem>().Property(i => i.Version).IsRowVersion();
+        builder.Entity<ProductVariant>().Property(v => v.NormalizedSku).HasComputedColumnSql("upper(btrim(\"SKU\"))", stored: true);
+        builder.Entity<ProductVariant>().HasIndex(v => v.NormalizedSku).IsUnique().HasDatabaseName("UX_ProductVariants_NormalizedSku");
+        builder.Entity<AttributeDefinition>().Property(a => a.MetadataSchemaJson).HasColumnType("jsonb");
+        builder.Entity<AttributeOption>().Property(a => a.MetadataJson).HasColumnType("jsonb");
+        builder.Entity<ProductAttributeDefinition>().Property(a => a.MetadataSchemaJson).HasColumnType("jsonb");
+        builder.Entity<ProductAttributeOption>().Property(a => a.MetadataJson).HasColumnType("jsonb");
         builder.Entity<StockNotification>(e =>
         {
             e.Property(x => x.Email).HasMaxLength(254);

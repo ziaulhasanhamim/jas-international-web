@@ -1,0 +1,18 @@
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<section class="shop-panel editor-section">
+    <h2>Content &amp; SEO</h2>
+    <AdminSeoFields Kind="product" Name="@Information.Name" Slug="@Information.Slug" Title="@Information.MetaTitle" TitleChanged="value => Patch(i => i.MetaTitle = value)" Description="@Information.MetaDescription" DescriptionChanged="value => Patch(i => i.MetaDescription = value)" FallbackDescription="@Information.Description" BaseUrl="@BaseUrl" />
+    <label class="shop-label">Warranty information<input class="shop-input" value="@Information.WarrantyInfo" @oninput="e => Patch(i => i.WarrantyInfo = e.Value?.ToString())" /></label>
+    <label class="shop-label">Search synonyms<input class="shop-input" value="@Information.Synonyms" @oninput="e => Patch(i => i.Synonyms = e.Value?.ToString())" /></label>
+    <label class="shop-label">Bangla name<input class="shop-input" value="@Information.BanglaName" @oninput="e => Patch(i => i.BanglaName = e.Value?.ToString())" /></label>
+    <label class="shop-label">Bangla description<textarea class="shop-input" value="@Information.BanglaDescription" @oninput="e => Patch(i => i.BanglaDescription = e.Value?.ToString())"></textarea></label>
+    <AdminImagePicker Label="Social sharing image" Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
+</section>
+@code {
+    [Parameter] public ProductInformation Information { get; set; } = new();
+    [Parameter] public string BaseUrl { get; set; } = "";
+    [Parameter] public EventCallback<InformationPatch> Changed { get; set; }
+    [Parameter] public EventCallback<bool> UploadBusy { get; set; }
+    private Task Patch(Action<ProductInformation> update) => Changed.InvokeAsync(new(update));
+}

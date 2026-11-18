@@ -1,3 +1,16 @@
+# v1.4.0 — Unified product editor and selective variants
+
+- One parent-owned draft and Save product action across Details, Options, Variants and Content & SEO; reliable validation/conflict/session/recovery states preserve edits and release busy controls.
+- Name/category-only drafts, no automatic placeholder variants, atomic publishing and explicit opening stock. Existing stock adjustments remain ledger-backed and independently versioned.
+- Filtered, paginated selective combinations; no automatic selections or Cartesian generation. Up to 100 non-archived actual variants, explicit archived restoration and existing-row mapping.
+- Product-local typed option metadata with global templates/suggestions, optional accessible SSR color swatches, stable readable automatic SKUs, explicit regeneration and normalized global uniqueness.
+- Missing storefront combinations retain choices and show Out of stock, N/A price and N/A SKU. Real zero-stock variants retain pricing and stock alerts. Public shopping stays static SSR.
+- Legacy product/workspace mutations now return 410 editor updated. Reload existing admin tabs. Existing public URLs and entity/inventory/order identities remain compatible.
+
+Migration: `20261118122633_ProductEditorV2` adds JSONB metadata/schema columns, retirement flags, operation receipts and normalized SKU uniqueness. Existing rows receive empty metadata/schemas. Inventory concurrency maps to PostgreSQL xmin. Preflight `upper(btrim("SKU"))` collisions, including archived records; resolve them explicitly. The migration refuses collisions without modifying historic identifiers. See README for the preflight SQL and admin contracts.
+
+Validation evidence and isolated staging screenshots are in `docs/product-editor-v2/`. No production customer data or real emails are used. Existing tag-based CI remains browser-free. Render keeps its configured deployment model; no separate manual production deploy was added.
+
 # v1.3.1 — Complete media cache invalidation
 
 - Media cache invalidation now evicts catalog, sitemap and static-page output-cache entries as well as HybridCache entries, keeping previously cached product feeds and image sitemaps current after URL migrations.

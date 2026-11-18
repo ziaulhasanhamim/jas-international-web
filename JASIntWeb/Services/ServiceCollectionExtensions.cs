@@ -235,6 +235,8 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddScoped<IAdminCatalogBackend, ServerAdminCatalogBackend>();
         builder.Services.AddScoped<IAdminProductWorkspaceBackend, ServerAdminProductWorkspaceBackend>();
         builder.Services.AddScoped<ProductWorkspaceService>();
+        builder.Services.AddScoped<JASIntWeb.Services.ProductEditor.ProductEditorService>();
+        builder.Services.AddScoped<IAdminProductEditorBackend, JASIntWeb.Services.ProductEditor.ServerAdminProductEditorBackend>();
         builder.Services.AddSingleton<CatalogContentRenderer>();
         builder.Services.AddScoped<AccountMailService>();
         builder.Services.AddScoped<CouponService>();

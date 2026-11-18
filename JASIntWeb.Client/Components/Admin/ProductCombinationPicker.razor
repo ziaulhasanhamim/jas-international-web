@@ -1,0 +1,58 @@
+@using System.Numerics
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<section class="shop-panel editor-section" aria-label="Combination picker">
+    <h2>Choose combinations to add</h2>
+    <p class="admin-help">Only selected combinations are added to your draft. Preview writes nothing. A product can have up to 100 current variants, even when many more combinations are possible.</p>
+    <div class="editor-combination-filters">
+    @foreach (var axis in Draft.Attributes.Where(a => !a.Retired))
+    {
+        <label class="shop-label">Filter @axis.Name<select class="shop-input" value="@filters.GetValueOrDefault(axis.DefinitionId)" @onchange="@(e => Filter(axis.DefinitionId, e))"><option value="">All values</option>
+            @foreach (var option in axis.Options.Where(o => !o.Retired)) { <option value="@option.ClientId">@option.Value</option> }
+            @if (!axis.Required) { <option value="@Guid.Empty">Not applicable</option> }
+        </select></label>
+    }
+    </div>
+    <button type="button" class="shop-button-secondary" @onclick="@(() => Request("0"))">Preview combinations</button>
+    @if (Page is not null && !filtersChanged)
+    {
+        <p class="admin-help" role="status">@Page.Total theoretical combinations under these filters · Showing up to 50 · @Draft.Variants.Count(v => !v.Archived)/100 current variants</p>
+        <div class="table-scroll"><table class="shop-table"><thead><tr><th><input type="checkbox" aria-label="Select missing combinations on this page" checked="@(Page.Rows.Any(r => r.Status == "Missing") && Page.Rows.Where(r => r.Status == "Missing").All(r => selected.Contains(r.Key)))" @onchange="SelectPage" /></th><th>Combination</th><th>Status</th><th>Existing variant</th></tr></thead><tbody>
+        @foreach (var row in Page.Rows)
+        {
+            <tr @key="row.Key"><td>@if (row.Status == "Missing") { <input type="checkbox" aria-label="@($"Select {row.Label}")" checked="@selected.Contains(row.Key)" @onchange="@(e => Toggle(row.Key, (bool)e.Value!))" /> }</td><td>@row.Label</td><td>@row.Status</td><td>
+                @if (row.Status == "Archived") { @foreach (var id in row.ExistingIds) { <button type="button" class="brand-text-action" @onclick="@(() => Restore.InvokeAsync(id))">Restore #@id</button> } }
+                else if (row.Status == "Missing")
+                {
+                    <select class="shop-input" aria-label="@($"Map existing variant to {row.Label}")" value="" @onchange="@(e => MapRow(row, e))"><option value="">Map an existing variant…</option>
+                        @foreach (var variant in Draft.Variants.Where(v => !v.Archived)) { <option value="@variant.ClientId">@(string.IsNullOrWhiteSpace(variant.Sku) ? "Unsaved variant" : variant.Sku)</option> }
+                    </select>
+                }
+            </td></tr>
+        }
+        </tbody></table></div>
+        <div class="form-actions"><button type="button" class="shop-button" disabled="@(selected.Count == 0)" @onclick="StageSelected">Add @selected.Count selected to draft</button>
+        <button type="button" class="shop-button-secondary" disabled="@(Page.Offset == "0")" @onclick="Previous">Previous</button><button type="button" class="shop-button-secondary" disabled="@(!Page.HasMore)" @onclick="Next">Next 50</button></div>
+    }
+</section>
+@code {
+    [Parameter] public ProductEditorDraft Draft { get; set; } = new();
+    [Parameter] public EditorCombinationPage? Page { get; set; }
+    [Parameter] public EventCallback<PreviewRequest> Preview { get; set; }
+    [Parameter] public EventCallback<List<EditorCombination>> Stage { get; set; }
+    [Parameter] public EventCallback<int> Restore { get; set; }
+    [Parameter] public EventCallback<CombinationMapping> Map { get; set; }
+    private bool filtersChanged;
+    private EditorCombinationPage? previous;
+    private readonly Dictionary<int, string> filters = [];
+    private readonly HashSet<string> selected = [];
+    protected override void OnParametersSet() { if (!ReferenceEquals(previous, Page)) { previous = Page; selected.Clear(); filtersChanged = false; } }
+    private void Filter(int id, ChangeEventArgs args) { filters[id] = args.Value?.ToString() ?? ""; selected.Clear(); filtersChanged = true; }
+    private Task Request(string offset) => Preview.InvokeAsync(new(offset, filters.Where(p => Guid.TryParse(p.Value, out _)).ToDictionary(p => p.Key, p => new List<Guid> { Guid.Parse(p.Value) })));
+    private Task Previous() => Request(BigInteger.Max(0, BigInteger.Parse(Page!.Offset) - 50).ToString());
+    private Task Next() => Request((BigInteger.Parse(Page!.Offset) + 50).ToString());
+    private void Toggle(string key, bool value) { if (value) selected.Add(key); else selected.Remove(key); }
+    private void SelectPage(ChangeEventArgs args) { foreach (var row in Page!.Rows.Where(r => r.Status == "Missing")) Toggle(row.Key, (bool)args.Value!); }
+    private Task StageSelected() => Stage.InvokeAsync(Page!.Rows.Where(r => selected.Contains(r.Key) && r.Status == "Missing").ToList());
+    private Task MapRow(EditorCombination row, ChangeEventArgs args) => Guid.TryParse(args.Value?.ToString(), out var key) ? Map.InvokeAsync(new(key, row)) : Task.CompletedTask;
+}

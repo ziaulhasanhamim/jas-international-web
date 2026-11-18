@@ -1,0 +1,31 @@
+@using JASIntWeb.Client.Contracts
+@using JASIntWeb.Client.Services
+<div class="editor-metadata-values">
+@foreach (var field in Fields)
+{
+    var key = field.Key;
+    var value = Values.GetValueOrDefault(key) ?? "";
+    <label class="shop-label">@field.Label <span class="admin-optional">Optional</span>
+        @if (field.Kind == ValueFieldKind.Boolean)
+        {
+            <select class="shop-input" value="@value" @onchange="@(e => Set(key, e.Value?.ToString() ?? ""))"><option value="">Not set</option><option value="true">Yes</option><option value="false">No</option></select>
+        }
+        else if (field.Kind == ValueFieldKind.HexColor)
+        {
+            <span class="editor-color-input"><input type="color" aria-label="@($"{field.Label} picker")" value="@(IsColor(value) ? value : "#000000")" @oninput="@(e => Set(key, e.Value?.ToString() ?? ""))" />
+            <input class="shop-input" value="@value" placeholder="#RRGGBB" maxlength="7" aria-label="@($"{field.Label} hex")" @oninput="@(e => Set(key, e.Value?.ToString() ?? ""))" /></span>
+        }
+        else
+        {
+            <input class="shop-input" type="@(field.Kind == ValueFieldKind.Number ? "number" : "text")" step="any" value="@value" maxlength="500" @oninput="@(e => Set(key, e.Value?.ToString() ?? ""))" />
+        }
+    </label>
+}
+</div>
+@code {
+    [Parameter] public List<ValueField> Fields { get; set; } = [];
+    [Parameter] public Dictionary<string, string> Values { get; set; } = [];
+    [Parameter] public EventCallback<MetadataPatch> Changed { get; set; }
+    private Task Set(string key, string value) => Changed.InvokeAsync(new(key, value));
+    private static bool IsColor(string value) => System.Text.RegularExpressions.Regex.IsMatch(value, "^#[0-9A-Fa-f]{6}$");
+}

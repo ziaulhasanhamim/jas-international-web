@@ -1,180 +1,50 @@
-@inherits AdminEditorBase<ProductEditForm>
+@implements IAsyncDisposable
 <PageTitle>@(Id == 0 ? "Add product" : "Edit product") — JAS Admin</PageTitle>
-<AdminPageHeader
-    Title="@(Id == 0 ? "Add product" : "Edit product")"
-    Description="Start with product information, then configure options, variants and stock."
-    ActionHref="/admin/products"
-    ActionText="Back to products"
-/>
-<ProductAdminTabs ProductId="Id" />
-@if (notFound)
+<AdminPageHeader Title="@(Id == 0 ? "Add product" : state.Draft.Information.Name)" Description="Save details, options and selected variants together. Existing stock movements stay explicit." ActionHref="/admin/products" ActionText="Back to products" />
+<NavigationLock ConfirmExternalNavigation="@state.Dirty" OnBeforeInternalNavigation="BeforeNavigation" />
+@if (state.Message is not null)
 {
-    <p class="admin-empty">Product not found.</p>
+    <div class="@(state.Phase == EditorPhase.Saved ? "editor-success" : "form-error")" role="@(state.Phase == EditorPhase.Saved ? "status" : "alert")">@state.Message</div>
+}
+@if (state.Errors.Count > 0) { <ul class="editor-error-list" role="alert">@foreach (var error in state.Errors) { <li><strong>@error.Key:</strong> @string.Join(" ", error.Value)</li> }</ul> }
+@if (state.Phase == EditorPhase.Conflict)
+{
+    <div class="editor-recovery"><p>Your draft is retained. Compare the latest product before replacing it.</p><button type="button" class="shop-button-secondary" @onclick="ReviewLatest">Review latest</button><button type="button" class="shop-button-secondary" @onclick="Export">Download draft</button>
+    @if (latest is not null) { <p>Latest revision: @latest.Draft.Revision · Your revision: @state.Draft.Revision</p><button type="button" class="brand-text-action" @onclick="UseLatest">Replace draft with latest (confirm)</button><a href="@($"/admin/products/{Id}/edit")" target="_blank">Open latest in another tab ↗</a> }</div>
+}
+@if (state.Phase == EditorPhase.SessionExpired) { <p><a href="/account/login" target="_blank">Sign in again ↗</a> then check the operation or retry. <button type="button" class="brand-text-action" @onclick="Export">Download draft</button></p> }
+@if (reloadRequired) { <button type="button" class="shop-button-secondary" @onclick="Reload">Reload saved product</button> }
+@if (uncertain)
+{
+    <div class="editor-recovery"><p>A previous request has not been confirmed. The submitted draft is retained; retry uses the same operation ID.</p><button type="button" class="shop-button-secondary" disabled="@state.Busy" @onclick="CheckOperation">Check save status</button><button type="button" class="shop-button-secondary" disabled="@(state.Busy || !retryAllowed)" @onclick="Retry">Retry same request</button><button type="button" class="brand-text-action" @onclick="Export">Download draft</button></div>
+}
+@if (state.Data is null)
+{
+    <p class="admin-empty">@(state.Phase == EditorPhase.Loading ? "Loading product editor…" : "The editor could not be loaded.")</p>
+    @if (!state.Busy) { <button type="button" class="shop-button-secondary" @onclick="Reload">Reload editor</button> }
 }
 else
 {
-    @if (error is not null)
-    {
-        <p class="form-error" role="alert">@error</p>
-    }
-    @if (AccessDenied)
-    {
-        <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri).Insert(0, "/"))}")" class="btn-secondary">Sign in again</a>
-    }
-    @if (Input is null)
-    {
-        <p class="admin-help">Loading form…</p>
-    }
-    else
-    {
-        <EditForm data-admin-draft data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="shop-panel admin-form">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
-            @if (!ContentTab)
-            {
-            <div class="admin-form-grid">
-                <label class="shop-label">
-                    Product name *
-                    <input @bind="Input!.Name" @bind:event="oninput" @bind:after="NameChanged" class="shop-input" placeholder="e.g. JBL PartyBox 520 Wireless Speaker" />
-                </label>
-                <label class="shop-label">
-                    URL slug (auto-generated if empty)
-                    <input @bind="Input!.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input" placeholder="e.g. jbl-partybox-520-wireless-speaker" />
-                    <small>Customer-facing canonical URL: /product/[slug]</small>
-                </label>
-            </div>
-            <div class="admin-form-grid">
-                <label class="shop-label">
-                    Category
-                    <InputSelect @bind-Value="Input!.CategoryId" class="shop-input">
-                        <option value="0">Select category</option>
-                        @foreach (var c in categories)
-                        {
-                            <option value="@c.Id">@CategoryName(c)</option>
-                        }
-                    </InputSelect>
-                </label>
-                <label class="shop-label">
-                    Brand (optional)
-                    <InputSelect @bind-Value="Input!.BrandId" class="shop-input">
-                        <option value="">No brand / generic</option>
-                        @foreach (var b in brands)
-                        {
-                            <option value="@b.Id">@b.Name</option>
-                        }
-                    </InputSelect>
-                </label>
-            </div>
-            <label class="shop-label">
-                Short overview / summary
-                <textarea @bind="Input!.Description" @bind:event="oninput" class="shop-input" rows="2" placeholder="Brief one or two sentence summary shown on product card and search snippets" ></textarea>
-            </label>
-
-            <AdminProductMedia Value="@(new AdminMediaValue(Input!.Image, Input.Images))" ValueChanged="MediaChanged" BusyChanged="UploadBusy" />
-            }
-            @* Available during creation and on both existing product tabs. *@
-            <!-- Rich Description & Specification Tables -->
-            <div class="mt-8 border-t border-slate-200/80 pt-6">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">Rich Description &amp; Specifications</h3>
-                        <p class="text-xs text-slate-500">Add rich text, headings, bullet lists, and specification tables. You can also paste formatted specs from official brand pages or toggle code mode.</p>
-                    </div>
-                </div>
-
-                <div class="rounded-2xl border border-slate-200 bg-white shadow-xs p-1">
-                    <AdminRichText Label="Product description & specifications" Height="480" Specifications="true" Disabled="Busy" @bind-Value="Input!.Details" @bind-Value:after="DetailsChanged" />
-                </div>
-            </div>
-            @if (!ContentTab)
-            {
-            <!-- Merchandising & Storefront Badges -->
-            <div class="mt-6 border-t border-slate-200/80 pt-6">
-                <h3 class="text-sm font-bold text-slate-900 mb-3">Merchandising &amp; Badges</h3>
-                <div class="space-y-2">
-                    <label class="check-label">
-                        <InputCheckbox @bind-Value="Input!.IsFeatured" />
-                        ⭐ Feature product on homepage highlights and recommendations
-                    </label>
-                    <label class="check-label">
-                        <InputCheckbox @bind-Value="Input!.IsNewArrival" />
-                        🏷️ Display red diagonal "NEW ARRIVAL" corner badge on product card
-                    </label>
-                </div>
-            </div>
-
-            <!-- Storefront Publishing Status -->
-            <div class="mt-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-                <label class="block text-sm font-bold text-slate-900 mb-1">Storefront Publication Status</label>
-                <p class="text-xs text-slate-500 mb-3">Choose whether this product is actively purchasable by customers or kept as an archived internal draft.</p>
-                <InputRadioGroup @bind-Value="Input!.Hidden">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label class="relative flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition @(!Input!.Hidden ? "border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500" : "border-slate-200 hover:bg-slate-50")">
-                            <InputRadio Value="false" class="mt-0.5 size-4 text-emerald-600 focus:ring-emerald-500" />
-                            <div>
-                                <span class="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                                    <span class="size-2 rounded-full bg-emerald-500"></span>
-                                    Published (Live Storefront)
-                                </span>
-                                <p class="text-xs text-slate-600 mt-0.5">Active and purchasable by customers in catalog, category listings, and search results.</p>
-                            </div>
-                        </label>
-                        <label class="relative flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition @(Input!.Hidden ? "border-rose-500 bg-rose-50/60 ring-1 ring-rose-500" : "border-slate-200 hover:bg-slate-50")">
-                            <InputRadio Value="true" class="mt-0.5 size-4 text-rose-600 focus:ring-rose-500" />
-                            <div>
-                                <span class="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                                    <span class="size-2 rounded-full bg-rose-500"></span>
-                                    Archived (Hidden Draft)
-                                </span>
-                                <p class="text-xs text-slate-600 mt-0.5">Completely hidden from customer storefront and search. Safe for staging edits or discontinued products.</p>
-                            </div>
-                        </label>
-                    </div>
-                </InputRadioGroup>
-            </div>
-
-            }
-            @if (ContentTab)
-            {
-            <AdminSeoFields Kind="product" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl" Brand="@brands.FirstOrDefault(b => b.Id == Input.BrandId)?.Name" />
-            <label class="shop-label">Warranty information<InputText @bind-Value="Input!.WarrantyInfo" class="shop-input" /></label>
-            <label class="shop-label">Search synonyms<InputText @bind-Value="Input!.Synonyms" class="shop-input" /></label>
-            <label class="shop-label">Bangla name<InputText @bind-Value="Input!.BanglaName" class="shop-input" /></label>
-            <label class="shop-label">Bangla description<InputText @bind-Value="Input!.BanglaDescription" class="shop-input" /></label>
-            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
-            }
-            <div class="form-actions">
-                <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving product...">
-                    <span class="form-submit-spinner" hidden></span>
-                    <span>Save product</span>
-                </button>
-                <a href="/admin/products" class="shop-button-secondary">Cancel</a>
-            </div>
+    <form @onsubmit="Save" @onsubmit:preventDefault novalidate>
+        <fieldset disabled="@(Disabled || uncertain || stockVariant is not null)">
+            <div class="editor-savebar"><label class="shop-label">Status<select class="shop-input" value="@state.Draft.Information.Hidden" @onchange="e => Change(d => d.Information.Hidden = bool.Parse(e.Value!.ToString()!))"><option value="true">Draft</option><option value="false">Published</option></select></label>
+            <span class="admin-help">@(state.Dirty ? "Unsaved changes" : state.Draft.Id == 0 ? "New draft" : "Saved")</span><button type="submit" class="shop-button">@(state.Phase == EditorPhase.Saving ? "Saving…" : "Save product")</button></div>
+            <nav class="admin-tabs product-editor-tabs" aria-label="Product editor sections">@foreach (var section in sections) { <button type="button" aria-current="@(tab == section.Key ? "page" : null)" @onclick="() => tab = section.Key">@section.Value</button> }</nav>
+            <div hidden="@(tab != "details")"><ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" /></div>
+            <div hidden="@(tab != "options")"><ProductEditorAttributes Attributes="state.Draft.Attributes" Templates="state.Data.Templates" Changed="AttributeChanged" Added="AddAttribute" Move="MoveAttribute" RefreshTemplates="RefreshTemplates" /></div>
+            <div hidden="@(tab != "variants")"><ProductCombinationPicker Draft="state.Draft" Page="preview" Preview="Preview" Stage="Stage" Restore="RestoreVariant" Map="MapVariant" />
+                <ProductEditorVariantRows Draft="state.Draft" Errors="state.Errors" Changed="VariantChanged" Default="SetDefault" Stock="OpenStock" Archive="ArchiveVariant" Standard="AddStandard" /></div>
+            <div hidden="@(tab != "content")"><ProductEditorSeo Information="state.Draft.Information" BaseUrl="@state.Data.PublicBaseUrl" Changed="InfoChanged" UploadBusy="UploadBusy" /></div>
+            <aside class="editor-readiness"><h3>Before publishing</h3><p class="admin-help">Drafts need a name and category. Publishing also needs a cover image, description, and one active default variant with a positive price. Sold-out variants are allowed.</p></aside>
+            <div class="form-actions"><button type="submit" class="shop-button">Save product</button><button type="button" class="shop-button-secondary" @onclick="Export">Download draft</button></div>
         </fieldset>
-        </EditForm>
-    }
-}
-
-
-@code {
-    [Parameter] public bool ContentTab { get; set; }
-    private void DetailsChanged() { MarkEdited(); EditContext?.NotifyFieldChanged(EditContext.Field(nameof(ProductEditForm.Details))); }
-    private bool slugEdited;
-    protected override Task<AdminEditorData<ProductEditForm>> LoadAsync() => Backend.ProductAsync(Id);
-    protected override Task<AdminSaveResult> SaveAsync(ProductEditForm input) => Backend.SaveProductAsync(input);
-    private void SlugChanged() => slugEdited = true;
-    private void NameChanged()
+    </form>
+    @if (pendingStock is not null && stockVariant is null)
     {
-        if (Id == 0 && !slugEdited) Input!.Slug = EditorSlug.FromName(Input.Name);
+        <section class="shop-panel editor-recovery"><p>Save the product draft before adjusting stock.</p><button type="button" class="shop-button" disabled="@Disabled" @onclick="SaveAndOpenStock">Save and continue</button><button type="button" class="shop-button-secondary" @onclick="() => pendingStock = null">Keep editing</button></section>
     }
-    private List<CategoryLinkDto> categories => Snapshot?.Categories ?? [];
-    private List<BrandLinkDto> brands => Snapshot?.Brands ?? [];
-    private string CategoryName(CategoryLinkDto category) => category.ParentId is int parent ? (categories.FirstOrDefault(p => p.Id == parent)?.Name + " / " + category.Name) : category.Name;
-    private void MediaChanged(AdminMediaValue value)
+    @if (stockVariant is not null)
     {
-        MarkEdited();
-        Input!.Image = value.Cover; Input.Images = value.Gallery;
-        EditContext!.NotifyFieldChanged(EditContext.Field(nameof(Input.Image)));
+        <ProductEditorStockDialog ProductId="state.Draft.Id" Variant="stockVariant" Busy="@(state.Busy || uncertain)" Message="@stockMessage" Save="Stock" Refresh="RefreshStock" Cancel="() => { stockVariant = null; stockMessage = null; }" />
     }
 }

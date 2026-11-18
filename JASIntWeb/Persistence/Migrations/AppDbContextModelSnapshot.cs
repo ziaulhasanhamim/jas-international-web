@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261117132551_ProductOwnedVariantOptions";
+    public override string LastMigrationId => "20261118122633_ProductEditorV2";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -41,8 +41,15 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasColumnType("text");
 
+                b.Property<string>("MetadataSchemaJson")
+                    .IsRequired()
+                    .HasColumnType("jsonb");
+
                 b.Property<string>("Name")
                     .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("SwatchFieldKey")
                     .HasColumnType("text");
 
                 b.Property<string>("Unit")
@@ -70,6 +77,10 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Code")
                     .IsRequired()
                     .HasColumnType("text");
+
+                b.Property<string>("MetadataJson")
+                    .IsRequired()
+                    .HasColumnType("jsonb");
 
                 b.Property<string>("Value")
                     .IsRequired()
@@ -809,6 +820,12 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("QuantityReserved")
                     .HasColumnType("integer");
 
+                b.Property<uint>("Version")
+                    .IsConcurrencyToken()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("xid")
+                    .HasColumnName("xmin");
+
                 b.HasKey("Id");
 
                 b.HasIndex("ProductVariantId")
@@ -1313,11 +1330,21 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<bool>("IsRequired")
                     .HasColumnType("boolean");
 
+                b.Property<bool>("IsRetired")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("MetadataSchemaJson")
+                    .IsRequired()
+                    .HasColumnType("jsonb");
+
                 b.Property<int>("ProductId")
                     .HasColumnType("integer");
 
                 b.Property<int>("SortOrder")
                     .HasColumnType("integer");
+
+                b.Property<string>("SwatchFieldKey")
+                    .HasColumnType("text");
 
                 b.HasKey("Id");
 
@@ -1354,6 +1381,13 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasMaxLength(120)
                     .HasColumnType("character varying(120)");
+
+                b.Property<bool>("IsRetired")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("MetadataJson")
+                    .IsRequired()
+                    .HasColumnType("jsonb");
 
                 b.Property<string>("NormalizedValue")
                     .IsRequired()
@@ -1396,6 +1430,37 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasDatabaseName("IX_ProductOptions_AttributeOwner");
 
                 b.ToTable("ProductAttributeOptions");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductEditorReceipt", b =>
+            {
+                b.Property<int>("ActorId")
+                    .HasColumnType("integer");
+
+                b.Property<Guid>("OperationId")
+                    .HasColumnType("uuid");
+
+                b.Property<string>("CommandKind")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("PayloadHash")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<int>("ProductId")
+                    .HasColumnType("integer");
+
+                b.Property<string>("ResultJson")
+                    .IsRequired()
+                    .HasColumnType("jsonb");
+
+                b.HasKey("ActorId", "OperationId");
+
+                b.ToTable("ProductEditorReceipts");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.ProductImage", b =>
@@ -1519,6 +1584,12 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<bool>("IsDeleted")
                     .HasColumnType("boolean");
 
+                b.Property<string>("NormalizedSku")
+                    .IsRequired()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("text")
+                    .HasComputedColumnSql("upper(btrim(\"SKU\"))", true);
+
                 b.Property<string>("OptionSignature")
                     .IsRequired()
                     .HasColumnType("text");
@@ -1546,6 +1617,10 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("Barcode")
                     .IsUnique();
+
+                b.HasIndex("NormalizedSku")
+                    .IsUnique()
+                    .HasDatabaseName("UX_ProductVariants_NormalizedSku");
 
                 b.HasIndex("ProductId")
                     .IsUnique()

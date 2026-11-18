@@ -1,0 +1,28 @@
+@using JASIntWeb.Client.Contracts
+<section class="shop-panel editor-stock-dialog" aria-label="Stock adjustment" role="dialog" aria-modal="false">
+    <h2>Adjust stock — @Variant.Sku</h2>
+    <p>On hand @Variant.OnHand · Reserved @Variant.Reserved</p>
+    <p class="admin-help">This adjustment is independent of product details and records a ledger movement.</p>
+    <label class="shop-label">New on-hand quantity<input class="shop-input" type="number" min="0" value="@quantityText" @oninput="@(e => quantityText = e.Value?.ToString() ?? "")" /></label>
+    <label class="shop-label">Reason<input class="shop-input" value="@reason" maxlength="500" @oninput="@(e => reason = e.Value?.ToString() ?? "")" /></label>
+    <p>Movement: @(ValidQuantity ? (Quantity - Variant.OnHand).ToString("+0;-0;0") : "—") units</p>
+    @if (Message is not null) { <p class="form-error" role="alert">@Message</p> }
+    <div class="form-actions"><button type="button" class="shop-button" disabled="@(Busy || !ValidQuantity || string.IsNullOrWhiteSpace(reason))" @onclick="Submit">@(Busy ? "Recording…" : "Record adjustment")</button>
+    <button type="button" class="shop-button-secondary" disabled="@Busy" @onclick="Refresh">Review current stock</button><button type="button" class="shop-button-secondary" disabled="@Busy" @onclick="Cancel">Cancel</button></div>
+</section>
+@code {
+    [Parameter] public int ProductId { get; set; }
+    [Parameter] public EditorVariant Variant { get; set; } = new();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback<EditorStock> Save { get; set; }
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    private Guid loaded;
+    private string quantityText = "";
+    private bool ValidQuantity => int.TryParse(quantityText, out var value) && value >= 0;
+    private int Quantity => int.Parse(quantityText, System.Globalization.CultureInfo.InvariantCulture);
+    private string reason = "";
+    protected override void OnParametersSet() { if (loaded != Variant.ClientId) { loaded = Variant.ClientId; quantityText = Variant.OnHand.ToString(System.Globalization.CultureInfo.InvariantCulture); reason = ""; } }
+    private Task Submit() => Save.InvokeAsync(new(Guid.NewGuid(), ProductId, Variant.Id, Variant.InventoryVersion, Quantity, reason));
+}

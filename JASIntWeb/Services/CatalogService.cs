@@ -228,14 +228,13 @@ public sealed class CatalogService(
                     })
                     .ToListAsync(ct);
                 // Configured product options remain visible even if no active variant currently offers a combination.
-                var bindings = await db.ProductAttributeDefinitions.AsNoTracking().Where(a => a.ProductId == p.Id)
-                    .OrderBy(a => a.SortOrder)
-                    .ThenBy(a => a.Id)
-                    .Select(a => new ProductAttributeDto(a.AttributeDefinition!.Code, a.AttributeDefinition.Name,
-                        a.Options.OrderBy(o => o.SortOrder).ThenBy(o => o.Id)
-                        .Select(o => new AttributeOptionDto(o.Id, o.Code, o.Value, o.SortOrder))
-                        .ToList(), a.IsRequired))
-                    .ToListAsync(ct);
+                var configured = await db.ProductAttributeDefinitions.AsNoTracking()
+                    .Include(a => a.AttributeDefinition).Include(a => a.Options)
+                    .Where(a => a.ProductId == p.Id && !a.IsRetired).OrderBy(a => a.SortOrder).ThenBy(a => a.Id).ToListAsync(ct);
+                var bindings = configured.Select(a => new ProductAttributeDto(a.AttributeDefinition!.Code, a.AttributeDefinition.Name,
+                    a.Options.Where(o => !o.IsRetired).OrderBy(o => o.SortOrder).ThenBy(o => o.Id)
+                        .Select(o => new AttributeOptionDto(o.Id, o.Code, o.Value, o.SortOrder,
+                            JASIntWeb.Client.Services.ProductEditorRules.Swatch(o.MetadataJson, a.SwatchFieldKey))).ToList(), a.IsRequired)).ToList();
                 var breadcrumbs = new List<CategoryLinkDto>();
                 if (p.Parent is not null)
                 {

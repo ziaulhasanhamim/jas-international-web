@@ -55,10 +55,10 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     private Task LockProductAsync(int id) => db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Products\" WHERE \"Id\" = {id} FOR UPDATE");
 
-    public async Task<int> SaveProductAsync(ProductEditForm input)
+    public async Task<int> SaveProductAsync(ProductEditForm input, bool unifiedEditor = false)
     {
-        Validate(input);
-        await using var transaction = await db.Database.BeginTransactionAsync();
+        if (!unifiedEditor) Validate(input);
+        await using var transaction = unifiedEditor ? null : await db.Database.BeginTransactionAsync();
         if (input.Id != 0) await LockProductAsync(input.Id);
         var p = input.Id == 0 ? new Product
         {
@@ -109,7 +109,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
         p.Description = input.Description?.Trim();
         p.Details = input.Details.Trim();
-        p.MainImageUrl = Url(input.Image);
+        p.MainImageUrl = unifiedEditor && input.Hidden && string.IsNullOrWhiteSpace(input.Image) ? "" : Url(input.Image);
         p.CategoryId = input.CategoryId;
         if (input.BrandId.HasValue && input.BrandId.Value > 0)
         {
@@ -123,9 +123,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             p.BrandId = null;
         }
-        if (input.Id != 0 && !input.Hidden && !await db.ProductVariants.AnyAsync(v => v.ProductId == p.Id && v.IsDefault && v.IsActive && !v.IsDeleted && v.SellingPrice > 0))
+        if (!unifiedEditor && input.Id != 0 && !input.Hidden && !await db.ProductVariants.AnyAsync(v => v.ProductId == p.Id && v.IsDefault && v.IsActive && !v.IsDeleted && v.SellingPrice > 0))
             throw new ShopException("Configure an active default variant with a positive price before publishing.");
-        p.IsDeleted = input.Id == 0 || input.Hidden;
+        p.IsDeleted = unifiedEditor ? input.Hidden : input.Id == 0 || input.Hidden;
         p.CatalogRevision++;
 
         p.IsFeatured = input.IsFeatured;
@@ -164,15 +164,18 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         await db.SaveChangesAsync();
 
-        if (input.Id == 0)
+        if (input.Id == 0 && !unifiedEditor)
         {
             db.ProductVariants.Add(new ProductVariant { ProductId = p.Id, SKU = $"JAS-{p.Id}-BASE", IsDefault = true, IsActive = false });
             await db.SaveChangesAsync();
         }
 
-        await transaction.CommitAsync();
-        await cache.RemoveByTagAsync(CatalogService.TagProducts);
-        await cache.RemoveByTagAsync(CatalogService.TagSections);
+        if (transaction is not null) await transaction.CommitAsync();
+        if (!unifiedEditor)
+        {
+            await cache.RemoveByTagAsync(CatalogService.TagProducts);
+            await cache.RemoveByTagAsync(CatalogService.TagSections);
+        }
         return p.Id;
     }
 

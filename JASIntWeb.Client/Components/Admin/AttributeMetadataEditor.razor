@@ -1,0 +1,51 @@
+@using JASIntWeb.Client.Contracts
+@inject IAdminProductEditorBackend Backend
+<section class="shop-panel editor-section">
+<h2>@(Suggestion ? "Suggested value data" : "Value field template")</h2>
+<p class="admin-help">Templates and suggestions are copied into products. Changing this library does not change existing product values.</p>
+@if (message is not null) { <p role="status">@message</p> }
+@if (loaded)
+{
+    <fieldset disabled="@(busy || !RendererInfo.IsInteractive)">
+    @if (Suggestion) { <ProductMetadataValues Fields="fields" Values="values" Changed="Change" /> }
+    else { <ProductMetadataSchema Fields="fields" SwatchField="@swatch" Changed="ChangeFields" SwatchChanged="ChangeSwatch" /> }
+    <button type="button" class="shop-button" @onclick="Save">@(busy ? "Saving…" : "Save value data")</button>
+    </fieldset>
+}
+</section>
+@code {
+    [Parameter] public int Id { get; set; }
+    [Parameter] public bool Suggestion { get; set; }
+    private int previous;
+    private bool loaded, busy;
+    private List<ValueField> fields = [];
+    private Dictionary<string, string> values = [];
+    private string? swatch, message;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (previous == Id && loaded) return; previous = Id;
+        try
+        {
+            if (Suggestion) { var data = await Backend.SuggestionAsync(Id); fields = data.Fields; values = data.Values; }
+            else { var data = await Backend.TemplateAsync(Id); fields = data.Fields; swatch = data.SwatchField; }
+            loaded = true;
+        }
+        catch (AdminCatalogException e) { message = e.Message; }
+    }
+    private void Change(MetadataPatch change) => values[change.Key] = change.Value;
+    private void ChangeFields(List<ValueField> next) => fields = next;
+    private void ChangeSwatch(string? next) => swatch = next;
+    private async Task Save()
+    {
+        if (busy) return; busy = true;
+        try
+        {
+            if (Suggestion) { var saved = await Backend.SaveSuggestionAsync(new(Id, fields, values)); values = saved.Values; }
+            else await Backend.SaveTemplateAsync(new(Id, fields, swatch));
+            message = "Value data saved. Existing product copies are unchanged.";
+        }
+        catch (AdminCatalogException e) { message = e.Message; }
+        catch (Exception) { message = "The save could not be confirmed. Your values are retained; reload before retrying."; }
+        finally { busy = false; }
+    }
+}

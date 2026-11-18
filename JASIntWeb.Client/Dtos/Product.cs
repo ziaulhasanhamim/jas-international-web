@@ -29,7 +29,7 @@ public sealed record BrandLinkDto(int Id, string Name, string Slug, string? Logo
 
 public sealed record ProductAttributeDto(string Code, string Name, List<AttributeOptionDto> Values, bool IsRequired = true);
 
-public sealed record AttributeOptionDto(int Id, string Code, string Value, int SortOrder);
+public sealed record AttributeOptionDto(int Id, string Code, string Value, int SortOrder, string? SwatchHex = null);
 
 public sealed record ProductVariantDto(int Id, string Sku, decimal Price, int Stock, bool IsDefault,
     Dictionary<string, string> Options, decimal? OriginalPrice = null);

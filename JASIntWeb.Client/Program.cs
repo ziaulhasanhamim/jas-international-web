@@ -11,6 +11,7 @@ builder.Services.AddAuthorizationCore(options => options.AddPolicy("AdminOnly", 
 builder.Services.AddScoped<HttpAdminCatalogBackend>();
 builder.Services.AddScoped<IAdminCatalogBackend>(sp => sp.GetRequiredService<HttpAdminCatalogBackend>());
 builder.Services.AddScoped<IAdminProductWorkspaceBackend, HttpAdminProductWorkspaceBackend>();
+builder.Services.AddScoped<IAdminProductEditorBackend, HttpAdminProductEditorBackend>();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthenticationStateDeserialization();
 await builder.Build().RunAsync();
