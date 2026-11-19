@@ -163,6 +163,28 @@ public class ImageCompressionAndPictureTests
     }
 
     [Test]
+    public async Task S3Configuration_SupportsCloudflareR2AutoRegionAndGenericS3()
+    {
+        var config = new Microsoft.Extensions.Configuration.ConfigurationManager();
+        config["R2_BUCKET"] = "my-r2-bucket";
+        config["R2_ENDPOINT"] = "https://abc123def456.r2.cloudflarestorage.com";
+        config["R2_ACCESS_KEY_ID"] = "r2-key";
+        config["R2_SECRET_ACCESS_KEY"] = "r2-secret";
+        config["R2_PUBLIC_URL"] = "https://pub-abc123def456.r2.dev";
+
+        var r2Options = S3StorageOptions.Read(config);
+        await r2Options.Bucket.Should().BeEqualTo("my-r2-bucket");
+        await r2Options.Region.Should().BeEqualTo("auto");
+        await r2Options.PublicBaseUrl.Should().BeEqualTo("https://pub-abc123def456.r2.dev");
+        await r2Options.ForcePathStyle.Should().BeTrue();
+        await r2Options.IsConfigured.Should().BeTrue();
+
+        using var r2Client = r2Options.CreateClient();
+        await ((AmazonS3Config)r2Client.Config).AuthenticationRegion.Should().BeEqualTo("auto");
+        await ((AmazonS3Config)r2Client.Config).ServiceURL.Should().BeEqualTo("https://abc123def456.r2.cloudflarestorage.com/");
+    }
+
+    [Test]
     public async Task MigrationCheckpoint_CancellationPreservesBackupAndRetryRetainsChecksums()
     {
         var directory = Path.Combine(Path.GetTempPath(), "jas-media-" + Guid.NewGuid().ToString("N"));

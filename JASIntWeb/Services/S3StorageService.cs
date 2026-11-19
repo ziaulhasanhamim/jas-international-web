@@ -8,6 +8,7 @@ public sealed partial class S3StorageService(IAmazonS3 client, S3StorageOptions 
     IImageOptimizerService optimizer, ILogger<S3StorageService> logger) : IStorageService
 {
     public bool IsConfigured => options.IsConfigured;
+
     [GeneratedRegex(@"^images/(static|animated)/[a-f0-9]{32,64}\.webp$", RegexOptions.CultureInvariant)]
     private static partial Regex ManagedKey();
 
@@ -18,7 +19,9 @@ public sealed partial class S3StorageService(IAmazonS3 client, S3StorageOptions 
     public async Task<string> UploadAssetAsync(Stream stream, string fileName, string contentType, string identity, CancellationToken ct = default)
     {
         if (!IsConfigured) throw new InvalidOperationException("Media storage is not configured.");
-        if (identity.Length is not (32 or 64) || identity.Any(c => !char.IsAsciiHexDigit(c) || char.IsUpper(c))) throw new ArgumentException("Invalid media identity.", nameof(identity));
+        if (identity.Length is not (32 or 64) || identity.Any(c => !char.IsAsciiHexDigit(c) || char.IsUpper(c)))
+            throw new ArgumentException("Invalid media identity.", nameof(identity));
+
         var image = await optimizer.OptimizeImageAsync(stream, fileName, contentType, ct);
         var key = $"images/{(image.IsAnimated ? "animated" : "static")}/{identity}.webp";
         List<string> attempted = [];
@@ -37,13 +40,22 @@ public sealed partial class S3StorageService(IAmazonS3 client, S3StorageOptions 
                 catch (Exception error) { logger.LogWarning(error, "Incomplete media cleanup failed for {Key}", item); }
             throw;
         }
+
         async Task Put(string objectKey, byte[] bytes, string type)
         {
             attempted.Add(objectKey);
             using var body = new MemoryStream(bytes, false);
-            await client.PutObjectAsync(new() { BucketName = options.Bucket, Key = objectKey, InputStream = body,
-                ContentType = type, AutoCloseStream = false, UseChunkEncoding = false, DisablePayloadSigning = true,
-                Headers = { CacheControl = "public,max-age=31536000,immutable" } }, ct);
+            await client.PutObjectAsync(new()
+            {
+                BucketName = options.Bucket,
+                Key = objectKey,
+                InputStream = body,
+                ContentType = type,
+                AutoCloseStream = false,
+                UseChunkEncoding = false,
+                DisablePayloadSigning = true,
+                Headers = { CacheControl = "public,max-age=31536000,immutable" }
+            }, ct);
         }
     }
 

@@ -15,6 +15,12 @@ public static class MediaMigrationCommand
     {
         var config = app.Configuration;
         if (config["MediaMigration:Action"] is not { } action) return false;
+
+        if (action == "sync-local")
+        {
+            return await SyncLocalMediaAsync(app);
+        }
+
         var path = config["MediaMigration:Manifest"] ?? throw new InvalidOperationException("A private migration manifest path is required.");
         await using var scope = app.Services.CreateAsyncScope();
         await using var db = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync();
@@ -141,6 +147,91 @@ public static class MediaMigrationCommand
             asset.VerifiedObjects[target] = hash;
         }
     }
+    private static async Task<bool> SyncLocalMediaAsync(WebApplication app)
+    {
+        var storage = app.Services.GetRequiredService<IStorageService>();
+        var s3Options = app.Services.GetRequiredService<S3StorageOptions>();
+        if (!s3Options.IsConfigured)
+            throw new InvalidOperationException("Configure destination S3/R2 storage (Bucket, Endpoint, AccessKey, SecretKey, PublicBaseUrl) before running sync-local.");
+
+        var env = app.Services.GetRequiredService<IWebHostEnvironment>();
+        var webRoot = env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+
+        Console.WriteLine($"Starting local media sync to S3/R2 ({s3Options.Bucket})...");
+        var localFiles = Directory.GetFiles(webRoot, "*.*", SearchOption.AllDirectories)
+            .Where(f => {
+                var ext = Path.GetExtension(f).ToLowerInvariant();
+                return ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".avif" or ".svg";
+            })
+            .ToList();
+
+        var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in localFiles)
+        {
+            var relativePath = "/" + Path.GetRelativePath(webRoot, file).Replace('\\', '/');
+            var fileName = Path.GetFileName(file);
+            var contentType = Path.GetExtension(file).ToLowerInvariant() switch
+            {
+                ".png" => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webp" => "image/webp",
+                ".avif" => "image/avif",
+                ".svg" => "image/svg+xml",
+                _ => "application/octet-stream"
+            };
+
+            await using var stream = File.OpenRead(file);
+            var remoteUrl = await storage.UploadFileAsync(stream, fileName, contentType);
+            replacements[relativePath] = remoteUrl;
+            Console.WriteLine($"[SYNCED] {relativePath} -> {remoteUrl}");
+        }
+
+        // Update database records that point to local paths
+        await using var dbScope = app.Services.CreateAsyncScope();
+        await using var context = await dbScope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync();
+
+        var settingsList = await context.DeliverySettings.ToListAsync();
+        foreach (var ds in settingsList)
+        {
+            if (!string.IsNullOrEmpty(ds.BanglaQrImageUrl) && replacements.TryGetValue(ds.BanglaQrImageUrl, out var newUrl))
+            {
+                ds.BanglaQrImageUrl = newUrl;
+            }
+        }
+
+        var products = await context.Products.ToListAsync();
+        foreach (var p in products)
+        {
+            if (!string.IsNullOrEmpty(p.MainImageUrl) && replacements.TryGetValue(p.MainImageUrl, out var newUrl)) p.MainImageUrl = newUrl;
+            if (!string.IsNullOrEmpty(p.OgImageUrl) && replacements.TryGetValue(p.OgImageUrl, out var newOg)) p.OgImageUrl = newOg;
+        }
+
+        var brands = await context.Brands.ToListAsync();
+        foreach (var b in brands)
+        {
+            if (!string.IsNullOrEmpty(b.LogoUrl) && replacements.TryGetValue(b.LogoUrl, out var newLogo)) b.LogoUrl = newLogo;
+            if (!string.IsNullOrEmpty(b.OgImageUrl) && replacements.TryGetValue(b.OgImageUrl, out var newOg)) b.OgImageUrl = newOg;
+        }
+
+        var categories = await context.Categories.ToListAsync();
+        foreach (var c in categories)
+        {
+            if (!string.IsNullOrEmpty(c.Icon) && replacements.TryGetValue(c.Icon, out var newIcon)) c.Icon = newIcon;
+            if (!string.IsNullOrEmpty(c.OgImageUrl) && replacements.TryGetValue(c.OgImageUrl, out var newOg)) c.OgImageUrl = newOg;
+        }
+
+        var slides = await context.CarouselSlides.ToListAsync();
+        foreach (var s in slides)
+        {
+            if (!string.IsNullOrEmpty(s.ImageUrl) && replacements.TryGetValue(s.ImageUrl, out var newImg)) s.ImageUrl = newImg;
+        }
+
+        await context.SaveChangesAsync();
+        Console.WriteLine($"Local media sync complete! Synced {replacements.Count} files and updated database references.");
+        return true;
+    }
+
     private static async Task<byte[]> ReadBoundedAsync(HttpResponseMessage response)
     {
         if (response.Content.Headers.ContentLength > 10 * 1024 * 1024) throw new InvalidDataException("Image exceeds migration size limit.");
