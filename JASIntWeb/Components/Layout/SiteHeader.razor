@@ -95,11 +95,12 @@
                 </span>
             </a>
 
-            <!-- Cart Trigger Link (Enhanced Nav Direct to /cart) -->
+            <!-- Cart Trigger Link (Drawer Modal Trigger + Enhanced Nav Fallback to /cart) -->
             <a
                 href="/cart"
                 data-enhance
-                class="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-blue-600 px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition active:scale-95"
+                data-cart-toggle
+                class="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-blue-600 px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition active:scale-95 cursor-pointer"
                 aria-label="View shopping cart"
             >
                 <Icon Name="cart" Class="size-4" />
@@ -163,8 +164,8 @@
         <span class="tracking-tight">Shop</span>
     </NavLink>
 
-    <!-- Cart Button with live Badge -->
-    <a href="/cart" data-enhance class="flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-all duration-150 hover:text-blue-600 active:scale-95 cursor-pointer relative">
+    <!-- Cart Button with live Badge (Drawer Trigger + Enhanced Nav to /cart) -->
+    <a href="/cart" data-enhance data-cart-toggle class="flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl transition-all duration-150 hover:text-blue-600 active:scale-95 cursor-pointer relative">
         <div class="relative">
             <Icon Name="cart" Class="size-5 text-slate-700" />
             <span data-cart-count class="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white shadow-xs">

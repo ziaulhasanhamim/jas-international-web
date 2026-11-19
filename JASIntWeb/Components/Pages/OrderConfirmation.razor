@@ -37,7 +37,10 @@
              data-currency="BDT"
              hidden></div>
 
-        <CheckoutCompleted CheckoutToken="order.CheckoutToken" OrderId="order.Id" OrderPublicToken="order.PublicToken" Total="order.Total" />
+        <script>
+            if (typeof window.jasClearCartCookie === 'function') window.jasClearCartCookie();
+            if (typeof window.jasRecordGuestOrder === 'function') window.jasRecordGuestOrder(@order.Id, '@order.PublicToken', @((double)order.Total));
+        </script>
 
         var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
         var isCancelled = order.Status == OrderStatus.Cancelled;

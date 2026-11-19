@@ -1,12 +1,13 @@
 {
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.5",
     "@tailwindcss/node": "4.3.5",
     "@tailwindcss/oxide": "4.3.5",
     "tailwindcss": "4.3.5"
   },
   "scripts": {
-    "css": "node scripts/build-css.mjs",
-    "css:watch": "node scripts/build-css.mjs --watch"
+    "css": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --minify",
+    "css:watch": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --watch"
   },
   "name": "jas-international-web",
   "private": true

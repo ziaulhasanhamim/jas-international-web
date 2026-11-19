@@ -1,0 +1,208 @@
+@page "/cart"
+@using JASIntWeb.Endpoints
+@using JASIntWeb.Persistence
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services
+@using JASIntWeb.Client.Dtos
+@inject ShoppingService Shop
+
+<PageTitle>Your Cart — JAS International</PageTitle>
+
+<div class="shop-container py-6 sm:py-10 max-w-5xl mx-auto">
+    <div id="jas-cart-page" class="space-y-6">
+        <div class="flex items-center justify-between mb-6 sm:mb-8">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Your Shopping Cart</h1>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">Review your items before proceeding to secure checkout</p>
+            </div>
+            @if (cart.Items.Count > 0)
+            {
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                    @cart.ItemCount @(cart.ItemCount == 1 ? "item" : "items")
+                </span>
+            }
+        </div>
+
+        @if (cart.Items.Count == 0)
+        {
+            <div class="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+                <div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-4">
+                    <svg class="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900">Your cart is empty</h2>
+                <p class="text-sm text-slate-500 mt-2 mb-6">Looks like you haven't added any authentic gadgets to your cart yet.</p>
+                <a href="/products" class="btn-primary shadow-xs">Explore Products</a>
+            </div>
+        }
+        else
+        {
+            <!-- Free Shipping Progress Bar -->
+            var target = 5000m;
+            var progress = Math.Min(100, (int)(cart.Subtotal / target * 100));
+            var remaining = Math.Max(0, target - cart.Subtotal);
+
+            <div class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50/50 p-4 shadow-xs">
+                <div class="flex items-center justify-between text-xs mb-2">
+                    <span id="jas-cart-page-delivery-text" class="font-medium text-slate-700">
+                        @if (remaining > 0)
+                        {
+                            <span>Add <strong class="text-blue-700 font-bold">৳@remaining.ToString("N0")</strong> more to unlock <strong class="text-blue-700 font-bold">FREE Nationwide Delivery!</strong></span>
+                        }
+                        else
+                        {
+                            <span class="font-bold text-emerald-700 flex items-center gap-1.5">
+                                <span class="size-2 rounded-full bg-emerald-500"></span>
+                                🎉 You qualified for FREE Nationwide Delivery!
+                            </span>
+                        }
+                    </span>
+                    <span id="jas-cart-page-delivery-pct" class="font-bold text-slate-500">@progress%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-blue-200/60">
+                    <div id="jas-cart-page-delivery-bar" class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300" style="width: @(progress)%"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <!-- Cart Items List (Col 8) -->
+                <div class="lg:col-span-8 space-y-3">
+                    @foreach (var item in cart.Items)
+                    {
+                        <article
+                            data-cart-page-item
+                            data-variant-id="@item.VariantId"
+                            class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs transition hover:border-slate-300"
+                        >
+                            <div class="flex items-center gap-4 min-w-0">
+                                <PictureImage Src="@item.Image" Alt="@item.Name" Class="size-16 sm:size-20 shrink-0 rounded-xl object-contain bg-slate-50 p-1 border border-slate-100" Width="80" Height="80" Loading="lazy" />
+                                <div class="min-w-0 flex-1">
+                                    <a href="/product/@item.Slug" class="font-bold text-slate-900 text-sm sm:text-base hover:text-blue-600 transition truncate block">
+                                        @item.Name
+                                    </a>
+                                    @if (!string.IsNullOrWhiteSpace(item.Variant))
+                                    {
+                                        <p class="text-xs text-slate-500 font-medium mt-0.5">@item.Variant</p>
+                                    }
+                                    <p class="text-xs font-semibold text-slate-700 sm:hidden mt-1">৳@item.Price.ToString("N0") each</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                                <!-- Stepper Buttons (Instant Optimistic Feedback via JS) -->
+                                <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
+                                    <button
+                                        type="button"
+                                        data-cart-qty="dec"
+                                        data-variant-id="@item.VariantId"
+                                        data-current-qty="@item.Quantity"
+                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+                                        aria-label="Decrease quantity"
+                                    >
+                                        −
+                                    </button>
+                                    <span data-cart-qty-val="@item.VariantId" class="w-8 text-center text-xs font-bold text-slate-800 tabular-nums">
+                                        @item.Quantity
+                                    </span>
+                                    <button
+                                        type="button"
+                                        data-cart-qty="inc"
+                                        data-variant-id="@item.VariantId"
+                                        data-current-qty="@item.Quantity"
+                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+                                        aria-label="Increase quantity"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+
+                                <strong data-cart-line-total="@item.VariantId" class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums min-w-[70px]">৳@item.LineTotal.ToString("N0")</strong>
+                                <button
+                                    type="button"
+                                    data-cart-remove
+                                    data-variant-id="@item.VariantId"
+                                    class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
+                                    title="Remove item"
+                                    aria-label="Remove item"
+                                >
+                                    <Icon Name="trash" Class="size-4" />
+                                </button>
+                            </div>
+                        </article>
+                    }
+                </div>
+
+                <!-- Order Summary Sidebar (Col 4) -->
+                <div class="lg:col-span-4">
+                    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs sticky top-24 space-y-5">
+                        <h2 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Order Summary</h2>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Subtotal</span>
+                                <strong data-cart-subtotal class="text-slate-900 tabular-nums font-bold">৳@cart.Subtotal.ToString("N0")</strong>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Estimated Delivery</span>
+                                <span class="text-slate-500 font-medium">Calculated at checkout</span>
+                            </div>
+                            <div class="border-t border-slate-100 pt-3 flex justify-between text-base">
+                                <span class="font-bold text-slate-900">Total</span>
+                                <strong data-cart-total class="font-extrabold text-slate-900 tabular-nums text-lg">৳@cart.Subtotal.ToString("N0")</strong>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2">
+                            <a
+                                href="/checkout"
+                                class="btn-primary w-full py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition cursor-pointer"
+                            >
+                                <span>Proceed to Checkout</span>
+                                <span>→</span>
+                            </a>
+                            <a href="/products" class="btn-secondary w-full py-2.5 text-xs text-center block">
+                                Continue Shopping
+                            </a>
+                        </div>
+
+                        <!-- Trust Badges -->
+                        <div class="border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-500">
+                            <div class="flex items-center gap-2">
+                                <span class="text-emerald-600 font-bold">✓</span>
+                                <span>100% Authentic Brand Warranties</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-emerald-600 font-bold">✓</span>
+                                <span>Fast Courier Delivery Across 64 Districts</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-emerald-600 font-bold">✓</span>
+                                <span>7 Days Replacement Guarantee</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private CartDto cart = new(false, []);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext != null)
+        {
+            var (token, userId) = CartEndpoints.ResolveCartIdentity(HttpContext);
+            if (token.HasValue || userId.HasValue)
+            {
+                cart = await Shop.GetCartAsync(token, userId);
+            }
+        }
+    }
+}

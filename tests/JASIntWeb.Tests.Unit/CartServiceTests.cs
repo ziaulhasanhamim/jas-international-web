@@ -3,10 +3,8 @@ using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Client.Services;
 using Microsoft.JSInterop;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using JASIntWeb.Client.Components.Cart;
 using NSubstitute;
 
 namespace JASIntWeb.Tests.Unit;
@@ -15,46 +13,6 @@ public class CartServiceTests
 {
     private static CartDto Cart(int quantity = 2, bool authenticated = true) => new(authenticated,
         [new(7, "Watch", "watch", "/watch.webp", "Black", 150m, quantity, 10, true)]);
-
-
-    [Test]
-    public async Task CartContents_RestoredServiceRendersItemsWithoutLoadingOrRefetch()
-    {
-        var backend = Substitute.For<ICartBackend>();
-        var service = new CartService(Substitute.For<IJSRuntime>(), backend) { State = new(Cart()) };
-        await using var provider = new ServiceCollection().AddLogging().AddSingleton(service).BuildServiceProvider();
-        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
-        var html = await renderer.Dispatcher.InvokeAsync(async () =>
-        {
-            var component = await renderer.RenderComponentAsync<CartContents>();
-            return component.ToHtmlString();
-        });
-        await html.Contains("href=\"/product/watch\"").Should().BeTrue();
-        await html.Contains("Loading your cart").Should().BeFalse();
-        await html.Contains("Your cart is empty").Should().BeFalse();
-        await backend.DidNotReceive().GetAsync();
-    }
-
-    [Test]
-    public async Task CartContents_RestoredFailureRendersRetryInsteadOfEmptyCart()
-    {
-        var backend = Substitute.For<ICartBackend>();
-        var service = new CartService(Substitute.For<IJSRuntime>(), backend)
-        {
-            State = new(null, "Connection interrupted. Please try again.")
-        };
-        await using var provider = new ServiceCollection().AddLogging().AddSingleton(service).BuildServiceProvider();
-        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
-        var html = await renderer.Dispatcher.InvokeAsync(async () =>
-        {
-            var component = await renderer.RenderComponentAsync<CartContents>();
-            return component.ToHtmlString();
-        });
-        await html.Contains("Retry").Should().BeTrue();
-        await html.Contains("Connection interrupted").Should().BeTrue();
-        await html.Contains("Your cart is empty").Should().BeFalse();
-        await backend.DidNotReceive().GetAsync();
-    }
 
     [Test]
     public async Task Initialize_ConcurrentConsumersLoadOnceAndReuseConfirmedCart()
