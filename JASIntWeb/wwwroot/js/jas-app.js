@@ -9,7 +9,7 @@ import { initWishlist } from './modules/wishlist.js';
 import { initCart } from './modules/cart.js';
 import { initCartDrawer } from './modules/cart-drawer.js';
 import { initCartPage } from './modules/cart-page.js';
-import { initOverlayDelegation } from './core/overlay.js';
+import { initOverlayDelegation, closeAllOverlays } from './core/overlay.js';
 import { initGallery } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
 
@@ -45,6 +45,7 @@ function initModules() {
  * Handles Blazor enhanced navigation start (instant non-blocking feedback).
  */
 function onEnhancedNavigationStart() {
+    closeAllOverlays();
     const JAS = window.JAS;
     JAS?.Navigation?.start();
     JAS?.OrderTracking?.cleanup();

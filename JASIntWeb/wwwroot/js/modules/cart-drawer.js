@@ -5,8 +5,8 @@
  */
 
 import { on } from '../core/events.js';
-import { openOverlay, closeOverlay, toggleOverlay } from '../core/overlay.js';
-import { fetchCart } from './cart.js';
+import { openOverlay, closeOverlay, toggleOverlay, isOverlayOpen } from '../core/overlay.js';
+import { fetchCart, getCurrentCart } from './cart.js';
 
 const DRAWER_ID = 'jas-cart-drawer';
 let isDrawerInitialized = false;
@@ -158,6 +158,8 @@ export function renderCartDrawer(cart = null) {
  */
 export async function openCartDrawer() {
     openOverlay(DRAWER_ID);
+    const cached = getCurrentCart();
+    if (cached) renderCartDrawer(cached);
     const cart = await fetchCart();
     if (cart) renderCartDrawer(cart);
 }
@@ -172,8 +174,12 @@ export function closeCartDrawer() {
 /**
  * Toggles the animated cart slide-over modal.
  */
-export function toggleCartDrawer() {
-    toggleOverlay(DRAWER_ID);
+export async function toggleCartDrawer() {
+    if (isOverlayOpen(DRAWER_ID)) {
+        closeOverlay(DRAWER_ID);
+    } else {
+        await openCartDrawer();
+    }
 }
 
 /**
@@ -185,11 +191,14 @@ export function initCartDrawer() {
 
     // Open drawer automatically when an item is added to cart
     on('cart:item-added', (detail) => {
+        if (detail?.openDrawer === false) return;
         openOverlay(DRAWER_ID);
         if (detail?.cart) {
             renderCartDrawer(detail.cart);
         } else {
-            fetchCart().then(renderCartDrawer);
+            const cached = getCurrentCart();
+            if (cached) renderCartDrawer(cached);
+            fetchCart().then(cart => { if (cart) renderCartDrawer(cart); });
         }
     });
 
@@ -200,6 +209,6 @@ export function initCartDrawer() {
 
     // Global toggle listener
     on('cart:toggle-drawer', () => {
-        toggleOverlay(DRAWER_ID);
+        toggleCartDrawer();
     });
 }

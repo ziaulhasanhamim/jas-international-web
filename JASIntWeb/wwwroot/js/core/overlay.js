@@ -132,6 +132,17 @@ export function closeOverlay(id, restoreFocus = true) {
 }
 
 /**
+ * Force-closes any active overlay immediately and unlocks scroll.
+ * Used during page transitions to prevent overlay leakage.
+ */
+export function closeAllOverlays() {
+    if (activeOverlayId) {
+        closeOverlay(activeOverlayId, false);
+    }
+    document.body.classList.remove('overflow-hidden');
+}
+
+/**
  * Toggles an overlay between open and closed states.
  * @param {string} id
  */

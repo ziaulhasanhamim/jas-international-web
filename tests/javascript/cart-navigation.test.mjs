@@ -13,6 +13,7 @@ function createBrowser({ enhanced = true, failure = false } = {}) {
     const reloads = [];
     const elements = [];
     const listeners = new Map();
+    const dispatchedEvents = [];
     function element() {
         const value = {
             textContent: '',
@@ -28,15 +29,25 @@ function createBrowser({ enhanced = true, failure = false } = {}) {
         location: { assign: path => reloads.push(path) },
         ...(enhanced ? { Blazor: { navigateTo: (path, options) => navigations.push({ path, options }) } } : {})
     };
+    class MockCustomEvent {
+        constructor(type, init = {}) {
+            this.type = type;
+            this.detail = init.detail;
+            this.bubbles = init.bubbles ?? false;
+            this.cancelable = init.cancelable ?? false;
+        }
+    }
     const context = vm.createContext({
         window,
+        CustomEvent: MockCustomEvent,
         document: {
             cookie: '',
             body: { appendChild() {} },
             createElement: element,
             getElementById: () => null,
             querySelectorAll: () => [],
-            addEventListener: (name, listener) => listeners.set(name, listener)
+            addEventListener: (name, listener) => listeners.set(name, listener),
+            dispatchEvent: event => { dispatchedEvents.push(event); return true; }
         },
         location: { origin: 'https://shop.example' },
         URL,
@@ -55,7 +66,7 @@ function createBrowser({ enhanced = true, failure = false } = {}) {
         }
     });
     vm.runInContext(source.replace(/^export /gm, ''), context);
-    return { context, window, requests, navigations, reloads, elements, listeners };
+    return { context, window, requests, navigations, reloads, elements, listeners, dispatchedEvents };
 }
 
 test('Buy Now posts once with the selected variant and quantity, then requests enhanced navigation', async () => {
@@ -130,4 +141,12 @@ test('clearCartToken expires cookie and resets badges', () => {
     browser.context.document.cookie = 'jas_cart_id=abc-123';
     browser.context.clearCartToken();
     assert.ok(browser.context.document.cookie.includes('max-age=0'));
+});
+
+test('Buy Now suppresses cart:item-added event so cart drawer does not flash before navigation', async () => {
+    const browser = createBrowser();
+    await browser.window.jasBuyNow(101, 1, 55);
+    const eventNames = browser.dispatchedEvents.map(e => e.type);
+    assert.ok(eventNames.includes('cart:updated'), 'Should update cart state and badges');
+    assert.ok(!eventNames.includes('cart:item-added'), 'Should NOT emit cart:item-added to prevent drawer flash');
 });

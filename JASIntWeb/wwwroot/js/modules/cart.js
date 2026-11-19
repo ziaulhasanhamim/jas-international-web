@@ -7,6 +7,14 @@
 let currentCartState = null;
 
 /**
+ * Returns the latest in-memory cart state if available.
+ * @returns {object|null}
+ */
+export function getCurrentCart() {
+    return currentCartState;
+}
+
+/**
  * Dispatches a custom event from document.
  * @param {string} eventName
  * @param {any} [detail=null]
@@ -185,9 +193,10 @@ export async function refreshCartBadge() {
  * @param {number} variantId
  * @param {number} [quantity=1]
  * @param {number} [productId=0]
+ * @param {{ openDrawer?: boolean }} [options={ openDrawer: true }]
  * @returns {Promise<{success: boolean, message?: string, cart?: object}>}
  */
-export async function addToCart(variantId, quantity = 1, productId = 0) {
+export async function addToCart(variantId, quantity = 1, productId = 0, options = { openDrawer: true }) {
     try {
         const payload = {
             variantId: Number(variantId) || 0,
@@ -219,9 +228,11 @@ export async function addToCart(variantId, quantity = 1, productId = 0) {
             updateCartBadges(totalCount);
 
             emit('cart:updated', cart);
-            emit('cart:item-added', { variantId, quantity: payload.quantity, cart });
 
-            showCartToast('Added to your shopping cart!', 'success');
+            if (options?.openDrawer !== false) {
+                emit('cart:item-added', { variantId, quantity: payload.quantity, cart });
+                showCartToast('Added to your shopping cart!', 'success');
+            }
             return { success: true, cart };
         } else {
             let message = 'Could not add item to cart.';
@@ -345,13 +356,13 @@ export function removeFromCart(variantId) {
 }
 
 /**
- * Adds item to cart and navigates directly to /cart or /checkout.
+ * Adds item to cart and navigates directly to /cart or /checkout without opening the drawer.
  * @param {number} variantId
  * @param {number} [quantity=1]
  * @param {number} [productId=0]
  */
 export async function buyNow(variantId, quantity = 1, productId = 0) {
-    const result = await addToCart(variantId, quantity, productId);
+    const result = await addToCart(variantId, quantity, productId, { openDrawer: false });
     if (result.success) {
         if (typeof window.Blazor?.navigateTo === 'function') {
             window.Blazor.navigateTo('/cart', { forceLoad: false });
@@ -478,6 +489,7 @@ export function initCartDelegation() {
         const toggleBtn = e.target.closest('[data-cart-toggle]');
         if (toggleBtn) {
             e.preventDefault();
+            e.stopPropagation();
             emit('cart:toggle-drawer');
             return;
         }
@@ -502,6 +514,7 @@ if (typeof window !== 'undefined') {
     window.jasAddToCart = (variantId, qty, prodId) => addToCart(variantId, qty, prodId);
     window.jasBuyNow = (variantId, qty, prodId) => buyNow(variantId, qty, prodId);
     window.jasSyncCartBadges = syncCartBadges;
+    window.jasGetCurrentCart = getCurrentCart;
     window.jasSetQuantity = setQuantity;
     window.jasRemoveFromCart = removeFromCart;
 }
