@@ -14,8 +14,7 @@ This document outlines the architecture, design principles, and patterns for cli
 ### B. Event-Driven Decoupling
 - Modules do **not** tightly couple or call each other's internal DOM manipulation routines directly.
 - Communication flows through native DOM `CustomEvent`s using `core/events.js` (`emit`, `on`).
-  - Example: When `addToCart(...)` succeeds in `modules/cart.js`, it dispatches `cart:item-added` and `cart:updated`.
-  - `modules/cart-drawer.js` listens to `cart:item-added` and smoothly slides open the drawer.
+  - Example: When `addToCart(...)` succeeds in `modules/cart.js`, it dispatches `cart:updated`.
   - `modules/cart-page.js` listens to `cart:updated` and recalculates line items and totals on `/cart`.
   - Header badges listen to `cart:updated` and pulse with the new count.
 
@@ -37,7 +36,6 @@ JASIntWeb/wwwroot/js/
 │   └── overlay.js             # Reusable modal/drawer controller blueprint
 └── modules/
     ├── cart.js                # Core cart API, 0ms optimistic updates & delegation
-    ├── cart-drawer.js         # Animated 60fps cart slide-over modal controller
     ├── cart-page.js           # Full /cart page in-place DOM sync
     ├── wishlist.js            # Wishlist localStorage & Blazor interop controller
     ├── gallery.js             # Product gallery image switching

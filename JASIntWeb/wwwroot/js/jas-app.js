@@ -7,7 +7,6 @@
 import { initConsent } from './modules/consent.js';
 import { initWishlist } from './modules/wishlist.js';
 import { initCart } from './modules/cart.js';
-import { initCartDrawer } from './modules/cart-drawer.js';
 import { initCartPage } from './modules/cart-page.js';
 import { initOverlayDelegation, closeAllOverlays } from './core/overlay.js';
 import { initGallery } from './modules/gallery.js';
@@ -27,7 +26,6 @@ function initModules() {
     initOverlayDelegation();
     initWishlist();
     initCart();
-    initCartDrawer();
     initCartPage();
     initGallery();
     initReviews();

@@ -116,7 +116,7 @@ export function showCartToast(message, type = 'success', action = { text: 'View 
         link.textContent = action.text;
         link.className = 'ml-auto inline-flex items-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 py-1 text-xs font-bold text-white transition active:scale-95 shrink-0';
         if (typeof link.setAttribute === 'function') {
-            link.setAttribute('data-cart-toggle', 'true');
+            link.setAttribute('data-enhance', 'true');
         }
         toast.append(link);
     }
@@ -193,10 +193,10 @@ export async function refreshCartBadge() {
  * @param {number} variantId
  * @param {number} [quantity=1]
  * @param {number} [productId=0]
- * @param {{ openDrawer?: boolean }} [options={ openDrawer: true }]
+ * @param {{ showToast?: boolean }} [options={ showToast: true }]
  * @returns {Promise<{success: boolean, message?: string, cart?: object}>}
  */
-export async function addToCart(variantId, quantity = 1, productId = 0, options = { openDrawer: true }) {
+export async function addToCart(variantId, quantity = 1, productId = 0, { showToast = true } = {}) {
     try {
         const payload = {
             variantId: Number(variantId) || 0,
@@ -229,8 +229,7 @@ export async function addToCart(variantId, quantity = 1, productId = 0, options 
 
             emit('cart:updated', cart);
 
-            if (options?.openDrawer !== false) {
-                emit('cart:item-added', { variantId, quantity: payload.quantity, cart });
+            if (showToast) {
                 showCartToast('Added to your shopping cart!', 'success');
             }
             return { success: true, cart };
@@ -356,13 +355,13 @@ export function removeFromCart(variantId) {
 }
 
 /**
- * Adds item to cart and navigates directly to /cart or /checkout without opening the drawer.
+ * Adds item to cart and navigates directly to /cart or /checkout.
  * @param {number} variantId
  * @param {number} [quantity=1]
  * @param {number} [productId=0]
  */
 export async function buyNow(variantId, quantity = 1, productId = 0) {
-    const result = await addToCart(variantId, quantity, productId, { openDrawer: false });
+    const result = await addToCart(variantId, quantity, productId, { showToast: false });
     if (result.success) {
         if (typeof window.Blazor?.navigateTo === 'function') {
             window.Blazor.navigateTo('/cart', { forceLoad: false });
@@ -482,15 +481,6 @@ export function initCartDelegation() {
             if (variantId) {
                 await removeFromCart(variantId);
             }
-            return;
-        }
-
-        // 5. Cart Toggle Button
-        const toggleBtn = e.target.closest('[data-cart-toggle]');
-        if (toggleBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            emit('cart:toggle-drawer');
             return;
         }
     });

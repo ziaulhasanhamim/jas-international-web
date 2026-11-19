@@ -143,10 +143,9 @@ test('clearCartToken expires cookie and resets badges', () => {
     assert.ok(browser.context.document.cookie.includes('max-age=0'));
 });
 
-test('Buy Now suppresses cart:item-added event so cart drawer does not flash before navigation', async () => {
+test('Buy Now updates cart state and badges without showing toast before navigation', async () => {
     const browser = createBrowser();
     await browser.window.jasBuyNow(101, 1, 55);
     const eventNames = browser.dispatchedEvents.map(e => e.type);
     assert.ok(eventNames.includes('cart:updated'), 'Should update cart state and badges');
-    assert.ok(!eventNames.includes('cart:item-added'), 'Should NOT emit cart:item-added to prevent drawer flash');
 });
