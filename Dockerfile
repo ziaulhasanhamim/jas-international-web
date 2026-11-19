@@ -9,7 +9,6 @@ RUN npm ci --ignore-scripts
 # Copy web source files required by Tailwind scanner
 COPY JASIntWeb ./JASIntWeb
 COPY JASIntWeb.Client ./JASIntWeb.Client
-COPY scripts ./scripts
 
 # Generate minified output.css
 RUN npm run css
