@@ -18,23 +18,43 @@
 }
 else
 {
-    var title = guide.MetaTitle ?? $"{guide.Title} | JAS International Guide";
-    var desc = guide.MetaDescription ?? guide.Summary;
-    var canonical = $"/guides/{guide.Slug}";
+    var hasBangla = !string.IsNullOrWhiteSpace(guide.BanglaTitle);
+    var isBangla = hasBangla && string.Equals(Lang, "bn", StringComparison.OrdinalIgnoreCase);
+
+    var displayTitle = isBangla ? guide.BanglaTitle! : guide.Title;
+    var displaySummary = (isBangla && !string.IsNullOrWhiteSpace(guide.BanglaSummary)) ? guide.BanglaSummary! : guide.Summary;
+    var displayContent = (isBangla && !string.IsNullOrWhiteSpace(guide.BanglaContentHtml)) ? guide.BanglaContentHtml! : guide.ContentHtml;
+
+    var title = isBangla
+        ? $"{displayTitle} | জেএএস ইন্টারন্যাশনাল"
+        : (guide.MetaTitle ?? $"{guide.Title} | JAS International Guide");
+
+    var desc = isBangla
+        ? displaySummary
+        : (guide.MetaDescription ?? guide.Summary);
+
+    var canonical = isBangla ? $"/guides/{guide.Slug}?lang=bn" : $"/guides/{guide.Slug}";
     var guideUrl = Seo.BuildAbsoluteUrl(canonical);
 
-    var crumbs = new (string Name, string Url)[]
-    {
-        ("Home", Seo.PublicBaseUrl),
-        ("Guides", $"{Seo.PublicBaseUrl}/guides"),
-        (guide.Title, guideUrl)
-    };
+    var crumbs = isBangla
+        ? new (string Name, string Url)[]
+        {
+            ("হোম", Seo.PublicBaseUrl),
+            ("বায়িং গাইড", $"{Seo.PublicBaseUrl}/guides"),
+            (displayTitle, guideUrl)
+        }
+        : new (string Name, string Url)[]
+        {
+            ("Home", Seo.PublicBaseUrl),
+            ("Buying Guides", $"{Seo.PublicBaseUrl}/guides"),
+            (displayTitle, guideUrl)
+        };
 
     var jsonLdList = new[]
     {
         JsonLdBuilder.BuildBreadcrumbs(crumbs),
         JsonLdBuilder.BuildArticle(
-            title: guide.Title,
+            title: displayTitle,
             description: desc,
             url: guideUrl,
             imageUrl: !string.IsNullOrWhiteSpace(guide.FeaturedImageUrl) ? Seo.BuildAbsoluteUrl(guide.FeaturedImageUrl) : null,
@@ -49,34 +69,57 @@ else
              CanonicalPath="@canonical"
              OgImage="@guide.FeaturedImageUrl"
              OgType="article"
+             OgLocale="@(isBangla ? "bn_BD" : "en_US")"
+             OgLocaleAlternate="@(hasBangla ? (isBangla ? "en_US" : "bn_BD") : null)"
              JsonLd="jsonLdList" />
 
     <article class="shop-container py-10 max-w-3xl mx-auto">
         <!-- Breadcrumbs -->
         <nav class="flex items-center gap-2 text-xs text-slate-400 mb-6" aria-label="Breadcrumb">
-            <a href="/" class="hover:text-blue-600 transition">Home</a>
+            <a href="/" class="hover:text-blue-600 transition">@(isBangla ? "হোম" : "Home")</a>
             <span>/</span>
-            <a href="/guides" class="hover:text-blue-600 transition">Buying Guides</a>
+            <a href="/guides" class="hover:text-blue-600 transition">@(isBangla ? "বায়িং গাইড" : "Buying Guides")</a>
             <span>/</span>
-            <span class="font-semibold text-slate-800 truncate">@guide.Title</span>
+            <span class="font-semibold text-slate-800 truncate max-w-xs sm:max-w-md">@displayTitle</span>
         </nav>
 
         <!-- Article Header -->
         <header class="mb-8">
-            <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight mb-4">
-                @guide.Title
-            </h1>
-            <div class="flex items-center gap-3 text-xs text-slate-500 border-b border-slate-100 pb-4">
-                <span>Published: <strong>@guide.PublishedAt.ToString("dd MMMM yyyy")</strong></span>
-                <span>•</span>
-                <span>Author: <strong>@guide.Author</strong></span>
-                <span>•</span>
-                <span class="text-blue-600 font-semibold">Verified Tech Guide</span>
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20">
+                    @(isBangla ? "এক্সপার্ট বায়িং গাইড" : "EXPERT BUYING GUIDE")
+                </span>
+
+                <!-- Language Toggle Switcher -->
+                @if (hasBangla)
+                {
+                    <div class="inline-flex items-center rounded-full bg-slate-100 p-0.5 text-xs font-bold ring-1 ring-slate-200">
+                        <a href="/guides/@guide.Slug" class="px-3 py-1 rounded-full transition @(!isBangla ? "bg-white text-blue-700 shadow-xs" : "text-slate-600 hover:text-slate-900")">
+                            English
+                        </a>
+                        <a href="/guides/@guide.Slug?lang=bn" class="px-3 py-1 rounded-full transition @(isBangla ? "bg-white text-blue-700 shadow-xs" : "text-slate-600 hover:text-slate-900")">
+                            বাংলা
+                        </a>
+                    </div>
+                }
             </div>
-            @if (!string.IsNullOrWhiteSpace(guide.Summary))
+
+            <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight mb-4">
+                @displayTitle
+            </h1>
+
+            <div class="flex items-center gap-3 text-xs text-slate-500 border-b border-slate-100 pb-4 flex-wrap">
+                <span>@(isBangla ? "প্রকাশিত:" : "Published:") <strong>@guide.PublishedAt.ToString("dd MMMM yyyy")</strong></span>
+                <span>•</span>
+                <span>@(isBangla ? "লেখক:" : "Author:") <strong>@guide.Author</strong></span>
+                <span>•</span>
+                <span class="text-blue-600 font-semibold">✓ @(isBangla ? "যাচাইকৃত টেক গাইড" : "Verified Tech Guide")</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(displaySummary))
             {
-                <p class="text-base text-slate-600 leading-relaxed mt-4 italic border-l-4 border-blue-500 pl-4 bg-slate-50 py-2 rounded-r-xl">
-                    @guide.Summary
+                <p class="text-base text-slate-700 leading-relaxed mt-4 italic border-l-4 border-blue-500 pl-4 bg-slate-50 py-3 rounded-r-2xl">
+                    @displaySummary
                 </p>
             }
         </header>
@@ -84,24 +127,28 @@ else
         <!-- Featured Image -->
         @if (!string.IsNullOrWhiteSpace(guide.FeaturedImageUrl))
         {
-            <div class="aspect-video w-full overflow-hidden rounded-3xl bg-slate-100 mb-8 shadow-xs">
-                <PictureImage Src="@guide.FeaturedImageUrl" Alt="@guide.Title" Class="size-full object-cover" FetchPriority="high" Loading="eager" />
+            <div class="aspect-video w-full overflow-hidden rounded-3xl bg-slate-100 mb-8 shadow-xs border border-slate-200/60">
+                <PictureImage Src="@guide.FeaturedImageUrl" Alt="@displayTitle" Class="size-full object-cover" FetchPriority="high" Loading="eager" />
             </div>
         }
 
         <!-- Main Content -->
-        <div class="prose prose-slate max-w-none text-sm sm:text-base leading-relaxed text-slate-700 space-y-4">
-            @((MarkupString)guide.ContentHtml)
+        <div class="guide-content text-sm sm:text-base leading-relaxed text-slate-700 space-y-4">
+            @((MarkupString)displayContent)
         </div>
 
         <!-- Call to Action Banner -->
         <div class="mt-12 rounded-3xl bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md">
             <div>
-                <h3 class="text-lg font-bold">Ready to choose your next gadget?</h3>
-                <p class="text-xs text-blue-200 mt-1">Browse our verified catalog with official brand warranty and nationwide delivery.</p>
+                <h3 class="text-lg font-bold">@(isBangla ? "আপনার পছন্দের গ্যাজেটটি কিনতে চান?" : "Ready to choose your next gadget?")</h3>
+                <p class="text-xs text-blue-200 mt-1">
+                    @(isBangla 
+                        ? "জেএএস ইন্টারন্যাশনাল দিচ্ছে ১০০% অথেনটিক ব্র্যান্ডের ওয়ারেন্টি ও খুলনা শোরুমসহ সারা দেশে ক্যাশ অন ডেলিভারি।" 
+                        : "Browse our verified catalog with official brand warranty and nationwide Cash on Delivery across Bangladesh.")
+                </p>
             </div>
-            <a href="/products" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-5 !py-2.5 text-xs font-bold shrink-0">
-                Shop Gadgets Now →
+            <a href="/category/audio-earbuds" class="btn-primary !bg-white !text-slate-950 hover:!bg-slate-100 !px-5 !py-2.5 text-xs font-bold shrink-0">
+                @(isBangla ? "ইয়ারবাড কালেকশন দেখুন →" : "Shop Audio & Earbuds →")
             </a>
         </div>
     </article>
@@ -109,6 +156,7 @@ else
 
 @code {
     [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "lang")] public string? Lang { get; set; }
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
     private Guide? guide;

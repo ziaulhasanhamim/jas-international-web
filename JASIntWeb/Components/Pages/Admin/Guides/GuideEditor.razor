@@ -1,0 +1,10 @@
+@page "/admin/guides/new"
+@page "/admin/guides/{Id:int}/edit"
+@page "/admin/guides/{Id:int}"
+
+<JASIntWeb.Client.Components.Admin.GuideEditorForm Id="Id" @key="Id" @rendermode="InteractiveAuto" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+}

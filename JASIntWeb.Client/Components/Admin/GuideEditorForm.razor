@@ -1,0 +1,392 @@
+@inherits AdminEditorBase<GuideEditForm>
+<PageTitle>@(Id == 0 ? "Write new guide" : Input?.Title ?? "Edit guide") — JAS Admin</PageTitle>
+
+@if (notFound)
+{
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-700">Guide not found.</p>
+        <a href="/admin/guides" class="btn-secondary text-xs mt-3 inline-block">Back to guides</a>
+    </div>
+}
+else
+{
+    @if (error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800" role="alert">
+            <span>⚠ @error</span>
+        </div>
+    }
+
+    @if (AccessDenied)
+    {
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+            Session expired. <a href="/account/login?returnUrl=/admin/guides" class="font-bold underline">Sign in again</a>.
+        </div>
+    }
+
+    @if (RestoredFromDraft)
+    {
+        <div class="flex items-center justify-between p-3.5 mb-5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 shadow-xs animate-fadeIn" role="status">
+            <span class="flex items-center gap-2 font-medium">
+                <svg class="size-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Restored unsaved draft from local storage.
+            </span>
+            <button type="button" class="text-xs font-bold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer" @onclick="DiscardDraftAsync">Discard draft</button>
+        </div>
+    }
+
+    @if (Input is null)
+    {
+        <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+            <p class="text-sm font-semibold text-slate-500">Loading guide editor…</p>
+        </div>
+    }
+    else
+    {
+        <EditForm data-admin-draft="guide" data-admin-dirty="@(HasUnsavedChanges ? "true" : "false")" @oninput="MarkEdited" @onchange="MarkEdited" EditContext="EditContext" OnValidSubmit="Save" class="space-y-6">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800" />
+
+            <fieldset disabled="@(!RendererInfo.IsInteractive || saving)">
+                <!-- Sticky Header Bar -->
+                <div class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                        <a href="/admin/guides" class="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs transition cursor-pointer" title="Back to guides">
+                            ←
+                        </a>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h1 class="text-base sm:text-lg font-black text-slate-900 truncate max-w-xs sm:max-w-md">
+                                    @(string.IsNullOrWhiteSpace(Input.Title) ? (Id == 0 ? "Write New Buying Guide" : "Untitled Guide") : Input.Title)
+                                </h1>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold @(Input.IsPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")">
+                                    @(Input.IsPublished ? "Published" : "Draft")
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(Input.BanglaTitle))
+                                {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                        বাংলা
+                                    </span>
+                                }
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                @if (saving)
+                                {
+                                    <span class="text-blue-600 font-semibold flex items-center gap-1">
+                                        <span class="inline-block animate-spin">⏳</span> Saving guide...
+                                    </span>
+                                }
+                                else if (HasUnsavedChanges)
+                                {
+                                    <span class="text-amber-600 font-semibold flex items-center gap-1">
+                                        <span class="size-2 rounded-full bg-amber-500 animate-pulse"></span> Unsaved changes
+                                    </span>
+                                }
+                                else if (Id == 0)
+                                {
+                                    <span class="text-slate-400">New article draft</span>
+                                }
+                                else
+                                {
+                                    <span class="text-emerald-700 font-semibold flex items-center gap-1">
+                                        <span>✓</span> All changes saved
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2.5">
+                        @if (Id != 0 && !string.IsNullOrWhiteSpace(Input.Slug))
+                        {
+                            <a href="/guides/@Input.Slug" target="_blank" class="btn-secondary text-xs inline-flex items-center gap-1.5 cursor-pointer" title="View live guide on storefront">
+                                <span>Storefront</span>
+                                <span>↗</span>
+                            </a>
+                        }
+                        <button type="submit" disabled="@Busy" class="btn-primary text-xs !px-5 !py-2 cursor-pointer shadow-xs">
+                            @(saving ? "Saving…" : Id == 0 ? "Publish Guide" : "Save Changes")
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Grid Layout -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left Column: Content & Details (2 Cols) -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Bilingual Language Navigation -->
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2">
+                                <button type="button" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition @(activeTab == "en" ? "bg-blue-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")" @onclick='() => activeTab = "en"'>
+                                    🇺🇸 English Version
+                                </button>
+                                <button type="button" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition @(activeTab == "bn" ? "bg-blue-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")" @onclick='() => activeTab = "bn"'>
+                                    🇧🇩 বাংলা সংস্করণ (Bengali)
+                                    @if (!string.IsNullOrWhiteSpace(Input.BanglaTitle))
+                                    {
+                                        <span class="ml-1 text-[10px] bg-white/20 px-1 rounded">✓</span>
+                                    }
+                                </button>
+                            </div>
+                            <span class="text-[11px] text-slate-400 hidden sm:inline">
+                                @(activeTab == "en" ? "Primary storefront language" : "Bangla bilingual article")
+                            </span>
+                        </div>
+
+                        <!-- English Tab Content -->
+                        @if (activeTab == "en")
+                        {
+                            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                                <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Article Details</h2>
+                                
+                                <div class="space-y-4">
+                                    <label class="shop-label">
+                                        Guide Title <span class="admin-required">Required</span>
+                                        <input @bind="Input.Title" @bind:event="oninput" @bind:after="TitleChanged" class="shop-input" placeholder="e.g. Best TWS Earbuds Under 3000 Taka in Bangladesh" />
+                                    </label>
+
+                                    <label class="shop-label">
+                                        URL Slug <span class="admin-required">Required</span>
+                                        <input @bind="Input.Slug" @bind:event="oninput" @bind:after="SlugChanged" class="shop-input font-mono text-xs" placeholder="e.g. best-tws-earbuds-under-3000-taka-bangladesh" />
+                                        <small class="text-slate-500 text-xs">Public link: <strong>/guides/@(string.IsNullOrWhiteSpace(Input.Slug) ? "guide-slug" : Input.Slug)</strong></small>
+                                    </label>
+
+                                    <label class="shop-label">
+                                        Executive Summary <span class="admin-required">Required</span>
+                                        <textarea @bind="Input.Summary" @bind:event="oninput" rows="3" class="shop-input" placeholder="A compelling 2-3 sentence overview that appears at the top of the guide and in search snippets..."></textarea>
+                                        <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                            <span>High-intent summary for readers and search engines</span>
+                                            <span>@(Input.Summary?.Length ?? 0) characters</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </section>
+
+                            <!-- Rich Content Editor (English) -->
+                            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <h2 class="text-sm font-bold text-slate-900">Guide Body &amp; Reviews</h2>
+                                    <span class="text-xs text-slate-400">Supports headings, tables &amp; R2 image uploads</span>
+                                </div>
+
+                                <!-- Quick Linking Helper Chips -->
+                                <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+                                    <p class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Quick Link Snippets (Click to copy URL):</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer" @onclick='() => CopyLink("/product/anker-soundcore-r60i-nc")'>
+                                            <span>🎧 Anker R60i NC</span>
+                                            <span class="text-[10px] text-slate-400">📋</span>
+                                        </button>
+                                        <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer" @onclick='() => CopyLink("/product/soundpeats-c30")'>
+                                            <span>🎧 SoundPEATS C30</span>
+                                            <span class="text-[10px] text-slate-400">📋</span>
+                                        </button>
+                                        <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer" @onclick='() => CopyLink("/product/qcy-melobuds-n20-pro")'>
+                                            <span>🎧 QCY N20 Pro</span>
+                                            <span class="text-[10px] text-slate-400">📋</span>
+                                        </button>
+                                        <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer" @onclick='() => CopyLink("/category/audio-earbuds")'>
+                                            <span>📁 Audio &amp; Earbuds</span>
+                                            <span class="text-[10px] text-slate-400">📋</span>
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(copiedToast))
+                                    {
+                                        <p class="text-[11px] text-emerald-600 font-bold animate-fadeIn">✓ Copied: @copiedToast</p>
+                                    }
+                                </div>
+
+                                <AdminRichText ConvertLegacyContent="false" Disabled="Busy" Label="Article Content" @bind-Value="Input.ContentHtml" @bind-Value:after="MarkEdited" />
+                            </section>
+                        }
+                        else
+                        {
+                            <!-- Bangla Tab Content -->
+                            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <h2 class="text-sm font-bold text-slate-900">বাংলা সংস্করণ (Bangla Translation)</h2>
+                                    <span class="text-xs text-blue-600 font-semibold">ঐচ্ছিক কিন্তু এসইও ও স্থানীয় ক্রেতাদের জন্য অত্যন্ত ফলপ্রসূ</span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <label class="shop-label">
+                                        গাইড শিরোনাম (Bangla Title)
+                                        <input @bind="Input.BanglaTitle" @bind:event="oninput" class="shop-input" placeholder="যেমন: বাংলাদেশে ৩০০০ টাকার মধ্যে সেরা ৩টি TWS ইয়ারবাড" />
+                                    </label>
+
+                                    <label class="shop-label">
+                                        সারসংক্ষেপ (Bangla Summary)
+                                        <textarea @bind="Input.BanglaSummary" @bind:event="oninput" rows="3" class="shop-input" placeholder="গাইডের শুরুতে প্রদর্শিত সংক্ষেপ তথ্য..."></textarea>
+                                    </label>
+                                </div>
+                            </section>
+
+                            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+                                <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">বাংলা পূর্ণ বিবরণ ও গাইড (Bangla Rich Content)</h2>
+                                <AdminRichText ConvertLegacyContent="false" Disabled="Busy" Label="বাংলা কনটেন্ট" @bind-Value="Input.BanglaContentHtml" @bind-Value:after="MarkEdited" />
+                            </section>
+                        }
+
+                        <!-- SEO & Social Sharing Disclosure -->
+                        <details class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" open>
+                            <summary class="text-sm font-bold text-slate-900 cursor-pointer flex items-center justify-between select-none">
+                                <span>Search &amp; Social Sharing Optimization</span>
+                                <span class="text-xs text-slate-400">Google SERP Preview</span>
+                            </summary>
+                            <div class="pt-4 space-y-4 border-t border-slate-100 mt-4">
+                                <AdminSeoFields Kind="guide" Name="@Input.Title" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Summary" BaseUrl="@(Snapshot?.PublicBaseUrl ?? "https://www.jasinternational.com.bd")" />
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- Right Column: Sidebar (1 Col) -->
+                    <div class="space-y-6">
+                        <!-- Featured Image Card -->
+                        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+                            <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Featured Cover Image</h2>
+                            <p class="text-xs text-slate-500">Appears on the guides archive, social media share cards, and at the top of the guide.</p>
+                            <AdminImagePicker Label="Cover image" @bind-Value="Input.FeaturedImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
+                        </section>
+
+                        <!-- Visibility & Publishing Card -->
+                        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+                            <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Publishing Status</h2>
+
+                            <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100/70 transition">
+                                <InputCheckbox @bind-Value="Input.IsPublished" class="mt-0.5 size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                <div>
+                                    <strong class="text-xs font-bold text-slate-900 block">Published on Storefront</strong>
+                                    <span class="text-[11px] text-slate-500 block leading-tight">When unchecked, this guide is saved as an internal draft and hidden from public search engines.</span>
+                                </div>
+                            </label>
+
+                            <label class="shop-label">
+                                Author Name
+                                <input @bind="Input.Author" @bind:event="oninput" class="shop-input" placeholder="JAS Editorial Team" />
+                            </label>
+
+                            <label class="shop-label">
+                                Publish Date
+                                <input type="datetime-local" value="@Input.PublishedAt.ToString("yyyy-MM-ddTHH:mm")" @onchange="OnPublishedAtChanged" class="shop-input" />
+                                <small class="text-slate-400 text-[11px]">Controls the date stamp displayed in structured data and article header.</small>
+                            </label>
+                        </section>
+
+                        <!-- Guide Metrics Card -->
+                        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3 text-xs text-slate-600">
+                            <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Article Insights</h2>
+                            <div class="flex items-center justify-between py-1 border-b border-slate-100">
+                                <span>Estimated reading time</span>
+                                <strong class="text-slate-900">@EstimatedReadingTime</strong>
+                            </div>
+                            <div class="flex items-center justify-between py-1 border-b border-slate-100">
+                                <span>English word count</span>
+                                <strong class="text-slate-900">@WordCount words</strong>
+                            </div>
+                            <div class="flex items-center justify-between py-1">
+                                <span>Bangla translation</span>
+                                <span class="font-bold @(string.IsNullOrWhiteSpace(Input.BanglaTitle) ? "text-amber-600" : "text-emerald-600")">
+                                    @(string.IsNullOrWhiteSpace(Input.BanglaTitle) ? "Not added" : "Ready ✓")
+                                </span>
+                            </div>
+                        </section>
+
+                        <!-- Danger Zone (Delete) -->
+                        @if (Id != 0)
+                        {
+                            <section class="rounded-2xl border border-rose-200 bg-rose-50/50 p-5 shadow-xs space-y-3">
+                                <h3 class="text-xs font-bold text-rose-900">Delete Guide</h3>
+                                <p class="text-[11px] text-rose-700 leading-relaxed">Permanently archive this guide from the storefront and sitemaps.</p>
+                                <button type="button" disabled="@Busy" @onclick="Delete" class="w-full rounded-xl border border-rose-300 bg-white py-2 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white transition cursor-pointer">
+                                    Delete Guide
+                                </button>
+                            </section>
+                        }
+                    </div>
+                </div>
+            </fieldset>
+        </EditForm>
+    }
+}
+
+@code {
+    private string activeTab = "en";
+    private bool slugEdited;
+    private string copiedToast = "";
+
+    protected override Task<AdminEditorData<GuideEditForm>> LoadAsync() => Backend.GuideAsync(Id);
+    protected override Task<AdminSaveResult> SaveAsync(GuideEditForm input) => Backend.SaveGuideAsync(input);
+
+    private void TitleChanged()
+    {
+        if (Id == 0 && !slugEdited)
+        {
+            Input!.Slug = EditorSlug.FromName(Input.Title);
+        }
+    }
+
+    private void SlugChanged() => slugEdited = true;
+
+    private void OnPublishedAtChanged(ChangeEventArgs e)
+    {
+        if (DateTimeOffset.TryParse(e.Value?.ToString(), out var dt))
+        {
+            Input!.PublishedAt = dt;
+            MarkEdited();
+        }
+    }
+
+    private int WordCount
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Input?.ContentHtml)) return 0;
+            var text = System.Text.RegularExpressions.Regex.Replace(Input.ContentHtml, "<.*?>", " ");
+            return text.Split([' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries).Length;
+        }
+    }
+
+    private string EstimatedReadingTime
+    {
+        get
+        {
+            var words = WordCount;
+            var minutes = Math.Max(1, (int)Math.Ceiling(words / 200.0));
+            return $"~{minutes} min read";
+        }
+    }
+
+    private async Task CopyLink(string path)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", path);
+            copiedToast = path;
+            StateHasChanged();
+            await Task.Delay(2500);
+            copiedToast = "";
+            StateHasChanged();
+        }
+        catch (Exception) { /* Non-blocking */ }
+    }
+
+    private async Task Delete()
+    {
+        if (Busy) return;
+        try
+        {
+            if (!await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this guide? It will be removed from storefront and sitemaps.")) return;
+            saving = true;
+            await Backend.DeleteGuideAsync(Id);
+            HasUnsavedChanges = false;
+            try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
+            Nav.NavigateTo("/admin/guides");
+        }
+        catch (AdminCatalogException failure) { error = failure.Message; }
+        catch (JSException) { error = "Confirmation dialog could not be opened. Try again."; }
+        catch (HttpRequestException) { error = "Connection failed. Try again."; }
+        finally { saving = false; }
+    }
+}

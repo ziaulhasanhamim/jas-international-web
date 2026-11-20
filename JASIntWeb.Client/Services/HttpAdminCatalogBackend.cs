@@ -30,11 +30,14 @@ public sealed class HttpAdminCatalogBackend(IHttpClientFactory factory) : IAdmin
     public Task<AdminEditorData<CategoryEditForm>> CategoryAsync(int id) => Send<AdminEditorData<CategoryEditForm>>(HttpMethod.Get, $"api/admin/categories/editor/{id}");
     public Task<AdminEditorData<BrandEditForm>> BrandAsync(int id) => Send<AdminEditorData<BrandEditForm>>(HttpMethod.Get, $"api/admin/brands/editor/{id}");
     public Task<AdminEditorData<ProductEditForm>> ProductAsync(int id) => Send<AdminEditorData<ProductEditForm>>(HttpMethod.Get, $"api/admin/products/editor/{id}");
+    public Task<AdminEditorData<GuideEditForm>> GuideAsync(int id) => Send<AdminEditorData<GuideEditForm>>(HttpMethod.Get, $"api/admin/guides/editor/{id}");
     private Task<AdminSaveResult> Save<T>(string kind, int id, T input) => Send<AdminSaveResult>(id == 0 ? HttpMethod.Post : HttpMethod.Put, $"api/admin/{kind}" + (id == 0 ? "" : $"/{id}"), input);
     public Task<AdminSaveResult> SaveCategoryAsync(CategoryEditForm input) => Save("categories", input.Id, input);
     public Task<AdminSaveResult> SaveBrandAsync(BrandEditForm input) => Save("brands", input.Id, input);
     public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => Save("products", input.Id, input);
+    public Task<AdminSaveResult> SaveGuideAsync(GuideEditForm input) => Save("guides", input.Id, input);
     public async Task DeleteBrandAsync(int id) => await Send<AdminSaveResult>(HttpMethod.Delete, $"api/admin/brands/{id}");
+    public async Task DeleteGuideAsync(int id) => await Send<AdminSaveResult>(HttpMethod.Delete, $"api/admin/guides/{id}");
     public async Task<string> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo)
     {
         using var form = new MultipartFormDataContent();

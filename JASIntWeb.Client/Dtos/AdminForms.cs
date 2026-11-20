@@ -286,6 +286,40 @@ public sealed record AdminProductRow(int Id, string Name, string Slug, string Ca
 
 public sealed record AdminBrandRow(int Id, string Name, string Slug, string? Description, string? LogoUrl, bool IsFeatured, int SortOrder, int ProductCount, bool Hidden);
 
+public sealed record AdminGuideRow(int Id, string Title, string Slug, string Author, DateTimeOffset PublishedAt, bool IsPublished, bool HasBangla, string? FeaturedImageUrl);
+
+public sealed class GuideEditForm
+{
+    public int Id { get; set; }
+    [Required(ErrorMessage = "Guide title is required"), StringLength(250)]
+    public string Title { get; set; } = "";
+    [Required(ErrorMessage = "URL slug is required"), StringLength(200)]
+    public string Slug { get; set; } = "";
+    [Required(ErrorMessage = "Summary is required"), StringLength(1000)]
+    public string Summary { get; set; } = "";
+    [Required(ErrorMessage = "Content is required"), StringLength(2000000)]
+    public string ContentHtml { get; set; } = "";
+
+    // Bangla bilingual support
+    [StringLength(250)]
+    public string? BanglaTitle { get; set; }
+    [StringLength(1000)]
+    public string? BanglaSummary { get; set; }
+    [StringLength(2000000)]
+    public string? BanglaContentHtml { get; set; }
+
+    [StringLength(100)]
+    public string Author { get; set; } = "JAS Editorial Team";
+    [StringLength(2000)]
+    public string? FeaturedImageUrl { get; set; }
+    [StringLength(150)]
+    public string? MetaTitle { get; set; }
+    [StringLength(350)]
+    public string? MetaDescription { get; set; }
+    public bool IsPublished { get; set; } = true;
+    public DateTimeOffset PublishedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 public sealed class BrandEditForm
 {
     public int Id { get; set; }

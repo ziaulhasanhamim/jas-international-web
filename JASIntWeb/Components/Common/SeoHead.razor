@@ -54,7 +54,11 @@
     {
         <meta property="og:image:type" content="image/jpeg" />
     }
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content="@(string.IsNullOrWhiteSpace(OgLocale) ? "en_US" : OgLocale)" />
+    @if (!string.IsNullOrWhiteSpace(OgLocaleAlternate))
+    {
+        <meta property="og:locale:alternate" content="@OgLocaleAlternate" />
+    }
 
     <!-- Twitter Card Metadata -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -127,6 +131,8 @@
     [Parameter] public string? OgImage { get; set; }
     [Parameter] public string? OgImageAlt { get; set; }
     [Parameter] public string? OgType { get; set; } = "website";
+    [Parameter] public string? OgLocale { get; set; } = "en_US";
+    [Parameter] public string? OgLocaleAlternate { get; set; }
     [Parameter] public string? Robots { get; set; }
     [Parameter] public string? PrevUrl { get; set; }
     [Parameter] public string? NextUrl { get; set; }

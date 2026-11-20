@@ -71,6 +71,12 @@
                             <span>@g.PublishedAt.ToString("dd MMM yyyy")</span>
                             <span>•</span>
                             <span class="font-medium text-slate-600">@g.Author</span>
+                            @if (!string.IsNullOrWhiteSpace(g.BanglaTitle))
+                            {
+                                <span class="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                    বাংলা
+                                </span>
+                            }
                         </div>
                         <h2 class="text-base font-bold text-slate-900 group-hover:text-blue-600 transition leading-snug">
                             @g.Title

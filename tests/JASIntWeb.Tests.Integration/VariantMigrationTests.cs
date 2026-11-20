@@ -62,7 +62,10 @@ public class VariantMigrationTests
         var first = new ProductVariant { ProductId = product.Id, SKU = "LEGACY-SKU", OptionSignature = "one" };
         var second = new ProductVariant { ProductId = product.Id, SKU = "SECOND-SKU", OptionSignature = "two", IsDefault = false };
         db.AddRange(first, second); await db.SaveChangesAsync(); var secondId = second.Id;
-        var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(db.Database.GetMigrations().Reverse().Skip(1).First());
+        var allMigrations = db.Database.GetMigrations().ToList();
+        var editorV2Index = allMigrations.FindIndex(m => m.Contains("ProductEditorV2"));
+        var priorMigration = editorV2Index > 0 ? allMigrations[editorV2Index - 1] : allMigrations.First();
+        var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(priorMigration);
         await db.Database.ExecuteSqlAsync($"UPDATE \"ProductVariants\" SET \"SKU\" = ' legacy-sku ' WHERE \"Id\" = {secondId}");
         var rejected = false; try { await migrator.MigrateAsync(); } catch (Npgsql.PostgresException e) { rejected = e.Message.Contains("SKU normalization collision"); }
         await rejected.Should().BeTrue();

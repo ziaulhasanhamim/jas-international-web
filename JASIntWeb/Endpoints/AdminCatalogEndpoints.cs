@@ -16,13 +16,17 @@ public static class AdminCatalogEndpoints
         group.MapGet("/categories/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.CategoryAsync(id));
         group.MapGet("/brands/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.BrandAsync(id));
         group.MapGet("/products/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.ProductAsync(id));
+        group.MapGet("/guides/editor/{id:int}", (int id, IAdminCatalogBackend backend) => backend.GuideAsync(id));
         group.MapPost("/categories", (CategoryEditForm input, IAdminCatalogBackend backend) => Create(input.Id, () => backend.SaveCategoryAsync(input)));
         group.MapPost("/brands", (BrandEditForm input, IAdminCatalogBackend backend) => Create(input.Id, () => backend.SaveBrandAsync(input)));
+        group.MapPost("/guides", (GuideEditForm input, IAdminCatalogBackend backend) => Create(input.Id, () => backend.SaveGuideAsync(input)));
         group.MapPost("/products", () => EditorUpdated());
         group.MapPut("/categories/{id:int}", (int id, CategoryEditForm input, IAdminCatalogBackend backend) => Update(id, input.Id, () => backend.SaveCategoryAsync(input)));
         group.MapPut("/brands/{id:int}", (int id, BrandEditForm input, IAdminCatalogBackend backend) => Update(id, input.Id, () => backend.SaveBrandAsync(input)));
+        group.MapPut("/guides/{id:int}", (int id, GuideEditForm input, IAdminCatalogBackend backend) => Update(id, input.Id, () => backend.SaveGuideAsync(input)));
         group.MapPut("/products/{id:int}", () => EditorUpdated());
         group.MapDelete("/brands/{id:int}", async (int id, IAdminCatalogBackend backend) => { await backend.DeleteBrandAsync(id); return new AdminSaveResult(id, "/admin/brands"); });
+        group.MapDelete("/guides/{id:int}", async (int id, IAdminCatalogBackend backend) => { await backend.DeleteGuideAsync(id); return new AdminSaveResult(id, "/admin/guides"); });
     }
     private static IResult EditorUpdated() => Results.Json(new AdminCatalogError("The product editor has been updated. Reload and use Save product in /admin/products/{id}/edit."), statusCode: 410);
     private static async Task<IResult> Create(int id, Func<Task<AdminSaveResult>> save)

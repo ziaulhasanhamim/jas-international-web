@@ -32,12 +32,14 @@
     {
         "product" => AdminSeoText.BuildProductTitle(string.IsNullOrWhiteSpace(Name) ? "Product" : Name, Brand),
         "brand" => AdminSeoText.BuildBrandTitle(string.IsNullOrWhiteSpace(Name) ? "Brand" : Name),
+        "guide" => AdminSeoText.BuildGuideTitle(string.IsNullOrWhiteSpace(Name) ? "Buying Guide" : Name),
         _ => AdminSeoText.BuildCategoryTitle(string.IsNullOrWhiteSpace(Name) ? "Category" : Name)
     };
     private string PreviewDescription => AdminSeoText.SanitizeDescription(!string.IsNullOrWhiteSpace(Description) ? Description : Kind switch
     {
         "category" => AdminSeoText.CategoryDescription(Name),
         "brand" => AdminSeoText.BrandDescription(Name, FallbackDescription),
+        "guide" => AdminSeoText.GuideDescription(Name, FallbackDescription),
         _ => AdminSeoText.ProductDescription(Name, FallbackDescription)
     });
 }

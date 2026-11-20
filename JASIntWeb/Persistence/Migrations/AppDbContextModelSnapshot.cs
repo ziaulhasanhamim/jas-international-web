@@ -17,7 +17,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261118122633_ProductEditorV2";
+    public override string LastMigrationId => "20261120195046_AddBanglaGuideFields";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -706,6 +706,15 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<string>("Author")
                     .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("BanglaContentHtml")
+                    .HasColumnType("text");
+
+                b.Property<string>("BanglaSummary")
+                    .HasColumnType("text");
+
+                b.Property<string>("BanglaTitle")
                     .HasColumnType("text");
 
                 b.Property<string>("ContentHtml")

@@ -6,6 +6,8 @@ public static class AdminSeoText
     public static string CategoryDescription(string name) => $"Browse 100% authentic {name} with official warranty, COD and nationwide delivery from JAS International.";
     public static string BrandDescription(string name, string? description) => string.IsNullOrWhiteSpace(description) ? $"Browse 100% authentic {name} gadgets and accessories at JAS International. Official warranty and fast delivery across Bangladesh." : description;
     public static string ProductDescription(string name, string? description) => string.IsNullOrWhiteSpace(description) ? $"{name} available at JAS International. Authentic tech gadgets with official warranty and nationwide delivery in Bangladesh." : description;
+    public static string GuideDescription(string title, string? summary) => string.IsNullOrWhiteSpace(summary) ? $"Read our expert buying guide on {title}. In-depth comparisons and recommendations in Bangladesh from JAS International." : summary;
+    public static string BuildGuideTitle(string guideTitle) => $"{guideTitle.Trim()} | JAS International Guide";
 
     private static readonly Regex HtmlTagRegex = new("<.*?>", RegexOptions.None, TimeSpan.FromSeconds(1));
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.None, TimeSpan.FromSeconds(1));

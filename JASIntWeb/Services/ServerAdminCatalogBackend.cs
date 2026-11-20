@@ -227,6 +227,132 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         await service.DeleteBrandAsync(id);
         return true;
     });
+
+    public Task<AdminEditorData<GuideEditForm>> GuideAsync(int id) => Execute(async service =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var categories = await db.Categories.AsNoTracking()
+            .Where(c => !c.IsDeleted && c.ParentCategoryId == null)
+            .OrderBy(c => c.Name)
+            .Select(c => new CategoryLinkDto(c.Id, c.Name, c.Slug, c.ParentCategoryId))
+            .ToListAsync();
+
+        var brands = await db.Brands.AsNoTracking()
+            .Where(b => !b.IsDeleted)
+            .OrderBy(b => b.Name)
+            .Select(b => new BrandLinkDto(b.Id, b.Name, b.Slug))
+            .ToListAsync();
+
+        if (id == 0)
+        {
+            return Data(new GuideEditForm(), categories, brands);
+        }
+
+        var g = await db.Guides.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id);
+        if (g is null)
+        {
+            throw new AdminCatalogException(404, "Guide not found.");
+        }
+
+        var input = new GuideEditForm
+        {
+            Id = g.Id,
+            Title = g.Title,
+            Slug = g.Slug,
+            Summary = g.Summary,
+            ContentHtml = g.ContentHtml,
+            BanglaTitle = g.BanglaTitle,
+            BanglaSummary = g.BanglaSummary,
+            BanglaContentHtml = g.BanglaContentHtml,
+            Author = g.Author,
+            FeaturedImageUrl = g.FeaturedImageUrl,
+            MetaTitle = g.MetaTitle,
+            MetaDescription = g.MetaDescription,
+            IsPublished = g.IsPublished,
+            PublishedAt = g.PublishedAt
+        };
+
+        return Data(input, categories, brands);
+    });
+
+    public Task<AdminSaveResult> SaveGuideAsync(GuideEditForm input) => Execute(async service =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        string cleanSlug = SlugAndSkuGenerator.GenerateSlug(string.IsNullOrWhiteSpace(input.Slug) ? input.Title : input.Slug);
+
+        var slugExists = await db.Guides.AnyAsync(g => g.Slug == cleanSlug && g.Id != input.Id && !g.IsDeleted);
+        if (slugExists)
+        {
+            throw new AdminCatalogException(409, "A guide with this URL slug already exists.");
+        }
+
+        Guide guide;
+        if (input.Id == 0)
+        {
+            guide = new Guide
+            {
+                Title = input.Title.Trim(),
+                Slug = cleanSlug,
+                Summary = input.Summary.Trim(),
+                ContentHtml = input.ContentHtml ?? "",
+                BanglaTitle = string.IsNullOrWhiteSpace(input.BanglaTitle) ? null : input.BanglaTitle.Trim(),
+                BanglaSummary = string.IsNullOrWhiteSpace(input.BanglaSummary) ? null : input.BanglaSummary.Trim(),
+                BanglaContentHtml = string.IsNullOrWhiteSpace(input.BanglaContentHtml) ? null : input.BanglaContentHtml,
+                Author = string.IsNullOrWhiteSpace(input.Author) ? "JAS Editorial Team" : input.Author.Trim(),
+                FeaturedImageUrl = string.IsNullOrWhiteSpace(input.FeaturedImageUrl) ? null : input.FeaturedImageUrl.Trim(),
+                MetaTitle = string.IsNullOrWhiteSpace(input.MetaTitle) ? null : input.MetaTitle.Trim(),
+                MetaDescription = string.IsNullOrWhiteSpace(input.MetaDescription) ? null : input.MetaDescription.Trim(),
+                IsPublished = input.IsPublished,
+                PublishedAt = input.PublishedAt
+            };
+            db.Guides.Add(guide);
+        }
+        else
+        {
+            var existing = await db.Guides.SingleOrDefaultAsync(g => g.Id == input.Id);
+            if (existing is null)
+            {
+                throw new AdminCatalogException(404, "Guide not found.");
+            }
+
+            existing.Title = input.Title.Trim();
+            existing.Slug = cleanSlug;
+            existing.Summary = input.Summary.Trim();
+            existing.ContentHtml = input.ContentHtml ?? "";
+            existing.BanglaTitle = string.IsNullOrWhiteSpace(input.BanglaTitle) ? null : input.BanglaTitle.Trim();
+            existing.BanglaSummary = string.IsNullOrWhiteSpace(input.BanglaSummary) ? null : input.BanglaSummary.Trim();
+            existing.BanglaContentHtml = string.IsNullOrWhiteSpace(input.BanglaContentHtml) ? null : input.BanglaContentHtml;
+            existing.Author = string.IsNullOrWhiteSpace(input.Author) ? "JAS Editorial Team" : input.Author.Trim();
+            existing.FeaturedImageUrl = string.IsNullOrWhiteSpace(input.FeaturedImageUrl) ? null : input.FeaturedImageUrl.Trim();
+            existing.MetaTitle = string.IsNullOrWhiteSpace(input.MetaTitle) ? null : input.MetaTitle.Trim();
+            existing.MetaDescription = string.IsNullOrWhiteSpace(input.MetaDescription) ? null : input.MetaDescription.Trim();
+            existing.IsPublished = input.IsPublished;
+            existing.PublishedAt = input.PublishedAt;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            guide = existing;
+        }
+
+        await db.SaveChangesAsync();
+        return new AdminSaveResult(guide.Id, $"/admin/guides/{guide.Id}/edit");
+    });
+
+    public async Task DeleteGuideAsync(int id) => await Execute(async service =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var existing = await db.Guides.SingleOrDefaultAsync(g => g.Id == id);
+        if (existing is not null)
+        {
+            existing.IsDeleted = true;
+            existing.DeletedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        return true;
+    });
     public Task<string> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo) => Execute(async service =>
     {
         var limit = (brandLogo ? 5 : 10) * 1024 * 1024;
