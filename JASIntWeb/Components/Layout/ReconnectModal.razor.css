@@ -104,7 +104,8 @@
     margin-bottom: 0.5rem;
 }
 
-.reconnect-card h2 {
+.reconnect-card h2,
+.reconnect-card .reconnect-title {
     font-size: 1.25rem;
     font-weight: 700;
     color: #0f172a;

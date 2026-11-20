@@ -200,6 +200,73 @@ public static class JsonTestDataSeeder
         }
     }
 
+    public static async Task PatchCatalogDataAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var libertyProducts = await db.Products
+            .Where(p => p.Slug.Contains("liberty-5") || p.Name.Contains("Liberty 5"))
+            .ToListAsync(ct);
+
+        var modifiedAny = false;
+        foreach (var p in libertyProducts)
+        {
+            // 1. Fix spec table (Details) contradictions
+            if (!string.IsNullOrWhiteSpace(p.Details))
+            {
+                var newDetails = p.Details
+                    .Replace("Bluetooth 5.3", "Bluetooth 5.4")
+                    .Replace("Water Resistance: IPX4 rating (splash-proof)", "Water Resistance: IP55 rating (dust, sweat & splash resistant)")
+                    .Replace("IPX4 rating", "IP55 rating")
+                    .Replace("IPX4", "IP55")
+                    .Replace("Liberty 5 NC", "Liberty 5 ANC");
+
+                if (newDetails != p.Details)
+                {
+                    p.Details = newDetails;
+                    modifiedAny = true;
+                }
+            }
+
+            // 2. Fix repetitive keyword stuffing & intro name in Description
+            if (!string.IsNullOrWhiteSpace(p.Description) &&
+                (p.Description.Contains("Anker Earbuds") || p.Description.Contains("Bluetooth 5.3") || p.Description.Contains("IPX4") || p.Description.Contains("Liberty 5 NC")))
+            {
+                p.Description = @"<div class=""full-description"">
+<h2>Anker Soundcore Liberty 5 ANC Earbuds</h2>
+<p>The <strong>Soundcore Liberty 5</strong> delivers rich, studio-grade wireless sound with advanced noise cancellation and extended battery life. Powered by custom dynamic drivers with Dolby Audio and Hi-Res LDAC certification, it reproduces deep, punchy bass, detailed mids, and sparkling treble for an elevated listening experience across music, movies, and podcasts.</p>
+<p>Equipped with Adaptive ANC 3.0, the earbuds sample external sound up to 3 times per second to automatically fine-tune noise reduction. From the steady drone of a commute to ambient cafe chatter, the system maintains a quiet, comfortable soundstage without ear fatigue. For crystal-clear calls, a six-microphone AI array filters out background noise and wind so your voice comes through with total clarity.</p>
+<p>Comfort is central to the design: each bud weighs only 4.6g for a virtually weightless in-ear feel. The earbuds provide up to 12 hours of playback on a single charge (8 hours with ANC active), and the pocket-friendly charging case extends total listening time up to 48 hours. When you're in a hurry, a quick 10-minute USB-C charge provides up to 5 hours of playtime.</p>
+<p>Built with an IP55 dust and water resistance rating, the Liberty 5 withstands sweaty workout sessions and unexpected rain showers. Modern Bluetooth 5.4 delivers a stable, low-latency connection with seamless dual-device multipoint pairing, while the Soundcore mobile app unlocks personalized HearID EQ tuning and responsive touch gesture controls.</p>
+<h3>Adaptive ANC 3.0 — Smarter Noise Cancellation</h3>
+<p>Adaptive ANC 3.0 continuously recalibrates noise cancellation in real time based on environmental noise levels and in-ear seal. Whether you are navigating busy city streets or focusing in an office, it delivers seamless immersion without distracting pressure artifacts.</p>
+</div>";
+                modifiedAny = true;
+            }
+
+            // 3. Fix MetaDescription
+            var cleanMeta = "Buy 100% authentic Anker Soundcore Liberty 5 ANC Earbuds in BD. Adaptive ANC 3.0, Dolby Audio, LDAC, 48h battery, Bluetooth 5.4, IP55 & official warranty at JAS International.";
+            if (p.MetaDescription != cleanMeta)
+            {
+                p.MetaDescription = cleanMeta;
+                modifiedAny = true;
+            }
+
+            // 4. Fix Name if it had NC
+            if (p.Name.Contains("Liberty 5 NC", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Name = p.Name.Replace("Liberty 5 NC", "Liberty 5 ANC");
+                modifiedAny = true;
+            }
+        }
+
+        if (modifiedAny)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     public static async Task SeedBrandsAsync(this IServiceProvider services, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();

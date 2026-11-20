@@ -86,6 +86,7 @@ else
              Description="@pageDesc"
              CanonicalPath="@canonical"
              OgImage="@(string.IsNullOrWhiteSpace(product.OgImageUrl) ? product.MainImage : product.OgImageUrl)"
+             OgImageAlt="@($"Official photo of {product.Name} - JAS International")"
              OgType="product"
              ProductPrice="@(selected?.Price)"
              ProductCurrency="BDT"

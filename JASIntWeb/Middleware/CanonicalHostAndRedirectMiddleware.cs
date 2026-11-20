@@ -75,6 +75,27 @@ public sealed class CanonicalHostAndRedirectMiddleware(RequestDelegate next)
             return;
         }
 
+        // 5. Category alias 301 consolidation (smart-wearables -> smartwatches, creator-essentials -> creator-gear, etc.)
+        if (path.StartsWith("/category/", StringComparison.OrdinalIgnoreCase))
+        {
+            var catSlug = path["/category/".Length..].Trim().TrimEnd('/').ToLowerInvariant();
+            var canonicalSlug = catSlug switch
+            {
+                "smart-wearables" => "smartwatches",
+                "creator-essentials" => "creator-gear",
+                "audio" => "audio-earbuds",
+                "chargers-power-banks" => "power-charging",
+                _ => null
+            };
+
+            if (canonicalSlug != null)
+            {
+                context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
+                context.Response.Headers.Location = $"/category/{canonicalSlug}{query}";
+                return;
+            }
+        }
+
         var redirects = await cache.GetOrCreateAsync("seo:redirects", async ct =>
         {
             using var scope = sp.CreateScope();

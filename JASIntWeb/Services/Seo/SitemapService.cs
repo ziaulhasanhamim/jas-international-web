@@ -10,55 +10,120 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
     private static readonly XNamespace S = "http://www.sitemaps.org/schemas/sitemap/0.9";
     private static readonly XNamespace ImageNs = "http://www.google.com/schemas/sitemap-image/1.1";
 
-    public string GenerateSitemapIndex()
+    public async Task<string> GenerateSitemapIndexAsync()
     {
+        var productsLastMod = await db.Products.AsNoTracking().MaxAsync(p => (DateTimeOffset?)(p.UpdatedAt ?? p.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
+        var categoriesLastMod = await db.Categories.AsNoTracking().MaxAsync(c => (DateTimeOffset?)(c.UpdatedAt ?? c.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
+        var brandsLastMod = await db.Brands.AsNoTracking().MaxAsync(b => (DateTimeOffset?)(b.UpdatedAt ?? b.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
+        var guidesLastMod = await db.Guides.AsNoTracking().MaxAsync(g => (DateTimeOffset?)(g.UpdatedAt ?? g.PublishedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
+
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", "yes"),
             new XElement(S + "sitemapindex",
-                CreateSitemapEntry("sitemap-pages.xml"),
-                CreateSitemapEntry("sitemap-categories.xml"),
-                CreateSitemapEntry("sitemap-brands.xml"),
-                CreateSitemapEntry("sitemap-products.xml"),
-                CreateSitemapEntry("sitemap-guides.xml")
+                CreateSitemapEntry("sitemap-pages.xml", productsLastMod),
+                CreateSitemapEntry("sitemap-categories.xml", categoriesLastMod),
+                CreateSitemapEntry("sitemap-brands.xml", brandsLastMod),
+                CreateSitemapEntry("sitemap-products.xml", productsLastMod),
+                CreateSitemapEntry("sitemap-guides.xml", guidesLastMod)
             )
         );
 
         return doc.Declaration + Environment.NewLine + doc.ToString();
 
-        XElement CreateSitemapEntry(string file)
+        XElement CreateSitemapEntry(string file, DateTimeOffset lastMod)
         {
             return new XElement(S + "sitemap",
                 new XElement(S + "loc", $"{seo.PublicBaseUrl}/{file}"),
-                new XElement(S + "lastmod", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"))
+                new XElement(S + "lastmod", lastMod.ToString("yyyy-MM-dd"))
             );
         }
     }
 
-    public string GeneratePagesSitemap()
+    public string GenerateSitemapIndex()
     {
-        var staticPages = new (string Path, string ChangeFreq, string Priority)[]
+        var staticDate = "2026-11-20";
+        var doc = new XDocument(
+            new XDeclaration("1.0", "utf-8", "yes"),
+            new XElement(S + "sitemapindex",
+                CreateSitemapEntry("sitemap-pages.xml", staticDate),
+                CreateSitemapEntry("sitemap-categories.xml", staticDate),
+                CreateSitemapEntry("sitemap-brands.xml", staticDate),
+                CreateSitemapEntry("sitemap-products.xml", staticDate),
+                CreateSitemapEntry("sitemap-guides.xml", staticDate)
+            )
+        );
+
+        return doc.Declaration + Environment.NewLine + doc.ToString();
+
+        XElement CreateSitemapEntry(string file, string date)
         {
-            ("/", "daily", "1.0"),
-            ("/products", "daily", "0.9"),
-            ("/guides", "daily", "0.8"),
-            ("/showroom", "weekly", "0.8"),
-            ("/about", "monthly", "0.7"),
-            ("/contact", "monthly", "0.7"),
-            ("/faq", "weekly", "0.7"),
-            ("/warranty-returns", "monthly", "0.6"),
-            ("/terms", "monthly", "0.5"),
-            ("/privacy", "monthly", "0.5")
+            return new XElement(S + "sitemap",
+                new XElement(S + "loc", $"{seo.PublicBaseUrl}/{file}"),
+                new XElement(S + "lastmod", date)
+            );
+        }
+    }
+
+    public async Task<string> GeneratePagesSitemapAsync()
+    {
+        var catalogLastMod = (await db.Products.AsNoTracking().MaxAsync(p => (DateTimeOffset?)(p.UpdatedAt ?? p.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero)).ToString("yyyy-MM-dd");
+        var guideLastMod = (await db.Guides.AsNoTracking().MaxAsync(g => (DateTimeOffset?)(g.UpdatedAt ?? g.PublishedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero)).ToString("yyyy-MM-dd");
+
+        var staticPages = new (string Path, string ChangeFreq, string Priority, string LastMod)[]
+        {
+            ("/", "daily", "1.0", catalogLastMod),
+            ("/products", "daily", "0.9", catalogLastMod),
+            ("/guides", "daily", "0.8", guideLastMod),
+            ("/showroom", "weekly", "0.8", "2026-11-10"),
+            ("/about", "monthly", "0.7", "2026-11-10"),
+            ("/contact", "monthly", "0.7", "2026-11-10"),
+            ("/faq", "weekly", "0.7", "2026-11-12"),
+            ("/warranty-returns", "monthly", "0.6", "2026-11-15"),
+            ("/terms", "monthly", "0.5", "2026-11-01"),
+            ("/privacy", "monthly", "0.5", "2026-11-01")
         };
 
         var root = new XElement(S + "urlset");
 
-        foreach (var (path, freq, priority) in staticPages)
+        foreach (var (path, freq, priority, lastMod) in staticPages)
         {
             root.Add(new XElement(S + "url",
                 new XElement(S + "loc", seo.BuildAbsoluteUrl(path)),
                 new XElement(S + "changefreq", freq),
                 new XElement(S + "priority", priority),
-                new XElement(S + "lastmod", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"))
+                new XElement(S + "lastmod", lastMod)
+            ));
+        }
+
+        var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);
+        return doc.Declaration + Environment.NewLine + doc.ToString();
+    }
+
+    public string GeneratePagesSitemap()
+    {
+        var staticPages = new (string Path, string ChangeFreq, string Priority, string LastMod)[]
+        {
+            ("/", "daily", "1.0", "2026-11-20"),
+            ("/products", "daily", "0.9", "2026-11-20"),
+            ("/guides", "daily", "0.8", "2026-11-20"),
+            ("/showroom", "weekly", "0.8", "2026-11-10"),
+            ("/about", "monthly", "0.7", "2026-11-10"),
+            ("/contact", "monthly", "0.7", "2026-11-10"),
+            ("/faq", "weekly", "0.7", "2026-11-12"),
+            ("/warranty-returns", "monthly", "0.6", "2026-11-15"),
+            ("/terms", "monthly", "0.5", "2026-11-01"),
+            ("/privacy", "monthly", "0.5", "2026-11-01")
+        };
+
+        var root = new XElement(S + "urlset");
+
+        foreach (var (path, freq, priority, lastMod) in staticPages)
+        {
+            root.Add(new XElement(S + "url",
+                new XElement(S + "loc", seo.BuildAbsoluteUrl(path)),
+                new XElement(S + "changefreq", freq),
+                new XElement(S + "priority", priority),
+                new XElement(S + "lastmod", lastMod)
             ));
         }
 

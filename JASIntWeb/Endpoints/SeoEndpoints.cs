@@ -7,15 +7,15 @@ public static class SeoEndpoints
 {
     public static IEndpointRouteBuilder MapSeoEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/sitemap.xml", (SitemapService sitemap) =>
+        endpoints.MapGet("/sitemap.xml", async (SitemapService sitemap) =>
         {
-            var xml = sitemap.GenerateSitemapIndex();
+            var xml = await sitemap.GenerateSitemapIndexAsync();
             return Results.Content(xml, "application/xml", Encoding.UTF8);
         }).CacheOutput("SitemapPolicy");
 
-        endpoints.MapGet("/sitemap-pages.xml", (SitemapService sitemap) =>
+        endpoints.MapGet("/sitemap-pages.xml", async (SitemapService sitemap) =>
         {
-            var xml = sitemap.GeneratePagesSitemap();
+            var xml = await sitemap.GeneratePagesSitemapAsync();
             return Results.Content(xml, "application/xml", Encoding.UTF8);
         }).CacheOutput("SitemapPolicy");
 

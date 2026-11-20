@@ -169,7 +169,7 @@ public static class JsonLdBuilder
         int? reviewCount = null,
         IEnumerable<(string Author, int Rating, string Comment, DateTimeOffset Date)>? reviews = null)
     {
-        var priceValidUntil = DateTime.UtcNow.AddMonths(3).ToString("yyyy-12-31");
+        var priceValidUntil = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd");
 
         var shippingDetails = new[]
         {
@@ -234,9 +234,10 @@ public static class JsonLdBuilder
             ["applicableCountry"] = "BD",
             ["returnPolicyCategory"] = "https://schema.org/MerchantReturnFiniteReturnWindow",
             ["merchantReturnDays"] = 7,
-            ["returnMethod"] = "https://schema.org/ReturnByMail",
-            ["returnFees"] = "https://schema.org/FreeReturn",
-            ["refundType"] = "https://schema.org/ExchangeRefund"
+            ["returnMethod"] = new[] { "https://schema.org/ReturnByMail", "https://schema.org/ReturnInStore" },
+            ["returnFees"] = "https://schema.org/ReturnFeesCustomerResponsibility",
+            ["refundType"] = "https://schema.org/ExchangeRefund",
+            ["merchantReturnLink"] = "https://www.jasinternational.com.bd/warranty-returns"
         };
 
         var offer = new Dictionary<string, object?>

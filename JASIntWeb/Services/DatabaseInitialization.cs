@@ -20,5 +20,6 @@ internal static class DatabaseInitialization
             await app.Services.SeedCommerceEnhancementsAsync();
         }
         await app.Services.SeedAdminAsync(app.Configuration);
+        await app.Services.PatchCatalogDataAsync();
     }
 }
