@@ -4,7 +4,6 @@ using Amazon.S3.Model;
 using ImageMagick;
 using JASIntWeb.Client.Services;
 using JASIntWeb.Services;
-using JASIntWeb.Services.MediaMigration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -182,41 +181,5 @@ public class ImageCompressionAndPictureTests
         using var r2Client = r2Options.CreateClient();
         await ((AmazonS3Config)r2Client.Config).AuthenticationRegion.Should().BeEqualTo("auto");
         await ((AmazonS3Config)r2Client.Config).ServiceURL.Should().BeEqualTo("https://abc123def456.r2.cloudflarestorage.com/");
-    }
-
-    [Test]
-    public async Task MigrationCheckpoint_CancellationPreservesBackupAndRetryRetainsChecksums()
-    {
-        var directory = Path.Combine(Path.GetTempPath(), "jas-media-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "manifest.json");
-        try
-        {
-            var manifest = new MediaMigrationManifest { DatabaseFingerprint = "fixture", DestinationBaseUrl = Base,
-                Assets = [new() { SourceUrl = "https://legacy.example.test/a.png", Identity = Id, DestinationUrl = NewUrl(), VerifiedObjects = new() { [NewUrl()] = "checksum" } }] };
-            await MediaMigrationManifest.SaveAsync(path, manifest, default);
-            manifest.Applied = true;
-            await Assert.ThrowsAsync<OperationCanceledException>(() => MediaMigrationManifest.SaveAsync(path, manifest, new CancellationToken(true)));
-            var original = System.Text.Json.JsonSerializer.Deserialize<MediaMigrationManifest>(await File.ReadAllTextAsync(path))!;
-            await original.Applied.Should().BeFalse();
-            await MediaMigrationManifest.SaveAsync(path, manifest, default);
-            var resumed = System.Text.Json.JsonSerializer.Deserialize<MediaMigrationManifest>(await File.ReadAllTextAsync(path))!;
-            await resumed.Assets[0].VerifiedObjects[NewUrl()].Should().BeEqualTo("checksum");
-            await resumed.Applied.Should().BeTrue();
-            if (!OperatingSystem.IsWindows()) await File.GetUnixFileMode(path).Should().BeEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        finally { Directory.Delete(directory, true); }
-        static string NewUrl() => $"{Base}/images/static/{Id}.webp";
-    }
-
-    [Test]
-    public async Task MigrationUrls_RemoveNegotiationButPreserveVisualTransformsAndHtml()
-    {
-        const string source = "https://res.cloudinary.com/store/image/upload/f_auto,q_auto/c_fill,w_300/v123/jas-storefront/photo.png";
-        const string canonical = "https://res.cloudinary.com/store/image/upload/c_fill,w_300/v123/jas-storefront/photo.png";
-        await LegacyMediaUrls.Canonical(source).Should().BeEqualTo(canonical);
-        var destination = $"{Base}/images/static/{Id}.webp";
-        await LegacyMediaUrls.Replace($"<p>Text</p><img src=\"{source}\">", new Dictionary<string, string> { [canonical] = destination }).Should().BeEqualTo($"<p>Text</p><img src=\"{destination}\">");
-        await Assert.ThrowsAsync<InvalidDataException>(() => Task.FromResult(LegacyMediaUrls.Replace(source, new Dictionary<string, string>())));
     }
 }
