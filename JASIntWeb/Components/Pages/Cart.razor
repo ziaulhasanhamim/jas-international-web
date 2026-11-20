@@ -38,33 +38,6 @@
         }
         else
         {
-            <!-- Free Shipping Progress Bar -->
-            var target = 5000m;
-            var progress = Math.Min(100, (int)(cart.Subtotal / target * 100));
-            var remaining = Math.Max(0, target - cart.Subtotal);
-
-            <div class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50/50 p-4 shadow-xs">
-                <div class="flex items-center justify-between text-xs mb-2">
-                    <span id="jas-cart-page-delivery-text" class="font-medium text-slate-700">
-                        @if (remaining > 0)
-                        {
-                            <span>Add <strong class="text-blue-700 font-bold">৳@remaining.ToString("N0")</strong> more to unlock <strong class="text-blue-700 font-bold">FREE Nationwide Delivery!</strong></span>
-                        }
-                        else
-                        {
-                            <span class="font-bold text-emerald-700 flex items-center gap-1.5">
-                                <span class="size-2 rounded-full bg-emerald-500"></span>
-                                🎉 You qualified for FREE Nationwide Delivery!
-                            </span>
-                        }
-                    </span>
-                    <span id="jas-cart-page-delivery-pct" class="font-bold text-slate-500">@progress%</span>
-                </div>
-                <div class="h-2 w-full overflow-hidden rounded-full bg-blue-200/60">
-                    <div id="jas-cart-page-delivery-bar" class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300" style="width: @(progress)%"></div>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <!-- Cart Items List (Col 8) -->
                 <div class="lg:col-span-8 space-y-3">

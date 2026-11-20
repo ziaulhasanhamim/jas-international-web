@@ -107,7 +107,7 @@ else
          data-currency="BDT"
          hidden></div>
     }
-    <div class="shop-container py-6">
+    <div class="shop-container pt-6 pb-20 md:pb-6">
         <!-- Breadcrumb Navigation -->
         <nav aria-label="Breadcrumb" class="mb-6 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <a href="/" class="hover:text-blue-600 transition">Home</a>
@@ -525,7 +525,7 @@ else
             var waText = Uri.EscapeDataString($"Hi JAS International, I want to order {product.Name} (৳{selected.Price:N0}). Link: {canonicalUrl}");
             var waUrl = $"https://wa.me/{waNumber}?text={waText}";
 
-            <div class="md:hidden fixed bottom-14 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3">
+            <div id="jas-mobile-buy-bar" data-mobile-buy-bar class="md:hidden fixed bottom-14 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3">
                 <div class="min-w-0 flex-1">
                     <span class="text-[11px] text-slate-500 truncate block font-medium">@product.Name</span>
                     <strong class="text-sm font-extrabold text-blue-600 tabular-nums block">৳@selected.Price.ToString("N0")</strong>

@@ -18,10 +18,16 @@ async function initOrderTracking() {
     window.JAS?.OrderTracking?.init();
 }
 
+function syncStickyBottomBar() {
+    const hasBuyBar = Boolean(document.querySelector('[data-mobile-buy-bar]'));
+    document.body.classList.toggle('has-mobile-buy-bar', hasBuyBar);
+}
+
 /**
  * Initializes all functional modules for the active DOM state.
  */
 function initModules() {
+    syncStickyBottomBar();
     initConsent();
     initOverlayDelegation();
     initWishlist();

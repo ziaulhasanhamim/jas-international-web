@@ -42,32 +42,7 @@ function handleCartUpdated(cart) {
     const totalEls = document.querySelectorAll('[data-cart-total]');
     totalEls.forEach(el => el.textContent = formatCurrency(cart.subtotal));
 
-    // 2. Update free delivery progress bar
-    const freeDeliveryThreshold = 5000;
-    const progress = Math.min(100, Math.round((cart.subtotal / freeDeliveryThreshold) * 100));
-    const remaining = Math.max(0, freeDeliveryThreshold - cart.subtotal);
-
-    const deliveryBar = document.getElementById('jas-cart-page-delivery-bar');
-    if (deliveryBar) deliveryBar.style.width = `${progress}%`;
-
-    const deliveryPct = document.getElementById('jas-cart-page-delivery-pct');
-    if (deliveryPct) deliveryPct.textContent = `${progress}%`;
-
-    const deliveryText = document.getElementById('jas-cart-page-delivery-text');
-    if (deliveryText) {
-        if (remaining > 0) {
-            deliveryText.innerHTML = `Add <strong class="text-blue-700 font-bold">${formatCurrency(remaining)}</strong> more to unlock <strong class="text-blue-700 font-bold">FREE Nationwide Delivery!</strong>`;
-        } else {
-            deliveryText.innerHTML = `
-                <span class="font-bold text-emerald-700 flex items-center gap-1.5">
-                    <span class="size-2 rounded-full bg-emerald-500"></span>
-                    🎉 You qualified for FREE Nationwide Delivery!
-                </span>
-            `;
-        }
-    }
-
-    // 3. Update or remove item rows
+    // 2. Update or remove item rows
     const presentVariantIds = new Set(cart.items.map(i => i.variantId));
     const existingCards = document.querySelectorAll('[data-cart-page-item]');
 

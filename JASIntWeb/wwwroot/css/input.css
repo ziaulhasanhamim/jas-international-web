@@ -398,3 +398,11 @@ form[data-submit-indication="true"][aria-busy="true"]:not([data-pending-cursor="
 .scrollbar-none::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
+
+/* Elevate Floating Support Widget on mobile when sticky buy bar is present */
+@media (max-width: 639.98px) {
+    body:has([data-mobile-buy-bar]) .floating-support-widget,
+    body.has-mobile-buy-bar .floating-support-widget {
+        bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
