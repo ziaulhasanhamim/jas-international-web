@@ -132,4 +132,16 @@ public class AdminEditorTests
         await restored.Variants[0].Price.Should().BeEqualTo(2499.00m);
         await restored.Variants[0].Sku.Should().BeEqualTo("JAS-REA-EAR-BLK-1234");
     }
+
+    [Test]
+    public async Task InlineBase64Images_AreDetectedInDetailsHtml()
+    {
+        var sampleHtml = "<p>Spec</p><img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=\" /><p>End</p>";
+        var matches = System.Text.RegularExpressions.Regex.Matches(sampleHtml, @"data:image/(?<type>[a-zA-Z0-9+]+);base64,(?<data>[A-Za-z0-9+/=]+)");
+
+        await matches.Count.Should().BeEqualTo(1);
+        await matches[0].Groups["type"].Value.Should().BeEqualTo("png");
+        var bytes = Convert.FromBase64String(matches[0].Groups["data"].Value);
+        await (bytes.Length > 0).Should().BeTrue();
+    }
 }

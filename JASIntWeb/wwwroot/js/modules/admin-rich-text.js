@@ -1,4 +1,24 @@
 let loading;
+async function uploadImageBlob(blob, filename) {
+    const tokenRes = await fetch('/api/admin/uploads/security', { cache: 'no-store' });
+    if (!tokenRes.ok) throw new Error('Please sign in as an administrator to upload images.');
+    const { token } = await tokenRes.json();
+    const formData = new FormData();
+    formData.append('file', blob, filename || 'image.png');
+    const res = await fetch('/api/admin/uploads/image', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': token },
+        body: formData,
+        signal: AbortSignal.timeout(60000)
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || `Upload failed (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    if (!data?.url) throw new Error('No image URL returned from storage');
+    return data.url;
+}
 async function loadEditor() {
     if (window.tinymce) return;
     loading ??= new Promise((resolve, reject) => {
@@ -38,6 +58,28 @@ export function create(element, receiver, options) {
                 menubar: false, branding: false, readonly: disabled,
                 formats: { underline: { inline: 'u' } },
                 content_style: 'body{font-family:Arial,sans-serif;font-size:14px;line-height:1.7}img{max-width:100%;height:auto}table{border-collapse:collapse}td,th{border:1px solid #cbd5e1;padding:8px}',
+                automatic_uploads: true,
+                paste_data_images: true,
+                images_upload_handler: (blobInfo) => uploadImageBlob(blobInfo.blob(), blobInfo.filename()),
+                file_picker_types: 'image',
+                file_picker_callback: (callback, value, meta) => {
+                    if (meta.filetype === 'image') {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/png,image/jpeg,image/webp,image/avif,image/gif,image/svg+xml';
+                        input.onchange = async () => {
+                            const file = input.files?.[0];
+                            if (!file) return;
+                            try {
+                                const url = await uploadImageBlob(file, file.name);
+                                callback(url, { alt: file.name });
+                            } catch (err) {
+                                alert(err.message || 'Image upload failed');
+                            }
+                        };
+                        input.click();
+                    }
+                },
                 setup(instance) {
                     if (options.specifications) instance.ui.registry.addButton('techspecs', { text: 'Tech Specs Template', onAction: () => instance.insertContent('<table><tbody><tr><th>Specification</th><th>Details</th></tr><tr><td>Model</td><td></td></tr><tr><td>Warranty</td><td></td></tr></tbody></table>') });
                     instance.on('input change undo redo blur', () => {

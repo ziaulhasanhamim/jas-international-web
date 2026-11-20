@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Client.Services;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 namespace JASIntWeb.Services.ProductEditor;
 
 public sealed partial class ProductEditorService(AppDbContext db, AdminService admin, CatalogService catalog,
-    IOutputCacheStore output, IConfiguration configuration, ILogger<ProductEditorService> logger)
+    IOutputCacheStore output, IConfiguration configuration, ILogger<ProductEditorService> logger, IStorageService storage)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static AdminCatalogException Invalid(string field, string message, int status = 422) => new(status, message, new() { [field] = [message] });
@@ -87,6 +88,7 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         if (command.Draft is null) throw Invalid("Product", "A product draft is required.", 400);
         var hash = Hash(command);
         var draft = ProductEditorRules.Copy(command.Draft);
+        await ProcessInlineBase64ImagesAsync(draft, ct);
         ValidateInformation(draft);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await LockOperationAsync(actor, command.OperationId, ct);
@@ -111,6 +113,57 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return await CompletedAsync(new(command.OperationId, id, product.CatalogRevision), ct);
+    }
+    private async Task ProcessInlineBase64ImagesAsync(ProductEditorDraft draft, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(draft.Information.Details)) return;
+        var html = draft.Information.Details;
+        var matches = Regex.Matches(html, @"data:image/(?<type>[a-zA-Z0-9+]+);base64,(?<data>[A-Za-z0-9+/=]+)");
+        if (matches.Count == 0) return;
+
+        var sb = new StringBuilder();
+        int lastIndex = 0;
+        foreach (Match match in matches)
+        {
+            sb.Append(html, lastIndex, match.Index - lastIndex);
+            lastIndex = match.Index + match.Length;
+
+            try
+            {
+                var type = match.Groups["type"].Value.ToLowerInvariant();
+                var base64 = match.Groups["data"].Value;
+                var bytes = Convert.FromBase64String(base64);
+                var ext = type switch
+                {
+                    "jpeg" or "jpg" => ".jpg",
+                    "png" => ".png",
+                    "webp" => ".webp",
+                    "avif" => ".avif",
+                    "gif" => ".gif",
+                    _ => ".png"
+                };
+                var contentType = type switch
+                {
+                    "jpeg" or "jpg" => "image/jpeg",
+                    "png" => "image/png",
+                    "webp" => "image/webp",
+                    "avif" => "image/avif",
+                    "gif" => "image/gif",
+                    _ => "image/png"
+                };
+                using var stream = new MemoryStream(bytes);
+                var fileName = $"spec-{Guid.NewGuid():N}{ext}";
+                var url = await ImageUploadValidator.UploadAsync(storage, stream, fileName, contentType, ct);
+                sb.Append(url);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to upload inline base64 image from product details to R2.");
+                sb.Append(match.Value);
+            }
+        }
+        sb.Append(html, lastIndex, html.Length - lastIndex);
+        draft.Information.Details = sb.ToString();
     }
     private static void ValidateInformation(ProductEditorDraft draft)
     {

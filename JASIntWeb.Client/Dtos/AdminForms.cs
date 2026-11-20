@@ -14,7 +14,7 @@ public sealed class ProductEditForm
     public int? BrandId { get; set; }
     [StringLength(2000)]
     public string Description { get; set; } = "";
-    [Required(ErrorMessage = "Product description details are required"), StringLength(100000)]
+    [Required(ErrorMessage = "Product description details are required"), StringLength(2000000)]
     public string Details { get; set; } = "";
     [Required(ErrorMessage = "Main product picture is required"), StringLength(5000)]
     public string Image { get; set; } = "";
