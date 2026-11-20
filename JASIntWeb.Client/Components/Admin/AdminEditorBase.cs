@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.JSInterop;
 using JASIntWeb.Client.Contracts;
 using Microsoft.AspNetCore.Components;
@@ -17,9 +18,28 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
     protected EditContext? EditContext;
     private ValidationMessageStore? messages;
     private PersistingComponentStateSubscription? subscription;
-    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] protected IJSRuntime JS { get; set; } = default!;
     protected bool HasUnsavedChanges;
-    protected void MarkEdited() => HasUnsavedChanges = true;
+    protected bool RestoredFromDraft;
+    protected virtual string GetDraftStorageKey() => $"jas-admin-draft:{GetType().Name}:{Id}";
+
+    protected void MarkEdited()
+    {
+        HasUnsavedChanges = true;
+        _ = SaveDraftAsync();
+    }
+
+    protected async Task SaveDraftAsync()
+    {
+        if (Input is null || !RendererInfo.IsInteractive) return;
+        try
+        {
+            var json = JsonSerializer.Serialize(Input);
+            await JS.InvokeVoidAsync("jasAdminDrafts.save", GetDraftStorageKey(), json);
+        }
+        catch (Exception) { /* Non-blocking */ }
+    }
+
     protected bool saving;
     protected bool AccessDenied;
     private int uploads;
@@ -50,6 +70,53 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
             error = "The editor could not be loaded. Check your connection and reload this page.";
         }
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !RendererInfo.IsInteractive || Input is null) return;
+        try
+        {
+            var key = GetDraftStorageKey();
+            var json = await JS.InvokeAsync<string?>("jasAdminDrafts.get", key);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                var draft = JsonSerializer.Deserialize<T>(json);
+                if (draft is not null && HasDraftDifferences(draft, Snapshot?.Input))
+                {
+                    Input = draft;
+                    HasUnsavedChanges = true;
+                    RestoredFromDraft = true;
+                    EditContext = new(Input);
+                    messages = new(EditContext);
+                    EditContext.OnValidationRequested += ClearServerValidation;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (Exception) { /* Non-blocking */ }
+    }
+
+    private static bool HasDraftDifferences(T draft, T? snapshot)
+    {
+        if (snapshot is null) return true;
+        return JsonSerializer.Serialize(draft) != JsonSerializer.Serialize(snapshot);
+    }
+
+    public async Task DiscardDraftAsync()
+    {
+        try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
+        if (Snapshot is not null)
+        {
+            Input = JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(Snapshot.Input))!;
+            HasUnsavedChanges = false;
+            RestoredFromDraft = false;
+            EditContext = new(Input);
+            messages = new(EditContext);
+            EditContext.OnValidationRequested += ClearServerValidation;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
     protected async Task Save()
     {
         if (Busy || Input is null) return;
@@ -60,6 +127,8 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
         {
             var saved = await SaveAsync(Input);
             HasUnsavedChanges = false;
+            RestoredFromDraft = false;
+            try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (JSException) { }
             try { await JS.InvokeVoidAsync("jasAdminDrafts.clear"); } catch (JSException) { }
             await InvokeAsync(StateHasChanged);
             Nav.NavigateTo(saved.RedirectUrl);

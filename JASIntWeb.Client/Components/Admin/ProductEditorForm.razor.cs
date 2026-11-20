@@ -23,7 +23,7 @@ public partial class ProductEditorForm
     private readonly Dictionary<string, string> sections = new() { ["details"] = "Details", ["options"] = "Options", ["variants"] = "Variants", ["content"] = "Content & SEO" };
     private string tab = "details", requestedTab = "";
     private int loaded = -1, uploads;
-    private bool disposed, uncertain, restored, reloadRequired, retryAllowed;
+    private bool disposed, uncertain, restored, reloadRequired, retryAllowed, restoredFromDraft;
     private CancellationTokenSource lifetime = new();
     private PersistingComponentStateSubscription subscription;
     private EditorCombinationPage? preview;
@@ -35,6 +35,7 @@ public partial class ProductEditorForm
     private EditorStock? submittedStock;
     private IJSObjectReference? browser;
     private string storageKey = "";
+    private string DraftStorageKey => $"jas-admin-draft:product:{Id}";
     private bool Disabled => state.Busy || reloadRequired || uploads > 0 || !RendererInfo.IsInteractive;
     private record Pending(EditorSave? Product, EditorStock? Stock);
     protected override void OnInitialized() => subscription = Persistent.RegisterOnPersisting(() =>
@@ -46,7 +47,7 @@ public partial class ProductEditorForm
     {
         if (loaded == Id) { if (requestedTab != InitialTab && sections.ContainsKey(InitialTab)) tab = InitialTab; requestedTab = InitialTab; return; }
         requestedTab = InitialTab;
-        loaded = Id; restored = false; uncertain = false; tab = ContentTab ? "content" : sections.ContainsKey(InitialTab) ? InitialTab : "details";
+        loaded = Id; restored = false; uncertain = false; restoredFromDraft = false; tab = ContentTab ? "content" : sections.ContainsKey(InitialTab) ? InitialTab : "details";
         lifetime.Cancel(); lifetime.Dispose(); lifetime = new(); preview = null; stockVariant = null; submitted = null; submittedStock = null;
         state.Phase = EditorPhase.Loading;
         try
@@ -72,12 +73,40 @@ public partial class ProductEditorForm
                 if (submitted is not null) state.Restore(submitted.Draft);
                 state.Phase = EditorPhase.ConnectionError; state.Message = "An earlier request needs confirmation. Check its status before making another save.";
                 StateHasChanged();
+                return;
+            }
+
+            // Check for unsaved local storage draft
+            var draftJson = await JS.InvokeAsync<string?>("jasAdminDrafts.get", DraftStorageKey);
+            if (!string.IsNullOrWhiteSpace(draftJson))
+            {
+                var draft = JsonSerializer.Deserialize<ProductEditorDraft>(draftJson);
+                if (draft is not null && HasDraftDifferences(draft, state.Data.Draft))
+                {
+                    state.Restore(draft);
+                    restoredFromDraft = true;
+                    StateHasChanged();
+                }
             }
         }
         catch (Exception e) when (e is JSException or JSDisconnectedException or JsonException) { /* Core editing remains available without optional session storage. */ }
     }
     private void Change(Action<ProductEditorDraft> update, bool invalidate = false)
-    { state.Change(update); if (invalidate) preview = null; }
+    {
+        state.Change(update);
+        if (invalidate) preview = null;
+        PersistDraft();
+    }
+    private void PersistDraft()
+    {
+        if (!state.Dirty || !RendererInfo.IsInteractive || disposed) return;
+        try
+        {
+            var json = JsonSerializer.Serialize(state.Draft);
+            _ = JS.InvokeVoidAsync("jasAdminDrafts.save", DraftStorageKey, json);
+        }
+        catch (Exception) { /* Non-blocking */ }
+    }
     private void InfoChanged(InformationPatch patch) => Change(d => patch.Apply(d.Information));
     private void AttributeChanged(AttributePatch patch) => Change(d => patch.Apply(d.Attributes.Single(a => a.DefinitionId == patch.DefinitionId)), true);
     private void VariantChanged(VariantPatch patch) { Change(d => patch.Apply(d.Variants.Single(v => v.ClientId == patch.ClientId))); RefreshPreview(); }
@@ -124,8 +153,11 @@ public partial class ProductEditorForm
     private async Task Accept(EditorCommit result)
     {
         var isNew = Id == 0;
-        state.Accepted(result); reloadRequired = result.Editor is null; uncertain = false; stockVariant = null; stockMessage = null; preview = null;
-        await Forget(); submitted = null; submittedStock = null;
+        state.Accepted(result); reloadRequired = result.Editor is null; uncertain = false; stockVariant = null; stockMessage = null; preview = null; restoredFromDraft = false;
+        await Forget();
+        try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", DraftStorageKey); } catch (Exception) { }
+        if (isNew) { try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", "jas-admin-draft:product:0"); } catch (Exception) { } }
+        submitted = null; submittedStock = null;
         if (isNew) Nav.NavigateTo($"/admin/products/{result.Receipt.ProductId}/edit", replace: true);
     }
     private async Task CheckOperation()
@@ -173,11 +205,34 @@ public partial class ProductEditorForm
         if (e is AdminCatalogException error) state.Reject(error);
         else { state.Phase = e is HttpRequestException or OperationCanceledException ? EditorPhase.ConnectionError : EditorPhase.Failed; state.Message = "The operation could not be confirmed. Your draft is retained. Check the operation status before retrying."; }
     }
+    private async Task DiscardDraft()
+    {
+        try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", DraftStorageKey); } catch (Exception) { }
+        if (Id == 0) { try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", "jas-admin-draft:product:0"); } catch (Exception) { } }
+        if (state.Data is not null)
+        {
+            state.Load(state.Data);
+            restoredFromDraft = false;
+            preview = null;
+        }
+    }
+    private static bool HasDraftDifferences(ProductEditorDraft draft, ProductEditorDraft? baseline)
+    {
+        if (baseline is null) return true;
+        return JsonSerializer.Serialize(draft) != JsonSerializer.Serialize(baseline);
+    }
     private async Task Remember() { try { if (browser is not null) await browser.InvokeVoidAsync("remember", storageKey, JsonSerializer.Serialize(new Pending(submitted, submittedStock))); } catch (JSException) { } }
     private async Task Forget() { try { if (browser is not null) await browser.InvokeVoidAsync("forget", storageKey); } catch (JSException) { } }
     private async Task Export() { try { browser ??= await JS.InvokeAsync<IJSObjectReference>("import", "/js/modules/product-editor.js"); await browser.InvokeVoidAsync("exportDraft", JsonSerializer.Serialize(new { state.Draft, Pending = new Pending(submitted, submittedStock) })); } catch (JSException) { state.Message = "Draft download is unavailable. Keep this tab open and retry."; } }
     private async Task<bool> Confirm(string message) { try { return await JS.InvokeAsync<bool>("confirm", message); } catch (JSException) { return false; } }
-    private async Task BeforeNavigation(LocationChangingContext context) { if (state.Dirty && !await Confirm("Leave this product with unsaved changes?")) context.PreventNavigation(); }
+    private Task BeforeNavigation(LocationChangingContext context)
+    {
+        if (state.Dirty)
+        {
+            PersistDraft();
+        }
+        return Task.CompletedTask;
+    }
     public async ValueTask DisposeAsync()
     { disposed = true; lifetime.Cancel(); lifetime.Dispose(); subscription.Dispose(); if (browser is not null) try { await browser.DisposeAsync(); } catch (JSDisconnectedException) { } }
 }

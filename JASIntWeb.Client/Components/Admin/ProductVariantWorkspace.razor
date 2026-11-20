@@ -1,10 +1,19 @@
 @inherits AdminEditorBase<ProductWorkspace>
 @inject IAdminProductWorkspaceBackend Workspace
-@inject IJSRuntime JS
 <PageTitle>Variants &amp; stock — JAS Admin</PageTitle>
 <AdminPageHeader Title="Variants & stock" Description="Configure this product's own values, then manage each sellable combination." ActionHref="/admin/products" ActionText="Back to products" />
 <ProductAdminTabs ProductId="Id" />
 @if (error is not null) { <p class="form-error" role="alert">@error</p> }
+@if (RestoredFromDraft)
+{
+    <div class="editor-recovery flex items-center justify-between p-3 mb-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800" role="status">
+        <span class="flex items-center gap-1.5 font-medium">
+            <svg class="size-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Restored unsaved draft from local storage.
+        </span>
+        <button type="button" class="text-xs font-semibold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer" @onclick="DiscardDraftAsync">Discard draft</button>
+    </div>
+}
 @if (Input is null) { <p class="admin-empty">@(notFound ? "Product not found." : "Loading workspace…")</p> }
 else
 {
@@ -59,16 +68,16 @@ else
     private WorkspaceVariant? stockVariant;
     protected override async Task<AdminEditorData<ProductWorkspace>> LoadAsync() => new(await Workspace.LoadAsync(Id), [], [], 0, 0, "");
     protected override Task<AdminSaveResult> SaveAsync(ProductWorkspace input) => throw new NotSupportedException("Use explicit workspace commands.");
-    private void OptionsChanged(List<WorkspaceAttribute> attributes) { Input = Input! with { Attributes = attributes }; MarkDirty(); }
-    private void VariantChanged(WorkspaceVariant variant) { var index = Input!.Variants.FindIndex(row => row.Id == variant.Id); Input.Variants[index] = variant; variantDirty = true; }
+    private void OptionsChanged(List<WorkspaceAttribute> attributes) { Input = Input! with { Attributes = attributes }; MarkDirty(); MarkEdited(); }
+    private void VariantChanged(WorkspaceVariant variant) { var index = Input!.Variants.FindIndex(row => row.Id == variant.Id); Input.Variants[index] = variant; variantDirty = true; MarkEdited(); }
     private void MarkDirty() { dirty = true; preview = null; }
     private void Select(WorkspaceVariant variant, int definition, ChangeEventArgs args)
-    { variant.Choices[definition] = int.TryParse(args.Value?.ToString(), out var id) ? id : 0; MarkDirty(); }
+    { variant.Choices[definition] = int.TryParse(args.Value?.ToString(), out var id) ? id : 0; MarkDirty(); MarkEdited(); }
     private async Task Execute(Func<Task<ProductWorkspace>> action)
     {
         if (Busy) return;
         saving = true; error = null;
-        try { Input = await action(); dirty = false; variantDirty = false; stockVariant = null; preview = null; await JS.InvokeVoidAsync("jasAdminDrafts.clear"); }
+        try { Input = await action(); dirty = false; variantDirty = false; stockVariant = null; preview = null; try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { } await JS.InvokeVoidAsync("jasAdminDrafts.clear"); }
         catch (AdminCatalogException failure) { error = failure.Message; AccessDenied = failure.Status is 401 or 403; }
         catch (HttpRequestException) { error = "Connection failed. Your draft is retained. Try again."; }
         catch (JSDisconnectedException) { error = "The operation completed. Reload to reconnect."; }

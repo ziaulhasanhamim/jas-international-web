@@ -9,6 +9,16 @@ else
 {
     @if (error is not null) { <p class="form-error" role="alert">@error</p> }
     @if (AccessDenied) { <a href="/account/login?returnUrl=/admin/brands" class="btn-secondary">Sign in again</a> }
+    @if (RestoredFromDraft)
+    {
+        <div class="editor-recovery flex items-center justify-between p-3 mb-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800" role="status">
+            <span class="flex items-center gap-1.5 font-medium">
+                <svg class="size-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Restored unsaved draft from local storage.
+            </span>
+            <button type="button" class="text-xs font-semibold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer" @onclick="DiscardDraftAsync">Discard draft</button>
+        </div>
+    }
     @if (Input is null) { <p class="admin-help">Loading brand…</p> }
     else
     {
@@ -78,12 +88,11 @@ else
     {
         if (Id == 0 && !slugEdited) Input!.Slug = EditorSlug.FromName(Input.Name);
     }
-    [Inject] private IJSRuntime JS { get; set; } = default!;
     private int productCount => Snapshot?.ProductCount ?? 0;
     private async Task Delete()
     {
         if (Busy) return;
-        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); HasUnsavedChanges = false; await JS.InvokeVoidAsync("jasAdminDrafts.clear"); Nav.NavigateTo("/admin/brands"); }
+        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); HasUnsavedChanges = false; try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { } await JS.InvokeVoidAsync("jasAdminDrafts.clear"); Nav.NavigateTo("/admin/brands"); }
         catch (AdminCatalogException failure) { error = failure.Message; }
         catch (JSException) { error = "Confirmation could not be opened. Try again."; }
         catch (HttpRequestException) { error = "Connection failed. Try again."; }

@@ -72,4 +72,64 @@ public class AdminEditorTests
         var descending = AdminSorting.Apply(rows, new Navigation("https://example.test/admin?sort=name&direction=desc"), ("name", r => r.Name)).First();
         await descending.Id.Should().BeEqualTo(2);
     }
+
+    [Test]
+    public async Task AdminDraftSerialization_PreservesFormsAcrossNavigation()
+    {
+        var brandDraft = new JASIntWeb.Client.Dtos.BrandEditForm
+        {
+            Name = "Draft Brand",
+            Slug = "draft-brand",
+            Description = "Unsaved draft",
+            IsFeatured = true,
+            IntroText = "<p>Draft intro</p>"
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(brandDraft);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<JASIntWeb.Client.Dtos.BrandEditForm>(json);
+
+        await restored.Should().NotBeNull();
+        await restored!.Name.Should().BeEqualTo("Draft Brand");
+        await restored.Slug.Should().BeEqualTo("draft-brand");
+        await restored.IsFeatured.Should().BeTrue();
+        await restored.IntroText.Should().BeEqualTo("<p>Draft intro</p>");
+    }
+
+    [Test]
+    public async Task ProductEditorDraft_SerializesAndRestoresCorrectly()
+    {
+        var draft = new JASIntWeb.Client.Contracts.ProductEditorDraft
+        {
+            Id = 0,
+            Information = new()
+            {
+                Name = "Unsaved Realme Earbuds",
+                Slug = "unsaved-realme-earbuds",
+                CategoryId = 2,
+                Details = "<p>Rich details draft</p>",
+                Hidden = true
+            },
+            Variants =
+            [
+                new()
+                {
+                    ClientId = Guid.NewGuid(),
+                    Sku = "JAS-REA-EAR-BLK-1234",
+                    Price = 2499.00m,
+                    Active = true,
+                    Default = true
+                }
+            ]
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(draft);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<JASIntWeb.Client.Contracts.ProductEditorDraft>(json);
+
+        await restored.Should().NotBeNull();
+        await restored!.Information.Name.Should().BeEqualTo("Unsaved Realme Earbuds");
+        await restored.Information.CategoryId.Should().BeEqualTo(2);
+        await restored.Variants.Count.Should().BeEqualTo(1);
+        await restored.Variants[0].Price.Should().BeEqualTo(2499.00m);
+        await restored.Variants[0].Sku.Should().BeEqualTo("JAS-REA-EAR-BLK-1234");
+    }
 }
