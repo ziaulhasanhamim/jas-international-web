@@ -451,6 +451,63 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
+    public async Task ProductDetails_SubmitReview_Ajax_ReturnsJsonWithoutPageRedirect()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cat = await db.Categories.FirstOrDefaultAsync(c => !c.IsDeleted)
+            ?? new Category { Name = "Ajax Rev Cat", Slug = "ajax-rev-cat-" + Guid.NewGuid().ToString("N")[..6] };
+        if (cat.Id == 0)
+        {
+            db.Categories.Add(cat);
+            await db.SaveChangesAsync();
+        }
+
+        var product = new Product
+        {
+            Name = "Ajax Review Watch",
+            Slug = "ajax-review-watch-" + Guid.NewGuid().ToString("N")[..6],
+            CategoryId = cat.Id,
+            Details = "Test details",
+            MainImageUrl = "/test.png"
+        };
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var client = Factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/products/{product.Id}/reviews")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "_handler", "submit-review" },
+                { "X-CSRF-TOKEN", "test-request-token" },
+                { "Name", "Ajax Shopper" },
+                { "Email", "shopper@jasinternational.test" },
+                { "Rating", "4" },
+                { "Title", "Awesome gadget review" },
+                { "Comment", "The build quality and fast delivery exceeded expectations!" }
+            })
+        };
+        request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+
+        var response = await client.SendAsync(request);
+        await ((int)response.StatusCode).Should().BeEqualTo(200);
+
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.Nodes.JsonObject>();
+        await json.Should().NotBeNull();
+        await json!["success"]!.GetValue<bool>().Should().BeTrue();
+        await json["review"]!["rating"]!.GetValue<int>().Should().BeEqualTo(4);
+        await json["review"]!["customerName"]!.GetValue<string>().Should().BeEqualTo("Ajax Shopper");
+
+        var reviewInDb = await db.ProductReviews.FirstOrDefaultAsync(r => r.ProductId == product.Id && r.CustomerName == "Ajax Shopper");
+        await reviewInDb.Should().NotBeNull();
+        await reviewInDb!.Rating.Should().BeEqualTo(4);
+        await reviewInDb.IsApproved.Should().BeFalse();
+    }
+
+    [Test]
     public async Task AdminCategories_BulkActions_AppliesHideRestoreAndDelete()
     {
         await using var scope = Factory.Services.CreateAsyncScope();

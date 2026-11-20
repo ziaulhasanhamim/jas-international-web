@@ -38,7 +38,12 @@ public static class CustomerConfidenceEndpoints
 
         endpoints.MapPost("/products/{id:int}/reviews", async (int id, HttpContext context, AppDbContext db, IAntiforgery csrf, CancellationToken ct) =>
         {
-            if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
+            var isAjax = IsAjax(context);
+            if (!await ValidFormAsync(context, csrf))
+            {
+                if (isAjax) return Results.BadRequest(new { success = false, message = "Security token expired. Please refresh the page and try again." });
+                return Results.BadRequest("Refresh the page and try again.");
+            }
             var form = await context.Request.ReadFormAsync(ct);
             var name = form["Name"].ToString().Trim();
             var email = form["Email"].ToString().Trim();
@@ -47,23 +52,57 @@ public static class CustomerConfidenceEndpoints
             if (name.Length is < 2 or > 100 || comment.Length is < 10 or > 3000 || title.Length > 150
                 || !int.TryParse(form["Rating"], out var rating) || rating is < 1 or > 5
                 || (email.Length > 0 && (email.Length > 254 || !new EmailAddressAttribute().IsValid(email))))
-                return Results.BadRequest("Enter your name, a rating from 1 to 5, and a review between 10 and 3000 characters.");
+            {
+                var msg = "Enter your name, a rating from 1 to 5, and a review between 10 and 3000 characters.";
+                if (isAjax) return Results.BadRequest(new { success = false, message = msg });
+                return Results.BadRequest(msg);
+            }
             var product = await db.Products.AsNoTracking().Where(p => p.Id == id && !p.IsDeleted && !p.Category!.IsDeleted)
                 .Select(p => new { p.Slug }).SingleOrDefaultAsync(ct);
-            if (product == null) return Results.NotFound();
+            if (product == null)
+            {
+                if (isAjax) return Results.NotFound(new { success = false, message = "Product not found." });
+                return Results.NotFound();
+            }
             var userId = ShoppingService.UserId(context.User);
             var verified = userId.HasValue && await db.Orders.AnyAsync(o => o.UserId == userId && o.Status == OrderStatus.Delivered
                 && o.Items.Any(i => i.ProductVariant!.ProductId == id), ct);
-            db.ProductReviews.Add(new ProductReview
+            var review = new ProductReview
             {
                 ProductId = id, CustomerName = name, CustomerEmail = email.Length == 0 ? null : email,
                 Title = title.Length == 0 ? null : title, Comment = comment, Rating = rating,
                 IsApproved = false, IsVerifiedPurchase = verified
-            });
+            };
+            db.ProductReviews.Add(review);
             await db.SaveChangesAsync(ct);
+
+            if (isAjax)
+            {
+                return Results.Ok(new
+                {
+                    success = true,
+                    message = "Thank you! Your review has been submitted and is awaiting moderation.",
+                    review = new
+                    {
+                        id = review.Id,
+                        customerName = name,
+                        rating = rating,
+                        title = title.Length == 0 ? null : title,
+                        comment = comment,
+                        createdAt = DateTimeOffset.UtcNow.ToString("dd MMM yyyy"),
+                        isApproved = false,
+                        isVerifiedPurchase = verified
+                    }
+                });
+            }
+
             return Results.Redirect($"/product/{Uri.EscapeDataString(product.Slug)}?review=submitted#reviews");
         }).WithSummary("Submit a product review for moderation.");
     }
+
+    private static bool IsAjax(HttpContext context) =>
+        context.Request.Headers.Accept.ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Headers["X-Requested-With"] == "XMLHttpRequest";
 
     private static async Task<bool> ValidFormAsync(HttpContext context, IAntiforgery csrf)
     {
