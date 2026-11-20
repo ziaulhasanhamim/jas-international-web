@@ -52,9 +52,9 @@ public class ProductEditorTests
         var option = new EditorOption { Value = "Midnight Black" };
         var draft = new ProductEditorDraft { Information = new() { Name = "Realme Buds Wireless 5 ANC" }, Attributes = [new() { DefinitionId = 1, Options = [option] }] };
         var variant = new EditorVariant { ClientId = Guid.Parse("12345678-0000-0000-0000-000000000001"), Choices = new() { [1] = option.ClientId } };
-        await ProductEditorRules.AutoSku(draft, variant).Should().BeEqualTo("JAS-REALME-BUDS-WIRELESS-5-ANC-MIDNIGHT-BLACK-12345678");
+        await ProductEditorRules.AutoSku(draft, variant).Should().BeEqualTo("JAS-REA-BW5A-MBLK-1234");
         variant.Choices.Clear(); await ProductEditorRules.AutoSku(draft, variant).Contains("-BASE-").Should().BeTrue();
-        draft.Information.Name = new('x', 200); await (ProductEditorRules.AutoSku(draft, variant).Length <= 100).Should().BeTrue();
+        draft.Information.Name = new('x', 200); await (ProductEditorRules.AutoSku(draft, variant).Length <= 35).Should().BeTrue();
     }
     [Test]
     public async Task StagingSelectsNothingImplicitlyAndDoesNotDuplicateOrRestoreRows()

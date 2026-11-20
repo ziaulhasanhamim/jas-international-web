@@ -15,15 +15,138 @@ public static partial class ProductEditorRules
     public static string ChoiceKey(IReadOnlyDictionary<int, Guid> choices) => string.Join('|', choices.Where(c => c.Value != Guid.Empty).OrderBy(c => c.Key).Select(c => $"{c.Key}:{c.Value:N}"));
     public static string AutoSku(ProductEditorDraft draft, EditorVariant variant)
     {
-        static string Part(string text, int length)
+        var prodCode = ShortProductCode(draft.Information?.Name, draft.Id);
+        var optCode = ShortOptionCode(draft, variant);
+        var clientSuffix = variant.ClientId.ToString("N")[..4].ToUpperInvariant();
+        return $"JAS-{prodCode}-{optCode}-{clientSuffix}";
+    }
+
+    private static string ShortProductCode(string? name, int id)
+    {
+        if (string.IsNullOrWhiteSpace(name))
         {
-            var code = Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9]+", "-").Trim('-');
-            return code.Length > length ? code[..length].TrimEnd('-') : code;
+            return id > 0 ? id.ToString() : "PROD";
         }
-        var title = Part(draft.Information.Name, 40);
-        var values = draft.Attributes.Where(a => !a.Retired).Select(a => a.Options.FirstOrDefault(o => variant.Choices.GetValueOrDefault(a.DefinitionId) == o.ClientId)?.Value).Where(v => v is not null);
-        var options = Part(string.Join('-', values), 40);
-        return $"JAS-{(title.Length == 0 ? "PRODUCT" : title)}-{(options.Length == 0 ? "BASE" : options)}-{variant.ClientId.ToString("N")[..8].ToUpperInvariant()}";
+
+        var words = Regex.Matches(name, @"[A-Za-z0-9]+")
+            .Select(m => m.Value.ToUpperInvariant())
+            .ToList();
+
+        if (words.Count == 0)
+        {
+            return id > 0 ? id.ToString() : "PROD";
+        }
+
+        if (words.Count == 1)
+        {
+            var w = words[0];
+            return w.Length <= 6 ? w : w[..6];
+        }
+
+        if (words.Count == 2)
+        {
+            var w1 = words[0].Length <= 3 ? words[0] : words[0][..3];
+            var w2 = words[1].Length <= 4 ? words[1] : words[1][..4];
+            return $"{w1}-{w2}";
+        }
+
+        // 3+ words: first word (up to 3 chars) + initials/numbers for subsequent words
+        var first = words[0].Length <= 3 ? words[0] : words[0][..3];
+        var rest = new StringBuilder();
+
+        for (var i = 1; i < words.Count && rest.Length < 6; i++)
+        {
+            var word = words[i];
+            if (word.Any(char.IsAsciiDigit))
+            {
+                rest.Append(word.Length <= 4 ? word : word[..4]);
+            }
+            else
+            {
+                rest.Append(word[0]);
+            }
+        }
+
+        var suffix = rest.ToString();
+        return suffix.Length > 0 ? $"{first}-{suffix}" : first;
+    }
+
+    private static string ShortOptionCode(ProductEditorDraft draft, EditorVariant variant)
+    {
+        var options = draft.Attributes
+            .Where(a => !a.Retired)
+            .Select(a => a.Options.FirstOrDefault(o => variant.Choices.GetValueOrDefault(a.DefinitionId) == o.ClientId))
+            .Where(o => o is not null)
+            .ToList();
+
+        if (options.Count == 0) return "BASE";
+
+        var codes = new List<string>();
+        foreach (var opt in options)
+        {
+            var code = !string.IsNullOrWhiteSpace(opt!.Code)
+                ? opt.Code.Trim().ToUpperInvariant()
+                : AbbreviateOption(opt.Value);
+
+            if (!string.IsNullOrEmpty(code))
+            {
+                codes.Add(code);
+            }
+        }
+
+        return codes.Count > 0 ? string.Join('-', codes) : "BASE";
+    }
+
+    private static string AbbreviateOption(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+
+        var clean = value.Trim().ToUpperInvariant();
+
+        return clean switch
+        {
+            "BLACK" => "BLK",
+            "WHITE" => "WHT",
+            "SILVER" => "SLV",
+            "BLUE" => "BLU",
+            "GREEN" => "GRN",
+            "RED" => "RED",
+            "GOLD" => "GLD",
+            "GRAY" or "GREY" => "GRY",
+            "ORANGE" => "ORG",
+            "YELLOW" => "YLW",
+            "PURPLE" => "PRP",
+            "PINK" => "PNK",
+            "MIDNIGHT BLACK" => "MBLK",
+            "SPACE GRAY" or "SPACE GREY" => "SGRY",
+            "ASH GRAY" or "ASH GREY" => "AGRY",
+            "DARK BLUE" => "DBLU",
+            "NAVY BLUE" => "NVY",
+            _ => ExtractGeneralOption(clean)
+        };
+    }
+
+    private static string ExtractGeneralOption(string clean)
+    {
+        var words = Regex.Matches(clean, @"[A-Za-z0-9]+")
+            .Select(m => m.Value)
+            .ToList();
+
+        if (words.Count == 0) return "";
+
+        if (words.Any(w => w.Any(char.IsAsciiDigit)))
+        {
+            var combined = string.Concat(words);
+            return combined.Length <= 5 ? combined : combined[..5];
+        }
+
+        if (words.Count == 1)
+        {
+            return words[0].Length <= 4 ? words[0] : words[0][..3];
+        }
+
+        var initials = string.Concat(words.Select(w => w[0]));
+        return initials.Length <= 4 ? initials : initials[..4];
     }
     public static void ValidateFields(IReadOnlyList<ValueField> fields, string? swatch)
     {

@@ -23,7 +23,7 @@ internal static class ApplicationPipeline
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
-        app.Use(JASIntWeb.Services.OrderAccess.ProtectAsync);
+        app.Use(OrderAccess.ProtectAsync);
         app.UseOutputCache();
         app.UseMiddleware<MetaAttributionMiddleware>();
         app.UseMiddleware<CartRequestMiddleware>();
