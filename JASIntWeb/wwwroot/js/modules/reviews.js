@@ -90,8 +90,10 @@ function createReviewCardHtml(review, isPending = false) {
         ? `<span>•</span><span class="text-emerald-700 font-semibold">✓ Verified Buyer</span>`
         : '';
 
+    const idAttr = review.id ? `data-review-id="${escapeHtml(review.id)}"` : '';
+
     return `
-        <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-300 animate-fadeIn" data-review-pending="${isPending ? 'true' : 'false'}">
+        <div class="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-300 animate-fadeIn" data-review-pending="${isPending ? 'true' : 'false'}" ${idAttr}>
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-0.5 text-xs" aria-label="${rating} out of 5 stars">
@@ -121,6 +123,11 @@ function insertReview(review, isPending = false) {
     const container = document.getElementById('reviews-container');
     if (!container) return;
 
+    // Guarantee that at most ONE pending card exists for this author
+    if (isPending) {
+        container.querySelectorAll('[data-review-pending="true"]').forEach(el => el.remove());
+    }
+
     const placeholder = document.getElementById('no-reviews-placeholder');
     if (placeholder) {
         placeholder.classList.add('hidden');
@@ -140,6 +147,7 @@ function insertReview(review, isPending = false) {
 
 /**
  * Restores any locally stored pending reviews for this product on page load.
+ * Only shown to the author on their device, and automatically removed once approved.
  */
 function restorePendingReviews() {
     const section = document.getElementById('reviews');
@@ -150,17 +158,42 @@ function restorePendingReviews() {
     try {
         const raw = localStorage.getItem(`jas_pending_review_${productId}`);
         if (!raw) return;
-        const storedList = JSON.parse(raw);
-        const reviews = Array.isArray(storedList) ? storedList : [storedList];
+        const stored = JSON.parse(raw);
+        // Handle array or single object - take the most recent
+        const rev = Array.isArray(stored) ? stored[stored.length - 1] : stored;
+        if (!rev || !rev.comment) return;
 
+        // Check if this review was already approved by an admin and rendered in the DOM
+        const list = document.getElementById('reviews-list');
+        if (list) {
+            let alreadyApproved = false;
+            if (rev.id) {
+                const elById = list.querySelector(`[data-review-id="${rev.id}"]`);
+                if (elById) alreadyApproved = true;
+            }
+            if (!alreadyApproved) {
+                const cleanComment = (rev.comment || '').trim().toLowerCase();
+                const cleanAuthor = (rev.customerName || '').trim().toLowerCase();
+                list.querySelectorAll('[data-review-id]').forEach(el => {
+                    const author = el.querySelector('.font-semibold.text-slate-800')?.textContent?.trim().toLowerCase();
+                    const comment = el.querySelector('p.text-slate-700')?.textContent?.trim().toLowerCase();
+                    if (author === cleanAuthor && comment === cleanComment) {
+                        alreadyApproved = true;
+                    }
+                });
+            }
+            if (alreadyApproved) {
+                // The review is now officially approved and visible from server
+                localStorage.removeItem(`jas_pending_review_${productId}`);
+                return;
+            }
+        }
+
+        // Only insert if not already present
         const existingPending = document.querySelectorAll('[data-review-pending="true"]');
         if (existingPending.length > 0) return;
 
-        reviews.forEach(rev => {
-            if (rev && rev.comment) {
-                insertReview(rev, true);
-            }
-        });
+        insertReview(rev, true);
     } catch {
         // Ignore localStorage parsing errors
     }
@@ -267,12 +300,12 @@ async function handleReviewSubmit(event) {
 
             insertReview(reviewData, true);
 
-            // 5. Save pending review into localStorage so it persists across refreshes
+            // 5. Save pending review into localStorage so it persists across refreshes for the author only
             const section = document.getElementById('reviews');
             const productId = section?.getAttribute('data-product-id');
             if (productId) {
                 try {
-                    localStorage.setItem(`jas_pending_review_${productId}`, JSON.stringify([reviewData]));
+                    localStorage.setItem(`jas_pending_review_${productId}`, JSON.stringify(reviewData));
                 } catch {
                     // Ignore localStorage quota errors
                 }

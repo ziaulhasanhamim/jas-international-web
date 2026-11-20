@@ -464,12 +464,6 @@ else
                                                 @rev.Rating.0 ★
                                             </span>
                                             <strong class="text-xs font-bold text-slate-900">@(rev.Title ?? "Customer Review")</strong>
-                                            @if (!rev.IsApproved)
-                                            {
-                                                <span class="inline-flex items-center text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                                                    ⏳ Pending Moderation
-                                                </span>
-                                            }
                                         </div>
                                         <span class="text-[11px] text-slate-400">@rev.CreatedAt.ToString("dd MMM yyyy")</span>
                                     </div>
@@ -676,22 +670,9 @@ else
     {
         if (product is null) return;
         await using var db = await DbFactory.CreateDbContextAsync();
-        var isAdmin = HttpContext?.User.IsInRole("Admin") ?? false;
         reviews = await db.ProductReviews.AsNoTracking()
-            .Where(r => r.ProductId == product.Id && (r.IsApproved || isAdmin))
+            .Where(r => r.ProductId == product.Id && r.IsApproved)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
-
-        if (QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("review"))
-        {
-            var recentPending = await db.ProductReviews.AsNoTracking()
-                .Where(r => r.ProductId == product.Id && !r.IsApproved && r.CreatedAt >= DateTimeOffset.UtcNow.AddMinutes(-5))
-                .OrderByDescending(r => r.CreatedAt)
-                .FirstOrDefaultAsync();
-            if (recentPending != null && !reviews.Any(r => r.Id == recentPending.Id))
-            {
-                reviews.Insert(0, recentPending);
-            }
-        }
     }
 }
