@@ -1,19 +1,69 @@
+@using JASIntWeb.Client.Dtos
+@using JASIntWeb.Components.Common
+
 @if (Products.Count > 0)
 {
     <aside class="min-w-0" aria-labelledby="related-products-title">
         <div class="mb-4 flex items-center justify-between gap-3">
-            <h2 id="related-products-title" class="text-xl font-bold text-slate-900">Related products</h2>
-            <a href="/category/@CategorySlug" class="text-xs font-semibold text-blue-700">View all →</a>
+            <h2 id="related-products-title" class="text-lg sm:text-xl font-bold text-slate-900">Related products</h2>
+            <a href="/category/@CategorySlug" class="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition">View all →</a>
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             @foreach (var item in Products)
             {
-                <ProductCard @key="item.Id" Product="item" />
+                var hasDiscount = item.OriginalPrice.HasValue && item.OriginalPrice.Value > item.Price;
+                var discountAmount = hasDiscount ? (item.OriginalPrice!.Value - item.Price) : 0m;
+
+                <a href="/product/@item.Slug"
+                   @key="item.Id"
+                   class="group flex items-center gap-3.5 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200">
+                    <!-- Product Thumbnail -->
+                    <div class="size-16 sm:size-20 shrink-0 rounded-xl bg-slate-50 p-1 flex items-center justify-center border border-slate-100/80 overflow-hidden">
+                        <PictureImage Src="@item.Image"
+                                      Alt="@item.Name"
+                                      Class="size-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                      Width="80"
+                                      Height="80"
+                                      Loading="lazy" />
+                    </div>
+
+                    <!-- Product Information -->
+                    <div class="flex-1 min-w-0 flex flex-col justify-center">
+                        <h3 class="text-sm sm:text-[15px] font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1 leading-snug">
+                            @item.Name
+                        </h3>
+
+                        <!-- Price Row -->
+                        <div class="flex items-baseline gap-2 mt-0.5">
+                            <strong class="text-sm sm:text-base font-bold text-slate-900">
+                                ৳ @item.Price.ToString("N0")
+                            </strong>
+                            @if (hasDiscount)
+                            {
+                                <span class="text-xs text-slate-400 line-through">
+                                    ৳@item.OriginalPrice!.Value.ToString("N0")
+                                </span>
+                            }
+                        </div>
+
+                        <!-- Discount Pill -->
+                        @if (hasDiscount)
+                        {
+                            <div class="mt-1.5">
+                                <span class="inline-flex items-center text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                                    ৳ @discountAmount.ToString("N0") OFF
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </a>
             }
         </div>
     </aside>
 }
+
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ProductSummaryDto> Products { get; set; } = [];
     [Parameter, EditorRequired] public string CategorySlug { get; set; } = "";
 }
+
