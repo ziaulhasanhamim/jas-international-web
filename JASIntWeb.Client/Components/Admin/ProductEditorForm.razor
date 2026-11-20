@@ -1,60 +1,307 @@
 @implements IAsyncDisposable
-<PageTitle>@(Id == 0 ? "Add product" : "Edit product") — JAS Admin</PageTitle>
-<AdminPageHeader Title="@(Id == 0 ? "Add product" : state.Draft.Information.Name)" Description="Save details, options and selected variants together. Existing stock movements stay explicit." ActionHref="/admin/products" ActionText="Back to products" />
+<PageTitle>@(Id == 0 ? "Add product" : state.Draft.Information.Name) — JAS Admin</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@state.Dirty" OnBeforeInternalNavigation="BeforeNavigation" />
+
+<!-- Recovery Notice -->
 @if (restoredFromDraft && state.Dirty)
 {
-    <div class="editor-recovery flex items-center justify-between p-3 mb-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800" role="status">
-        <span class="flex items-center gap-1.5 font-medium">
+    <div class="flex items-center justify-between p-3.5 mb-5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 shadow-xs animate-fadeIn" role="status">
+        <span class="flex items-center gap-2 font-medium">
             <svg class="size-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             Restored unsaved draft from local storage.
         </span>
-        <button type="button" class="text-xs font-semibold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer" @onclick="DiscardDraft">Discard draft</button>
+        <button type="button" class="text-xs font-bold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer" @onclick="DiscardDraft">Discard draft</button>
     </div>
 }
+
+<!-- Save Success Toast -->
 @if (state.Message is not null)
 {
-    <div class="@(state.Phase == EditorPhase.Saved ? "editor-success" : "form-error")" role="@(state.Phase == EditorPhase.Saved ? "status" : "alert")">@state.Message</div>
+    <div class="mb-5 rounded-2xl p-4 text-xs font-semibold flex items-center justify-between shadow-xs animate-fadeIn @(state.Phase == EditorPhase.Saved ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "border border-rose-200 bg-rose-50 text-rose-800")" role="@(state.Phase == EditorPhase.Saved ? "status" : "alert")">
+        <span>@(state.Phase == EditorPhase.Saved ? "✓ " : "⚠ ")@state.Message</span>
+        <button type="button" class="font-bold opacity-60 hover:opacity-100 p-1 cursor-pointer" @onclick="() => state.Message = null">✕</button>
+    </div>
 }
-@if (state.Errors.Count > 0) { <ul class="editor-error-list" role="alert">@foreach (var error in state.Errors) { <li><strong>@error.Key:</strong> @string.Join(" ", error.Value)</li> }</ul> }
+
+<!-- Error List -->
+@if (state.Errors.Count > 0)
+{
+    <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-xs" role="alert">
+        <h4 class="text-xs font-bold text-rose-800 mb-1.5">Please correct the following errors:</h4>
+        <ul class="text-xs text-rose-700 space-y-1 list-disc list-inside">
+            @foreach (var error in state.Errors)
+            {
+                <li><strong>@error.Key:</strong> @string.Join(" ", error.Value)</li>
+            }
+        </ul>
+    </div>
+}
+
+<!-- Revision Conflict Recovery -->
 @if (state.Phase == EditorPhase.Conflict)
 {
-    <div class="editor-recovery"><p>Your draft is retained. Compare the latest product before replacing it.</p><button type="button" class="shop-button-secondary" @onclick="ReviewLatest">Review latest</button><button type="button" class="shop-button-secondary" @onclick="Export">Download draft</button>
-    @if (latest is not null) { <p>Latest revision: @latest.Draft.Revision · Your revision: @state.Draft.Revision</p><button type="button" class="brand-text-action" @onclick="UseLatest">Replace draft with latest (confirm)</button><a href="@($"/admin/products/{Id}/edit")" target="_blank">Open latest in another tab ↗</a> }</div>
+    <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-xs space-y-3">
+        <p class="text-xs font-semibold text-amber-900">Your draft is retained. Compare the latest product before replacing it.</p>
+        <div class="flex items-center gap-2">
+            <button type="button" class="btn-secondary text-xs cursor-pointer" @onclick="ReviewLatest">Review latest</button>
+            <button type="button" class="btn-secondary text-xs cursor-pointer" @onclick="Export">Download draft</button>
+        </div>
+        @if (latest is not null)
+        {
+            <div class="pt-2 border-t border-amber-200/80 text-xs text-amber-800 space-y-2">
+                <p>Latest revision: @latest.Draft.Revision · Your revision: @state.Draft.Revision</p>
+                <button type="button" class="btn-primary text-xs !bg-amber-600 hover:!bg-amber-700 cursor-pointer" @onclick="UseLatest">Replace draft with latest (confirm)</button>
+                <a href="@($"/admin/products/{Id}/edit")" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline ml-3">Open latest in another tab ↗</a>
+            </div>
+        }
+    </div>
 }
-@if (state.Phase == EditorPhase.SessionExpired) { <p><a href="/account/login" target="_blank">Sign in again ↗</a> then check the operation or retry. <button type="button" class="brand-text-action" @onclick="Export">Download draft</button></p> }
-@if (reloadRequired) { <button type="button" class="shop-button-secondary" @onclick="Reload">Reload saved product</button> }
+
+@if (state.Phase == EditorPhase.SessionExpired)
+{
+    <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 font-medium">
+        Session expired. <a href="/account/login" target="_blank" class="font-bold underline">Sign in again ↗</a> then retry save.
+        <button type="button" class="btn-secondary text-xs ml-3" @onclick="Export">Download draft</button>
+    </div>
+}
+
+@if (reloadRequired)
+{
+    <div class="mb-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 flex items-center justify-between text-xs text-blue-800">
+        <span>The product was updated and requires a reload.</span>
+        <button type="button" class="btn-primary text-xs !bg-blue-600 hover:!bg-blue-700 cursor-pointer" @onclick="Reload">Reload saved product</button>
+    </div>
+}
+
 @if (uncertain)
 {
-    <div class="editor-recovery"><p>A previous request has not been confirmed. The submitted draft is retained; retry uses the same operation ID.</p><button type="button" class="shop-button-secondary" disabled="@state.Busy" @onclick="CheckOperation">Check save status</button><button type="button" class="shop-button-secondary" disabled="@(state.Busy || !retryAllowed)" @onclick="Retry">Retry same request</button><button type="button" class="brand-text-action" @onclick="Export">Download draft</button></div>
+    <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xs space-y-3 text-xs text-amber-900">
+        <p class="font-semibold">A previous request has not been confirmed. The submitted draft is retained; retry uses the same operation ID.</p>
+        <div class="flex items-center gap-2">
+            <button type="button" class="btn-secondary text-xs cursor-pointer" disabled="@state.Busy" @onclick="CheckOperation">Check save status</button>
+            <button type="button" class="btn-secondary text-xs cursor-pointer" disabled="@(state.Busy || !retryAllowed)" @onclick="Retry">Retry same request</button>
+            <button type="button" class="btn-secondary text-xs cursor-pointer" @onclick="Export">Download draft</button>
+        </div>
+    </div>
 }
+
 @if (state.Data is null)
 {
-    <p class="admin-empty">@(state.Phase == EditorPhase.Loading ? "Loading product editor…" : "The editor could not be loaded.")</p>
-    @if (!state.Busy) { <button type="button" class="shop-button-secondary" @onclick="Reload">Reload editor</button> }
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-600">@(state.Phase == EditorPhase.Loading ? "Loading product editor…" : "The editor could not be loaded.")</p>
+        @if (!state.Busy)
+        {
+            <button type="button" class="btn-secondary text-xs mt-3 cursor-pointer" @onclick="Reload">Reload editor</button>
+        }
+    </div>
 }
 else
 {
-    <form data-admin-draft="product" @onsubmit="Save" @onsubmit:preventDefault novalidate>
+    <form data-admin-draft="product" @onsubmit="Save" @onsubmit:preventDefault novalidate class="space-y-6">
         <fieldset disabled="@(Disabled || uncertain || stockVariant is not null)">
-            <div class="editor-savebar"><label class="shop-label">Status<select class="shop-input" value="@(state.Draft.Information.Hidden ? "true" : "false")" @onchange="e => Change(d => d.Information.Hidden = bool.Parse(e.Value!.ToString()!))"><option value="true">Draft</option><option value="false">Published</option></select></label>
-            <span class="admin-help">@(state.Dirty ? "Unsaved changes" : state.Draft.Id == 0 ? "New draft" : "Saved")</span><button type="submit" class="shop-button">@(state.Phase == EditorPhase.Saving ? "Saving…" : "Save product")</button></div>
-            <nav class="admin-tabs product-editor-tabs" aria-label="Product editor sections">@foreach (var section in sections) { <button type="button" aria-current="@(tab == section.Key ? "page" : null)" @onclick="() => tab = section.Key">@section.Value</button> }</nav>
-            <div hidden="@(tab != "details")"><ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" /></div>
-            <div hidden="@(tab != "options")"><ProductEditorAttributes Attributes="state.Draft.Attributes" Templates="state.Data.Templates" Changed="AttributeChanged" Added="AddAttribute" Move="MoveAttribute" RefreshTemplates="RefreshTemplates" /></div>
-            <div hidden="@(tab != "variants")"><ProductCombinationPicker Draft="state.Draft" Page="preview" Preview="Preview" Stage="Stage" Restore="RestoreVariant" Map="MapVariant" />
-                <ProductEditorVariantRows Draft="state.Draft" Errors="state.Errors" Changed="VariantChanged" Default="SetDefault" Stock="OpenStock" Archive="ArchiveVariant" Standard="AddStandard" /></div>
-            <div hidden="@(tab != "content")"><ProductEditorSeo Information="state.Draft.Information" BaseUrl="@state.Data.PublicBaseUrl" Changed="InfoChanged" UploadBusy="UploadBusy" /></div>
-            <aside class="editor-readiness"><h3>Before publishing</h3><p class="admin-help">Drafts need a name and category. Publishing also needs a cover image, description, and one active default variant with a positive price. Sold-out variants are allowed.</p></aside>
-            <div class="form-actions"><button type="submit" class="shop-button">Save product</button><button type="button" class="shop-button-secondary" @onclick="Export">Download draft</button></div>
+
+            <!-- Industry Standard Sticky Command Header (Amazon/Shopify Style) -->
+            <div class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5 min-w-0">
+                    <a href="/admin/products" class="size-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs transition cursor-pointer" title="Back to products">
+                        ←
+                    </a>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h1 class="text-base sm:text-lg font-black text-slate-900 truncate max-w-xs sm:max-w-md">
+                                @(string.IsNullOrWhiteSpace(state.Draft.Information.Name) ? (Id == 0 ? "Add New Product" : "Untitled Product") : state.Draft.Information.Name)
+                            </h1>
+                            <!-- Status Pill -->
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold @(state.Draft.Information.Hidden ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200")">
+                                @(state.Draft.Information.Hidden ? "Draft" : "Published")
+                            </span>
+                        </div>
+                        <!-- Dirty / Saved Indicator -->
+                        <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                            @if (state.Phase == EditorPhase.Saving)
+                            {
+                                <span class="text-blue-600 font-semibold flex items-center gap-1">
+                                    <span class="inline-block animate-spin">⏳</span> Saving product...
+                                </span>
+                            }
+                            else if (state.Dirty)
+                            {
+                                <span class="text-amber-600 font-semibold flex items-center gap-1">
+                                    <span class="size-2 rounded-full bg-amber-500 animate-pulse"></span> Unsaved changes
+                                </span>
+                            }
+                            else if (state.Draft.Id == 0)
+                            {
+                                <span class="text-slate-400">New product draft</span>
+                            }
+                            else
+                            {
+                                <span class="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <span>✓</span> All changes saved
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex items-center gap-3">
+                    <label class="sr-only" for="product-status-selector">Product Status</label>
+                    <select id="product-status-selector" class="shop-input text-xs w-32 !py-2 font-semibold"
+                            value="@(state.Draft.Information.Hidden ? "true" : "false")"
+                            @onchange="e => Change(d => d.Information.Hidden = bool.Parse(e.Value!.ToString()!))">
+                        <option value="true">Draft</option>
+                        <option value="false">Published</option>
+                    </select>
+
+                    @if (Id > 0 && !state.Draft.Information.Hidden && !string.IsNullOrEmpty(state.Draft.Information.Slug))
+                    {
+                        <a href="@($"/product/{state.Draft.Information.Slug}")" target="_blank" class="btn-secondary text-xs !py-2 !px-3 font-semibold inline-flex items-center gap-1 cursor-pointer" title="View product on storefront">
+                            <span>View Store ↗</span>
+                        </a>
+                    }
+
+                    <button type="submit"
+                            id="save-product-top-btn"
+                            class="btn-primary !bg-blue-600 hover:!bg-blue-700 !py-2 !px-5 text-xs font-bold shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            disabled="@(Disabled || state.Phase == EditorPhase.Saving)">
+                        @if (state.Phase == EditorPhase.Saving)
+                        {
+                            <span class="inline-block animate-spin">⏳</span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Product</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modern Segmented Pill Tabs Navigation -->
+            <nav class="flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 mb-6 overflow-x-auto" aria-label="Product editor sections">
+                <button type="button"
+                        class="flex-1 min-w-[120px] py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer @(tab == "details" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900")"
+                        aria-current="@(tab == "details" ? "page" : null)"
+                        @onclick='() => tab = "details"'>
+                    <span>📋 Details</span>
+                </button>
+
+                <button type="button"
+                        class="flex-1 min-w-[140px] py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer @(tab == "options" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900")"
+                        aria-current="@(tab == "options" ? "page" : null)"
+                        @onclick='() => tab = "options"'>
+                    <span>🎨 Options &amp; Attributes</span>
+                    <span class="size-5 rounded-full text-[10px] font-bold flex items-center justify-center @(tab == "options" ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600")">
+                        @state.Draft.Attributes.Count(a => !a.Retired)
+                    </span>
+                </button>
+
+                <button type="button"
+                        class="flex-1 min-w-[140px] py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer @(tab == "variants" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900")"
+                        aria-current="@(tab == "variants" ? "page" : null)"
+                        @onclick='() => tab = "variants"'>
+                    <span>📦 Variants &amp; Stock</span>
+                    <span class="size-5 rounded-full text-[10px] font-bold flex items-center justify-center @(tab == "variants" ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600")">
+                        @state.Draft.Variants.Count(v => !v.Archived)
+                    </span>
+                </button>
+
+                <button type="button"
+                        class="flex-1 min-w-[120px] py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer @(tab == "content" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900")"
+                        aria-current="@(tab == "content" ? "page" : null)"
+                        @onclick='() => tab = "content"'>
+                    <span>🔍 Content &amp; SEO</span>
+                </button>
+            </nav>
+
+            <!-- Tab Content Panes -->
+            <div hidden="@(tab != "details")">
+                <ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" />
+            </div>
+
+            <div hidden="@(tab != "options")">
+                <ProductEditorAttributes Attributes="state.Draft.Attributes" Templates="state.Data.Templates" Changed="AttributeChanged" Added="AddAttribute" Move="MoveAttribute" RefreshTemplates="RefreshTemplates" />
+            </div>
+
+            <div hidden="@(tab != "variants")">
+                <ProductCombinationPicker Draft="state.Draft" Page="preview" Preview="Preview" Stage="Stage" Restore="RestoreVariant" Map="MapVariant" />
+                <ProductEditorVariantRows Draft="state.Draft" Errors="state.Errors" Changed="VariantChanged" Default="SetDefault" Stock="OpenStock" Archive="ArchiveVariant" Standard="AddStandard" />
+            </div>
+
+            <div hidden="@(tab != "content")">
+                <ProductEditorSeo Information="state.Draft.Information" BaseUrl="@state.Data.PublicBaseUrl" Changed="InfoChanged" UploadBusy="UploadBusy" />
+            </div>
+
+            <!-- Readiness Guidelines -->
+            <aside class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 mt-6">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Publishing Requirements</h4>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Drafts require only a name and category. To publish on the public storefront, the product also requires a cover image, description, and at least one active default variant with a positive selling price. Sold-out variants are permitted.
+                </p>
+            </aside>
+
+            <!-- Bottom Floating Action Bar -->
+            <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-200">
+                <button type="button" class="btn-secondary text-xs !py-2.5 !px-4 cursor-pointer" @onclick="Export">
+                    Download Draft JSON
+                </button>
+                <button type="submit" class="btn-primary !bg-blue-600 hover:!bg-blue-700 text-xs !py-2.5 !px-6 font-bold shadow-xs cursor-pointer" disabled="@(Disabled || state.Phase == EditorPhase.Saving)">
+                    @(state.Phase == EditorPhase.Saving ? "Saving Product..." : "Save Product")
+                </button>
+            </div>
         </fieldset>
     </form>
+
+    <!-- Point 2: High-Visibility Centered Modal for Unsaved Changes when Adjusting Stock -->
     @if (pendingStock is not null && stockVariant is null)
     {
-        <section class="shop-panel editor-recovery"><p>Save the product draft before adjusting stock.</p><button type="button" class="shop-button" disabled="@Disabled" @onclick="SaveAndOpenStock">Save and continue</button><button type="button" class="shop-button-secondary" @onclick="() => pendingStock = null">Keep editing</button></section>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="unsaved-stock-title">
+            <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200/90 space-y-4 animate-scaleIn">
+                <div class="flex items-start gap-3.5">
+                    <div class="size-11 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0 text-xl font-bold">
+                        ⚠️
+                    </div>
+                    <div>
+                        <h3 id="unsaved-stock-title" class="text-base font-bold text-slate-900">Save Product to Adjust Stock</h3>
+                        <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                            You have unsaved changes in this product draft. To record an official inventory ledger movement, your draft must be saved first.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                    <button type="button" class="btn-secondary text-xs !py-2 !px-4 font-semibold cursor-pointer" @onclick="() => pendingStock = null">
+                        Cancel &amp; Keep Editing
+                    </button>
+                    <button type="button"
+                            class="btn-primary text-xs !py-2 !px-5 !bg-blue-600 hover:!bg-blue-700 font-bold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            disabled="@Disabled"
+                            @onclick="SaveAndOpenStock">
+                        @if (state.Phase == EditorPhase.Saving)
+                        {
+                            <span class="inline-block animate-spin">⏳</span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save &amp; Open Stock Adjustment</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
     }
+
+    <!-- Stock Adjustment Modal -->
     @if (stockVariant is not null)
     {
-        <ProductEditorStockDialog ProductId="state.Draft.Id" Variant="stockVariant" Busy="@(state.Busy || uncertain)" Message="@stockMessage" Save="Stock" Refresh="RefreshStock" Cancel="() => { stockVariant = null; stockMessage = null; }" />
+        <ProductEditorStockDialog ProductId="state.Draft.Id"
+                                  Variant="stockVariant"
+                                  Busy="@(state.Busy || uncertain)"
+                                  Message="@stockMessage"
+                                  Save="Stock"
+                                  Refresh="RefreshStock"
+                                  Cancel="() => { stockVariant = null; stockMessage = null; }" />
     }
 }

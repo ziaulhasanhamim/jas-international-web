@@ -1,39 +1,271 @@
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Client.Services
-<section class="shop-panel editor-section">
-    <h2>Options &amp; value data</h2>
-    <p class="admin-help">Add the values this product uses. Values and extra fields belong to this product; suggestions are copied, never linked.</p>
-    <div class="form-actions"><select class="shop-input" aria-label="Attribute to add" @bind="definition"><option value="0">Choose attribute</option>
-        @foreach (var template in Templates.Where(t => !Attributes.Any(a => a.DefinitionId == t.Id && !a.Retired))) { <option value="@template.Id">@template.Name</option> }
-    </select><button type="button" class="shop-button-secondary" @onclick="Add">Add attribute</button><a href="/admin/attributes" target="_blank">Manage definitions &amp; suggestions ↗</a><button type="button" class="brand-text-action" @onclick="RefreshTemplates">Refresh suggestions</button></div>
+
+<section class="space-y-6">
+    <!-- Options Header Card -->
+    <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">Options &amp; Attributes</h2>
+                <p class="text-xs text-slate-500 mt-1">
+                    Define the variation axes for this product (e.g. Color, Storage, Size). Individual variants and inventory are generated from these options.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/admin/attributes" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline">
+                    Manage templates ↗
+                </a>
+                <button type="button" class="btn-secondary !py-1.5 !px-3 text-xs font-medium cursor-pointer" @onclick="RefreshTemplates">
+                    ↻ Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Option Axis Bar -->
+        <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
+            <label class="sr-only" for="choose-attribute-select">Choose Option Attribute</label>
+            <select id="choose-attribute-select" class="shop-input text-xs w-64" @bind="definition">
+                <option value="0">Select an attribute to add (e.g. Color, Size)...</option>
+                @foreach (var template in Templates.Where(t => !Attributes.Any(a => a.DefinitionId == t.Id && !a.Retired)))
+                {
+                    <option value="@template.Id">@template.Name</option>
+                }
+            </select>
+            <button type="button" class="btn-primary !bg-blue-600 hover:!bg-blue-700 !py-2 !px-4 text-xs font-bold cursor-pointer disabled:opacity-50" disabled="@(definition == 0)" @onclick="Add">
+                + Add Option
+            </button>
+        </div>
+    </div>
+
+    @if (Attributes.Count == 0)
+    {
+        <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+            <span class="text-3xl block mb-2">🎨</span>
+            <h3 class="text-sm font-bold text-slate-800">No Options Added Yet</h3>
+            <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Does this gadget come in different colors, storage capacities, or sizes? Select an attribute above to start generating combinations.
+            </p>
+        </div>
+    }
+
+    <!-- Attributes Cards -->
     @foreach (var axis in Attributes)
     {
         var id = axis.DefinitionId;
-        <details class="editor-attribute" open="@(!axis.Retired)" @key="id">
-            <summary>@axis.Name @(axis.Retired ? "· Retired" : $"· {axis.Options.Count(o => !o.Retired)} values")</summary>
-            <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@axis.Required" @onchange="@(e => Patch(id, a => a.Required = (bool)e.Value!))" /> Selection required</label>
-                <button type="button" class="brand-text-action" @onclick="@(() => Patch(id, a => a.Retired = !a.Retired))">@(axis.Retired ? "Restore attribute" : "Retire attribute")</button>
-                <button type="button" class="brand-text-action" @onclick="@(() => Move.InvokeAsync((id, -1)))">Move up</button><button type="button" class="brand-text-action" @onclick="@(() => Move.InvokeAsync((id, 1)))">Move down</button></div>
-            <ProductMetadataSchema Fields="axis.Fields" SwatchField="@axis.SwatchField" Changed="@(fields => Patch(id, a => a.Fields = fields))" SwatchChanged="@(key => Patch(id, a => a.SwatchField = key))" />
-            @foreach (var option in axis.Options)
-            {
-                var key = option.ClientId;
-                <div class="editor-option-card" @key="key">
-                    <label class="shop-label">@axis.Name value<input class="shop-input" value="@option.Value" maxlength="200" @oninput="@(e => Patch(id, a => Find(a, key).Value = e.Value?.ToString() ?? ""))" /></label>
-                    @if (!string.IsNullOrEmpty(option.Code)) { <small class="admin-help">Selection code: @option.Code</small> }
-                    <ProductMetadataValues Fields="axis.Fields" Values="option.Metadata" Changed="@(change => Patch(id, a => Find(a, key).Metadata[change.Key] = change.Value))" />
-                    <div class="form-actions"><button type="button" class="brand-text-action" @onclick="@(() => Patch(id, a => { if (Find(a, key).Id == 0) a.Options.Remove(Find(a, key)); else Find(a, key).Retired = !Find(a, key).Retired; }))">@(option.Id == 0 ? "Remove unsaved value" : option.Retired ? "Restore value" : "Retire value")</button>
-                    <button type="button" class="brand-text-action" @onclick="@(() => MoveValue(id, key, -1))">Move up</button><button type="button" class="brand-text-action" @onclick="@(() => MoveValue(id, key, 1))">Move down</button>
-                    @if (option.Retired) { <span class="admin-help">Retired — historical selections are preserved.</span> }</div>
+        var activeOptions = axis.Options.Where(o => !o.Retired).ToList();
+        var retiredOptions = axis.Options.Where(o => o.Retired).ToList();
+        var template = Templates.FirstOrDefault(t => t.Id == id);
+        var unaddedSuggestions = (template?.Suggestions ?? [])
+            .Where(s => !axis.Options.Any(o => !o.Retired && string.Equals(o.Value, s.Value, StringComparison.OrdinalIgnoreCase)))
+            .Take(8)
+            .ToList();
+
+        <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs p-6 mb-5 transition-all @(axis.Retired ? "opacity-60 bg-slate-50" : "")" @key="id">
+            <!-- Attribute Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <span class="size-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                        @(axis.Name.Length > 0 ? axis.Name[0].ToString().ToUpper() : "O")
+                    </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-bold text-slate-900">@axis.Name</h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                                @activeOptions.Count @(activeOptions.Count == 1 ? "value" : "values")
+                            </span>
+                            @if (axis.Retired)
+                            {
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Retired
+                                </span>
+                            }
+                        </div>
+                    </div>
                 </div>
-            }
-            <div class="form-actions"><button type="button" class="shop-button-secondary" disabled="@(axis.Options.Count(o => !o.Retired) >= 100)" @onclick="@(() => Patch(id, a => a.Options.Add(new())))">Add custom value</button>
-            <select class="shop-input" aria-label="@($"Suggested {axis.Name} values")" value="0" @onchange="@(e => Suggest(id, e))"><option value="0">Copy suggested value…</option>
-                @foreach (var suggestion in Templates.FirstOrDefault(t => t.Id == id)?.Suggestions ?? []) { <option value="@suggestion.SuggestionId">@suggestion.Value</option> }
-            </select></div>
-        </details>
+
+                <!-- Attribute Level Controls -->
+                <div class="flex items-center gap-3">
+                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                               checked="@axis.Required"
+                               @onchange="@(e => Patch(id, a => a.Required = (bool)e.Value!))" />
+                        <span>Selection required</span>
+                    </label>
+
+                    <div class="flex items-center border-l border-slate-200 pl-3 gap-1">
+                        <button type="button" class="size-7 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                                title="Move up"
+                                @onclick="@(() => Move.InvokeAsync((id, -1)))">
+                            ↑
+                        </button>
+                        <button type="button" class="size-7 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                                title="Move down"
+                                @onclick="@(() => Move.InvokeAsync((id, 1)))">
+                            ↓
+                        </button>
+                        <button type="button" class="ml-2 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                                @onclick="@(() => Patch(id, a => a.Retired = !a.Retired))">
+                            @(axis.Retired ? "Restore" : "Remove")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Values List -->
+            <div class="mt-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Configured Values (@activeOptions.Count)
+                    </label>
+                    @if (!string.IsNullOrEmpty(axis.SwatchField))
+                    {
+                        <span class="text-[11px] text-slate-400">Color swatch enabled</span>
+                    }
+                </div>
+
+                @if (activeOptions.Count > 0)
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach (var option in activeOptions)
+                        {
+                            var key = option.ClientId;
+                            var swatchHex = !string.IsNullOrEmpty(axis.SwatchField) && option.Metadata.TryGetValue(axis.SwatchField, out var hexVal) ? hexVal : null;
+
+                            <div class="group flex items-center justify-between gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-blue-300 hover:shadow-xs transition" @key="key">
+                                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                    @if (!string.IsNullOrEmpty(axis.SwatchField))
+                                    {
+                                        <div class="relative size-6 shrink-0 rounded-full border border-slate-300 shadow-2xs overflow-hidden cursor-pointer" style="@($"background-color: {swatchHex ?? "#1e293b"}")" title="Click to pick swatch color">
+                                            <input type="color" class="absolute inset-0 opacity-0 cursor-pointer size-full"
+                                                   value="@(IsColor(swatchHex) ? swatchHex : "#000000")"
+                                                   @oninput="@(e => Patch(id, a => Find(a, key).Metadata[axis.SwatchField] = e.Value?.ToString() ?? ""))" />
+                                        </div>
+                                    }
+
+                                    <input class="field !py-1 text-xs font-semibold text-slate-800 bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 transition min-w-0 flex-1"
+                                           value="@option.Value"
+                                           maxlength="200"
+                                           placeholder="Value name..."
+                                           @oninput="@(e => Patch(id, a => Find(a, key).Value = e.Value?.ToString() ?? ""))" />
+                                </div>
+
+                                <!-- Action Buttons: Delete / Move -->
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <button type="button"
+                                            class="size-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center text-[10px] transition cursor-pointer"
+                                            title="Move left"
+                                            @onclick="@(() => MoveValue(id, key, -1))">
+                                        ←
+                                    </button>
+                                    <button type="button"
+                                            class="size-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center text-[10px] transition cursor-pointer"
+                                            title="Move right"
+                                            @onclick="@(() => MoveValue(id, key, 1))">
+                                        →
+                                    </button>
+                                    <!-- Dedicated Deletion Button -->
+                                    <button type="button"
+                                            class="size-6 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                                            title="Delete value"
+                                            @onclick="@(() => DeleteOption(id, key))">
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-xs text-slate-400 italic">No values added for this option yet. Type a value below to add one.</p>
+                }
+
+                @if (retiredOptions.Count > 0)
+                {
+                    <div class="mt-3 pt-3 border-t border-slate-100">
+                        <span class="text-[11px] font-medium text-slate-400 block mb-2">Retired Values (retained for historical orders):</span>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach (var ropt in retiredOptions)
+                            {
+                                var rkey = ropt.ClientId;
+                                <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs bg-slate-100 text-slate-500 line-through">
+                                    @ropt.Value
+                                    <button type="button" class="text-blue-600 hover:underline text-[10px] font-bold not-italic cursor-pointer" @onclick="@(() => Patch(id, a => Find(a, rkey).Retired = false))">
+                                        Restore
+                                    </button>
+                                </span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Unified Single Input to Add Value (Point 3) -->
+                <div class="mt-4 pt-4 border-t border-slate-100">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5" for="@($"attr-input-{id}")">
+                        Add @axis.Name Value
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input id="@($"attr-input-{id}")"
+                               type="text"
+                               list="@($"attr-suggestions-{id}")"
+                               class="shop-input text-xs flex-1"
+                               placeholder="@($"Type a {axis.Name} (e.g. {GetExamplePlaceholder(axis.Name)}) or choose suggestion...")"
+                               value="@GetNewValueText(id)"
+                               @oninput="@(e => SetNewValueText(id, e.Value?.ToString() ?? ""))"
+                               @onkeydown="@(e => HandleKeyDown(id, e))" />
+
+                        <datalist id="@($"attr-suggestions-{id}")">
+                            @foreach (var suggestion in template?.Suggestions ?? [])
+                            {
+                                <option value="@suggestion.Value">@suggestion.Value</option>
+                            }
+                        </datalist>
+
+                        <button type="button"
+                                class="btn-primary !bg-blue-600 hover:!bg-blue-700 !py-2 !px-4 text-xs font-bold shrink-0 cursor-pointer disabled:opacity-50"
+                                disabled="@string.IsNullOrWhiteSpace(GetNewValueText(id))"
+                                @onclick="() => AddUnifiedValue(id)">
+                            + Add Value
+                        </button>
+                    </div>
+
+                    <!-- 1-Click Fast Suggestions Pills -->
+                    @if (unaddedSuggestions.Count > 0)
+                    {
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                            <span class="text-[11px] font-semibold text-slate-400">Popular Suggestions:</span>
+                            @foreach (var sug in unaddedSuggestions)
+                            {
+                                var sugVal = sug.Value;
+                                var sugHex = !string.IsNullOrEmpty(axis.SwatchField) && sug.Metadata.TryGetValue(axis.SwatchField, out var h) ? h : null;
+                                <button type="button"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border border-slate-200/60 transition cursor-pointer"
+                                        @onclick="() => AddUnifiedValue(id, sugVal)">
+                                    @if (!string.IsNullOrEmpty(sugHex))
+                                    {
+                                        <span class="size-2.5 rounded-full border border-slate-300" style="@($"background-color:{sugHex}")"></span>
+                                    }
+                                    <span>+ @sugVal</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Advanced Extra Value Fields (Collapsible Disclosure) -->
+                <details class="mt-4 pt-3 border-t border-slate-100 text-xs">
+                    <summary class="font-semibold text-slate-500 hover:text-slate-800 cursor-pointer select-none">
+                        ⚙️ Advanced: Extra schema fields &amp; presentation
+                    </summary>
+                    <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+                        <ProductMetadataSchema Fields="axis.Fields" SwatchField="@axis.SwatchField" Changed="@(fields => Patch(id, a => a.Fields = fields))" SwatchChanged="@(key => Patch(id, a => a.SwatchField = key))" />
+                    </div>
+                </details>
+            </div>
+        </div>
     }
 </section>
+
 @code {
     [Parameter] public List<EditorAttribute> Attributes { get; set; } = [];
     [Parameter] public List<EditorAttributeTemplate> Templates { get; set; } = [];
@@ -41,23 +273,125 @@
     [Parameter] public EventCallback<EditorAttribute> Added { get; set; }
     [Parameter] public EventCallback<(int Id, int Step)> Move { get; set; }
     [Parameter] public EventCallback RefreshTemplates { get; set; }
+
     private int definition;
+    private readonly Dictionary<int, string> newValues = [];
+
     private Task Patch(int id, Action<EditorAttribute> update) => Changed.InvokeAsync(new(id, update));
     private static EditorOption Find(EditorAttribute a, Guid key) => a.Options.Single(o => o.ClientId == key);
+
+    private string GetNewValueText(int id) => newValues.GetValueOrDefault(id, "");
+    private void SetNewValueText(int id, string value) => newValues[id] = value;
+
+    private static bool IsColor(string? value) => !string.IsNullOrEmpty(value) && System.Text.RegularExpressions.Regex.IsMatch(value, "^#[0-9A-Fa-f]{6}$");
+
+    private static string GetExamplePlaceholder(string name) => name.ToLowerInvariant() switch
+    {
+        var n when n.Contains("color") => "Space Black, Silver, Navy",
+        var n when n.Contains("size") => "S, M, L, XL",
+        var n when n.Contains("storage") => "64GB, 128GB, 256GB",
+        var n when n.Contains("ram") => "4GB, 8GB, 16GB",
+        _ => "Option value"
+    };
+
     private async Task Add()
     {
-        var template = Templates.FirstOrDefault(t => t.Id == definition); if (template is null) return;
-        await Added.InvokeAsync(new() { DefinitionId = template.Id, Name = template.Name, Fields = ProductEditorRules.Copy(template.Fields), SwatchField = template.SwatchField }); definition = 0;
+        var template = Templates.FirstOrDefault(t => t.Id == definition);
+        if (template is null) return;
+        await Added.InvokeAsync(new()
+        {
+            DefinitionId = template.Id,
+            Name = template.Name,
+            Fields = ProductEditorRules.Copy(template.Fields),
+            SwatchField = template.SwatchField
+        });
+        definition = 0;
     }
-    private Task Suggest(int id, ChangeEventArgs e)
+
+    private async Task AddUnifiedValue(int id, string? specificValue = null)
     {
-        var source = Templates.First(t => t.Id == id).Suggestions.FirstOrDefault(o => o.SuggestionId == (int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0));
-        if (source is null) return Task.CompletedTask;
-        var option = ProductEditorRules.Copy(source); option.ClientId = Guid.NewGuid(); option.Id = 0; option.Code = "";
-        var schema = Attributes.Single(a => a.DefinitionId == id).Fields.Select(f => f.Key).ToHashSet();
-        option.Metadata = option.Metadata.Where(pair => schema.Contains(pair.Key)).ToDictionary();
-        return Patch(id, a => a.Options.Add(option));
+        var text = (specificValue ?? GetNewValueText(id)).Trim();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var axis = Attributes.FirstOrDefault(a => a.DefinitionId == id);
+        if (axis is null) return;
+
+        // If this value is already active, don't duplicate
+        if (axis.Options.Any(o => !o.Retired && string.Equals(o.Value, text, StringComparison.OrdinalIgnoreCase)))
+        {
+            newValues[id] = "";
+            return;
+        }
+
+        // If it was previously retired, restore it
+        var retiredMatch = axis.Options.FirstOrDefault(o => o.Retired && string.Equals(o.Value, text, StringComparison.OrdinalIgnoreCase));
+        if (retiredMatch is not null)
+        {
+            await Patch(id, a => Find(a, retiredMatch.ClientId).Retired = false);
+            newValues[id] = "";
+            return;
+        }
+
+        var template = Templates.FirstOrDefault(t => t.Id == id);
+        var matchingSuggestion = template?.Suggestions?.FirstOrDefault(s => string.Equals(s.Value, text, StringComparison.OrdinalIgnoreCase));
+
+        EditorOption option;
+        if (matchingSuggestion is not null)
+        {
+            option = ProductEditorRules.Copy(matchingSuggestion);
+            option.ClientId = Guid.NewGuid();
+            option.Id = 0;
+            option.Code = "";
+            var schema = axis.Fields.Select(f => f.Key).ToHashSet();
+            option.Metadata = option.Metadata.Where(pair => schema.Contains(pair.Key)).ToDictionary();
+        }
+        else
+        {
+            option = new EditorOption
+            {
+                ClientId = Guid.NewGuid(),
+                Id = 0,
+                Value = text,
+                Code = ""
+            };
+            if (!string.IsNullOrEmpty(axis.SwatchField))
+            {
+                option.Metadata[axis.SwatchField] = "#1e293b";
+            }
+        }
+
+        await Patch(id, a => a.Options.Add(option));
+        newValues[id] = "";
     }
+
+    private async Task HandleKeyDown(int id, KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or "NumpadEnter")
+        {
+            await AddUnifiedValue(id);
+        }
+    }
+
+    private Task DeleteOption(int id, Guid key) => Patch(id, a =>
+    {
+        var opt = Find(a, key);
+        if (opt.Id == 0)
+        {
+            a.Options.Remove(opt);
+        }
+        else
+        {
+            opt.Retired = true;
+        }
+    });
+
     private Task MoveValue(int id, Guid key, int step) => Patch(id, a =>
-    { var index = a.Options.FindIndex(o => o.ClientId == key); var next = index + step; if (next < 0 || next >= a.Options.Count) return; var option = a.Options[index]; a.Options.RemoveAt(index); a.Options.Insert(next, option); });
+    {
+        var index = a.Options.FindIndex(o => o.ClientId == key);
+        var next = index + step;
+        if (next < 0 || next >= a.Options.Count) return;
+        var option = a.Options[index];
+        a.Options.RemoveAt(index);
+        a.Options.Insert(next, option);
+    });
 }

@@ -1,43 +1,278 @@
 @using System.Globalization
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Client.Services
-<section class="shop-panel editor-section" aria-label="Variant rows">
-    <div class="editor-inline-heading"><h2>Variants &amp; pricing</h2><span>@Draft.Variants.Count(v => !v.Archived)/100 current</span>
-    @if (!Draft.Attributes.Any(a => !a.Retired) && !Draft.Variants.Any(v => !v.Archived)) { <button type="button" class="shop-button-secondary" @onclick="Standard">Add standard variant</button> }</div>
-    <p class="admin-help">Blank SKUs are generated on save. Existing prices and stock change only when you edit them explicitly.</p>
-    <label class="check-label"><input type="checkbox" @bind="showArchived" /> Show archived variants</label>
-    @foreach (var variant in Draft.Variants.Where(v => showArchived || !v.Archived))
-    {
-        var key = variant.ClientId;
-        <details class="variant-editor editor-variant" open="@(variant.Id == 0 || Draft.Variants.Count(v => !v.Archived) == 1)" @key="key">
-            <summary>@Label(variant) · @(variant.Archived ? "Archived" : variant.Active ? "Active" : "Inactive") @(variant.Default ? "· Default" : "")</summary>
-            <fieldset disabled="@variant.Archived">
-            <div class="admin-form-grid">
-                @foreach (var axis in Draft.Attributes.Where(a => !a.Retired))
-                {
-                    var definition = axis.DefinitionId;
-                    <label class="shop-label">@axis.Name<select class="shop-input" value="@variant.Choices.GetValueOrDefault(definition)" @onchange="@(e => Patch(key, v => { if (Guid.TryParse(e.Value?.ToString(), out var option)) v.Choices[definition] = option; else v.Choices.Remove(definition); }))"><option value="@Guid.Empty">@(axis.Required ? "Choose value" : "Not applicable")</option>
-                        @foreach (var option in axis.Options) { <option value="@option.ClientId" disabled="@option.Retired">@option.Value @(option.Retired ? "(retired)" : "")</option> }
-                    </select></label>
-                }
-                <label class="shop-label">SKU<input class="shop-input" value="@variant.Sku" maxlength="100" placeholder="Generate automatically on save" @oninput="@(e => Patch(key, v => v.Sku = Text(e)))" /><small>@(string.IsNullOrWhiteSpace(variant.Sku) ? "Preview: " + ProductEditorRules.AutoSku(Draft, variant) : "Kept stable when titles or labels change")</small></label>
-                <label class="shop-label">Barcode<input class="shop-input" value="@variant.Barcode" maxlength="100" @oninput="@(e => Patch(key, v => v.Barcode = Text(e)))" /></label>
-                <label class="shop-label">Selling price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.Price)" @oninput="@(e => Patch(key, v => v.Price = Decimal(e)))" /></label>
-                <label class="shop-label">Compare-at price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.CompareAt)" @oninput="@(e => Patch(key, v => v.CompareAt = Decimal(e)))" /></label>
-                <label class="shop-label">Cost price (৳)<input class="shop-input" type="number" min="0" step="0.01" value="@Number(variant.Cost)" @oninput="@(e => Patch(key, v => v.Cost = Decimal(e)))" /></label>
-                @if (variant.Id == 0) { <label class="shop-label">Opening stock<input class="shop-input" type="number" min="0" value="@variant.OpeningStock" @oninput="@(e => Patch(key, v => v.OpeningStock = int.TryParse(Text(e), out var q) ? q : 0))" /><small>Recorded once as an initial inventory movement.</small></label> }
+
+<section class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div>
+            <div class="flex items-center gap-2">
+                <h2 class="text-lg font-bold text-slate-900">Variants &amp; Pricing Matrix</h2>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
+                    @Draft.Variants.Count(v => !v.Archived) / 100 current
+                </span>
             </div>
-            <div class="form-actions"><label class="check-label"><input type="checkbox" checked="@variant.Active" @onchange="@(e => Patch(key, v => v.Active = (bool)e.Value!))" /> Active</label>
-            <label class="check-label"><input type="checkbox" checked="@variant.Default" @onchange="@(e => Default.InvokeAsync(((bool)e.Value!, key)))" /> Default</label>
-            <button type="button" class="brand-text-action" @onclick="@(() => Patch(key, v => v.Sku = ""))">Regenerate SKU</button>
-            @if (variant.Id > 0) { <button type="button" class="shop-button-secondary" @onclick="@(() => Stock.InvokeAsync(key))">Adjust stock</button> }
-            </div></fieldset>
-            <p class="admin-help">On hand @variant.OnHand · Reserved @variant.Reserved · Available @(variant.OnHand - variant.Reserved)</p>
-            <button type="button" class="brand-text-action is-danger" disabled="@(!variant.Archived && variant.Id > 0 && (variant.OnHand > 0 || variant.Reserved > 0))" @onclick="@(() => Archive.InvokeAsync(key))">@(variant.Id == 0 ? "Remove unsaved variant" : variant.Archived ? "Restore variant" : "Archive variant")</button>
-            @if (Errors.TryGetValue($"Variants.{key:N}", out var errors)) { <p class="form-error" role="alert">@string.Join(" ", errors)</p> }
-        </details>
+            <p class="text-xs text-slate-500 mt-1">
+                Manage individual variant pricing, SKU codes, and inventory levels. Blank SKUs are automatically generated upon saving.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" @bind="showArchived" />
+                <span>Show archived</span>
+            </label>
+
+            @if (!Draft.Attributes.Any(a => !a.Retired) && !Draft.Variants.Any(v => !v.Archived))
+            {
+                <button type="button" class="btn-primary !bg-blue-600 hover:!bg-blue-700 !py-1.5 !px-3 text-xs font-bold cursor-pointer" @onclick="Standard">
+                    + Add Standard Variant
+                </button>
+            }
+        </div>
+    </div>
+
+    @{
+        var visibleVariants = Draft.Variants.Where(v => showArchived || !v.Archived).ToList();
+    }
+
+    @if (visibleVariants.Count == 0)
+    {
+        <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+            <span class="text-3xl block mb-2">📦</span>
+            <h3 class="text-sm font-bold text-slate-800">No Variants Created Yet</h3>
+            <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                @(Draft.Attributes.Any(a => !a.Retired) ? "Use the combination generator above to add variants for your configured options." : "Click '+ Add Standard Variant' to sell this item without size/color variations.")
+            </p>
+        </div>
+    }
+    else
+    {
+        <!-- Modern Amazon / Daraz Style Variant Matrix Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50/80 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+                    <tr>
+                        <th class="py-3 px-3.5">Variant / Combination</th>
+                        <th class="py-3 px-3">SKU</th>
+                        <th class="py-3 px-3">Selling Price (৳) *</th>
+                        <th class="py-3 px-3">Compare-At (৳)</th>
+                        <th class="py-3 px-3">Stock &amp; Inventory</th>
+                        <th class="py-3 px-2 text-center">Default</th>
+                        <th class="py-3 px-2 text-center">Active</th>
+                        <th class="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var variant in visibleVariants)
+                    {
+                        var key = variant.ClientId;
+                        var isExpanded = expandedKeys.Contains(key);
+                        var isArchived = variant.Archived;
+
+                        <tr class="hover:bg-slate-50/60 transition @(isArchived ? "opacity-50 bg-slate-50" : "")" @key="key">
+                            <!-- Combination Name -->
+                            <td class="py-3 px-3.5 align-middle">
+                                <div class="space-y-1">
+                                    <strong class="text-xs font-bold text-slate-900 block leading-tight">
+                                        @Label(variant)
+                                    </strong>
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        @if (variant.Default)
+                                        {
+                                            <span class="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                                ★ Default
+                                            </span>
+                                        }
+                                        @if (isArchived)
+                                        {
+                                            <span class="inline-flex items-center text-[10px] font-semibold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
+                                                Archived
+                                            </span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- SKU -->
+                            <td class="py-3 px-3 align-middle">
+                                <div class="flex items-center gap-1">
+                                    <input class="field text-xs font-mono w-36 !py-1 px-2"
+                                           value="@variant.Sku"
+                                           maxlength="100"
+                                           disabled="@isArchived"
+                                           placeholder="Auto-generated"
+                                           title="@(string.IsNullOrWhiteSpace(variant.Sku) ? "Auto SKU Preview: " + ProductEditorRules.AutoSku(Draft, variant) : "Stable variant SKU")"
+                                           @oninput="@(e => Patch(key, v => v.Sku = Text(e)))" />
+                                    <button type="button"
+                                            class="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 cursor-pointer"
+                                            title="Regenerate automatic SKU"
+                                            disabled="@isArchived"
+                                            @onclick="@(() => Patch(key, v => v.Sku = ""))">
+                                        ↻
+                                    </button>
+                                </div>
+                            </td>
+
+                            <!-- Selling Price -->
+                            <td class="py-3 px-3 align-middle">
+                                <div class="relative w-28">
+                                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">৳</span>
+                                    <input type="number"
+                                           min="0"
+                                           step="1"
+                                           disabled="@isArchived"
+                                           class="field text-xs pl-6 w-full !py-1 font-bold text-blue-600 focus:text-blue-700"
+                                           value="@Number(variant.Price)"
+                                           placeholder="0"
+                                           @oninput="@(e => Patch(key, v => v.Price = Decimal(e)))" />
+                                </div>
+                            </td>
+
+                            <!-- Compare-At Price -->
+                            <td class="py-3 px-3 align-middle">
+                                <div class="relative w-28">
+                                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">৳</span>
+                                    <input type="number"
+                                           min="0"
+                                           step="1"
+                                           disabled="@isArchived"
+                                           class="field text-xs pl-6 w-full !py-1 text-slate-500"
+                                           value="@Number(variant.CompareAt)"
+                                           placeholder="Optional"
+                                           @oninput="@(e => Patch(key, v => v.CompareAt = Decimal(e)))" />
+                                </div>
+                            </td>
+
+                            <!-- Stock & Inventory -->
+                            <td class="py-3 px-3 align-middle">
+                                @if (variant.Id > 0)
+                                {
+                                    <div class="flex items-center gap-2">
+                                        <div class="space-y-0.5">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold @(variant.OnHand > 0 ? "bg-emerald-50 text-emerald-800 border border-emerald-200/80" : "bg-rose-50 text-rose-800 border border-rose-200/80")">
+                                                @variant.OnHand in stock
+                                            </span>
+                                            @if (variant.Reserved > 0)
+                                            {
+                                                <span class="text-[10px] text-amber-600 block font-medium">
+                                                    (@variant.Reserved reserved)
+                                                </span>
+                                            }
+                                        </div>
+                                        <button type="button"
+                                                class="btn-secondary !py-1 !px-2.5 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                                disabled="@isArchived"
+                                                @onclick="@(() => Stock.InvokeAsync(key))">
+                                            <span>📦</span> Adjust
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="flex items-center gap-1.5">
+                                        <label class="sr-only" for="@($"opening-stock-{key}")">Opening stock</label>
+                                        <input id="@($"opening-stock-{key}")"
+                                               type="number"
+                                               min="0"
+                                               class="field text-xs w-20 !py-1"
+                                               placeholder="Qty"
+                                               value="@variant.OpeningStock"
+                                               @oninput="@(e => Patch(key, v => v.OpeningStock = int.TryParse(Text(e), out var q) ? q : 0))" />
+                                        <span class="text-[10px] text-slate-400">Opening</span>
+                                    </div>
+                                }
+                            </td>
+
+                            <!-- Default Radio -->
+                            <td class="py-3 px-2 text-center align-middle">
+                                <button type="button"
+                                        class="cursor-pointer text-xs p-1 rounded hover:bg-slate-100 transition @(variant.Default ? "text-amber-500 font-bold" : "text-slate-300 hover:text-slate-500")"
+                                        disabled="@isArchived"
+                                        title="@(variant.Default ? "Default variant" : "Click to make default")"
+                                        @onclick="@(() => Default.InvokeAsync((!variant.Default, key)))">
+                                    @(variant.Default ? "★" : "☆")
+                                </button>
+                            </td>
+
+                            <!-- Active Checkbox -->
+                            <td class="py-3 px-2 text-center align-middle">
+                                <input type="checkbox"
+                                       class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                       checked="@variant.Active"
+                                       disabled="@isArchived"
+                                       @onchange="@(e => Patch(key, v => v.Active = (bool)e.Value!))" />
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="py-3 px-3 text-right align-middle">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button type="button"
+                                            class="text-xs p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 cursor-pointer"
+                                            title="Toggle advanced fields (Barcode, Cost)"
+                                            @onclick="@(() => ToggleExpand(key))">
+                                        @(isExpanded ? "▲" : "▼")
+                                    </button>
+                                    <button type="button"
+                                            class="text-xs p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                            disabled="@(!isArchived && variant.Id > 0 && (variant.OnHand > 0 || variant.Reserved > 0))"
+                                            title="@(variant.Id == 0 ? "Remove unsaved variant" : isArchived ? "Restore variant" : "Archive variant")"
+                                            @onclick="@(() => Archive.InvokeAsync(key))">
+                                        @(isArchived ? "↺" : "🗑️")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Expanded Row for Barcode & Cost Price -->
+                        @if (isExpanded)
+                        {
+                            <tr class="bg-slate-50/50" @key="@($"{key}-expanded")">
+                                <td colspan="8" class="p-3 pl-6 border-b border-slate-100">
+                                    <div class="flex flex-wrap items-center gap-4 text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-slate-600">Barcode / EAN:</span>
+                                            <input class="field text-xs font-mono w-40 !py-1"
+                                                   value="@variant.Barcode"
+                                                   maxlength="100"
+                                                   placeholder="Barcode number"
+                                                   disabled="@isArchived"
+                                                   @oninput="@(e => Patch(key, v => v.Barcode = Text(e)))" />
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-slate-600">Cost Price (৳):</span>
+                                            <input type="number"
+                                                   min="0"
+                                                   step="1"
+                                                   class="field text-xs w-28 !py-1"
+                                                   value="@Number(variant.Cost)"
+                                                   placeholder="Cost"
+                                                   disabled="@isArchived"
+                                                   @oninput="@(e => Patch(key, v => v.Cost = Decimal(e)))" />
+                                        </div>
+                                        <div class="text-[11px] text-slate-400">
+                                            Recorded movements: @variant.OnHand units on hand.
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+
+                        @if (Errors.TryGetValue($"Variants.{key:N}", out var errors))
+                        {
+                            <tr class="bg-rose-50" @key="@($"{key}-errors")">
+                                <td colspan="8" class="p-2.5 px-4 text-xs text-rose-700 font-semibold" role="alert">
+                                    ⚠ @string.Join(" ", errors)
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 </section>
+
 @code {
     [Parameter] public ProductEditorDraft Draft { get; set; } = new();
     [Parameter] public Dictionary<string, string[]> Errors { get; set; } = [];
@@ -46,10 +281,30 @@
     [Parameter] public EventCallback<Guid> Stock { get; set; }
     [Parameter] public EventCallback<Guid> Archive { get; set; }
     [Parameter] public EventCallback Standard { get; set; }
+
     private bool showArchived;
+    private readonly HashSet<Guid> expandedKeys = [];
+
+    private void ToggleExpand(Guid key)
+    {
+        if (!expandedKeys.Add(key))
+        {
+            expandedKeys.Remove(key);
+        }
+    }
+
     private Task Patch(Guid key, Action<EditorVariant> update) => Changed.InvokeAsync(new(key, update));
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
     private static decimal? Decimal(ChangeEventArgs e) => decimal.TryParse(Text(e), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : null;
     private static string Number(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
-    private string Label(EditorVariant variant) => string.Join(" / ", Draft.Attributes.Select(a => a.Options.FirstOrDefault(o => o.ClientId == variant.Choices.GetValueOrDefault(a.DefinitionId))?.Value).Where(v => !string.IsNullOrEmpty(v))) is { Length: > 0 } label ? label : "Standard variant";
+
+    private string Label(EditorVariant variant)
+    {
+        var parts = Draft.Attributes
+            .Select(a => a.Options.FirstOrDefault(o => o.ClientId == variant.Choices.GetValueOrDefault(a.DefinitionId))?.Value)
+            .Where(v => !string.IsNullOrEmpty(v))
+            .ToList();
+
+        return parts.Count > 0 ? string.Join(" / ", parts) : "Standard Variant";
+    }
 }

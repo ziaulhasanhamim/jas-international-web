@@ -1,18 +1,57 @@
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Client.Services
-<section class="shop-panel editor-section">
-    <h2>Content &amp; SEO</h2>
-    <AdminSeoFields Kind="product" Name="@Information.Name" Slug="@Information.Slug" Title="@Information.MetaTitle" TitleChanged="value => Patch(i => i.MetaTitle = value)" Description="@Information.MetaDescription" DescriptionChanged="value => Patch(i => i.MetaDescription = value)" FallbackDescription="@Information.Description" BaseUrl="@BaseUrl" />
-    <label class="shop-label">Warranty information<input class="shop-input" value="@Information.WarrantyInfo" @oninput="e => Patch(i => i.WarrantyInfo = e.Value?.ToString())" /></label>
-    <label class="shop-label">Search synonyms<input class="shop-input" value="@Information.Synonyms" @oninput="e => Patch(i => i.Synonyms = e.Value?.ToString())" /></label>
-    <label class="shop-label">Bangla name<input class="shop-input" value="@Information.BanglaName" @oninput="e => Patch(i => i.BanglaName = e.Value?.ToString())" /></label>
-    <label class="shop-label">Bangla description<textarea class="shop-input" @bind:get="Information.BanglaDescription" @bind:set="value => Patch(i => i.BanglaDescription = value)" @bind:event="oninput"></textarea></label>
-    <AdminImagePicker Label="Social sharing image" Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
+
+<section class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-6">
+    <div class="pb-4 border-b border-slate-100">
+        <h2 class="text-lg font-bold text-slate-900">Content, Localization &amp; SEO</h2>
+        <p class="text-xs text-slate-500 mt-1">
+            Optimize search engine visibility, metadata, Bengali translations, and warranty details.
+        </p>
+    </div>
+
+    <!-- Google Search Engine Metadata Preview & Inputs -->
+    <div>
+        <AdminSeoFields Kind="product" Name="@Information.Name" Slug="@Information.Slug" Title="@Information.MetaTitle" TitleChanged="value => Patch(i => i.MetaTitle = value)" Description="@Information.MetaDescription" DescriptionChanged="value => Patch(i => i.MetaDescription = value)" FallbackDescription="@Information.Description" BaseUrl="@BaseUrl" />
+    </div>
+
+    <!-- Trust & Search Details -->
+    <div class="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1" for="prod-warranty">Warranty Information</label>
+            <input id="prod-warranty" class="shop-input text-xs" value="@Information.WarrantyInfo" placeholder="e.g. 1 Year Official Brand Warranty" @oninput="e => Patch(i => i.WarrantyInfo = e.Value?.ToString())" />
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1" for="prod-synonyms">Search Synonyms / Keywords</label>
+            <input id="prod-synonyms" class="shop-input text-xs" value="@Information.Synonyms" placeholder="e.g. cmf watch 2, nothing watch, smart band" @oninput="e => Patch(i => i.Synonyms = e.Value?.ToString())" />
+            <span class="text-[11px] text-slate-400 mt-1 block">Comma-separated alternative names for store search.</span>
+        </div>
+    </div>
+
+    <!-- Bengali Localization -->
+    <div class="pt-4 border-t border-slate-100 space-y-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Bengali Localization (বাংলা)</h3>
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1" for="prod-bangla-name">Bangla Product Name</label>
+            <input id="prod-bangla-name" class="shop-input text-xs" value="@Information.BanglaName" placeholder="e.g. সিএমএফ ওয়াচ প্রো ২" @oninput="e => Patch(i => i.BanglaName = e.Value?.ToString())" />
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1" for="prod-bangla-desc">Bangla Description</label>
+            <textarea id="prod-bangla-desc" class="shop-input text-xs" rows="3" placeholder="পণ্য সম্পর্কে বিস্তারিত বাংলায় লিখুন..." @bind:get="Information.BanglaDescription" @bind:set="value => Patch(i => i.BanglaDescription = value)" @bind:event="oninput"></textarea>
+        </div>
+    </div>
+
+    <!-- Social Image -->
+    <div class="pt-4 border-t border-slate-100">
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">OpenGraph Social Sharing Card</label>
+        <AdminImagePicker Label="Social preview image (1200x630px recommended)" Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
+    </div>
 </section>
+
 @code {
     [Parameter] public ProductInformation Information { get; set; } = new();
     [Parameter] public string BaseUrl { get; set; } = "";
     [Parameter] public EventCallback<InformationPatch> Changed { get; set; }
     [Parameter] public EventCallback<bool> UploadBusy { get; set; }
+
     private Task Patch(Action<ProductInformation> update) => Changed.InvokeAsync(new(update));
 }

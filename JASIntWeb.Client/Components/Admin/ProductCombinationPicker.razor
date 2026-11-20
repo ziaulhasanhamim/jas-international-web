@@ -1,40 +1,138 @@
 @using System.Numerics
 @using JASIntWeb.Client.Contracts
 @using JASIntWeb.Client.Services
-<section class="shop-panel editor-section" aria-label="Combination picker">
-    <h2>Choose combinations to add</h2>
-    <p class="admin-help">Only selected combinations are added to your draft. Preview writes nothing. A product can have up to 100 current variants, even when many more combinations are possible.</p>
-    <div class="editor-combination-filters">
-    @foreach (var axis in Draft.Attributes.Where(a => !a.Retired))
-    {
-        <label class="shop-label">Filter @axis.Name<select class="shop-input" value="@filters.GetValueOrDefault(axis.DefinitionId)" @onchange="@(e => Filter(axis.DefinitionId, e))"><option value="">All values</option>
-            @foreach (var option in axis.Options.Where(o => !o.Retired)) { <option value="@option.ClientId">@option.Value</option> }
-            @if (!axis.Required) { <option value="@Guid.Empty">Not applicable</option> }
-        </select></label>
-    }
+
+<section class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4 mb-6">
+    <div>
+        <h3 class="text-base font-bold text-slate-900">Generate Option Combinations</h3>
+        <p class="text-xs text-slate-500 mt-1">
+            Choose combinations of your configured options to stage as variants. A product can have up to 100 current variants.
+        </p>
     </div>
-    <button type="button" class="shop-button-secondary" @onclick="@(() => Request("0"))">Preview combinations</button>
+
+    @if (Draft.Attributes.Any(a => !a.Retired))
+    {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+            @foreach (var axis in Draft.Attributes.Where(a => !a.Retired))
+            {
+                <label class="block text-xs font-semibold text-slate-700">
+                    Filter @axis.Name
+                    <select class="shop-input text-xs mt-1" value="@filters.GetValueOrDefault(axis.DefinitionId)" @onchange="@(e => Filter(axis.DefinitionId, e))">
+                        <option value="">All @axis.Name values</option>
+                        @foreach (var option in axis.Options.Where(o => !o.Retired))
+                        {
+                            <option value="@option.ClientId">@option.Value</option>
+                        }
+                        @if (!axis.Required)
+                        {
+                            <option value="@Guid.Empty">Not applicable</option>
+                        }
+                    </select>
+                </label>
+            }
+        </div>
+
+        <div class="pt-2">
+            <button type="button" class="btn-secondary !py-2 !px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer" @onclick="@(() => Request("0"))">
+                <span>🔍</span> Preview Available Combinations
+            </button>
+        </div>
+    }
+
     @if (Page is not null && !filtersChanged)
     {
-        <p class="admin-help" role="status">@Page.Total theoretical combinations under these filters · Showing up to 50 · @Draft.Variants.Count(v => !v.Archived)/100 current variants</p>
-        <div class="table-scroll"><table class="shop-table"><thead><tr><th><input type="checkbox" aria-label="Select missing combinations on this page" checked="@(Page.Rows.Any(r => r.Status == "Missing") && Page.Rows.Where(r => r.Status == "Missing").All(r => selected.Contains(r.Key)))" @onchange="SelectPage" /></th><th>Combination</th><th>Status</th><th>Existing variant</th></tr></thead><tbody>
-        @foreach (var row in Page.Rows)
-        {
-            <tr @key="row.Key"><td>@if (row.Status == "Missing") { <input type="checkbox" aria-label="@($"Select {row.Label}")" checked="@selected.Contains(row.Key)" @onchange="@(e => Toggle(row.Key, (bool)e.Value!))" /> }</td><td>@row.Label</td><td>@row.Status</td><td>
-                @if (row.Status == "Archived") { @foreach (var id in row.ExistingIds) { <button type="button" class="brand-text-action" @onclick="@(() => Restore.InvokeAsync(id))">Restore #@id</button> } }
-                else if (row.Status == "Missing")
-                {
-                    <select class="shop-input" aria-label="@($"Map existing variant to {row.Label}")" value="" @onchange="@(e => MapRow(row, e))"><option value="">Map an existing variant…</option>
-                        @foreach (var variant in Draft.Variants.Where(v => !v.Archived)) { <option value="@variant.ClientId">@(string.IsNullOrWhiteSpace(variant.Sku) ? "Unsaved variant" : variant.Sku)</option> }
-                    </select>
-                }
-            </td></tr>
-        }
-        </tbody></table></div>
-        <div class="form-actions"><button type="button" class="shop-button" disabled="@(selected.Count == 0)" @onclick="StageSelected">Add @selected.Count selected to draft</button>
-        <button type="button" class="shop-button-secondary" disabled="@(Page.Offset == "0")" @onclick="Previous">Previous</button><button type="button" class="shop-button-secondary" disabled="@(!Page.HasMore)" @onclick="Next">Next 50</button></div>
+        <div class="pt-3 border-t border-slate-100 space-y-3">
+            <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>@Page.Total theoretical combinations under these filters · Showing up to 50</span>
+                <span class="font-semibold text-slate-700">@Draft.Variants.Count(v => !v.Archived) / 100 current variants</span>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="py-2.5 px-3 w-10">
+                                <input type="checkbox"
+                                       class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                       aria-label="Select all missing combinations"
+                                       checked="@(Page.Rows.Any(r => r.Status == "Missing") && Page.Rows.Where(r => r.Status == "Missing").All(r => selected.Contains(r.Key)))"
+                                       @onchange="SelectPage" />
+                            </th>
+                            <th class="py-2.5 px-3">Combination</th>
+                            <th class="py-2.5 px-3">Status</th>
+                            <th class="py-2.5 px-3">Mapping / Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var row in Page.Rows)
+                        {
+                            <tr class="hover:bg-slate-50 transition" @key="row.Key">
+                                <td class="py-2.5 px-3 align-middle">
+                                    @if (row.Status == "Missing")
+                                    {
+                                        <input type="checkbox"
+                                               class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                               aria-label="@($"Select {row.Label}")"
+                                               checked="@selected.Contains(row.Key)"
+                                               @onchange="@(e => Toggle(row.Key, (bool)e.Value!))" />
+                                    }
+                                </td>
+                                <td class="py-2.5 px-3 align-middle font-semibold text-slate-900">
+                                    @row.Label
+                                </td>
+                                <td class="py-2.5 px-3 align-middle">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold @(row.Status == "Missing" ? "bg-amber-50 text-amber-700 border border-amber-200" : row.Status == "Existing" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600")">
+                                        @row.Status
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-3 align-middle">
+                                    @if (row.Status == "Archived")
+                                    {
+                                        @foreach (var id in row.ExistingIds)
+                                        {
+                                            <button type="button" class="text-xs font-semibold text-blue-600 hover:underline mr-2 cursor-pointer" @onclick="@(() => Restore.InvokeAsync(id))">
+                                                Restore #@id
+                                            </button>
+                                        }
+                                    }
+                                    else if (row.Status == "Missing")
+                                    {
+                                        <select class="shop-input text-xs w-48 !py-1" aria-label="@($"Map existing variant to {row.Label}")" value="" @onchange="@(e => MapRow(row, e))">
+                                            <option value="">Map an existing variant…</option>
+                                            @foreach (var variant in Draft.Variants.Where(v => !v.Archived))
+                                            {
+                                                <option value="@variant.ClientId">@(string.IsNullOrWhiteSpace(variant.Sku) ? "Unsaved variant" : variant.Sku)</option>
+                                            }
+                                        </select>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <button type="button"
+                        class="btn-primary !bg-blue-600 hover:!bg-blue-700 !py-2 !px-4 text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                        disabled="@(selected.Count == 0)"
+                        @onclick="StageSelected">
+                    + Add @selected.Count Selected Combinations to Draft
+                </button>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary !py-1.5 !px-3 text-xs cursor-pointer disabled:opacity-40" disabled="@(Page.Offset == "0")" @onclick="Previous">
+                        Previous
+                    </button>
+                    <button type="button" class="btn-secondary !py-1.5 !px-3 text-xs cursor-pointer disabled:opacity-40" disabled="@(!Page.HasMore)" @onclick="Next">
+                        Next 50
+                    </button>
+                </div>
+            </div>
+        </div>
     }
 </section>
+
 @code {
     [Parameter] public ProductEditorDraft Draft { get; set; } = new();
     [Parameter] public EditorCombinationPage? Page { get; set; }
@@ -42,12 +140,29 @@
     [Parameter] public EventCallback<List<EditorCombination>> Stage { get; set; }
     [Parameter] public EventCallback<int> Restore { get; set; }
     [Parameter] public EventCallback<CombinationMapping> Map { get; set; }
+
     private bool filtersChanged;
     private EditorCombinationPage? previous;
     private readonly Dictionary<int, string> filters = [];
     private readonly HashSet<string> selected = [];
-    protected override void OnParametersSet() { if (!ReferenceEquals(previous, Page)) { previous = Page; selected.Clear(); filtersChanged = false; } }
-    private void Filter(int id, ChangeEventArgs args) { filters[id] = args.Value?.ToString() ?? ""; selected.Clear(); filtersChanged = true; }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(previous, Page))
+        {
+            previous = Page;
+            selected.Clear();
+            filtersChanged = false;
+        }
+    }
+
+    private void Filter(int id, ChangeEventArgs args)
+    {
+        filters[id] = args.Value?.ToString() ?? "";
+        selected.Clear();
+        filtersChanged = true;
+    }
+
     private Task Request(string offset) => Preview.InvokeAsync(new(offset, filters.Where(p => Guid.TryParse(p.Value, out _)).ToDictionary(p => p.Key, p => new List<Guid> { Guid.Parse(p.Value) })));
     private Task Previous() => Request(BigInteger.Max(0, BigInteger.Parse(Page!.Offset) - 50).ToString());
     private Task Next() => Request((BigInteger.Parse(Page!.Offset) + 50).ToString());
