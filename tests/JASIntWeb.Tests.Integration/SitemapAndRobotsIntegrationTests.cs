@@ -50,20 +50,6 @@ public class SitemapAndRobotsIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task LegacyProductCategoryUrl_Returns301RedirectToCanonicalCategory()
-    {
-        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
-        var response = await client.GetAsync("/products/smartphones");
-
-        await response.StatusCode.Should().BeEqualTo(HttpStatusCode.MovedPermanently);
-        await response.Headers.Location!.ToString().Should().BeEqualTo("/category/smartphones");
-    }
-
-    [Test]
     public async Task GetHealth_ReturnsOkWithHealthyStatus()
     {
         var client = Factory.CreateClient();

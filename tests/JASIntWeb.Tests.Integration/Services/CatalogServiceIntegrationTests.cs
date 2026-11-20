@@ -30,8 +30,8 @@ public class CatalogServiceIntegrationTests : JasIntegrationTestBase
 
         await categories.Should().NotBeNull();
         await (categories.Count >= 3).Should().BeTrue();
-        await categories.Any(c => c.Slug == "power-charging").Should().BeTrue();
-        await categories.Any(c => c.Slug == "smartwatches").Should().BeTrue();
+        await categories.Any(c => c.Slug == "chargers-power-banks").Should().BeTrue();
+        await categories.Any(c => c.Slug == "smart-wearables").Should().BeTrue();
     }
 
     [Test]

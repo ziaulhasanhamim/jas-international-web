@@ -19,7 +19,6 @@ internal static class ApplicationPipeline
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseMiddleware<ApiExceptionMiddleware>();
         app.UseHttpsRedirection();
-        app.UseMiddleware<CanonicalHostAndRedirectMiddleware>();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();

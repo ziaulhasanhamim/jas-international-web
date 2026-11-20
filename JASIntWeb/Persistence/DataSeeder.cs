@@ -469,8 +469,8 @@ public static class JsonTestDataSeeder
                 {
                     Title = "Smart Watches & Bands",
                     Eyebrow = "AMOLED & CALLING",
-                    CategorySlug = "smartwatches",
-                    ViewAllHref = "/category/smartwatches",
+                    CategorySlug = "smart-wearables",
+                    ViewAllHref = "/category/smart-wearables",
                     SortOrder = 1,
                     IsActive = true,
                     ItemLimit = 8
@@ -479,8 +479,8 @@ public static class JsonTestDataSeeder
                 {
                     Title = "Wireless Earbuds & Audio",
                     Eyebrow = "STUDIO ACOUSTICS",
-                    CategorySlug = "audio-earbuds",
-                    ViewAllHref = "/category/audio-earbuds",
+                    CategorySlug = "audio",
+                    ViewAllHref = "/category/audio",
                     SortOrder = 2,
                     IsActive = true,
                     ItemLimit = 8
@@ -489,8 +489,8 @@ public static class JsonTestDataSeeder
                 {
                     Title = "Power Banks & Chargers",
                     Eyebrow = "DAILY ESSENTIALS",
-                    CategorySlug = "power-charging",
-                    ViewAllHref = "/category/power-charging",
+                    CategorySlug = "chargers-power-banks",
+                    ViewAllHref = "/category/chargers-power-banks",
                     SortOrder = 3,
                     IsActive = true,
                     ItemLimit = 8
@@ -519,8 +519,8 @@ public static class JsonTestDataSeeder
                 {
                     Title = "Creator Gear & Microphones",
                     Eyebrow = "STUDIO & STREAMING",
-                    CategorySlug = "creator-gear",
-                    ViewAllHref = "/category/creator-gear",
+                    CategorySlug = "creator-essentials",
+                    ViewAllHref = "/category/creator-essentials",
                     SortOrder = 6,
                     IsActive = true,
                     ItemLimit = 8
@@ -537,7 +537,7 @@ public static class JsonTestDataSeeder
                     Eyebrow = "SMART WEARABLES",
                     Title = "Flagship Smartwatches",
                     Subtitle = "Amazfit, Kieslect & Kospet rugged outdoor & AMOLED watches.",
-                    LinkUrl = "/category/smartwatches",
+                    LinkUrl = "/category/smart-wearables",
                     LinkText = "Explore Watches",
                     Theme = "navy",
                     SortOrder = 1,
@@ -548,7 +548,7 @@ public static class JsonTestDataSeeder
                     Eyebrow = "PURE ACOUSTICS",
                     Title = "Studio ANC Earbuds",
                     Subtitle = "Soundcore Liberty 4 Pro, OnePlus Buds & QCY wireless audio.",
-                    LinkUrl = "/category/audio-earbuds",
+                    LinkUrl = "/category/audio",
                     LinkText = "Hear the Difference",
                     Theme = "amber",
                     SortOrder = 2,
@@ -559,7 +559,7 @@ public static class JsonTestDataSeeder
                     Eyebrow = "FAST CHARGE ECOSYSTEM",
                     Title = "GaN Fast Charge & Power",
                     Subtitle = "Anker Zolo 30W, Baseus 65W & high-capacity 27600mAh power banks.",
-                    LinkUrl = "/category/power-charging",
+                    LinkUrl = "/category/chargers-power-banks",
                     LinkText = "Power Up Fast",
                     Theme = "indigo",
                     SortOrder = 3,

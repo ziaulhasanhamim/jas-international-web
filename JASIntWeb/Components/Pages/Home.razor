@@ -140,8 +140,8 @@
             </div>
         </section>
 
-        <ProductSection Title="Wireless Earbuds &amp; Audio" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/audio-earbuds" />
-        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/smartwatches" />
+        <ProductSection Title="Wireless Earbuds &amp; Audio" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/audio" />
+        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/smart-wearables" />
         <ProductSection Title="Bluetooth Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
     }
 
@@ -213,8 +213,8 @@
         if (customSections.Count == 0)
         {
             var newArrivalsTask = Catalog.LatestAsync(null);
-            var audioTask = Catalog.LatestAsync("audio-earbuds");
-            var watchesTask = Catalog.LatestAsync("smartwatches");
+            var audioTask = Catalog.LatestAsync("audio");
+            var watchesTask = Catalog.LatestAsync("smart-wearables");
             var speakersTask = Catalog.LatestAsync("speakers");
 
             await Task.WhenAll(newArrivalsTask, audioTask, watchesTask, speakersTask);

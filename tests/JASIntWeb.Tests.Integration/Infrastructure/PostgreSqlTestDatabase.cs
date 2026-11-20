@@ -184,21 +184,21 @@ public static class PostgreSqlTestDatabase
         {
             Id = 1,
             Name = "Power & Chargers",
-            Slug = "power-charging",
+            Slug = "chargers-power-banks",
             IsDeleted = false
         };
         var catAudio = new Category
         {
             Id = 2,
             Name = "Audio & Earbuds",
-            Slug = "audio-earbuds",
+            Slug = "audio",
             IsDeleted = false
         };
         var catWatch = new Category
         {
             Id = 3,
             Name = "Smart Watches",
-            Slug = "smartwatches",
+            Slug = "smart-wearables",
             IsDeleted = false
         };
         db.Categories.AddRange(catPower, catAudio, catWatch);
