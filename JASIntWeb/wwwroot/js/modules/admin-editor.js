@@ -17,12 +17,17 @@ function isEligibleEntityForm(form) {
     // Skip search forms or table filters
     if (form.querySelector('input[type="search"], input[name="q"], input[name="search"], input[name="filter"]')) return false;
     // Skip quick table action forms (e.g. status toggle, delete)
-    if (form.dataset.formname && (form.dataset.formname.includes('table-action') || form.dataset.formname.includes('quick-action'))) return false;
+    if (form.dataset.formname && (form.dataset.formname.includes('table-action') || form.dataset.formname.includes('quick-action') || form.dataset.formname.startsWith('delete-'))) return false;
 
-    // Must be an entity edit/create form
-    const isEditPage = location.pathname.endsWith('/new') || location.pathname.includes('/edit');
+    // Strict URL check: Drafts ONLY exist on dedicated entity creation or editing pages
+    const path = (location.pathname || '').toLowerCase();
+    const isEditOrCreatePath = (path.endsWith('/new') || path.includes('/edit')) &&
+        (path.startsWith('/admin/coupons') || path.startsWith('/admin/categories') || path.startsWith('/admin/brands') || path.startsWith('/admin/carousel'));
+    if (!isEditOrCreatePath) return false;
+
+    // Form must be explicitly designated as an entity edit form
     const hasEntityClass = form.classList.contains('admin-form') || form.hasAttribute('data-admin-entity-form');
-    if (!isEditPage && !hasEntityClass) return false;
+    if (!hasEntityClass) return false;
 
     // Count meaningful input elements (text, number, textarea, select, checkbox)
     let editableCount = 0;
@@ -122,8 +127,34 @@ async function uploadSecurityHeaders() {
 
 class AdminEditorController {
     static initAll() {
+        this.purgeStaleDrafts();
         this.initUniversalImageUploaders();
         this.restoreFormDrafts();
+    }
+
+    static purgeStaleDrafts() {
+        try {
+            const toDelete = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k) continue;
+                if (k.startsWith('jas-admin-form-draft:')) {
+                    const p = k.substring('jas-admin-form-draft:'.length).toLowerCase();
+                    const isAllowed = (p.endsWith('/new') || p.includes('/edit')) &&
+                        (p.startsWith('/admin/coupons') || p.startsWith('/admin/categories') || p.startsWith('/admin/brands') || p.startsWith('/admin/carousel'));
+                    if (!isAllowed) toDelete.push(k);
+                }
+            }
+            toDelete.forEach(k => {
+                try { localStorage.removeItem(k); } catch (e) {}
+            });
+        } catch (e) {}
+
+        // Remove any orphan banners currently in DOM that belong to ineligible forms
+        document.querySelectorAll('.admin-draft-restored-banner').forEach(b => {
+            const form = b.closest('form');
+            if (!isEligibleEntityForm(form)) b.remove();
+        });
     }
 
     static getFormDraftKey(form) {
