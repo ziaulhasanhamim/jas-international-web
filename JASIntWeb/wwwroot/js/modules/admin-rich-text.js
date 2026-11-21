@@ -25,8 +25,12 @@ async function loadEditor() {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js';
         script.referrerPolicy = 'origin';
-        script.onload = resolve;
-        script.onerror = () => { loading = null; script.remove(); reject(new Error('Rich editor unavailable')); };
+        script.onload = () => resolve();
+        script.onerror = () => {
+            loading = null;
+            script.remove();
+            reject(new Error('Failed to load TinyMCE editor from CDN'));
+        };
         document.head.append(script);
     });
     await loading;
@@ -35,6 +39,7 @@ export function create(element, receiver, options) {
     options = options || {};
     let disposed = false, starting = false, editor = null;
     let html = element.value, disabled = options.disabled ?? options.Disabled ?? false, synchronizing = false, ready = false;
+
     function sync() {
         if (!editor) return;
         synchronizing = true;
@@ -44,13 +49,20 @@ export function create(element, receiver, options) {
             if (editor.mode.isReadOnly() !== disabled) editor.mode.set(disabled ? 'readonly' : 'design');
         } finally { synchronizing = false; }
     }
+
     async function start() {
-        if (disposed || starting || !element.isConnected || element.getClientRects().length === 0) return;
+        if (disposed || starting || !element.isConnected) return;
+        if (element.getClientRects().length === 0) return;
         starting = true;
         try {
             await loadEditor();
             if (disposed || !element.isConnected) return;
             html = element.value;
+
+            // Remove any existing editor attached to this target element or id
+            if (element.id && window.tinymce?.get(element.id)) {
+                try { window.tinymce.get(element.id).remove(); } catch (e) {}
+            }
 
             const rawHeight = options.height || options.Height;
             const parsedHeight = parseInt(rawHeight, 10);
@@ -62,42 +74,29 @@ export function create(element, receiver, options) {
                 min_height: 500,
                 max_height: 1600,
                 resize: true,
+                promotion: false,
+                menubar: false,
+                branding: false,
+                readonly: disabled,
                 iframe_aria_text: options.label || options.Label || 'Content editor',
-                plugins: 'table lists link code image fullscreen wordcount',
+                plugins: 'table lists link code image fullscreen',
                 toolbar_mode: 'wrap',
-                toolbar: [
-                    'undo redo | blocks styles | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist',
-                    `table ${options.specifications || options.Specifications ? 'techspecs' : ''} productcard calloutbox | link image | hr removeformat | code fullscreen`
-                ],
+                toolbar: `undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | bullist numlist | table ${options.specifications || options.Specifications ? 'techspecs' : ''} productcard calloutbox | link image | removeformat | code fullscreen`,
                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
                 contextmenu: 'link image table',
                 block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
-                style_formats: [
-                    { title: 'Headings', items: [
-                        { title: 'Heading 2', format: 'h2' },
-                        { title: 'Heading 3', format: 'h3' },
-                        { title: 'Heading 4', format: 'h4' }
-                    ]},
-                    { title: 'Pricing & Text Highlights', items: [
-                        { title: 'Current Price (৳ Blue)', inline: 'span', classes: 'price-current text-blue-600 font-black', styles: { color: '#2563eb', fontWeight: '800' } },
-                        { title: 'Strikethrough Price (Gray)', inline: 'span', classes: 'price-original text-slate-400 line-through', styles: { textDecoration: 'line-through', color: '#94a3b8' } },
-                        { title: 'Discount Badge (Green)', inline: 'span', classes: 'price-badge bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 rounded-full px-2 py-0.5 text-xs', styles: { backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: '700' } },
-                        { title: 'Action Button (Blue Link)', selector: 'a', classes: 'guide-product-btn inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white', styles: { backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 16px', borderRadius: '10px', textDecoration: 'none', fontWeight: '700' } }
-                    ]},
-                    { title: 'Callout Containers', items: [
-                        { title: 'Editorial Callout Box (Gray)', block: 'div', classes: 'callout-box my-6 rounded-2xl bg-slate-50 border border-slate-200 p-6', wrapper: true },
-                        { title: 'Highlight Callout Box (Blue)', block: 'div', classes: 'callout-box my-6 rounded-2xl bg-blue-50 border border-blue-200 p-6', wrapper: true }
-                    ]}
-                ],
-                menubar: false, branding: false, readonly: disabled,
-                formats: { underline: { inline: 'u' }, strikethrough: { inline: 's' } },
+                formats: {
+                    underline: { inline: 'u' },
+                    strikethrough: { inline: 's' }
+                },
+                content_css: '/css/output.css',
                 content_style: `
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                         font-size: 15px;
                         line-height: 1.7;
                         color: #334155;
-                        padding: 18px 24px;
+                        padding: 20px 24px;
                         margin: 0;
                         background-color: #ffffff;
                     }
@@ -123,7 +122,6 @@ export function create(element, receiver, options) {
                     div[class*="rounded-2xl"][class*="border"],
                     div[class*="rounded-xl"][class*="border"],
                     div[class*="shadow"][class*="border"],
-                    div[class*="flex-row"],
                     div[class*="sm:flex-row"] {
                         display: flex !important;
                         flex-direction: row !important;
@@ -148,14 +146,13 @@ export function create(element, receiver, options) {
                     div[class*="rounded-2xl"][class*="border"] img,
                     div[class*="rounded-xl"][class*="border"] img,
                     div[class*="shadow"][class*="border"] img,
-                    div[class*="flex-row"] img,
                     div[class*="sm:flex-row"] img {
-                        width: 125px !important;
-                        height: 125px !important;
-                        min-width: 125px !important;
-                        min-height: 125px !important;
-                        max-width: 125px !important;
-                        max-height: 125px !important;
+                        width: 120px !important;
+                        height: 120px !important;
+                        min-width: 120px !important;
+                        min-height: 120px !important;
+                        max-width: 120px !important;
+                        max-height: 120px !important;
                         object-fit: cover !important;
                         border-radius: 12px !important;
                         background-color: #f8fafc !important;
@@ -171,7 +168,6 @@ export function create(element, receiver, options) {
                     .guide-product-info,
                     div[class*="rounded-2xl"][class*="border"] > div,
                     div[class*="shadow"][class*="border"] > div,
-                    div[class*="flex-row"] > div,
                     div[class*="sm:flex-row"] > div {
                         flex: 1 1 auto !important;
                         min-width: 0 !important;
@@ -233,7 +229,7 @@ export function create(element, receiver, options) {
                         border-radius: 9999px !important;
                     }
 
-                    /* Button Link inside Card */
+                    /* Button Link inside Card - High contrast white text guaranteed */
                     a.guide-product-btn,
                     div[class*="rounded-2xl"][class*="border"] a[class*="bg-blue"],
                     div[class*="border"] a[class*="bg-blue"],
@@ -377,7 +373,7 @@ export function create(element, receiver, options) {
                                         {
                                             type: 'input',
                                             name: 'originalPrice',
-                                            label: 'Original Price (Will be automatically struck-through)',
+                                            label: 'Original Price (Will be struck through)',
                                             placeholder: '৳3,200 (optional)'
                                         },
                                         {
@@ -441,7 +437,7 @@ export function create(element, receiver, options) {
                     instance.ui.registry.addButton('calloutbox', {
                         text: 'Callout Box',
                         icon: 'info',
-                        tooltip: 'Insert a highlighted tip, recommendation, or note box',
+                        tooltip: 'Insert a highlighted recommendation or note box',
                         onAction: () => {
                             instance.insertContent(`
 <div class="callout-box my-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 space-y-2">
@@ -461,24 +457,35 @@ export function create(element, receiver, options) {
                     });
                 }
             });
+
             if (disposed) { for (const item of editors) item.remove(); return; }
             editor = editors[0];
             observer.disconnect();
             sync();
             ready = true;
-        } catch {
+        } catch (err) {
+            console.error('[AdminRichText] Editor initialization error:', err);
             if (!disposed) receiver.invokeMethodAsync('Unavailable').catch(() => {});
+        } finally {
+            starting = false;
         }
     }
+
     const observer = new ResizeObserver(start);
     const removalObserver = new MutationObserver(() => { if (!element.isConnected) dispose(); });
     removalObserver.observe(document.body, { childList: true, subtree: true });
+
     function dispose() {
         if (disposed) return;
-        disposed = true; observer.disconnect(); removalObserver.disconnect(); editor?.remove();
+        disposed = true;
+        observer.disconnect();
+        removalObserver.disconnect();
+        editor?.remove();
     }
+
     observer.observe(element);
     start();
+
     return {
         update(value, readOnly) { if (disposed) return; html = value ?? ''; disabled = readOnly; sync(); },
         dispose

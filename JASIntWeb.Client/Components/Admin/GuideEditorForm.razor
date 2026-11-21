@@ -202,7 +202,7 @@ else
                                     }
                                 </div>
 
-                                <AdminRichText ConvertLegacyContent="false" Disabled="Busy" Label="Article Content" Height="750" @bind-Value="Input.ContentHtml" @bind-Value:after="MarkEdited" />
+                                <AdminRichText @key="@("guide-rich-en")" ConvertLegacyContent="false" Disabled="Busy" Label="Article Content" Height="750" @bind-Value="Input.ContentHtml" @bind-Value:after="MarkEdited" />
                                 <p class="text-[11px] text-slate-400 mt-1">💡 <strong>Pro Tips:</strong> Use the <strong>Product Card</strong> button to insert a product recommendation card with price and photo. Use <strong>⛶ Fullscreen</strong> for distraction-free full-screen writing. Use <strong>S̶ (Strikethrough)</strong> to cross out original prices.</p>
                             </section>
                         }
@@ -230,7 +230,7 @@ else
 
                             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
                                 <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">বাংলা পূর্ণ বিবরণ ও গাইড (Bangla Rich Content)</h2>
-                                <AdminRichText ConvertLegacyContent="false" Disabled="Busy" Label="বাংলা কনটেন্ট" Height="750" @bind-Value="Input.BanglaContentHtml" @bind-Value:after="MarkEdited" />
+                                <AdminRichText @key="@("guide-rich-bn")" ConvertLegacyContent="false" Disabled="Busy" Label="বাংলা কনটেন্ট" Height="750" @bind-Value="Input.BanglaContentHtml" @bind-Value:after="MarkEdited" />
                                 <p class="text-[11px] text-slate-400 mt-1">💡 <strong>পরামর্শ:</strong> পণ্য সুপারিশ বা কার্ড যুক্ত করতে টুলবারের <strong>Product Card</strong> বোতাম ব্যবহার করুন। সম্পূর্ণ স্ক্রিন জুড়ে লেখার জন্য <strong>⛶ Fullscreen</strong> ব্যবহার করুন।</p>
                             </section>
                         }

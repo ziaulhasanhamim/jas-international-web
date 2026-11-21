@@ -143,6 +143,28 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #60
     to { transform: rotate(360deg); }
 }
 
+/* Guide and Product Card Action Buttons - Always ensure high-contrast white text */
+.guide-content .guide-product-btn,
+.guide-content a.guide-product-btn,
+.guide-content a.btn-primary,
+.guide-content a[class*="bg-blue"],
+.guide-content a[class*="bg-indigo"],
+.guide-content a[class*="bg-emerald"],
+.guide-product-card a,
+a.guide-product-btn {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+.guide-content .guide-product-btn:hover,
+.guide-content a.guide-product-btn:hover,
+.guide-content a.btn-primary:hover,
+.guide-content a[class*="bg-blue"]:hover,
+.guide-product-card a:hover,
+a.guide-product-btn:hover {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
 /* Print Invoices & Packing Slips */
 @media print {
     body * {

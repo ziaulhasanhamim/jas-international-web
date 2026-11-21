@@ -2,7 +2,7 @@
 @page "/admin/guides/{Id:int}/edit"
 @page "/admin/guides/{Id:int}"
 
-<JASIntWeb.Client.Components.Admin.GuideEditorForm Id="Id" @key="Id" @rendermode="InteractiveAuto" />
+<JASIntWeb.Client.Components.Admin.GuideEditorForm Id="Id" @key="Id" @rendermode="new InteractiveAutoRenderMode(prerender: false)" />
 
 @code {
     [Parameter]
