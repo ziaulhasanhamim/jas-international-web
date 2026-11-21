@@ -81,10 +81,26 @@ export function create(element, receiver, options) {
                 iframe_aria_text: options.label || options.Label || 'Content editor',
                 plugins: 'table lists link code image fullscreen',
                 toolbar_mode: 'wrap',
-                toolbar: `undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | bullist numlist | table ${options.specifications || options.Specifications ? 'techspecs' : ''} productcard calloutbox | link image | removeformat | code fullscreen`,
+                toolbar: `undo redo | blocks styles | bold italic underline strikethrough | forecolor backcolor | bullist numlist | table ${options.specifications || options.Specifications ? 'techspecs' : ''} productcard calloutbox | link image | removeformat | code fullscreen`,
                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
                 contextmenu: 'link image table',
                 block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
+                style_formats: [
+                    {
+                        title: 'Badges & Pricing',
+                        items: [
+                            { title: 'Discount Badge (Save ৳ Green)', inline: 'span', classes: 'price-badge' },
+                            { title: 'Current Price (৳ Blue)', inline: 'span', classes: 'price-current' },
+                            { title: 'Original Price (Strikethrough)', inline: 'span', classes: 'price-original' }
+                        ]
+                    },
+                    {
+                        title: 'Action Buttons',
+                        items: [
+                            { title: 'Order Button (Primary Blue)', selector: 'a', classes: 'guide-product-btn' }
+                        ]
+                    }
+                ],
                 formats: {
                     underline: { inline: 'u' },
                     strikethrough: { inline: 's' }
@@ -362,7 +378,7 @@ export function create(element, receiver, options) {
                                             type: 'input',
                                             name: 'specs',
                                             label: 'Key Highlights / Specs (bullets separated by •)',
-                                            placeholder: 'Hi-Res Audio LDAC Codec • 12mm Driver • 43dB Hybrid ANC'
+                                            placeholder: 'Hi-Res Audio LDAC • 12mm Driver • 52dB Hybrid ANC • 40H Battery'
                                         },
                                         {
                                             type: 'input',
@@ -374,7 +390,13 @@ export function create(element, receiver, options) {
                                             type: 'input',
                                             name: 'originalPrice',
                                             label: 'Original Price (Will be struck through)',
-                                            placeholder: '৳3,200 (optional)'
+                                            placeholder: '৳3,100 (optional)'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'savings',
+                                            label: 'Discount / Savings Badge (Optional, e.g. Save ৳450)',
+                                            placeholder: 'Save ৳450 (or leave empty to auto-calculate)'
                                         },
                                         {
                                             type: 'input',
@@ -404,9 +426,21 @@ export function create(element, receiver, options) {
                                     const origPrice = data.originalPrice?.trim() || '';
                                     const link = data.productLink?.trim() || '#';
 
+                                    let savingsText = data.savings?.trim() || '';
+                                    if (!savingsText && origPrice && sellPrice) {
+                                        const origNum = parseInt(origPrice.replace(/[^0-9]/g, ''), 10);
+                                        const sellNum = parseInt(sellPrice.replace(/[^0-9]/g, ''), 10);
+                                        if (!isNaN(origNum) && !isNaN(sellNum) && origNum > sellNum) {
+                                            savingsText = `Save ৳${(origNum - sellNum).toLocaleString()}`;
+                                        }
+                                    }
+
                                     let priceHtml = `<span class="price-current text-lg font-black text-blue-600">${sellPrice}</span>`;
                                     if (origPrice) {
                                         priceHtml += `&nbsp;<span class="price-original text-xs text-slate-400 line-through">${origPrice}</span>`;
+                                    }
+                                    if (savingsText) {
+                                        priceHtml += `&nbsp;<span class="price-badge rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">${savingsText}</span>`;
                                     }
 
                                     const cardHtml = `
