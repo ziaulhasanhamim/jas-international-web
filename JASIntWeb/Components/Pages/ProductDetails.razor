@@ -88,6 +88,8 @@ else
              OgImage="@(string.IsNullOrWhiteSpace(product.OgImageUrl) ? product.MainImage : product.OgImageUrl)"
              OgImageAlt="@($"Official photo of {product.Name} - JAS International")"
              OgType="product"
+             OgImageWidth="1000"
+             OgImageHeight="1000"
              ProductPrice="@(selected?.Price)"
              ProductCurrency="BDT"
              ProductAvailability="@(inStock ? "in stock" : "out of stock")"
