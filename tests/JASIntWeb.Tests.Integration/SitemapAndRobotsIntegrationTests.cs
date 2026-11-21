@@ -33,6 +33,13 @@ public class SitemapAndRobotsIntegrationTests : JasIntegrationTestBase
         var categoriesContent = await categoriesSitemapResp.Content.ReadAsStringAsync();
         await categoriesContent.Should().Contain("<urlset");
         await categoriesContent.Should().Contain("/category/");
+
+        var guidesSitemapResp = await client.GetAsync("/sitemap-guides.xml");
+        await ((int)guidesSitemapResp.StatusCode).Should().BeEqualTo(200);
+        var guidesContent = await guidesSitemapResp.Content.ReadAsStringAsync();
+        await guidesContent.Should().Contain("<urlset");
+        await guidesContent.Should().Contain("<url>");
+        await guidesContent.Should().Contain("/guides");
     }
 
     [Test]

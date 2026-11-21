@@ -145,6 +145,16 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
 
         var root = new XElement(S + "urlset");
 
+        if (categories.Count == 0)
+        {
+            root.Add(new XElement(S + "url",
+                new XElement(S + "loc", seo.BuildAbsoluteUrl("/products")),
+                new XElement(S + "changefreq", "daily"),
+                new XElement(S + "priority", "0.8"),
+                new XElement(S + "lastmod", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"))
+            ));
+        }
+
         foreach (var c in categories)
         {
             root.Add(new XElement(S + "url",
@@ -172,6 +182,16 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
             .ToListAsync();
 
         var root = new XElement(S + "urlset");
+
+        if (brands.Count == 0)
+        {
+            root.Add(new XElement(S + "url",
+                new XElement(S + "loc", seo.BuildAbsoluteUrl("/products")),
+                new XElement(S + "changefreq", "daily"),
+                new XElement(S + "priority", "0.8"),
+                new XElement(S + "lastmod", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"))
+            ));
+        }
 
         foreach (var b in brands)
         {
@@ -204,6 +224,16 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
             .ToListAsync();
 
         var root = new XElement(S + "urlset", new XAttribute(XNamespace.Xmlns + "image", ImageNs.NamespaceName));
+
+        if (products.Count == 0)
+        {
+            root.Add(new XElement(S + "url",
+                new XElement(S + "loc", seo.BuildAbsoluteUrl("/products")),
+                new XElement(S + "changefreq", "daily"),
+                new XElement(S + "priority", "0.9"),
+                new XElement(S + "lastmod", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd"))
+            ));
+        }
 
         foreach (var p in products)
         {
@@ -250,21 +280,65 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
             .OrderByDescending(g => g.PublishedAt)
             .Select(g => new
             {
+                g.Title,
+                g.BanglaTitle,
+                g.BanglaContentHtml,
                 g.Slug,
+                g.FeaturedImageUrl,
                 LastMod = g.UpdatedAt ?? g.PublishedAt
             })
             .ToListAsync();
 
-        var root = new XElement(S + "urlset");
+        var root = new XElement(S + "urlset", new XAttribute(XNamespace.Xmlns + "image", ImageNs.NamespaceName));
+
+        // Always include the main guides hub page so the sitemap is never empty even with 0 articles
+        var hubLastMod = guides.Count > 0 ? guides.Max(g => g.LastMod) : DateTimeOffset.UtcNow;
+        root.Add(new XElement(S + "url",
+            new XElement(S + "loc", seo.BuildAbsoluteUrl("/guides")),
+            new XElement(S + "changefreq", "daily"),
+            new XElement(S + "priority", "0.8"),
+            new XElement(S + "lastmod", hubLastMod.ToString("yyyy-MM-dd"))
+        ));
 
         foreach (var g in guides)
         {
-            root.Add(new XElement(S + "url",
+            var urlElement = new XElement(S + "url",
                 new XElement(S + "loc", seo.BuildAbsoluteUrl($"/guides/{g.Slug}")),
                 new XElement(S + "changefreq", "weekly"),
                 new XElement(S + "priority", "0.7"),
                 new XElement(S + "lastmod", g.LastMod.ToString("yyyy-MM-dd"))
-            ));
+            );
+
+            if (!string.IsNullOrWhiteSpace(g.FeaturedImageUrl))
+            {
+                urlElement.Add(new XElement(ImageNs + "image",
+                    new XElement(ImageNs + "loc", seo.BuildAbsoluteUrl(g.FeaturedImageUrl)),
+                    new XElement(ImageNs + "title", g.Title)
+                ));
+            }
+
+            root.Add(urlElement);
+
+            var hasBangla = !string.IsNullOrWhiteSpace(g.BanglaTitle) || !string.IsNullOrWhiteSpace(g.BanglaContentHtml);
+            if (hasBangla)
+            {
+                var bnUrlElement = new XElement(S + "url",
+                    new XElement(S + "loc", seo.BuildAbsoluteUrl($"/guides/{g.Slug}?lang=bn")),
+                    new XElement(S + "changefreq", "weekly"),
+                    new XElement(S + "priority", "0.7"),
+                    new XElement(S + "lastmod", g.LastMod.ToString("yyyy-MM-dd"))
+                );
+
+                if (!string.IsNullOrWhiteSpace(g.FeaturedImageUrl))
+                {
+                    bnUrlElement.Add(new XElement(ImageNs + "image",
+                        new XElement(ImageNs + "loc", seo.BuildAbsoluteUrl(g.FeaturedImageUrl)),
+                        new XElement(ImageNs + "title", g.BanglaTitle ?? g.Title)
+                    ));
+                }
+
+                root.Add(bnUrlElement);
+            }
         }
 
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);
