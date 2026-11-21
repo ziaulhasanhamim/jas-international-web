@@ -2,12 +2,10 @@
 @page "/admin/coupons/{Id:int}/edit"
 @attribute [Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
-@implements IDisposable
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.EntityFrameworkCore
 @inject AppDbContext Db
 @inject NavigationManager Nav
-@inject PersistentComponentState ApplicationState
 
 <PageTitle>@(Id == 0 ? "Create Coupon" : "Edit Coupon") · JAS Admin</PageTitle>
 
@@ -29,7 +27,7 @@
     </div>
 }
 
-@if (loading)
+@if (loading || Input is null)
 {
     <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
         <p class="text-sm font-semibold text-slate-500">Loading coupon editor…</p>
@@ -158,12 +156,12 @@ else
     [Parameter]
     public int Id { get; set; }
 
-    public CouponFormModel Input { get; set; } = new();
+    [PersistentState]
+    public CouponFormModel? Input { get; set; }
 
     private string? errorMessage;
     private bool loading = true;
     private bool saving;
-    private PersistingComponentStateSubscription persistingSubscription;
 
     public class CouponFormModel
     {
@@ -193,15 +191,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        persistingSubscription = ApplicationState.RegisterOnPersisting(PersistCouponState);
-
-        var stateKey = $"jas_coupon_editor_{Id}";
-        if (ApplicationState.TryTakeFromJson<CouponFormModel>(stateKey, out var restored) && restored is not null)
-        {
-            Input = restored;
-            loading = false;
-        }
-        else
+        if (Input is null)
         {
             if (Id != 0)
             {
@@ -226,23 +216,17 @@ else
                     IsActive = existing.IsActive
                 };
             }
-            loading = false;
+            else
+            {
+                Input = new CouponFormModel();
+            }
         }
-    }
-
-    private Task PersistCouponState()
-    {
-        ApplicationState.PersistAsJson($"jas_coupon_editor_{Id}", Input);
-        return Task.CompletedTask;
-    }
-
-    public void Dispose()
-    {
-        persistingSubscription.Dispose();
+        loading = false;
     }
 
     private void OnDiscountTypeChanged()
     {
+        if (Input is null) return;
         if (Input.DiscountType == CouponDiscountType.FreeDelivery)
         {
             Input.DiscountValue = 0;
@@ -260,7 +244,7 @@ else
 
     private async Task Save()
     {
-        if (saving) return;
+        if (saving || Input is null) return;
         errorMessage = null;
 
         var cleanCode = (Input.Code ?? "").Trim().ToUpperInvariant();

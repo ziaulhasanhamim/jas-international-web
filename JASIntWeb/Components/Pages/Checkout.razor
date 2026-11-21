@@ -14,7 +14,6 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject IServiceScopeFactory ScopeFactory
-@inject PersistentComponentState ApplicationState
 
 <PageTitle>Secure Checkout · JAS International</PageTitle>
 
@@ -696,10 +695,8 @@
     private decimal couponDiscount;
     private string? couponMessage;
 
-    // Prerender to Interactive State Persistence
-    private PersistingComponentStateSubscription persistingSubscription;
-
-    private sealed class CheckoutPersistedState
+    // Persisted State across Prerendering and Interactive
+    public sealed class CheckoutPersistedState
     {
         public DeliverySettings? DeliverySettings { get; set; }
         public CartState? CartState { get; set; }
@@ -718,6 +715,9 @@
         public decimal Total { get; set; }
         public bool IsHubDistrict { get; set; }
     }
+
+    [PersistentState]
+    public CheckoutPersistedState? PersistedState { get; set; }
 
     // Totals
     private decimal deliveryFee;
@@ -753,36 +753,34 @@
 
     protected override async Task OnInitializedAsync()
     {
-        persistingSubscription = ApplicationState.RegisterOnPersisting(PersistCheckoutState);
-
         availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
         paymentReferenceCode = $"JAS{Random.Shared.Next(1000, 9999)}";
         Cart.OnChange += OnCartChanged;
 
-        if (ApplicationState.TryTakeFromJson<CheckoutPersistedState>("jas_checkout_state", out var restored) && restored is not null && restored.DeliverySettings is not null)
+        if (PersistedState is not null && PersistedState.DeliverySettings is not null)
         {
-            deliverySettings = restored.DeliverySettings;
-            if (restored.CartState != null && Cart.State == null)
+            deliverySettings = PersistedState.DeliverySettings;
+            if (PersistedState.CartState != null && Cart.State == null)
             {
-                Cart.State = restored.CartState;
+                Cart.State = PersistedState.CartState;
             }
-            customerName = restored.CustomerName;
-            phoneNumber = restored.PhoneNumber;
-            email = restored.Email;
-            streetAddress = restored.StreetAddress;
-            selectedDivision = restored.SelectedDivision;
-            selectedDistrict = restored.SelectedDistrict;
-            selectedThana = restored.SelectedThana;
+            customerName = PersistedState.CustomerName;
+            phoneNumber = PersistedState.PhoneNumber;
+            email = PersistedState.Email;
+            streetAddress = PersistedState.StreetAddress;
+            selectedDivision = PersistedState.SelectedDivision;
+            selectedDistrict = PersistedState.SelectedDistrict;
+            selectedThana = PersistedState.SelectedThana;
             availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
             availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
-            appliedCouponCode = restored.AppliedCouponCode;
-            appliedCouponType = restored.AppliedCouponType;
-            couponDiscount = restored.CouponDiscount;
-            couponMessage = restored.CouponMessage;
-            deliveryFee = restored.DeliveryFee;
-            total = restored.Total;
-            isHubDistrict = restored.IsHubDistrict;
+            appliedCouponCode = PersistedState.AppliedCouponCode;
+            appliedCouponType = PersistedState.AppliedCouponType;
+            couponDiscount = PersistedState.CouponDiscount;
+            couponMessage = PersistedState.CouponMessage;
+            deliveryFee = PersistedState.DeliveryFee;
+            total = PersistedState.Total;
+            isHubDistrict = PersistedState.IsHubDistrict;
             cartReady = true;
 
             _ = Task.Run(async () =>
@@ -856,32 +854,27 @@
             {
                 cartReady = true;
                 UpdateDeliveryAndTotal();
+                PersistedState = new CheckoutPersistedState
+                {
+                    DeliverySettings = deliverySettings,
+                    CartState = Cart.State,
+                    CustomerName = customerName,
+                    PhoneNumber = phoneNumber,
+                    Email = email,
+                    StreetAddress = streetAddress,
+                    SelectedDivision = selectedDivision,
+                    SelectedDistrict = selectedDistrict,
+                    SelectedThana = selectedThana,
+                    AppliedCouponCode = appliedCouponCode,
+                    AppliedCouponType = appliedCouponType,
+                    CouponDiscount = couponDiscount,
+                    CouponMessage = couponMessage,
+                    DeliveryFee = deliveryFee,
+                    Total = total,
+                    IsHubDistrict = isHubDistrict
+                };
             }
         }
-    }
-
-    private Task PersistCheckoutState()
-    {
-        ApplicationState.PersistAsJson("jas_checkout_state", new CheckoutPersistedState
-        {
-            DeliverySettings = deliverySettings,
-            CartState = Cart.State,
-            CustomerName = customerName,
-            PhoneNumber = phoneNumber,
-            Email = email,
-            StreetAddress = streetAddress,
-            SelectedDivision = selectedDivision,
-            SelectedDistrict = selectedDistrict,
-            SelectedThana = selectedThana,
-            AppliedCouponCode = appliedCouponCode,
-            AppliedCouponType = appliedCouponType,
-            CouponDiscount = couponDiscount,
-            CouponMessage = couponMessage,
-            DeliveryFee = deliveryFee,
-            Total = total,
-            IsHubDistrict = isHubDistrict
-        });
-        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1225,7 +1218,6 @@
 
     public void Dispose()
     {
-        persistingSubscription.Dispose();
         Cart.OnChange -= OnCartChanged;
     }
 }
