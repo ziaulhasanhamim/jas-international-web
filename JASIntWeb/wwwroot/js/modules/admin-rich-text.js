@@ -39,6 +39,7 @@ export function create(element, receiver, options) {
     options = options || {};
     let disposed = false, starting = false, editor = null;
     let html = element.value, disabled = options.disabled ?? options.Disabled ?? false, synchronizing = false, ready = false;
+    let layoutRetries = 0;
 
     function sync() {
         if (!editor) return;
@@ -52,16 +53,47 @@ export function create(element, receiver, options) {
 
     async function start() {
         if (disposed || starting || !element.isConnected) return;
-        if (element.getClientRects().length === 0) return;
+        if (ready && editor) return;
+
+        // Check if element is inside a closed <details> or hidden container
+        const isHiddenContainer = element.closest('details:not([open]), [hidden]');
+        if (isHiddenContainer) {
+            // Wait for user to open the container (ResizeObserver will trigger start)
+            return;
+        }
+
+        // Handle momentary zero-geometry during Blazor enhanced navigation DOM settling
+        if (element.getClientRects().length === 0) {
+            if (layoutRetries < 5) {
+                layoutRetries++;
+                requestAnimationFrame(() => {
+                    if (!disposed && element.isConnected) start();
+                });
+                return;
+            }
+        }
         starting = true;
         try {
             await loadEditor();
             if (disposed || !element.isConnected) return;
             html = element.value;
 
-            // Remove any existing editor attached to this target element or id
-            if (element.id && window.tinymce?.get(element.id)) {
-                try { window.tinymce.get(element.id).remove(); } catch (e) {}
+            // Ensure element has a valid, unique id
+            if (!element.id) {
+                element.id = 'tinymce_' + Math.random().toString(36).substring(2, 9);
+            }
+            const targetId = element.id;
+
+            // Purge any existing editor attached to this target element or id, or detached editors
+            if (window.tinymce) {
+                if (targetId && window.tinymce.get(targetId)) {
+                    try { window.tinymce.get(targetId).remove(); } catch (e) {}
+                }
+                for (const ed of [...(window.tinymce.editors || [])]) {
+                    if (ed.getElement() === element || !ed.getElement()?.isConnected) {
+                        try { ed.remove(); } catch (e) {}
+                    }
+                }
             }
 
             const rawHeight = options.height || options.Height;
@@ -492,8 +524,16 @@ export function create(element, receiver, options) {
                 }
             });
 
-            if (disposed) { for (const item of editors) item.remove(); return; }
-            editor = editors[0];
+            if (disposed) {
+                const ed = window.tinymce?.get(targetId);
+                if (ed) try { ed.remove(); } catch (e) {}
+                for (const item of (editors || [])) item.remove();
+                return;
+            }
+            editor = (editors && editors.length > 0) ? editors[0] : (window.tinymce?.get(targetId) || null);
+            if (!editor && window.tinymce?.activeEditor) {
+                editor = window.tinymce.activeEditor;
+            }
             observer.disconnect();
             sync();
             ready = true;
@@ -506,15 +546,17 @@ export function create(element, receiver, options) {
     }
 
     const observer = new ResizeObserver(start);
-    const removalObserver = new MutationObserver(() => { if (!element.isConnected) dispose(); });
-    removalObserver.observe(document.body, { childList: true, subtree: true });
 
     function dispose() {
         if (disposed) return;
         disposed = true;
         observer.disconnect();
-        removalObserver.disconnect();
-        editor?.remove();
+        if (editor) {
+            try { editor.remove(); } catch (e) {}
+            editor = null;
+        } else if (element.id && window.tinymce?.get(element.id)) {
+            try { window.tinymce.get(element.id).remove(); } catch (e) {}
+        }
     }
 
     observer.observe(element);
@@ -524,4 +566,19 @@ export function create(element, receiver, options) {
         update(value, readOnly) { if (disposed) return; html = value ?? ''; disabled = readOnly; sync(); },
         dispose
     };
+}
+
+// Listen to Blazor enhanced load events to purge stale, detached editors
+if (typeof window !== 'undefined' && window.Blazor) {
+    try {
+        window.Blazor.addEventListener('enhancedload', () => {
+            if (window.tinymce) {
+                for (const ed of [...(window.tinymce.editors || [])]) {
+                    if (!ed.getElement()?.isConnected) {
+                        try { ed.remove(); } catch (e) {}
+                    }
+                }
+            }
+        });
+    } catch (e) {}
 }

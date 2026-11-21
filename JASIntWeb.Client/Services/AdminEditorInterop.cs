@@ -8,7 +8,7 @@ public sealed record RichEditorOptions(int Height, bool Specifications, bool Dis
 // Each component owns one handle. Modules use local listeners and expose deterministic cleanup.
 public sealed class AdminEditorInterop(IJSRuntime js) : IAsyncDisposable
 {
-    private const string Version = "20261121v8";
+    private const string Version = "20261121v11";
     private IJSObjectReference? module;
     private IJSObjectReference? control;
     private bool disposed;

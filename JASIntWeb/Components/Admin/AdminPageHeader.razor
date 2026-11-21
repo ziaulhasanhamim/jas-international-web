@@ -7,8 +7,8 @@
     @if (!string.IsNullOrWhiteSpace(ActionHref))
     {
         <div class="admin-heading-actions">
-            @if (!string.IsNullOrWhiteSpace(SecondaryActionHref)) { <a href="@SecondaryActionHref" class="btn-secondary">@SecondaryActionText</a> }
-            <a href="@ActionHref" class="@(ActionText.StartsWith("Back", StringComparison.OrdinalIgnoreCase) ? "btn-secondary" : "btn-primary")">@ActionText.TrimStart('+', ' ')</a>
+            @if (!string.IsNullOrWhiteSpace(SecondaryActionHref)) { <a href="@SecondaryActionHref" data-enhance="@ActionEnhance" class="btn-secondary">@SecondaryActionText</a> }
+            <a href="@ActionHref" data-enhance="@ActionEnhance" class="@(ActionText.StartsWith("Back", StringComparison.OrdinalIgnoreCase) ? "btn-secondary" : "btn-primary")">@ActionText.TrimStart('+', ' ')</a>
         </div>
     }
 </div>
@@ -25,6 +25,8 @@
     public string? ActionHref { get; set; }
     [Parameter]
     public string ActionText { get; set; } = "Add record";
+    [Parameter]
+    public string? ActionEnhance { get; set; }
     [Parameter]
     public string? SecondaryActionHref { get; set; }
     [Parameter]

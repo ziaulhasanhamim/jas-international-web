@@ -7,7 +7,7 @@
 
 <PageTitle>Buying Guides · JAS Admin</PageTitle>
 
-<AdminPageHeader Title="Buying Guides" Eyebrow="Storefront Content & SEO" Description="Create and manage comprehensive tech buying guides, model comparisons and product recommendations." ActionHref="/admin/guides/new" ActionText="Write guide" />
+<AdminPageHeader Title="Buying Guides" Eyebrow="Storefront Content & SEO" Description="Create and manage comprehensive tech buying guides, model comparisons and product recommendations." ActionHref="/admin/guides/new" ActionText="Write guide" ActionEnhance="false" />
 
 @if (!string.IsNullOrWhiteSpace(_toast))
 {
@@ -52,7 +52,7 @@
             <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                 @(string.IsNullOrWhiteSpace(Query) ? "Write informative guides to help customers compare audio, smartwatches, and chargers." : "Try adjusting your search query or clear the filter.")
             </p>
-            <a href="@(string.IsNullOrWhiteSpace(Query) ? "/admin/guides/new" : "/admin/guides")" class="btn-primary text-xs mt-4 inline-block">
+            <a href="@(string.IsNullOrWhiteSpace(Query) ? "/admin/guides/new" : "/admin/guides")" data-enhance="@(string.IsNullOrWhiteSpace(Query) ? "false" : null)" class="btn-primary text-xs mt-4 inline-block">
                 @(string.IsNullOrWhiteSpace(Query) ? "Write your first guide" : "Clear filters")
             </a>
         </div>
@@ -77,7 +77,7 @@
 
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 flex-wrap mb-1">
-                                <a href="/admin/guides/@g.Id/edit" class="text-sm font-bold text-slate-900 hover:text-blue-600 transition truncate max-w-md">
+                                <a href="/admin/guides/@g.Id/edit" data-enhance="false" class="text-sm font-bold text-slate-900 hover:text-blue-600 transition truncate max-w-md">
                                     @g.Title
                                 </a>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold @(g.IsPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")">
@@ -104,7 +104,7 @@
                         <a href="/guides/@g.Slug" target="_blank" class="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition" title="View live on storefront">
                             <span class="text-xs font-semibold">Live ↗</span>
                         </a>
-                        <a href="/admin/guides/@g.Id/edit" class="btn-secondary text-xs !px-3 !py-1.5">
+                        <a href="/admin/guides/@g.Id/edit" data-enhance="false" class="btn-secondary text-xs !px-3 !py-1.5">
                             Edit
                         </a>
                         <form method="post" @formname="@($"delete-guide-{g.Id}")" data-enhance class="inline">
