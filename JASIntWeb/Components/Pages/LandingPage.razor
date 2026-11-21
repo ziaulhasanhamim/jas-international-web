@@ -8,6 +8,7 @@
 @inject ISeoService Seo
 @inject NavigationManager Nav
 @inject IConfiguration Config
+@inject JASIntWeb.Services.Meta.IMetaConversionsApiService MetaApi
 
 @if (loading)
 {
@@ -42,6 +43,8 @@ else
     var waText = Uri.EscapeDataString($"Hi JAS International, I want to order {product.Name} (৳{price:N0}) from your special offer. Link: {currentUrl}");
     var waUrl = $"https://wa.me/{waNumber}?text={waText}";
 
+    var sku = (!string.IsNullOrWhiteSpace(defaultVariant?.SKU) ? defaultVariant.SKU : (defaultVariant != null ? $"V{defaultVariant.Id}" : $"P{product.Id}")).Trim().ToUpperInvariant();
+
     <SeoHead Title="@($"{product.Name} — Exclusive Offer | JAS International")"
              Description="@($"Special promotion on authentic {product.Name}. Fast delivery across Bangladesh with Cash on Delivery.")"
              CanonicalPath="@($"/product/{product.Slug}")"
@@ -49,7 +52,8 @@ else
              Robots="noindex,follow" />
 
     <div data-meta-event="ViewContent"
-         data-content-id="@(defaultVariant?.SKU ?? product.Id.ToString())"
+         data-event-id="@viewContentEventId"
+         data-content-id="@sku"
          data-content-name="@product.Name"
          data-content-category="@(product.Category?.Name ?? "Gadgets")"
          data-value="@price"
@@ -167,6 +171,7 @@ else
 
     private bool loading = true;
     private Product? product;
+    private string? viewContentEventId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -185,6 +190,17 @@ else
             if (product == null && HttpContext != null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            }
+            else if (product != null)
+            {
+                var defaultVariant = product.ProductVariants.FirstOrDefault(v => v.IsDefault && !v.IsDeleted && v.IsActive)
+                    ?? product.ProductVariants.FirstOrDefault(v => !v.IsDeleted && v.IsActive);
+                var sku = (!string.IsNullOrWhiteSpace(defaultVariant?.SKU) ? defaultVariant.SKU : (defaultVariant != null ? $"V{defaultVariant.Id}" : $"P{product.Id}")).Trim().ToUpperInvariant();
+                viewContentEventId = $"vc_lp_{defaultVariant?.Id ?? product.Id}_{Guid.CreateVersion7():N}";
+                if (HttpContext != null && defaultVariant != null)
+                {
+                    _ = MetaApi.EnqueueViewContentEventAsync(sku, product.Name, product.Category?.Name, defaultVariant.SellingPrice, viewContentEventId, HttpContext);
+                }
             }
         }
         finally

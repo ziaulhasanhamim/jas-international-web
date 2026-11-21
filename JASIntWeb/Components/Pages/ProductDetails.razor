@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject JASIntWeb.Services.Seo.ISeoService Seo
 @inject IConfiguration Config
+@inject JASIntWeb.Services.Meta.IMetaConversionsApiService MetaApi
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Services
@@ -103,13 +104,15 @@ else
 
     @if (selected is not null)
     {
-    <div data-meta-event="ViewContent"
-         data-content-id="@selectedSku"
-         data-content-name="@product.Name"
-         data-content-category="@product.Category"
-         data-value="@price"
-         data-currency="BDT"
-         hidden></div>
+        var sku = (!string.IsNullOrWhiteSpace(selected.Sku) ? selected.Sku : $"V{selected.Id}").Trim().ToUpperInvariant();
+        <div data-meta-event="ViewContent"
+             data-event-id="@viewContentEventId"
+             data-content-id="@sku"
+             data-content-name="@product.Name"
+             data-content-category="@product.Category"
+             data-value="@selected.Price"
+             data-currency="BDT"
+             hidden></div>
     }
     <div class="shop-container pt-6 pb-20 md:pb-6">
         <!-- Breadcrumb Navigation -->
@@ -610,6 +613,7 @@ else
 
     private ProductDetailsDto? product;
     private ProductVariantDto? selected;
+    private string? viewContentEventId;
     private Dictionary<string, string> choices = [];
     private string image = "";
     private List<ProductSummaryDto> relatedProducts = [];
@@ -659,6 +663,15 @@ else
         }
         choices = ProductOptions.Selection(product, requested);
         selected = ProductOptions.Match(product, choices);
+        if (selected is not null)
+        {
+            var sku = (!string.IsNullOrWhiteSpace(selected.Sku) ? selected.Sku : $"V{selected.Id}").Trim().ToUpperInvariant();
+            viewContentEventId = $"vc_{selected.Id}_{Guid.CreateVersion7():N}";
+            if (HttpContext is not null)
+            {
+                _ = MetaApi.EnqueueViewContentEventAsync(sku, product.Name, product.Category, selected.Price, viewContentEventId, HttpContext);
+            }
+        }
         image = product.Images.ElementAtOrDefault(ImageIndex ?? 0) ?? product.MainImage;
 
         relatedProducts = await Catalog.LatestAsync(product.CategorySlug, 4, product.Id);

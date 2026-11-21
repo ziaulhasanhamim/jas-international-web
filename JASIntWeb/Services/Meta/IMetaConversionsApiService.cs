@@ -47,6 +47,9 @@ public interface IMetaConversionsApiService
     Task<MetaAdsConfig> GetEffectiveConfigAsync();
     Task<bool> SendPurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null, CancellationToken ct = default);
     Task<bool> EnqueuePurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null);
+    Task<bool> EnqueueViewContentEventAsync(string sku, string productName, string? categoryName, decimal price, string eventId, HttpContext? httpContext = null);
+    Task<bool> EnqueueAddToCartEventAsync(string sku, string productName, string? categoryName, decimal price, int quantity, string eventId, HttpContext? httpContext = null);
+    Task<bool> EnqueueInitiateCheckoutEventAsync(CartDto cart, string eventId, HttpContext? httpContext = null);
     Task<bool> EnqueueDeliveredEventAsync(Order order, HttpContext? httpContext = null);
     Task<bool> EnqueueCancelledEventAsync(Order order, HttpContext? httpContext = null);
     Task<bool> SendEventAsync(string eventName, string eventId, string? eventSourceUrl, MetaUserData userData, MetaCustomData? customData = null, CancellationToken ct = default);

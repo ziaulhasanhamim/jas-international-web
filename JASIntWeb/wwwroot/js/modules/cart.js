@@ -229,6 +229,28 @@ export async function addToCart(variantId, quantity = 1, productId = 0, { showTo
 
             emit('cart:updated', cart);
 
+            // Track Meta Pixel AddToCart event
+            try {
+                const addedItem = Array.isArray(cart?.items) ? cart.items.find(i => i.variantId === Number(variantId)) : null;
+                const sku = cart?.addedSku || addedItem?.sku || (variantId ? `V${variantId}` : null);
+                const eventId = cart?.metaEventId || response.headers?.get('X-Meta-Event-Id') || `atc_${variantId}_${Date.now()}`;
+                const price = addedItem?.price || 0;
+                const name = addedItem?.name || 'Product';
+                const qty = Math.max(1, Number(quantity) || 1);
+
+                if (sku && typeof window.jasTrackMeta === 'function') {
+                    window.jasTrackMeta('AddToCart', {
+                        content_ids: [String(sku).trim().toUpperCase()],
+                        content_name: name,
+                        content_type: 'product',
+                        value: price * qty,
+                        currency: 'BDT'
+                    }, eventId);
+                }
+            } catch (trackErr) {
+                console.debug('[Cart] Meta AddToCart tracking error:', trackErr);
+            }
+
             if (showToast) {
                 showCartToast('Added to your shopping cart!', 'success');
             }

@@ -66,15 +66,235 @@ public sealed partial class MetaConversionsApiService(
         return await EnqueuePurchaseEventAsync(order, request, httpContext);
     }
 
+    private static bool HasMarketingConsent(HttpContext? httpContext)
+    {
+        if (httpContext == null) return true;
+        return httpContext.Request.Cookies["jas_cookie_consent"] != "essential";
+    }
+
+    private static MetaUserData ExtractUserData(HttpContext? httpContext, CheckoutRequest? request = null)
+    {
+        string? clientIp = null;
+        string? userAgent = null;
+        string? fbp = null;
+        string? fbc = null;
+
+        if (httpContext != null)
+        {
+            clientIp = ResolveClientIp(httpContext);
+            userAgent = httpContext.Request.Headers.UserAgent.ToString();
+            httpContext.Request.Cookies.TryGetValue("_fbp", out fbp);
+            httpContext.Request.Cookies.TryGetValue("_fbc", out fbc);
+        }
+
+        if (request != null)
+        {
+            fbp ??= request.Fbp;
+            fbc ??= request.Fbc;
+        }
+
+        return new MetaUserData
+        {
+            ClientIpAddress = clientIp,
+            ClientUserAgent = userAgent,
+            Fbp = fbp,
+            Fbc = fbc,
+            Country = "BD"
+        };
+    }
+
+    public async Task<bool> EnqueueViewContentEventAsync(
+        string sku,
+        string productName,
+        string? categoryName,
+        decimal price,
+        string eventId,
+        HttpContext? httpContext = null)
+    {
+        if (!HasMarketingConsent(httpContext)) return false;
+        try
+        {
+            var config = await GetEffectiveConfigAsync();
+            if (!config.Enabled || !config.IsConfigured) return false;
+
+            var normalizedSku = sku.Trim().ToUpperInvariant();
+            var userData = ExtractUserData(httpContext);
+
+            var eventSourceUrl = httpContext != null
+                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}{httpContext.Request.Path}{httpContext.Request.QueryString}"
+                : "https://www.jasinternational.com.bd";
+
+            var customData = new MetaCustomData
+            {
+                Value = price,
+                Currency = "BDT",
+                ContentType = "product",
+                ContentName = productName,
+                ContentCategory = categoryName,
+                ContentIds = [normalizedSku],
+                Contents =
+                [
+                    new MetaContentItem
+                    {
+                        Id = normalizedSku,
+                        Title = productName,
+                        Quantity = 1,
+                        ItemPrice = price
+                    }
+                ]
+            };
+
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "ViewContent",
+                EventId = eventId,
+                EventSourceUrl = eventSourceUrl,
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogDebug("Enqueued Meta CAPI ViewContent event for SKU {Sku} (EventId: {EventId})", normalizedSku, eventId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue Meta CAPI ViewContent event for SKU {Sku}", sku);
+            return false;
+        }
+    }
+
+    public async Task<bool> EnqueueAddToCartEventAsync(
+        string sku,
+        string productName,
+        string? categoryName,
+        decimal price,
+        int quantity,
+        string eventId,
+        HttpContext? httpContext = null)
+    {
+        if (!HasMarketingConsent(httpContext)) return false;
+        try
+        {
+            var config = await GetEffectiveConfigAsync();
+            if (!config.Enabled || !config.IsConfigured) return false;
+
+            var normalizedSku = sku.Trim().ToUpperInvariant();
+            var qty = Math.Max(1, quantity);
+            var userData = ExtractUserData(httpContext);
+
+            var eventSourceUrl = httpContext != null
+                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}{httpContext.Request.Path}"
+                : "https://www.jasinternational.com.bd";
+
+            var customData = new MetaCustomData
+            {
+                Value = price * qty,
+                Currency = "BDT",
+                ContentType = "product",
+                ContentName = productName,
+                ContentCategory = categoryName,
+                NumItems = qty,
+                ContentIds = [normalizedSku],
+                Contents =
+                [
+                    new MetaContentItem
+                    {
+                        Id = normalizedSku,
+                        Title = productName,
+                        Quantity = qty,
+                        ItemPrice = price
+                    }
+                ]
+            };
+
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "AddToCart",
+                EventId = eventId,
+                EventSourceUrl = eventSourceUrl,
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogDebug("Enqueued Meta CAPI AddToCart event for SKU {Sku} (EventId: {EventId})", normalizedSku, eventId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue Meta CAPI AddToCart event for SKU {Sku}", sku);
+            return false;
+        }
+    }
+
+    public async Task<bool> EnqueueInitiateCheckoutEventAsync(
+        CartDto cart,
+        string eventId,
+        HttpContext? httpContext = null)
+    {
+        if (!HasMarketingConsent(httpContext)) return false;
+        try
+        {
+            var config = await GetEffectiveConfigAsync();
+            if (!config.Enabled || !config.IsConfigured) return false;
+
+            var userData = ExtractUserData(httpContext);
+
+            var eventSourceUrl = httpContext != null
+                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/checkout"
+                : "https://www.jasinternational.com.bd/checkout";
+
+            var items = cart.Items.Select(i => new MetaContentItem
+            {
+                Id = (!string.IsNullOrWhiteSpace(i.Sku) ? i.Sku : $"V{i.VariantId}").Trim().ToUpperInvariant(),
+                Title = $"{i.Name} ({i.Variant})",
+                Quantity = i.Quantity,
+                ItemPrice = i.Price
+            }).ToList();
+
+            var customData = new MetaCustomData
+            {
+                Value = cart.Subtotal,
+                Currency = "BDT",
+                ContentType = "product",
+                NumItems = cart.ItemCount,
+                ContentIds = [.. items.Select(i => i.Id)],
+                Contents = items
+            };
+
+            var payload = new MetaCapiEventPayload
+            {
+                EventName = "InitiateCheckout",
+                EventId = eventId,
+                EventSourceUrl = eventSourceUrl,
+                EventTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UserData = userData,
+                CustomData = customData
+            };
+
+            await queue.EnqueueAsync(payload);
+            logger.LogDebug("Enqueued Meta CAPI InitiateCheckout event (EventId: {EventId})", eventId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue Meta CAPI InitiateCheckout event");
+            return false;
+        }
+    }
+
     public async Task<bool> EnqueuePurchaseEventAsync(Order order, CheckoutRequest? request = null, HttpContext? httpContext = null)
     {
-        if (!order.MarketingConsent) return false;
+        if (!order.MarketingConsent || !HasMarketingConsent(httpContext)) return false;
         try
         {
             var eventId = order.PublicToken.ToString();
             var eventSourceUrl = httpContext != null
-                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/checkout"
-                : $"https://www.jasinternational.com.bd/checkout";
+                ? $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/order/{order.PublicToken}"
+                : $"https://www.jasinternational.com.bd/order/{order.PublicToken}";
 
             var customerName = order.DeliveryAddress?.CustomerName ?? request?.CustomerName ?? "";
             var (firstName, lastName) = SplitName(customerName);
@@ -113,7 +333,9 @@ public sealed partial class MetaConversionsApiService(
 
             var items = order.Items?.Select(i => new MetaContentItem
             {
-                Id = i.ProductVariantId > 0 ? i.ProductVariantId.ToString() : i.ProductName,
+                Id = (!string.IsNullOrWhiteSpace(i.ProductVariant?.SKU)
+                    ? i.ProductVariant.SKU
+                    : (i.ProductVariantId > 0 ? $"V{i.ProductVariantId}" : i.ProductName)).Trim().ToUpperInvariant(),
                 Title = $"{i.ProductName} ({i.VariantName})",
                 Quantity = i.Quantity,
                 ItemPrice = i.UnitPrice

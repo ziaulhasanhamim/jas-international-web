@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services;
+using JASIntWeb.Services.Meta;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +41,8 @@ public static class CartEndpoints
             [FromForm] int? variantId,
             [FromForm] int? quantity,
             AppDbContext db,
-            ShoppingService shop) =>
+            ShoppingService shop,
+            IMetaConversionsApiService metaApi) =>
         {
             var vId = variantId ?? 0;
             if (vId <= 0 && productId > 0)
@@ -55,7 +57,7 @@ public static class CartEndpoints
 
             try
             {
-                await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop);
+                await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop, metaApi);
             }
             catch (ShopException)
             {
@@ -70,11 +72,12 @@ public static class CartEndpoints
             [FromForm] int? quantity,
             [FromForm] string? returnUrl,
             AppDbContext db,
-            ShoppingService shop) =>
+            ShoppingService shop,
+            IMetaConversionsApiService metaApi) =>
         {
             try
             {
-                await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop);
+                await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop, metaApi);
             }
             catch (ShopException)
             {
@@ -164,7 +167,8 @@ public static class CartEndpoints
         int? variantId,
         int quantity,
         AppDbContext db,
-        ShoppingService shop)
+        ShoppingService shop,
+        IMetaConversionsApiService? metaApi = null)
     {
         var vId = variantId ?? 0;
         if (vId <= 0 && productId > 0)
@@ -189,6 +193,20 @@ public static class CartEndpoints
                 {
                     SetCartCookie(context, cart.Token.Value);
                 }
+
+                if (metaApi != null)
+                {
+                    var variant = await db.ProductVariants.AsNoTracking()
+                        .Include(v => v.Product).ThenInclude(p => p!.Category)
+                        .FirstOrDefaultAsync(v => v.Id == vId);
+                    if (variant != null)
+                    {
+                        var sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
+                        var atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
+                        await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+                    }
+                }
+
                 return cart.Items.Sum(i => i.Quantity);
             }
             catch (ShopException)
@@ -241,7 +259,8 @@ public static class CartEndpoints
         HttpContext context,
         ClaimsPrincipal user,
         ShoppingService shop,
-        AppDbContext db)
+        AppDbContext db,
+        IMetaConversionsApiService metaApi)
     {
         var variantId = line.VariantId;
         if (variantId <= 0 && line.ProductId > 0)
@@ -267,6 +286,26 @@ public static class CartEndpoints
             {
                 SetCartCookie(context, cart.Token.Value);
             }
+
+            var variant = await db.ProductVariants.AsNoTracking()
+                .Include(v => v.Product).ThenInclude(p => p!.Category)
+                .FirstOrDefaultAsync(v => v.Id == variantId);
+
+            string? atcEventId = null;
+            string? sku = null;
+            if (variant != null)
+            {
+                sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
+                atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
+                var qty = line.Quantity > 0 ? line.Quantity : 1;
+                await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+
+                context.Response.Headers["X-Meta-Event-Id"] = atcEventId;
+                context.Response.Headers["X-Meta-SKU"] = sku;
+
+                cart = cart with { MetaEventId = atcEventId, AddedSku = sku };
+            }
+
             return Results.Ok(cart);
         }
         catch (ShopException ex)

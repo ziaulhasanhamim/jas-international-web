@@ -20,18 +20,28 @@ public class CustomerConfidenceTests
         => await BangladeshPhone.Normalize(input).Should().BeEqualTo(expected);
 
     [Test]
-    public async Task Attribution_WithoutAcceptedConsentCreatesNoTrackingCookiesOrData()
+    public async Task Attribution_WithEssentialConsent_CreatesNoTrackingCookiesOrData()
     {
-        foreach (var cookie in new[] { "", "jas_cookie_consent=essential" })
-        {
-            var context = new DefaultHttpContext(); context.Request.Headers.Cookie = cookie;
-            context.Request.QueryString = new QueryString("?fbclid=test-click&utm_source=meta");
-            var called = false;
-            await new MetaAttributionMiddleware(_ => { called = true; return Task.CompletedTask; }).InvokeAsync(context);
-            await called.Should().BeTrue();
-            await context.Response.Headers.SetCookie.Count.Should().BeEqualTo(0);
-            await context.Items.ContainsKey(MetaAttributionMiddleware.AttributionItemKey).Should().BeFalse();
-        }
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = "jas_cookie_consent=essential";
+        context.Request.QueryString = new QueryString("?fbclid=test-click&utm_source=meta");
+        var called = false;
+        await new MetaAttributionMiddleware(_ => { called = true; return Task.CompletedTask; }).InvokeAsync(context);
+        await called.Should().BeTrue();
+        await context.Response.Headers.SetCookie.Count.Should().BeEqualTo(0);
+        await context.Items.ContainsKey(MetaAttributionMiddleware.AttributionItemKey).Should().BeFalse();
+    }
+
+    [Test]
+    public async Task Attribution_DefaultWithoutExplicitDecline_CapturesAttribution()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?fbclid=test-click&utm_source=meta");
+        var called = false;
+        await new MetaAttributionMiddleware(_ => { called = true; return Task.CompletedTask; }).InvokeAsync(context);
+        await called.Should().BeTrue();
+        await context.Response.Headers.SetCookie.Count.Should().BeGreaterThan(0);
+        await context.Items.ContainsKey(MetaAttributionMiddleware.AttributionItemKey).Should().BeTrue();
     }
 
     [Test]

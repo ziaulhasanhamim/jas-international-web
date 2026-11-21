@@ -30,11 +30,21 @@
     {
         <PaymentSummary Order="order" />
         <OrderProgress Status="order.Status" />
+
+        var contentIds = order.Items.Select(i => (!string.IsNullOrWhiteSpace(i.ProductVariant?.SKU) ? i.ProductVariant.SKU : $"V{i.ProductVariantId}").Trim().ToUpperInvariant()).ToList();
+        var contents = order.Items.Select(i => new {
+            id = (!string.IsNullOrWhiteSpace(i.ProductVariant?.SKU) ? i.ProductVariant.SKU : $"V{i.ProductVariantId}").Trim().ToUpperInvariant(),
+            quantity = i.Quantity,
+            item_price = i.UnitPrice
+        }).ToList();
+
         <div data-meta-event="Purchase"
              data-event-id="@order.PublicToken"
-             data-order-id="@order.PublicToken"
+             data-order-id="@order.Id"
              data-value="@order.Total"
              data-currency="BDT"
+             data-content-ids="@System.Text.Json.JsonSerializer.Serialize(contentIds)"
+             data-contents="@System.Text.Json.JsonSerializer.Serialize(contents)"
              hidden></div>
 
         <script>
@@ -324,7 +334,7 @@
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var q = db.Orders.AsNoTracking()
-                .Include(o => o.Items)
+                .Include(o => o.Items).ThenInclude(i => i.ProductVariant)
                 .Include(o => o.DeliveryAddress)
                 .Include(o => o.Payments)
                 .AsQueryable();

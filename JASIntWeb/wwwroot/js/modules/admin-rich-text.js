@@ -78,16 +78,10 @@ export function create(element, receiver, options) {
             if (disposed || !element.isConnected) return;
             html = element.value;
 
-            // Ensure element has a valid, unique id
-            if (!element.id) {
-                element.id = 'tinymce_' + Math.random().toString(36).substring(2, 9);
-            }
-            const targetId = element.id;
-
-            // Purge any existing editor attached to this target element or id, or detached editors
+            // Always purge any stale/detached editor before mounting
             if (window.tinymce) {
-                if (targetId && window.tinymce.get(targetId)) {
-                    try { window.tinymce.get(targetId).remove(); } catch (e) {}
+                if (element.id && window.tinymce.get(element.id)) {
+                    try { window.tinymce.get(element.id).remove(); } catch (e) {}
                 }
                 for (const ed of [...(window.tinymce.editors || [])]) {
                     if (ed.getElement() === element || !ed.getElement()?.isConnected) {
@@ -95,6 +89,11 @@ export function create(element, receiver, options) {
                     }
                 }
             }
+
+            // Assign a unique instance ID to avoid colliding with any lingering reference in TinyMCE cache
+            const instanceId = 'tinymce_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+            element.id = instanceId;
+            const targetId = instanceId;
 
             const rawHeight = options.height || options.Height;
             const parsedHeight = parseInt(rawHeight, 10);

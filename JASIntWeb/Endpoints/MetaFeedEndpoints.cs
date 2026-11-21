@@ -63,6 +63,7 @@ public static class MetaFeedEndpoints
             .Include(v => v.Product).ThenInclude(p => p!.Brand)
             .Include(v => v.Product).ThenInclude(p => p!.Category)
             .Include(v => v.Product).ThenInclude(p => p!.ProductImages)
+            .Include(v => v.Options).ThenInclude(o => o.ProductAttributeOption).ThenInclude(pao => pao!.ProductAttributeDefinition)
             .Where(v => v.IsActive && !v.IsDeleted && v.Product != null && !v.Product.IsDeleted)
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
@@ -92,9 +93,8 @@ public static class MetaFeedEndpoints
             }
 
             var productUrl = $"{baseUrl}product/{prod.Slug}?variant={v.Id}";
-            var title = string.IsNullOrWhiteSpace(v.OptionSignature) || v.OptionSignature.Equals("Default", StringComparison.OrdinalIgnoreCase)
-                ? prod.Name
-                : $"{prod.Name} - {v.OptionSignature}";
+            var id = (!string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}").Trim().ToUpperInvariant();
+            var title = BuildVariantTitle(v, prod);
 
             var description = !string.IsNullOrWhiteSpace(prod.Description) ? prod.Description.Trim() : title;
             description = Regex.Replace(description, "<.*?>", string.Empty);
@@ -103,7 +103,7 @@ public static class MetaFeedEndpoints
             var (label0, label1, label2, label3, label4) = ComputeCustomLabels(v, prod, availableStock);
 
             var item = new XElement("item",
-                new XElement(G + "id", !string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}"),
+                new XElement(G + "id", id),
                 new XElement(G + "item_group_id", $"P{prod.Id}"),
                 new XElement(G + "title", new XCData(title)),
                 new XElement(G + "description", new XCData(description)),
@@ -113,6 +113,7 @@ public static class MetaFeedEndpoints
                 new XElement(G + "condition", "new"),
                 new XElement(G + "availability", inStock ? "in stock" : "out of stock"),
                 new XElement(G + "price", $"{v.SellingPrice:0.00} BDT"),
+                new XElement(G + "google_product_category", ResolveGoogleProductCategory(prod.Category?.Slug)),
                 new XElement(G + "custom_label_0", label0),
                 new XElement(G + "custom_label_1", label1),
                 new XElement(G + "custom_label_2", label2),
@@ -122,7 +123,12 @@ public static class MetaFeedEndpoints
 
             if (!string.IsNullOrWhiteSpace(v.Barcode))
             {
-                item.Add(new XElement(G + "gtin", v.Barcode));
+                item.Add(new XElement(G + "gtin", v.Barcode.Trim()));
+                item.Add(new XElement(G + "identifier_exists", "true"));
+            }
+            else
+            {
+                item.Add(new XElement(G + "identifier_exists", "false"));
             }
 
             if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
@@ -174,13 +180,14 @@ public static class MetaFeedEndpoints
             .Include(v => v.Product).ThenInclude(p => p!.Brand)
             .Include(v => v.Product).ThenInclude(p => p!.Category)
             .Include(v => v.Product).ThenInclude(p => p!.ProductImages)
+            .Include(v => v.Options).ThenInclude(o => o.ProductAttributeOption).ThenInclude(pao => pao!.ProductAttributeDefinition)
             .Where(v => v.IsActive && !v.IsDeleted && v.Product != null && !v.Product.IsDeleted)
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
             .ToListAsync();
 
         var sb = new StringBuilder();
-        sb.AppendLine("id,title,description,availability,condition,price,link,image_link,brand,item_group_id,custom_label_0,custom_label_1,custom_label_2,custom_label_3,custom_label_4");
+        sb.AppendLine("id,title,description,availability,condition,price,link,image_link,brand,item_group_id,google_product_category,gtin,identifier_exists,custom_label_0,custom_label_1,custom_label_2,custom_label_3,custom_label_4");
 
         foreach (var v in variants)
         {
@@ -200,10 +207,8 @@ public static class MetaFeedEndpoints
             }
 
             var productUrl = $"{baseUrl}product/{prod.Slug}?variant={v.Id}";
-            var id = !string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}";
-            var title = string.IsNullOrWhiteSpace(v.OptionSignature) || v.OptionSignature.Equals("Default", StringComparison.OrdinalIgnoreCase)
-                ? prod.Name
-                : $"{prod.Name} - {v.OptionSignature}";
+            var id = (!string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}").Trim().ToUpperInvariant();
+            var title = BuildVariantTitle(v, prod);
 
             var description = !string.IsNullOrWhiteSpace(prod.Description) ? prod.Description : title;
             description = Regex.Replace(description, "<.*?>", string.Empty);
@@ -212,10 +217,13 @@ public static class MetaFeedEndpoints
             var availability = inStock ? "in stock" : "out of stock";
             var price = $"{v.SellingPrice:0.00} BDT";
             var itemGroupId = $"P{prod.Id}";
+            var googleCat = ResolveGoogleProductCategory(prod.Category?.Slug);
+            var gtin = !string.IsNullOrWhiteSpace(v.Barcode) ? v.Barcode.Trim() : "";
+            var identifierExists = !string.IsNullOrWhiteSpace(v.Barcode) ? "true" : "false";
 
             var (label0, label1, label2, label3, label4) = ComputeCustomLabels(v, prod, availableStock);
 
-            sb.AppendLine($"{CsvEscape(id)},{CsvEscape(title)},{CsvEscape(description)},{availability},new,{price},{CsvEscape(productUrl)},{CsvEscape(prodImage)},{CsvEscape(brandName)},{CsvEscape(itemGroupId)},{CsvEscape(label0)},{CsvEscape(label1)},{CsvEscape(label2)},{CsvEscape(label3)},{CsvEscape(label4)}");
+            sb.AppendLine($"{CsvEscape(id)},{CsvEscape(title)},{CsvEscape(description)},{availability},new,{price},{CsvEscape(productUrl)},{CsvEscape(prodImage)},{CsvEscape(brandName)},{CsvEscape(itemGroupId)},{CsvEscape(googleCat)},{CsvEscape(gtin)},{identifierExists},{CsvEscape(label0)},{CsvEscape(label1)},{CsvEscape(label2)},{CsvEscape(label3)},{CsvEscape(label4)}");
         }
 
         return Results.Content(sb.ToString(), "text/csv; charset=utf-8", Encoding.UTF8);
@@ -238,6 +246,7 @@ public static class MetaFeedEndpoints
             .Include(v => v.Product).ThenInclude(p => p!.Brand)
             .Include(v => v.Product).ThenInclude(p => p!.Category)
             .Include(v => v.Product).ThenInclude(p => p!.ProductImages)
+            .Include(v => v.Options).ThenInclude(o => o.ProductAttributeOption).ThenInclude(pao => pao!.ProductAttributeDefinition)
             .Where(v => v.IsActive && !v.IsDeleted && v.Product != null && !v.Product.IsDeleted)
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
@@ -267,9 +276,8 @@ public static class MetaFeedEndpoints
             }
 
             var productUrl = $"{baseUrl}product/{prod.Slug}?variant={v.Id}";
-            var title = string.IsNullOrWhiteSpace(v.OptionSignature) || v.OptionSignature.Equals("Default", StringComparison.OrdinalIgnoreCase)
-                ? prod.Name
-                : $"{prod.Name} - {v.OptionSignature}";
+            var id = (!string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}").Trim().ToUpperInvariant();
+            var title = BuildVariantTitle(v, prod);
 
             var description = !string.IsNullOrWhiteSpace(prod.Description) ? prod.Description.Trim() : title;
             description = Regex.Replace(description, "<.*?>", string.Empty);
@@ -278,7 +286,7 @@ public static class MetaFeedEndpoints
             var (label0, label1, label2, label3, label4) = ComputeCustomLabels(v, prod, availableStock);
 
             var item = new XElement("item",
-                new XElement(G + "id", !string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"V{v.Id}"),
+                new XElement(G + "id", id),
                 new XElement(G + "item_group_id", $"P{prod.Id}"),
                 new XElement(G + "title", new XCData(title)),
                 new XElement(G + "description", new XCData(description)),
@@ -288,6 +296,7 @@ public static class MetaFeedEndpoints
                 new XElement(G + "condition", "new"),
                 new XElement(G + "availability", inStock ? "in stock" : "out of stock"),
                 new XElement(G + "price", $"{v.SellingPrice:0.00} BDT"),
+                new XElement(G + "google_product_category", ResolveGoogleProductCategory(prod.Category?.Slug)),
                 new XElement(G + "custom_label_0", label0),
                 new XElement(G + "custom_label_1", label1),
                 new XElement(G + "custom_label_2", label2),
@@ -308,7 +317,12 @@ public static class MetaFeedEndpoints
 
             if (!string.IsNullOrWhiteSpace(v.Barcode))
             {
-                item.Add(new XElement(G + "gtin", v.Barcode));
+                item.Add(new XElement(G + "gtin", v.Barcode.Trim()));
+                item.Add(new XElement(G + "identifier_exists", "true"));
+            }
+            else
+            {
+                item.Add(new XElement(G + "identifier_exists", "false"));
             }
 
             if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
@@ -391,5 +405,57 @@ public static class MetaFeedEndpoints
         if (string.IsNullOrEmpty(value)) return "\"\"";
         var escaped = value.Replace("\"", "\"\"").Replace("\r", " ").Replace("\n", " ");
         return $"\"{escaped}\"";
+    }
+
+    public static string ResolveGoogleProductCategory(string? categorySlug) => (categorySlug?.ToLowerInvariant().Trim()) switch
+    {
+        "true-wireless-earbuds" or "tws" or "neckbands" or "neckband" or "headphones" or "audio-earbuds" or "audio"
+            => "Electronics > Audio > Audio Components > Headphones & Headsets",
+        "speakers" or "portable-speakers"
+            => "Electronics > Audio > Audio Components > Speakers",
+        "microphones" or "microphone"
+            => "Electronics > Audio > Audio Components > Microphones",
+        "smart-watches" or "smartwatches" or "smart-wearables"
+            => "Electronics > Wearable Technology > Smartwatches",
+        "fitness-bands"
+            => "Electronics > Wearable Technology > Activity Trackers",
+        "watch-accessories"
+            => "Electronics > Electronics Accessories > Watch Accessories",
+        "power-charging" or "power-banks" or "wall-chargers" or "wireless-chargers" or "chargers-power-banks"
+            => "Electronics > Electronics Accessories > Power > Power Adapters & Chargers",
+        "cables" or "cables-adapters"
+            => "Electronics > Electronics Accessories > Cables",
+        "converters-hubs"
+            => "Electronics > Electronics Accessories > Computer Components > USB & FireWire Hubs",
+        "tripods-lighting" or "creator-gear" or "creator-essentials" or "tripods-stands"
+            => "Cameras & Optics > Camera & Optic Accessories > Tripods & Monopods",
+        "cases-protection" or "screen-protectors" or "protective-cases" or "coolers-stands" or "phone-coolers" or "phone-stands" or "ipad-tablet-accessories"
+            => "Electronics > Electronics Accessories",
+        _ => "Electronics"
+    };
+
+    public static string BuildVariantTitle(Persistence.Entities.ProductVariant v, Persistence.Entities.Product prod)
+    {
+        var optionNames = string.Join(" / ", v.Options
+            .Where(o => o.ProductAttributeOption != null && !string.IsNullOrWhiteSpace(o.ProductAttributeOption.Value))
+            .OrderBy(o => o.ProductAttributeOption!.ProductAttributeDefinition?.SortOrder ?? 0)
+            .ThenBy(o => o.ProductAttributeDefinitionId)
+            .Select(o => o.ProductAttributeOption!.Value.Trim())
+            .Where(val => !string.IsNullOrWhiteSpace(val)));
+
+        if (!string.IsNullOrWhiteSpace(optionNames))
+        {
+            return $"{prod.Name} - {optionNames}";
+        }
+
+        // Avoid odd numeric suffixes like "2-3" or "~guid-1"
+        if (!string.IsNullOrWhiteSpace(v.OptionSignature) &&
+            !v.OptionSignature.Equals("Default", StringComparison.OrdinalIgnoreCase) &&
+            !Regex.IsMatch(v.OptionSignature.Trim(), @"^~?[0-9a-fA-F-]+$"))
+        {
+            return $"{prod.Name} - {v.OptionSignature.Trim()}";
+        }
+
+        return prod.Name;
     }
 }

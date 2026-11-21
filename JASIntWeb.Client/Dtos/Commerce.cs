@@ -6,12 +6,12 @@ public sealed record CartLineRequest(int VariantId, int Quantity, int ProductId 
 public sealed record CartMergeRequest(Guid Token, List<CartLineRequest> Items);
 
 public sealed record CartItemDto(int VariantId, string Name, string Slug, string Image, string Variant,
-    decimal Price, int Quantity, int Stock, bool IsAvailable)
+    decimal Price, int Quantity, int Stock, bool IsAvailable, string? Sku = null)
 {
     public decimal LineTotal => Price * Quantity;
 }
 
-public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items, Guid? Token = null)
+public sealed record CartDto(bool IsAuthenticated, List<CartItemDto> Items, Guid? Token = null, string? MetaEventId = null, string? AddedSku = null)
 {
     public decimal Subtotal => Items.Sum(x => x.LineTotal);
     public int ItemCount => Items.Sum(x => x.Quantity);

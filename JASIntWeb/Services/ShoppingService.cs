@@ -102,6 +102,7 @@ public sealed class ShoppingService(
             .Select(v => new
             {
                 v.Id,
+                v.SKU,
                 v.SellingPrice,
                 v.Product!.Name,
                 v.Product.Slug,
@@ -122,9 +123,10 @@ public sealed class ShoppingService(
                 {
                     var v = variants.GetValueOrDefault(l.VariantId);
                     var available = v?.Available == true;
+                    var sku = (!string.IsNullOrWhiteSpace(v?.SKU) ? v.SKU : (v != null ? $"V{v.Id}" : $"V{l.VariantId}")).Trim().ToUpperInvariant();
                     return new CartItemDto(l.VariantId, v?.Name ?? "Unavailable product", v?.Slug ?? "",
                         v?.MainImageUrl ?? "", v is null ? "" : string.Join(" / ", v.Options),
-                        v?.SellingPrice ?? 0, l.Quantity, available ? v!.Stock : 0, available);
+                        v?.SellingPrice ?? 0, l.Quantity, available ? v!.Stock : 0, available, sku);
                 })]);
     }
 
@@ -572,7 +574,7 @@ public sealed class ShoppingService(
         var adSetId = !string.IsNullOrWhiteSpace(request.AdSetId) ? request.AdSetId.Trim() : attr?.AdSetId;
         var adId = !string.IsNullOrWhiteSpace(request.AdId) ? request.AdId.Trim() : attr?.AdId;
         var landingPath = attr?.LandingPath;
-        var marketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted";
+        var marketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] != "essential";
         if (!marketingConsent)
         {
             fbclid = fbp = fbc = utmSource = utmMedium = utmCampaign = utmContent = utmTerm = campaignId = adSetId = adId = landingPath = null;
@@ -612,13 +614,14 @@ public sealed class ShoppingService(
             AdSetId = adSetId,
             AdId = adId,
             LandingPath = landingPath,
-            MarketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted",
-            MetaPurchaseSent = httpContext?.Request.Cookies["jas_cookie_consent"] == "accepted",
+            MarketingConsent = httpContext?.Request.Cookies["jas_cookie_consent"] != "essential",
+            MetaPurchaseSent = httpContext?.Request.Cookies["jas_cookie_consent"] != "essential",
             ClientIpAddress = clientIp,
             ClientUserAgent = clientUserAgent,
             Items = [.. summary.Items.Select(i => new OrderItem
                 {
                     ProductVariantId = i.VariantId,
+                    ProductVariant = db.ProductVariants.Local.FirstOrDefault(v => v.Id == i.VariantId),
                     ProductName = i.Name,
                     VariantName = i.Variant,
                     UnitPrice = i.Price,

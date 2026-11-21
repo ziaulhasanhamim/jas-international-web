@@ -14,6 +14,8 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject IServiceScopeFactory ScopeFactory
+@inject JASIntWeb.Services.Meta.IMetaConversionsApiService MetaApi
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Secure Checkout · JAS International</PageTitle>
 
@@ -86,10 +88,20 @@
     }
     else
     {
+        var contentIds = Cart.Items.Select(i => (!string.IsNullOrWhiteSpace(i.Sku) ? i.Sku : $"V{i.VariantId}").Trim().ToUpperInvariant()).ToList();
+        var contents = Cart.Items.Select(i => new {
+            id = (!string.IsNullOrWhiteSpace(i.Sku) ? i.Sku : $"V{i.VariantId}").Trim().ToUpperInvariant(),
+            quantity = i.Quantity,
+            item_price = i.Price
+        }).ToList();
+
         <div data-meta-event="InitiateCheckout"
+             data-event-id="@initiateCheckoutEventId"
              data-value="@total"
              data-currency="BDT"
              data-num-items="@Cart.Items.Sum(i => i.Quantity)"
+             data-content-ids="@System.Text.Json.JsonSerializer.Serialize(contentIds)"
+             data-contents="@System.Text.Json.JsonSerializer.Serialize(contents)"
              hidden></div>
 
         <div class="grid gap-8 lg:grid-cols-12 items-start">
@@ -975,6 +987,21 @@
         }
 
         total = Math.Max(0, Cart.Total + deliveryFee - couponDiscount);
+        EnsureInitiateCheckoutTracked();
+    }
+
+    private string? initiateCheckoutEventId;
+    private bool initiateCheckoutSent;
+
+    private void EnsureInitiateCheckoutTracked()
+    {
+        if (initiateCheckoutSent || Cart.Items.Count == 0) return;
+        initiateCheckoutSent = true;
+        initiateCheckoutEventId = $"ic_{Cart.State?.Cart?.Token ?? Guid.NewGuid()}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+        if (Cart.State?.Cart != null)
+        {
+            _ = MetaApi.EnqueueInitiateCheckoutEventAsync(Cart.State.Cart, initiateCheckoutEventId, HttpContextAccessor.HttpContext);
+        }
     }
 
     private async Task ApplyCoupon()

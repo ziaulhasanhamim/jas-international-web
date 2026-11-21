@@ -17,7 +17,33 @@ public sealed class MetaAttributionMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Cookies["jas_cookie_consent"] != "accepted")
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/feeds/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/feeds/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/sitemap", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/images/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/css/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/js/", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".ico", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            await next(context);
+            return;
+        }
+
+        if (context.Request.Cookies["jas_cookie_consent"] == "essential")
         {
             await next(context);
             return;
