@@ -33,7 +33,7 @@ body{background:var(--canvas);color:var(--ink)}
 .catalog-content h2{font-size:1.4rem}.catalog-content h3{font-size:1.15rem}
 .catalog-content p{margin:.8em 0}.catalog-content :first-child{margin-top:0}.catalog-content :last-child{margin-bottom:0}
 .catalog-content ul{list-style:disc;padding-left:1.5em;margin:1em 0}.catalog-content ol{list-style:decimal;padding-left:1.5em;margin:1em 0}
-.catalog-content a{color:#1d4ed8;text-decoration:underline}.catalog-content table{display:block;overflow:auto;width:100%;border-collapse:collapse;margin:1em 0}
+.catalog-content a{color:#1d4ed8;text-decoration:underline}.catalog-content a[class*="text-white"],.catalog-content a[class*="bg-"]{color:#ffffff!important;text-decoration:none!important}.catalog-content table{display:block;overflow:auto;width:100%;border-collapse:collapse;margin:1em 0}
 .catalog-content :is(th,td){padding:.6rem .8rem;border:1px solid #e2e8f0;text-align:left}.catalog-content th{font-weight:700;background:#f8fafc}
 .catalog-content blockquote{border-left:3px solid #cbd5e1;padding-left:1rem}.catalog-content pre{overflow:auto;background:#f1f5f9;padding:1rem;border-radius:.5rem}
 .admin-shell :is(input,select,textarea,button,a):focus-visible{outline:2px solid #2563eb;outline-offset:3px}

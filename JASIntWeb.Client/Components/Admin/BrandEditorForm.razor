@@ -48,8 +48,8 @@ else
                         <details class="brand-editor-section brand-editor-disclosure">
                             <summary><span>Storefront content</span><span class="admin-optional">Optional</span></summary>
                             <p class="brand-section-description">Add an introduction and a buying guide to the public brand page.</p>
-                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Introduction — above the products" @bind-Value="Input!.IntroText" @bind-Value:after="MarkEdited" />
-                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Buyer guide — below the products" @bind-Value="Input!.BottomSeoCopy" @bind-Value:after="MarkEdited" />
+                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Introduction — above the products" Height="360" @bind-Value="Input!.IntroText" @bind-Value:after="MarkEdited" />
+                            <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Buyer guide — below the products" Height="500" @bind-Value="Input!.BottomSeoCopy" @bind-Value:after="MarkEdited" />
                         </details>
                         <details class="brand-editor-section brand-editor-disclosure">
                             <summary><span>Search &amp; social sharing</span><span class="admin-optional">Optional</span></summary>

@@ -461,6 +461,30 @@ form[data-submit-indication="true"][aria-busy="true"]:not([data-pending-cursor="
     color: #1d4ed8;
     text-decoration-color: #1d4ed8;
 }
+
+/* Ensure button links inside rich content keep crisp, readable white text */
+.guide-content a.btn-primary,
+.guide-content a[class*="text-white"],
+.guide-content a[class*="bg-blue"],
+.guide-content a[class*="bg-indigo"],
+.guide-content a[class*="bg-emerald"],
+.guide-content a[class*="bg-slate-900"],
+.guide-content .guide-product-btn,
+.product-rich-specs a[class*="text-white"],
+.product-rich-specs a[class*="bg-blue"],
+.catalog-content a[class*="text-white"],
+.catalog-content a[class*="bg-blue"] {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+.guide-content a.btn-primary:hover,
+.guide-content a[class*="text-white"]:hover,
+.guide-content a[class*="bg-blue"]:hover,
+.product-rich-specs a[class*="text-white"]:hover,
+.catalog-content a[class*="text-white"]:hover {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
 .guide-content blockquote {
     border-left: 4px solid #3b82f6;
     padding: 0.75rem 1rem;
