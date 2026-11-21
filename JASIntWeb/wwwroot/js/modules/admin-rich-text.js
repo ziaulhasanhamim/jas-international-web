@@ -32,8 +32,9 @@ async function loadEditor() {
     await loading;
 }
 export function create(element, receiver, options) {
+    options = options || {};
     let disposed = false, starting = false, editor = null;
-    let html = element.value, disabled = options.disabled, synchronizing = false, ready = false;
+    let html = element.value, disabled = options.disabled ?? options.Disabled ?? false, synchronizing = false, ready = false;
     function sync() {
         if (!editor) return;
         synchronizing = true;
@@ -50,27 +51,53 @@ export function create(element, receiver, options) {
             await loadEditor();
             if (disposed || !element.isConnected) return;
             html = element.value;
+
+            const rawHeight = options.height || options.Height;
+            const parsedHeight = parseInt(rawHeight, 10);
+            const targetHeight = (!isNaN(parsedHeight) && parsedHeight >= 350) ? parsedHeight : 700;
+
             const editors = await window.tinymce.init({
                 target: element,
-                height: options.height || 480,
-                min_height: 350,
-                max_height: 1200,
+                height: targetHeight,
+                min_height: 500,
+                max_height: 1600,
                 resize: true,
-                iframe_aria_text: options.label,
-                plugins: 'table lists link code image fullscreen',
-                toolbar: `undo redo | blocks | bold italic underline | bullist numlist | table ${options.specifications ? 'techspecs' : ''} productcard | link image | code | fullscreen`,
+                iframe_aria_text: options.label || options.Label || 'Content editor',
+                plugins: 'table lists link code image fullscreen wordcount',
+                toolbar_mode: 'wrap',
+                toolbar: [
+                    'undo redo | blocks styles | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist',
+                    `table ${options.specifications || options.Specifications ? 'techspecs' : ''} productcard calloutbox | link image | hr removeformat | code fullscreen`
+                ],
                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
                 contextmenu: 'link image table',
                 block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
+                style_formats: [
+                    { title: 'Headings', items: [
+                        { title: 'Heading 2', format: 'h2' },
+                        { title: 'Heading 3', format: 'h3' },
+                        { title: 'Heading 4', format: 'h4' }
+                    ]},
+                    { title: 'Pricing & Text Highlights', items: [
+                        { title: 'Current Price (৳ Blue)', inline: 'span', classes: 'price-current text-blue-600 font-black', styles: { color: '#2563eb', fontWeight: '800' } },
+                        { title: 'Strikethrough Price (Gray)', inline: 'span', classes: 'price-original text-slate-400 line-through', styles: { textDecoration: 'line-through', color: '#94a3b8' } },
+                        { title: 'Discount Badge (Green)', inline: 'span', classes: 'price-badge bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 rounded-full px-2 py-0.5 text-xs', styles: { backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: '700' } },
+                        { title: 'Action Button (Blue Link)', selector: 'a', classes: 'guide-product-btn inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white', styles: { backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 16px', borderRadius: '10px', textDecoration: 'none', fontWeight: '700' } }
+                    ]},
+                    { title: 'Callout Containers', items: [
+                        { title: 'Editorial Callout Box (Gray)', block: 'div', classes: 'callout-box my-6 rounded-2xl bg-slate-50 border border-slate-200 p-6', wrapper: true },
+                        { title: 'Highlight Callout Box (Blue)', block: 'div', classes: 'callout-box my-6 rounded-2xl bg-blue-50 border border-blue-200 p-6', wrapper: true }
+                    ]}
+                ],
                 menubar: false, branding: false, readonly: disabled,
-                formats: { underline: { inline: 'u' } },
+                formats: { underline: { inline: 'u' }, strikethrough: { inline: 's' } },
                 content_style: `
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                         font-size: 15px;
                         line-height: 1.7;
                         color: #334155;
-                        padding: 16px 20px;
+                        padding: 18px 24px;
                         margin: 0;
                         background-color: #ffffff;
                     }
@@ -91,87 +118,111 @@ export function create(element, receiver, options) {
                     }
                     a:hover { color: #1d4ed8; }
 
-                    /* Button links inside content */
-                    a.btn-primary,
-                    a[class*="bg-blue"],
-                    a[class*="text-white"],
-                    .guide-product-btn {
-                        display: inline-flex !important;
-                        align-items: center !important;
-                        gap: 6px !important;
-                        background-color: #2563eb !important;
-                        color: #ffffff !important;
-                        font-size: 13px !important;
-                        font-weight: 700 !important;
-                        padding: 8px 18px !important;
-                        border-radius: 12px !important;
-                        text-decoration: none !important;
-                        margin-top: 8px !important;
-                        box-shadow: 0 1px 2px rgba(37,99,235,0.2) !important;
-                    }
-                    a[class*="text-white"]:hover,
-                    a[class*="bg-blue"]:hover {
-                        background-color: #1d4ed8 !important;
-                        color: #ffffff !important;
-                    }
-
-                    /* Product Cards in Guide/Product Rich Text */
-                    div[class*="border"][class*="rounded"], .guide-product-card {
+                    /* Product Cards in Guide/Product Rich Text - Horizontal Compact Layout */
+                    .guide-product-card,
+                    div[class*="rounded-2xl"][class*="border"],
+                    div[class*="rounded-xl"][class*="border"],
+                    div[class*="shadow"][class*="border"],
+                    div[class*="flex-row"],
+                    div[class*="sm:flex-row"] {
                         display: flex !important;
                         flex-direction: row !important;
                         align-items: center !important;
-                        gap: 22px !important;
+                        gap: 20px !important;
                         border: 1px solid #e2e8f0 !important;
                         border-radius: 16px !important;
                         background-color: #ffffff !important;
-                        padding: 18px 22px !important;
-                        margin: 22px 0 !important;
-                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+                        padding: 16px 20px !important;
+                        margin: 20px 0 !important;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+                        box-sizing: border-box !important;
+                        clear: both !important;
                     }
-                    div[class*="border"][class*="rounded"] img, .guide-product-card img {
-                        width: 130px !important;
-                        height: 130px !important;
-                        max-width: 130px !important;
-                        max-height: 130px !important;
-                        object-fit: contain !important;
-                        border-radius: 14px !important;
+
+                    /* Card image - FORCE COMPACT FIXED SIZE so it NEVER expands or overflows */
+                    .guide-product-card img,
+                    .guide-product-img,
+                    img[class*="size-"],
+                    img[class*="size-36"],
+                    img[class*="size-32"],
+                    div[class*="rounded-2xl"][class*="border"] img,
+                    div[class*="rounded-xl"][class*="border"] img,
+                    div[class*="shadow"][class*="border"] img,
+                    div[class*="flex-row"] img,
+                    div[class*="sm:flex-row"] img {
+                        width: 125px !important;
+                        height: 125px !important;
+                        min-width: 125px !important;
+                        min-height: 125px !important;
+                        max-width: 125px !important;
+                        max-height: 125px !important;
+                        object-fit: cover !important;
+                        border-radius: 12px !important;
                         background-color: #f8fafc !important;
                         border: 1px solid #f1f5f9 !important;
                         flex-shrink: 0 !important;
-                        margin: 0 !important;
                         display: block !important;
-                        padding: 4px !important;
+                        margin: 0 !important;
+                        padding: 2px !important;
                     }
-                    div[class*="border"][class*="rounded"] > div, .guide-product-card > div {
+
+                    /* Card details column */
+                    .guide-product-card > div,
+                    .guide-product-info,
+                    div[class*="rounded-2xl"][class*="border"] > div,
+                    div[class*="shadow"][class*="border"] > div,
+                    div[class*="flex-row"] > div,
+                    div[class*="sm:flex-row"] > div {
                         flex: 1 1 auto !important;
                         min-width: 0 !important;
                     }
-                    div[class*="border"][class*="rounded"] h3, .guide-product-card h3 {
+
+                    /* Card Title */
+                    .guide-product-card h3,
+                    .guide-product-title,
+                    div[class*="rounded-2xl"][class*="border"] h3 {
                         font-size: 16px !important;
                         font-weight: 700 !important;
                         color: #0f172a !important;
                         margin: 0 0 4px 0 !important;
                         line-height: 1.3 !important;
                     }
-                    div[class*="border"][class*="rounded"] p, .guide-product-card p {
-                        font-size: 13px !important;
+
+                    /* Card Specs */
+                    .guide-product-card p,
+                    .guide-product-specs,
+                    div[class*="rounded-2xl"][class*="border"] p {
+                        font-size: 12.5px !important;
                         color: #64748b !important;
-                        margin: 0 0 8px 0 !important;
-                        line-height: 1.5 !important;
+                        margin: 0 0 6px 0 !important;
+                        line-height: 1.4 !important;
                     }
-                    div[class*="border"][class*="rounded"] span[class*="text-blue"], .guide-product-card .price-current {
-                        font-size: 18px !important;
+
+                    /* Selling Price (Bold Blue) */
+                    .price-current,
+                    span[class*="text-blue"],
+                    div[class*="rounded-2xl"][class*="border"] span[class*="text-blue"] {
+                        font-size: 1.15rem !important;
                         font-weight: 800 !important;
                         color: #2563eb !important;
                         margin-right: 8px !important;
                     }
-                    div[class*="border"][class*="rounded"] span[class*="line-through"], .guide-product-card .price-original {
-                        font-size: 13px !important;
+
+                    /* Original Struck-Through Price */
+                    .price-original,
+                    s, strike, del,
+                    span[class*="line-through"],
+                    div[class*="rounded-2xl"][class*="border"] span[class*="line-through"] {
+                        font-size: 0.9rem !important;
                         color: #94a3b8 !important;
                         text-decoration: line-through !important;
                         margin-right: 8px !important;
                     }
-                    div[class*="border"][class*="rounded"] span[class*="bg-emerald"], .guide-product-card .price-badge {
+
+                    /* Discount Badge */
+                    .price-badge,
+                    span[class*="bg-emerald"],
+                    div[class*="rounded-2xl"][class*="border"] span[class*="bg-emerald"] {
                         display: inline-block !important;
                         font-size: 11px !important;
                         font-weight: 700 !important;
@@ -180,6 +231,49 @@ export function create(element, receiver, options) {
                         border: 1px solid #a7f3d0 !important;
                         padding: 2px 8px !important;
                         border-radius: 9999px !important;
+                    }
+
+                    /* Button Link inside Card */
+                    a.guide-product-btn,
+                    div[class*="rounded-2xl"][class*="border"] a[class*="bg-blue"],
+                    div[class*="border"] a[class*="bg-blue"],
+                    a[class*="bg-blue-600"] {
+                        display: inline-flex !important;
+                        align-items: center !important;
+                        gap: 6px !important;
+                        background-color: #2563eb !important;
+                        color: #ffffff !important;
+                        font-size: 12.5px !important;
+                        font-weight: 700 !important;
+                        padding: 7px 16px !important;
+                        border-radius: 10px !important;
+                        text-decoration: none !important;
+                        margin-top: 6px !important;
+                        box-shadow: 0 1px 2px rgba(37,99,235,0.2) !important;
+                    }
+                    a.guide-product-btn:hover,
+                    div[class*="rounded-2xl"][class*="border"] a[class*="bg-blue"]:hover {
+                        background-color: #1d4ed8 !important;
+                        color: #ffffff !important;
+                    }
+
+                    /* Callout Box */
+                    .callout-box,
+                    div[class*="bg-slate-50"][class*="border"] {
+                        background-color: #f8fafc !important;
+                        border: 1px solid #e2e8f0 !important;
+                        border-radius: 16px !important;
+                        padding: 18px 22px !important;
+                        margin: 20px 0 !important;
+                        display: block !important;
+                    }
+                    div[class*="bg-blue-50"][class*="border"] {
+                        background-color: #eff6ff !important;
+                        border: 1px solid #bfdbfe !important;
+                        border-radius: 16px !important;
+                        padding: 18px 22px !important;
+                        margin: 20px 0 !important;
+                        display: block !important;
                     }
 
                     /* Tables */
@@ -237,37 +331,126 @@ export function create(element, receiver, options) {
                     }
                 },
                 setup(instance) {
-                    if (options.specifications) {
+                    if (options.specifications || options.Specifications) {
                         instance.ui.registry.addButton('techspecs', {
-                            text: 'Tech Specs Template',
+                            text: 'Tech Specs Table',
                             onAction: () => instance.insertContent('<table><tbody><tr><th>Specification</th><th>Details</th></tr><tr><td>Model</td><td></td></tr><tr><td>Warranty</td><td></td></tr></tbody></table>')
                         });
                     }
+
+                    // Interactive Product Card Dialog Button
                     instance.ui.registry.addButton('productcard', {
                         text: 'Product Card',
                         icon: 'embed',
-                        tooltip: 'Insert a featured product card template',
+                        tooltip: 'Insert a featured product recommendation card',
                         onAction: () => {
-                            instance.insertContent(`
-<div class="my-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center gap-6">
-  <img class="size-36 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0" src="https://media.jasinternational.com.bd/images/static/06be0c161d334131b1c7e0d9848b117d.webp" alt="Product Name" loading="lazy" />
-  <div class="space-y-2 text-sm">
-    <h3 class="text-base font-bold text-slate-900 m-0">Product Name</h3>
-    <p class="text-xs text-slate-500 m-0">Key specification highlights &bull; Bullet 2 &bull; Bullet 3</p>
-    <div class="flex items-center gap-3 pt-1">
-      <span class="text-lg font-black text-blue-600">৳2,999</span>
-      <span class="text-xs text-slate-400 line-through">৳3,499</span>
-      <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">Save ৳500</span>
+                            instance.windowManager.open({
+                                title: 'Insert Product Recommendation Card',
+                                size: 'medium',
+                                body: {
+                                    type: 'panel',
+                                    items: [
+                                        {
+                                            type: 'input',
+                                            name: 'title',
+                                            label: 'Product Title',
+                                            placeholder: 'e.g. SoundPEATS C30 ANC TWS Earbuds'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'imageUrl',
+                                            label: 'Product Image URL',
+                                            placeholder: 'https://media.jasinternational.com.bd/... (or paste image URL)'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'specs',
+                                            label: 'Key Highlights / Specs (bullets separated by •)',
+                                            placeholder: 'Hi-Res Audio LDAC Codec • 12mm Driver • 43dB Hybrid ANC'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'sellingPrice',
+                                            label: 'Selling Price (Current)',
+                                            placeholder: '৳2,650'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'originalPrice',
+                                            label: 'Original Price (Will be automatically struck-through)',
+                                            placeholder: '৳3,200 (optional)'
+                                        },
+                                        {
+                                            type: 'input',
+                                            name: 'productLink',
+                                            label: 'Storefront Product URL',
+                                            placeholder: '/product/soundpeats-c30'
+                                        }
+                                    ]
+                                },
+                                buttons: [
+                                    {
+                                        type: 'cancel',
+                                        text: 'Cancel'
+                                    },
+                                    {
+                                        type: 'submit',
+                                        text: 'Insert Card',
+                                        primary: true
+                                    }
+                                ],
+                                onSubmit: (api) => {
+                                    const data = api.getData();
+                                    const title = data.title?.trim() || 'Product Name';
+                                    const img = data.imageUrl?.trim() || 'https://media.jasinternational.com.bd/images/static/06be0c161d334131b1c7e0d9848b117d.webp';
+                                    const specs = data.specs?.trim() || '';
+                                    const sellPrice = data.sellingPrice?.trim() || '৳0';
+                                    const origPrice = data.originalPrice?.trim() || '';
+                                    const link = data.productLink?.trim() || '#';
+
+                                    let priceHtml = `<span class="price-current text-lg font-black text-blue-600">${sellPrice}</span>`;
+                                    if (origPrice) {
+                                        priceHtml += `&nbsp;<span class="price-original text-xs text-slate-400 line-through">${origPrice}</span>`;
+                                    }
+
+                                    const cardHtml = `
+<div class="guide-product-card my-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center gap-6">
+  <img class="guide-product-img size-36 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0" src="${img}" alt="${title}" loading="lazy" />
+  <div class="guide-product-info space-y-2 text-sm flex-1">
+    <h3 class="guide-product-title text-base font-bold text-slate-900 m-0">${title}</h3>
+    ${specs ? `<p class="guide-product-specs text-xs text-slate-500 m-0">${specs}</p>` : ''}
+    <div class="guide-product-prices flex items-center gap-3 pt-1">
+      ${priceHtml}
     </div>
     <div class="pt-2">
-      <a class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition" href="/product/product-slug">
+      <a class="guide-product-btn inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition" href="${link}">
         View Product &amp; Order Online &rarr;
       </a>
     </div>
   </div>
+</div><p></p>`;
+
+                                    instance.insertContent(cardHtml);
+                                    api.close();
+                                }
+                            });
+                        }
+                    });
+
+                    // Callout Box Button
+                    instance.ui.registry.addButton('calloutbox', {
+                        text: 'Callout Box',
+                        icon: 'info',
+                        tooltip: 'Insert a highlighted tip, recommendation, or note box',
+                        onAction: () => {
+                            instance.insertContent(`
+<div class="callout-box my-6 rounded-2xl bg-slate-50 border border-slate-200 p-6 space-y-2">
+  <h4 class="text-base font-bold text-slate-900 m-0">💡 Editorial Recommendation:</h4>
+  <p class="text-sm text-slate-600 m-0">Write your highlighted tip, pros/cons, or buying advice here...</p>
 </div><p></p>`);
                         }
                     });
+
                     instance.on('input change undo redo blur', () => {
                         if (ready && !disposed && !synchronizing && !disabled) {
                             const changed = instance.getContent();
@@ -287,7 +470,6 @@ export function create(element, receiver, options) {
             if (!disposed) receiver.invokeMethodAsync('Unavailable').catch(() => {});
         }
     }
-    // Collapsed optional sections initialize only when opened, avoiding zero-width editors.
     const observer = new ResizeObserver(start);
     const removalObserver = new MutationObserver(() => { if (!element.isConnected) dispose(); });
     removalObserver.observe(document.body, { childList: true, subtree: true });

@@ -3,7 +3,7 @@
 @inject IAdminCatalogBackend Backend
 <div class="admin-rich-editor">
     <p class="admin-rich-label">@Label</p>
-    <textarea @ref="element" class="shop-input" style="min-height:@(Height)px" @bind="text" @bind:event="oninput" @bind:after="PlainChanged" disabled="@(Disabled || conversionFailed)" aria-label="@Label"></textarea>
+    <textarea @ref="element" class="shop-input" style="min-height:@(Height)px; height:@(Height)px" @bind="text" @bind:event="oninput" @bind:after="PlainChanged" disabled="@(Disabled || conversionFailed)" aria-label="@Label"></textarea>
     @if (unavailable) { <p class="admin-help" role="status">The formatting toolbar could not load. Your content is preserved; you can edit the HTML here.</p> }
     @if (conversionFailed) { <p class="form-error" role="alert">Existing content could not be prepared for visual editing. Reload before making changes.</p> }
 </div>
@@ -11,7 +11,7 @@
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public string Label { get; set; } = "Rich description";
-    [Parameter] public int Height { get; set; } = 480;
+    [Parameter] public int Height { get; set; } = 600;
     [Parameter] public bool Specifications { get; set; }
     [Parameter] public bool ConvertLegacyContent { get; set; }
     [Parameter] public bool Disabled { get; set; }
