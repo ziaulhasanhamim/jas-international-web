@@ -1,11 +1,40 @@
-// Enhancements for the remaining static SSR admin upload forms.
-// Auto editors own their uploads, slugs and rich-text state in Blazor.
+// Enhancements for static SSR admin upload forms and entity drafts.
+// Auto editors (Products, Guides) own their uploads, slugs and rich-text state in Blazor.
 (() => {
 "use strict";
-// A single delegated guard works with static enhanced navigation and Auto islands.
+
+const dirty = new Set();
+let leaving = false;
+
+function isEligibleEntityForm(form) {
+    if (!form || !(form instanceof HTMLFormElement)) return false;
+    // Interactive Auto islands manage their own drafts in Blazor state
+    if (form.hasAttribute('data-admin-draft')) return false;
+    // Skip GET forms (search, pagination, filters)
+    if (form.method && form.method.toLowerCase() === 'get') return false;
+    // Skip forms explicitly marked to not save drafts
+    if (form.hasAttribute('data-no-draft')) return false;
+    // Skip search forms or table filters
+    if (form.querySelector('input[type="search"], input[name="q"], input[name="search"], input[name="filter"]')) return false;
+    // Skip quick table action forms (e.g. status toggle, delete)
+    if (form.dataset.formname && (form.dataset.formname.includes('table-action') || form.dataset.formname.includes('quick-action'))) return false;
+
+    // Must be an entity edit/create form
+    const isEditPage = location.pathname.endsWith('/new') || location.pathname.includes('/edit');
+    const hasEntityClass = form.classList.contains('admin-form') || form.hasAttribute('data-admin-entity-form');
+    if (!isEditPage && !hasEntityClass) return false;
+
+    // Count meaningful input elements (text, number, textarea, select, checkbox)
+    let editableCount = 0;
+    for (const el of form.elements) {
+        if (!el.name || el.disabled || el.type === 'submit' || el.type === 'button' || el.type === 'hidden') continue;
+        if (el.name.startsWith('__RequestVerificationToken')) continue;
+        editableCount++;
+    }
+    return editableCount >= 2;
+}
+
 if (!window.jasAdminDrafts) {
-    const dirty = new Set();
-    let leaving = false;
     const roots = () => { for (const root of dirty) if (!root.isConnected) dirty.delete(root); return [...dirty]; };
     const hasDraft = () => roots().length > 0 || document.querySelector('[data-admin-draft][data-admin-dirty="true"]') !== null;
     const clear = () => { dirty.clear(); document.querySelectorAll('[data-admin-draft]').forEach(root => root.dataset.adminDirty = 'false'); leaving = false; };
@@ -19,46 +48,70 @@ if (!window.jasAdminDrafts) {
         try { localStorage.removeItem(key); } catch (e) {}
     };
     window.jasAdminDrafts = { clear, save, get, remove };
+
     const changed = event => {
         if (!(event.target instanceof Element)) return;
-        const root = event.target.closest('[data-admin-draft], form.admin-form, main.admin-main form');
-        if (root) {
-            dirty.add(root);
-            leaving = false;
-            if (root instanceof HTMLFormElement && !root.hasAttribute('data-admin-draft')) {
-                AdminEditorController.saveFormDraft(root);
-            }
-        }
+        const form = event.target.closest('form');
+        if (!isEligibleEntityForm(form)) return;
+
+        dirty.add(form);
+        leaving = false;
+        AdminEditorController.saveFormDraft(form);
     };
+
     document.addEventListener('input', changed);
     document.addEventListener('change', changed);
+
     document.addEventListener('click', event => {
         if (!(event.target instanceof Element) || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         const link = event.target.closest('a[href]');
         if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-        const form = document.querySelector('form.admin-form:not([data-admin-draft]), main.admin-main form:not([data-admin-draft])');
-        if (form) AdminEditorController.saveFormDraft(form);
+        // Only save eligible entity forms
+        const form = document.querySelector('form.admin-form:not([data-admin-draft]), form[data-admin-entity-form]:not([data-admin-draft])');
+        if (form && isEligibleEntityForm(form)) {
+            AdminEditorController.saveFormDraft(form);
+        }
     }, true);
+
     document.addEventListener('submit', event => {
         if (event.target instanceof HTMLFormElement) {
             AdminEditorController.clearFormDraft(event.target);
+            dirty.delete(event.target);
             if (!event.target.hasAttribute('data-admin-draft')) clear();
         }
     });
-    window.addEventListener('beforeunload', event => { if (!leaving && hasDraft()) { event.preventDefault(); event.returnValue = ''; } });
+
+    window.addEventListener('beforeunload', event => {
+        if (!leaving && hasDraft()) {
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    });
 }
+
 if (!window.__jasAdminMenu) {
     window.__jasAdminMenu = true;
-    const close = () => { const toggle = document.getElementById('mobile-nav-toggle'); if (toggle) toggle.checked = false; document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', 'false')); };
+    const close = () => {
+        const toggle = document.getElementById('mobile-nav-toggle');
+        if (toggle) toggle.checked = false;
+        document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+    };
     document.addEventListener('click', event => {
         if (!(event.target instanceof Element)) return;
         const button = event.target.closest('[data-admin-menu]');
         const toggle = document.getElementById('mobile-nav-toggle');
-        if (button && toggle) { toggle.checked = !toggle.checked; document.querySelectorAll('[data-admin-menu]').forEach(item => item.setAttribute('aria-expanded', String(toggle.checked))); }
+        if (button && toggle) {
+            toggle.checked = !toggle.checked;
+            document.querySelectorAll('[data-admin-menu]').forEach(item => item.setAttribute('aria-expanded', String(toggle.checked)));
+        }
         if (event.target.closest('#admin-sidebar a')) close();
     });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
-    document.addEventListener('change', event => { if (event.target instanceof HTMLInputElement && event.target.id === 'mobile-nav-toggle') document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', String(event.target.checked))); });
+    document.addEventListener('change', event => {
+        if (event.target instanceof HTMLInputElement && event.target.id === 'mobile-nav-toggle') {
+            document.querySelectorAll('[data-admin-menu]').forEach(button => button.setAttribute('aria-expanded', String(event.target.checked)));
+        }
+    });
 }
 
 async function uploadSecurityHeaders() {
@@ -72,27 +125,32 @@ class AdminEditorController {
         this.initUniversalImageUploaders();
         this.restoreFormDrafts();
     }
+
     static getFormDraftKey(form) {
         return 'jas-admin-form-draft:' + location.pathname;
     }
-    static saveFormDraft(form) {
-        if (!form || form.hasAttribute('data-admin-draft')) return;
-        try {
-            const data = {};
-            let hasAny = false;
-            for (const el of form.elements) {
-                if (!el.name || el.disabled || el.type === 'submit' || el.type === 'button' || el.type === 'file' || el.type === 'password') continue;
-                if (el.name.startsWith('__RequestVerificationToken')) continue;
-                if (el.type === 'checkbox') {
-                    data[el.name] = el.checked;
-                    hasAny = true;
-                } else if (el.type === 'radio') {
-                    if (el.checked) { data[el.name] = el.value; hasAny = true; }
-                } else {
-                    data[el.name] = el.value;
-                    if (el.value) hasAny = true;
-                }
+
+    static captureFormData(form) {
+        const data = {};
+        for (const el of form.elements) {
+            if (!el.name || el.disabled || el.type === 'submit' || el.type === 'button' || el.type === 'file' || el.type === 'password') continue;
+            if (el.name.startsWith('__RequestVerificationToken')) continue;
+            if (el.type === 'checkbox') {
+                data[el.name] = el.checked;
+            } else if (el.type === 'radio') {
+                if (el.checked) data[el.name] = el.value;
+            } else {
+                data[el.name] = el.value;
             }
+        }
+        return data;
+    }
+
+    static saveFormDraft(form) {
+        if (!isEligibleEntityForm(form)) return;
+        try {
+            const data = this.captureFormData(form);
+            const hasAny = Object.values(data).some(v => v !== '' && v !== false && v !== null && v !== undefined);
             if (hasAny) {
                 localStorage.setItem(this.getFormDraftKey(form), JSON.stringify(data));
             }
@@ -100,14 +158,66 @@ class AdminEditorController {
             console.warn('[AdminEditor] Could not save form draft:', e);
         }
     }
+
     static clearFormDraft(form) {
         try {
             localStorage.removeItem(this.getFormDraftKey(form));
         } catch (e) {}
     }
+
+    static applyFormData(form, data) {
+        for (const [name, val] of Object.entries(data)) {
+            const el = form.elements[name];
+            if (!el) continue;
+
+            if (el instanceof RadioNodeList) {
+                for (const radio of el) {
+                    radio.checked = (radio.value === String(val));
+                }
+            } else if (el.type === 'checkbox') {
+                el.checked = Boolean(val);
+            } else {
+                const strVal = String(val ?? '');
+                el.value = strVal;
+
+                const uploader = el.closest('[data-admin-image-uploader]');
+                if (uploader) {
+                    const previewImg = uploader.querySelector('.image-uploader-preview');
+                    const statusText = uploader.querySelector('.image-uploader-status');
+                    const btnClear = uploader.querySelector('.image-uploader-btn-clear');
+                    const drawer = uploader.querySelector('.image-uploader-drawer');
+                    const urlInput = uploader.querySelector('.image-uploader-url-input');
+                    const urlDisplay = uploader.querySelector('.image-uploader-url-display');
+                    if (strVal) {
+                        if (previewImg) { previewImg.src = strVal; previewImg.classList.remove('opacity-25', 'grayscale'); }
+                        if (statusText) statusText.textContent = 'Image attached';
+                        if (btnClear) btnClear.classList.remove('hidden');
+                        if (drawer) drawer.classList.remove('hidden');
+                        if (urlInput) urlInput.value = strVal;
+                        if (urlDisplay) urlDisplay.textContent = strVal;
+                    } else {
+                        if (previewImg) { previewImg.src = '/jas-logo.png'; previewImg.classList.add('opacity-25', 'grayscale'); }
+                        if (statusText) statusText.textContent = 'No image uploaded yet';
+                        if (btnClear) btnClear.classList.add('hidden');
+                        if (drawer) drawer.classList.add('hidden');
+                        if (urlInput) urlInput.value = '';
+                        if (urlDisplay) urlDisplay.textContent = '';
+                    }
+                }
+            }
+        }
+    }
+
     static restoreFormDrafts() {
-        const forms = document.querySelectorAll('form.admin-form:not([data-admin-draft]), main.admin-main form:not([data-admin-draft])');
+        const forms = document.querySelectorAll('form');
         forms.forEach(form => {
+            if (!isEligibleEntityForm(form)) return;
+
+            // Snapshot baseline form values on first load for non-reloading discard
+            if (!form._originalValues) {
+                form._originalValues = this.captureFormData(form);
+            }
+
             const key = this.getFormDraftKey(form);
             let json = null;
             try { json = localStorage.getItem(key); } catch (e) { return; }
@@ -116,64 +226,46 @@ class AdminEditorController {
             try {
                 const data = JSON.parse(json);
                 if (!data || typeof data !== 'object') return;
-                let restoredCount = 0;
 
-                for (const [name, val] of Object.entries(data)) {
-                    const el = form.elements[name];
-                    if (!el) continue;
+                // Check if draft has any differences from initial baseline
+                const current = this.captureFormData(form);
+                const isDifferent = Object.entries(data).some(([k, v]) => String(current[k] ?? '') !== String(v ?? ''));
+                if (!isDifferent) return;
 
-                    if (el instanceof RadioNodeList) {
-                        for (const radio of el) {
-                            if (radio.value === String(val)) {
-                                if (!radio.checked) { radio.checked = true; restoredCount++; }
-                            }
-                        }
-                    } else if (el.type === 'checkbox') {
-                        const boolVal = Boolean(val);
-                        if (el.checked !== boolVal) { el.checked = boolVal; restoredCount++; }
-                    } else {
-                        const strVal = String(val ?? '');
-                        if (el.value !== strVal) {
-                            el.value = strVal;
-                            restoredCount++;
+                this.applyFormData(form, data);
 
-                            const uploader = el.closest('[data-admin-image-uploader]');
-                            if (uploader) {
-                                const previewImg = uploader.querySelector('.image-uploader-preview');
-                                const statusText = uploader.querySelector('.image-uploader-status');
-                                const btnClear = uploader.querySelector('.image-uploader-btn-clear');
-                                const drawer = uploader.querySelector('.image-uploader-drawer');
-                                const urlInput = uploader.querySelector('.image-uploader-url-input');
-                                const urlDisplay = uploader.querySelector('.image-uploader-url-display');
-                                if (strVal) {
-                                    if (previewImg) { previewImg.src = strVal; previewImg.classList.remove('opacity-25', 'grayscale'); }
-                                    if (statusText) statusText.textContent = 'Image attached';
-                                    if (btnClear) btnClear.classList.remove('hidden');
-                                    if (drawer) drawer.classList.remove('hidden');
-                                    if (urlInput) urlInput.value = strVal;
-                                    if (urlDisplay) urlDisplay.textContent = strVal;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (restoredCount > 0 && !form.querySelector('.admin-draft-restored-banner')) {
+                if (!form.querySelector('.admin-draft-restored-banner')) {
                     const banner = document.createElement('div');
-                    banner.className = 'admin-draft-restored-banner flex items-center justify-between p-3 mb-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800';
+                    banner.className = 'admin-draft-restored-banner flex items-center justify-between p-3.5 mb-5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 shadow-xs';
                     banner.setAttribute('role', 'status');
                     banner.innerHTML = `
-                        <span class="flex items-center gap-1.5 font-medium">
+                        <span class="flex items-center gap-2 font-medium">
                             <svg class="size-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            Restored unsaved draft from local storage.
+                            <span>Restored unsaved draft from your previous session.</span>
                         </span>
-                        <button type="button" class="admin-discard-draft-btn text-xs font-semibold text-amber-900 underline hover:text-amber-950 ml-3 cursor-pointer">Discard draft</button>
+                        <button type="button" class="admin-discard-draft-btn px-2.5 py-1 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg transition cursor-pointer">Discard Draft</button>
                     `;
-                    banner.querySelector('.admin-discard-draft-btn')?.addEventListener('click', () => {
-                        try { localStorage.removeItem(key); } catch (e) {}
-                        banner.remove();
-                        location.reload();
+
+                    banner.querySelector('.admin-discard-draft-btn')?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try { localStorage.removeItem(key); } catch (err) {}
+                        dirty.delete(form);
+
+                        // Reset form values to baseline WITHOUT reloading the page!
+                        if (form._originalValues) {
+                            AdminEditorController.applyFormData(form, form._originalValues);
+                        } else {
+                            form.reset();
+                        }
+
+                        // Smoothly animate and remove banner
+                        banner.style.transition = 'all 200ms ease';
+                        banner.style.opacity = '0';
+                        banner.style.transform = 'translateY(-4px)';
+                        setTimeout(() => banner.remove(), 200);
                     });
+
                     form.prepend(banner);
                 }
             } catch (e) {
@@ -181,6 +273,7 @@ class AdminEditorController {
             }
         });
     }
+
     static initUniversalImageUploaders() {
         const uploaders = document.querySelectorAll("[data-admin-image-uploader]");
         uploaders.forEach(uploader => {
@@ -221,7 +314,7 @@ class AdminEditorController {
                     if (drawer) drawer.classList.add("hidden");
                 }
                 const form = hiddenValInput.closest('form');
-                if (form && !form.hasAttribute('data-admin-draft')) {
+                if (form && isEligibleEntityForm(form)) {
                     AdminEditorController.saveFormDraft(form);
                 }
             };
@@ -240,7 +333,7 @@ class AdminEditorController {
 
                 try {
                     const response = await fetch("/api/admin/uploads/image", {
-                    headers: await uploadSecurityHeaders(),
+                        headers: await uploadSecurityHeaders(),
                         method: "POST",
                         body: formData,
                         signal: AbortSignal.timeout(30000)
@@ -314,8 +407,36 @@ class AdminEditorController {
         });
     }
 }
+
 const JAS = window.JAS ??= {};
-JAS.AdminEditor = { init: () => AdminEditorController.initAll(), initImageUploaders: () => AdminEditorController.initUniversalImageUploaders() };
+JAS.AdminEditor = {
+    init: () => AdminEditorController.initAll(),
+    initImageUploaders: () => AdminEditorController.initUniversalImageUploaders()
+};
+
+function autoInit() {
+    AdminEditorController.initAll();
+}
+
+// 1. Initial page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInit);
+} else {
+    autoInit();
+}
+window.addEventListener('load', autoInit);
+
+// 2. Enhanced Navigation listener (Blazor SSR / interactive navigation)
+if (window.Blazor) {
+    window.Blazor.addEventListener('enhancedload', autoInit);
+}
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.Blazor) {
+        window.Blazor.addEventListener('enhancedload', autoInit);
+    }
+});
+window.addEventListener('popstate', autoInit);
+
 if (!window.__jasAdminDismiss) {
     window.__jasAdminDismiss = true;
     document.addEventListener('click', event => {

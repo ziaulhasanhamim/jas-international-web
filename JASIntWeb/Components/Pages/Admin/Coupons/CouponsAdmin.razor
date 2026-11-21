@@ -122,6 +122,9 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
+    [SupplyParameterFromQuery(Name = "saved")]
+    public bool Saved { get; set; }
+
     [SupplyParameterFromForm(FormName = "coupons-table-action")]
     public int ToggleCouponId { get; set; }
 
@@ -132,6 +135,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (Saved)
+        {
+            _toast = "Coupon saved successfully.";
+        }
+
         if (ToggleCouponId > 0)
         {
             var existing = await Db.Coupons.FindAsync(ToggleCouponId);
