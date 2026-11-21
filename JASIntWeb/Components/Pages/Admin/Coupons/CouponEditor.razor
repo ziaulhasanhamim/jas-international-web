@@ -1,7 +1,9 @@
 @page "/admin/coupons/new"
 @page "/admin/coupons/{Id:int}/edit"
 @attribute [Authorize(Roles = "Admin")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
@@ -25,16 +27,17 @@
     </div>
 }
 
-@if (Input is null)
+@if (loading)
 {
-    <p class="admin-help">Loading coupon editor…</p>
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-500">Loading coupon editor…</p>
+    </div>
 }
 else
 {
-    <EditForm Model="Input" OnValidSubmit="Save" FormName="coupon-editor" method="post" Enhance="true" data-submit-indication="true" data-admin-entity-form="true" class="shop-panel admin-form space-y-5">
+    <EditForm Model="Input" OnValidSubmit="Save" class="shop-panel admin-form space-y-5">
         <DataAnnotationsValidator />
         <ValidationSummary class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 space-y-1 mb-4" />
-        <input type="hidden" name="Input.Id" value="@Id" />
 
         <!-- Section 1: Code & Name -->
         <div class="admin-form-grid">
@@ -55,7 +58,7 @@ else
         <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
             <label class="shop-label">
                 Discount Benefit Type <span class="admin-required">Required</span>
-                <InputSelect @bind-Value="Input.DiscountType" class="shop-input font-medium">
+                <InputSelect @bind-Value="Input.DiscountType" @bind-Value:after="OnDiscountTypeChanged" class="shop-input font-medium cursor-pointer">
                     <option value="@CouponDiscountType.Percentage">Percentage Off (%)</option>
                     <option value="@CouponDiscountType.FixedAmount">Fixed Amount Off (৳ Flat)</option>
                     <option value="@CouponDiscountType.FreeDelivery">🚚 Free Delivery (Waives full delivery fee)</option>
@@ -65,7 +68,7 @@ else
 
             @if (Input.DiscountType == CouponDiscountType.FreeDelivery)
             {
-                <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2.5">
+                <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2.5 animate-fadeIn">
                     <span class="text-base leading-none">🚚</span>
                     <div>
                         <strong class="block font-bold text-emerald-900">Free Delivery Mode Active</strong>
@@ -84,7 +87,7 @@ else
 
                     @if (Input.DiscountType == CouponDiscountType.Percentage)
                     {
-                        <label class="shop-label">
+                        <label class="shop-label animate-fadeIn">
                             Maximum Discount Cap (৳, optional)
                             <InputNumber @bind-Value="Input.MaxDiscountAmount" class="shop-input" />
                             <small>Upper limit cap for percentage discounts (e.g. 15% off up to ৳500).</small>
@@ -126,9 +129,16 @@ else
 
         <div class="form-actions pt-2 border-t border-slate-100 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <button type="submit" class="shop-button" data-pending-text="Saving coupon...">
-                    <span class="form-submit-spinner" hidden></span>
-                    <span>@(Id == 0 ? "Create Coupon" : "Save Changes")</span>
+                <button type="submit" disabled="@saving" class="shop-button flex items-center gap-2">
+                    @if (saving)
+                    {
+                        <span class="inline-block animate-spin">⏳</span>
+                        <span>Saving coupon…</span>
+                    }
+                    else
+                    {
+                        <span>@(Id == 0 ? "Create Coupon" : "Save Changes")</span>
+                    }
                 </button>
                 <a href="/admin/coupons" class="shop-button-secondary">Cancel</a>
             </div>
@@ -146,11 +156,11 @@ else
     [Parameter]
     public int Id { get; set; }
 
-    [SupplyParameterFromForm(FormName = "coupon-editor", Name = "Input")]
-    public CouponFormModel? Input { get; set; }
+    public CouponFormModel Input { get; set; } = new();
 
     private string? errorMessage;
-    private bool initialized;
+    private bool loading = true;
+    private bool saving;
 
     public class CouponFormModel
     {
@@ -180,11 +190,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        Input ??= new();
-        if (initialized) return;
-        initialized = true;
-
-        if (Id != 0 && string.IsNullOrWhiteSpace(Input.Code))
+        if (Id != 0)
         {
             var existing = await Db.Coupons.FindAsync(Id);
             if (existing == null)
@@ -207,11 +213,29 @@ else
                 IsActive = existing.IsActive
             };
         }
+        loading = false;
+    }
+
+    private void OnDiscountTypeChanged()
+    {
+        if (Input.DiscountType == CouponDiscountType.FreeDelivery)
+        {
+            Input.DiscountValue = 0;
+            Input.MaxDiscountAmount = null;
+        }
+        else if (Input.DiscountType == CouponDiscountType.Percentage && Input.DiscountValue == 0)
+        {
+            Input.DiscountValue = 10;
+        }
+        else if (Input.DiscountType == CouponDiscountType.FixedAmount && Input.DiscountValue == 0)
+        {
+            Input.DiscountValue = 100;
+        }
     }
 
     private async Task Save()
     {
-        if (Input is null) return;
+        if (saving) return;
         errorMessage = null;
 
         var cleanCode = (Input.Code ?? "").Trim().ToUpperInvariant();
@@ -240,40 +264,52 @@ else
 
         var cleanDesc = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
 
-        if (Id == 0)
+        saving = true;
+        try
         {
-            var newCoupon = new Coupon
+            if (Id == 0)
             {
-                Code = cleanCode,
-                Description = cleanDesc,
-                DiscountType = Input.DiscountType,
-                DiscountValue = Input.DiscountValue,
-                MaxDiscountAmount = Input.MaxDiscountAmount,
-                MinOrderAmount = Input.MinOrderAmount,
-                ExpiryDate = expiryOffset,
-                UsageLimit = Input.UsageLimit,
-                IsActive = Input.IsActive
-            };
-            Db.Coupons.Add(newCoupon);
-        }
-        else
-        {
-            var existing = await Db.Coupons.FindAsync(Id);
-            if (existing != null)
-            {
-                existing.Code = cleanCode;
-                existing.Description = cleanDesc;
-                existing.DiscountType = Input.DiscountType;
-                existing.DiscountValue = Input.DiscountValue;
-                existing.MaxDiscountAmount = Input.MaxDiscountAmount;
-                existing.MinOrderAmount = Input.MinOrderAmount;
-                existing.ExpiryDate = expiryOffset;
-                existing.UsageLimit = Input.UsageLimit;
-                existing.IsActive = Input.IsActive;
+                var newCoupon = new Coupon
+                {
+                    Code = cleanCode,
+                    Description = cleanDesc,
+                    DiscountType = Input.DiscountType,
+                    DiscountValue = Input.DiscountValue,
+                    MaxDiscountAmount = Input.MaxDiscountAmount,
+                    MinOrderAmount = Input.MinOrderAmount,
+                    ExpiryDate = expiryOffset,
+                    UsageLimit = Input.UsageLimit,
+                    IsActive = Input.IsActive
+                };
+                Db.Coupons.Add(newCoupon);
             }
-        }
+            else
+            {
+                var existing = await Db.Coupons.FindAsync(Id);
+                if (existing != null)
+                {
+                    existing.Code = cleanCode;
+                    existing.Description = cleanDesc;
+                    existing.DiscountType = Input.DiscountType;
+                    existing.DiscountValue = Input.DiscountValue;
+                    existing.MaxDiscountAmount = Input.MaxDiscountAmount;
+                    existing.MinOrderAmount = Input.MinOrderAmount;
+                    existing.ExpiryDate = expiryOffset;
+                    existing.UsageLimit = Input.UsageLimit;
+                    existing.IsActive = Input.IsActive;
+                }
+            }
 
-        await Db.SaveChangesAsync();
-        Nav.NavigateTo("/admin/coupons?saved=true");
+            await Db.SaveChangesAsync();
+            Nav.NavigateTo("/admin/coupons?saved=true");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save coupon: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 }
