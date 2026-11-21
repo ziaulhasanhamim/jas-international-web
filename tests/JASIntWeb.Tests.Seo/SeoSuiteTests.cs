@@ -236,6 +236,54 @@ public class SeoSuiteTests
         await rating.GetProperty("@type").GetString().Should().BeEqualTo("AggregateRating");
         await rating.GetProperty("ratingValue").GetDecimal().Should().BeEqualTo(4.8m);
         await rating.GetProperty("reviewCount").GetInt32().Should().BeEqualTo(42);
+        await rating.GetProperty("bestRating").GetInt32().Should().BeEqualTo(5);
+        await rating.GetProperty("worstRating").GetInt32().Should().BeEqualTo(1);
+    }
+
+    [Test]
+    public async Task JsonLd_Product_WithReviews_EmitsBothAggregateRatingAndReviewArray()
+    {
+        var reviews = new[]
+        {
+            ("Verified Buyer", 5, "Authentic smartwatch with smooth display.", DateTimeOffset.UtcNow.AddDays(-10))
+        };
+
+        var jsonLd = JsonLdBuilder.BuildProduct(
+            name: "Zeblaze Btalk 4 Pro Smart Watch",
+            description: "AMOLED calling smartwatch.",
+            productUrl: "https://www.jasinternational.com.bd/product/zeblaze-btalk-4-pro",
+            imageUrls: ["https://www.jasinternational.com.bd/images/btalk4.webp"],
+            brandName: "Zeblaze",
+            sku: "ZEB-BTALK4-PRO",
+            gtin: null,
+            mpn: "ZEB-BTALK4-PRO",
+            price: 2950m,
+            compareAtPrice: 3500m,
+            inStock: true,
+            ratingValue: 5.0m,
+            reviewCount: 12,
+            reviews: reviews
+        );
+
+        using var doc = JsonDocument.Parse(jsonLd);
+        var root = doc.RootElement;
+
+        var rating = root.GetProperty("aggregateRating");
+        await rating.GetProperty("@type").GetString().Should().BeEqualTo("AggregateRating");
+        await rating.GetProperty("ratingValue").GetDecimal().Should().BeEqualTo(5.0m);
+        await rating.GetProperty("reviewCount").GetInt32().Should().BeEqualTo(12);
+        await rating.GetProperty("bestRating").GetInt32().Should().BeEqualTo(5);
+        await rating.GetProperty("worstRating").GetInt32().Should().BeEqualTo(1);
+
+        var revArray = root.GetProperty("review");
+        await revArray.GetArrayLength().Should().BeEqualTo(1);
+        var first = revArray[0];
+        await first.GetProperty("@type").GetString().Should().BeEqualTo("Review");
+        await first.GetProperty("author").GetProperty("name").GetString().Should().BeEqualTo("Verified Buyer");
+        await first.GetProperty("reviewRating").GetProperty("ratingValue").GetInt32().Should().BeEqualTo(5);
+        await first.GetProperty("reviewRating").GetProperty("bestRating").GetInt32().Should().BeEqualTo(5);
+        await first.GetProperty("reviewRating").GetProperty("worstRating").GetInt32().Should().BeEqualTo(1);
+        await first.GetProperty("reviewBody").GetString().Should().BeEqualTo("Authentic smartwatch with smooth display.");
     }
 
     [Test]

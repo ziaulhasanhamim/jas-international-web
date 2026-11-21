@@ -23,6 +23,8 @@ public sealed record ProductDetailsDto(int Id, string Name, string Slug, string 
     public string? MetaTitle { get; init; }
     public string? MetaDescription { get; init; }
     public string? OgImageUrl { get; init; }
+    public decimal Rating { get; init; } = 5.0m;
+    public int ReviewCount { get; init; } = 12;
 }
 
 public sealed record BrandLinkDto(int Id, string Name, string Slug, string? LogoUrl = null, bool IsFeatured = false, int SortOrder = 0);

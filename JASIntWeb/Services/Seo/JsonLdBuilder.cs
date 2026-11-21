@@ -282,7 +282,7 @@ public static class JsonLdBuilder
         if (!string.IsNullOrWhiteSpace(gtin)) model["gtin"] = gtin;
         if (!string.IsNullOrWhiteSpace(mpn)) model["mpn"] = mpn;
 
-        // Add aggregateRating and reviews ONLY if valid reviews exist
+        // Add aggregateRating and reviews
         if (reviewCount is > 0 && ratingValue is > 0)
         {
             model["aggregateRating"] = new Dictionary<string, object>
@@ -293,34 +293,35 @@ public static class JsonLdBuilder
                 ["bestRating"] = 5,
                 ["worstRating"] = 1
             };
+        }
 
-            if (reviews != null)
+        if (reviews != null)
+        {
+            var revList = new List<Dictionary<string, object>>();
+            foreach (var r in reviews)
             {
-                var revList = new List<Dictionary<string, object>>();
-                foreach (var r in reviews)
+                revList.Add(new Dictionary<string, object>
                 {
-                    revList.Add(new Dictionary<string, object>
+                    ["@type"] = "Review",
+                    ["author"] = new Dictionary<string, object>
                     {
-                        ["@type"] = "Review",
-                        ["author"] = new Dictionary<string, object>
-                        {
-                            ["@type"] = "Person",
-                            ["name"] = r.Author
-                        },
-                        ["reviewRating"] = new Dictionary<string, object>
-                        {
-                            ["@type"] = "Rating",
-                            ["ratingValue"] = r.Rating,
-                            ["bestRating"] = 5
-                        },
-                        ["reviewBody"] = r.Comment,
-                        ["datePublished"] = r.Date.ToString("yyyy-MM-dd")
-                    });
-                }
-                if (revList.Count > 0)
-                {
-                    model["review"] = revList;
-                }
+                        ["@type"] = "Person",
+                        ["name"] = r.Author
+                    },
+                    ["reviewRating"] = new Dictionary<string, object>
+                    {
+                        ["@type"] = "Rating",
+                        ["ratingValue"] = r.Rating,
+                        ["bestRating"] = 5,
+                        ["worstRating"] = 1
+                    },
+                    ["reviewBody"] = r.Comment,
+                    ["datePublished"] = r.Date.ToString("yyyy-MM-dd")
+                });
+            }
+            if (revList.Count > 0)
+            {
+                model["review"] = revList;
             }
         }
 
