@@ -14,6 +14,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject IServiceScopeFactory ScopeFactory
+@inject PersistentComponentState ApplicationState
 
 <PageTitle>Secure Checkout · JAS International</PageTitle>
 
@@ -541,6 +542,8 @@
                                 class="field uppercase font-mono text-xs !py-2"
                                 placeholder="e.g. WELCOME200"
                                 @bind="couponInput"
+                                @bind:event="oninput"
+                                @onkeydown="@(async e => { if (e.Key == "Enter") await ApplyCoupon(); })"
                                 disabled="@isSubmitting"
                             />
                             <button
@@ -689,8 +692,32 @@
     // Coupon fields
     private string couponInput = "";
     private string? appliedCouponCode;
+    private CouponDiscountType? appliedCouponType;
     private decimal couponDiscount;
     private string? couponMessage;
+
+    // Prerender to Interactive State Persistence
+    private PersistingComponentStateSubscription persistingSubscription;
+
+    private sealed class CheckoutPersistedState
+    {
+        public DeliverySettings? DeliverySettings { get; set; }
+        public CartState? CartState { get; set; }
+        public string CustomerName { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string StreetAddress { get; set; } = "";
+        public string SelectedDivision { get; set; } = "Dhaka";
+        public string SelectedDistrict { get; set; } = "Dhaka";
+        public string SelectedThana { get; set; } = "Dhanmondi";
+        public string? AppliedCouponCode { get; set; }
+        public CouponDiscountType? AppliedCouponType { get; set; }
+        public decimal CouponDiscount { get; set; }
+        public string? CouponMessage { get; set; }
+        public decimal DeliveryFee { get; set; }
+        public decimal Total { get; set; }
+        public bool IsHubDistrict { get; set; }
+    }
 
     // Totals
     private decimal deliveryFee;
@@ -726,72 +753,141 @@
 
     protected override async Task OnInitializedAsync()
     {
-        deliverySettings = await DeliverySettingsSvc.GetSettingsAsync();
+        persistingSubscription = ApplicationState.RegisterOnPersisting(PersistCheckoutState);
 
         availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
         availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
-
         paymentReferenceCode = $"JAS{Random.Shared.Next(1000, 9999)}";
-
         Cart.OnChange += OnCartChanged;
 
-        try
+        if (ApplicationState.TryTakeFromJson<CheckoutPersistedState>("jas_checkout_state", out var restored) && restored is not null && restored.DeliverySettings is not null)
         {
-            await Cart.InitializeAsync();
-
-            // Pre-fill user address if authenticated
-            if (AuthStateTask != null)
+            deliverySettings = restored.DeliverySettings;
+            if (restored.CartState != null && Cart.State == null)
             {
-                var auth = await AuthStateTask;
-                var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
-                if (userId.HasValue)
+                Cart.State = restored.CartState;
+            }
+            customerName = restored.CustomerName;
+            phoneNumber = restored.PhoneNumber;
+            email = restored.Email;
+            streetAddress = restored.StreetAddress;
+            selectedDivision = restored.SelectedDivision;
+            selectedDistrict = restored.SelectedDistrict;
+            selectedThana = restored.SelectedThana;
+            availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
+            availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
+            appliedCouponCode = restored.AppliedCouponCode;
+            appliedCouponType = restored.AppliedCouponType;
+            couponDiscount = restored.CouponDiscount;
+            couponMessage = restored.CouponMessage;
+            deliveryFee = restored.DeliveryFee;
+            total = restored.Total;
+            isHubDistrict = restored.IsHubDistrict;
+            cartReady = true;
+
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    await using var scope = ScopeFactory.CreateAsyncScope();
-                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var addr = await db.DeliveryAddresses.AsNoTracking().FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
-                    if (addr != null)
+                    await Cart.InitializeAsync();
+                    await InvokeAsync(() =>
                     {
-                        customerName = addr.CustomerName;
-                        phoneNumber = addr.PhoneNumber;
-                        if (!string.IsNullOrWhiteSpace(addr.Email)) email = addr.Email;
-                        streetAddress = addr.FullAddress;
-                        if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
-                        availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
-                        if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
-                        availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
-                        if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
-                    }
-                    var userName = auth?.User?.Identity?.Name;
-                    if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(userName) && userName.Contains('@'))
+                        UpdateDeliveryAndTotal();
+                        StateHasChanged();
+                    });
+                }
+                catch
+                {
+                    // Non-blocking background sync
+                }
+            });
+        }
+        else
+        {
+            deliverySettings = await DeliverySettingsSvc.GetSettingsAsync();
+
+            try
+            {
+                await Cart.InitializeAsync();
+
+                // Pre-fill user address if authenticated
+                if (AuthStateTask != null)
+                {
+                    var auth = await AuthStateTask;
+                    var userId = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
+                    if (userId.HasValue)
                     {
-                        email = userName;
+                        await using var scope = ScopeFactory.CreateAsyncScope();
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var addr = await db.DeliveryAddresses.AsNoTracking().FirstOrDefaultAsync(d => d.CustomerId == userId.Value);
+                        if (addr != null)
+                        {
+                            customerName = addr.CustomerName;
+                            phoneNumber = addr.PhoneNumber;
+                            if (!string.IsNullOrWhiteSpace(addr.Email)) email = addr.Email;
+                            streetAddress = addr.FullAddress;
+                            if (!string.IsNullOrWhiteSpace(addr.Division)) selectedDivision = addr.Division;
+                            availableDistricts = BangladeshLocationService.GetDistricts(selectedDivision);
+                            if (!string.IsNullOrWhiteSpace(addr.District)) selectedDistrict = addr.District;
+                            availableThanas = BangladeshLocationService.GetThanas(selectedDistrict);
+                            if (!string.IsNullOrWhiteSpace(addr.Thana)) selectedThana = addr.Thana;
+                        }
+                        var userName = auth?.User?.Identity?.Name;
+                        if (string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(userName) && userName.Contains('@'))
+                        {
+                            email = userName;
+                        }
                     }
                 }
-            }
 
-            // Auto-apply deep-linked coupon from URL
-            var uri = Nav.ToAbsoluteUri(Nav.Uri);
-            if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("coupon", out var couponParam) && !string.IsNullOrWhiteSpace(couponParam))
+                // Auto-apply deep-linked coupon from URL
+                var uri = Nav.ToAbsoluteUri(Nav.Uri);
+                if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("coupon", out var couponParam) && !string.IsNullOrWhiteSpace(couponParam))
+                {
+                    couponInput = couponParam.ToString().Trim().ToUpperInvariant();
+                    await ApplyCoupon();
+                }
+            }
+            catch (Exception ex)
             {
-                couponInput = couponParam.ToString().Trim().ToUpperInvariant();
-                await ApplyCoupon();
+                Console.WriteLine($"[Checkout] Init warning: {ex.Message}");
+            }
+            finally
+            {
+                cartReady = true;
+                UpdateDeliveryAndTotal();
             }
         }
-        catch (Exception ex)
+    }
+
+    private Task PersistCheckoutState()
+    {
+        ApplicationState.PersistAsJson("jas_checkout_state", new CheckoutPersistedState
         {
-            Console.WriteLine($"[Checkout] Init warning: {ex.Message}");
-        }
-        finally
-        {
-            cartReady = true;
-            UpdateDeliveryAndTotal();
-        }
+            DeliverySettings = deliverySettings,
+            CartState = Cart.State,
+            CustomerName = customerName,
+            PhoneNumber = phoneNumber,
+            Email = email,
+            StreetAddress = streetAddress,
+            SelectedDivision = selectedDivision,
+            SelectedDistrict = selectedDistrict,
+            SelectedThana = selectedThana,
+            AppliedCouponCode = appliedCouponCode,
+            AppliedCouponType = appliedCouponType,
+            CouponDiscount = couponDiscount,
+            CouponMessage = couponMessage,
+            DeliveryFee = deliveryFee,
+            Total = total,
+            IsHubDistrict = isHubDistrict
+        });
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) await Cart.SynchronizeBadgeAsync();
-        if (firstRender && string.IsNullOrWhiteSpace(couponInput))
+        if (firstRender && string.IsNullOrWhiteSpace(appliedCouponCode))
         {
             try
             {
@@ -880,6 +976,11 @@
             deliveryFee = deliverySettings.OutsideFee;
         }
 
+        if (appliedCouponType == CouponDiscountType.FreeDelivery)
+        {
+            couponDiscount = deliveryFee;
+        }
+
         total = Math.Max(0, Cart.Total + deliveryFee - couponDiscount);
     }
 
@@ -890,6 +991,7 @@
         if (res.IsValid)
         {
             appliedCouponCode = res.Code;
+            appliedCouponType = res.DiscountType;
             couponDiscount = res.DiscountAmount;
             couponMessage = $"✓ {res.Message}";
             UpdateDeliveryAndTotal();
@@ -899,6 +1001,7 @@
             couponMessage = res.Message;
             couponDiscount = 0;
             appliedCouponCode = null;
+            appliedCouponType = null;
             UpdateDeliveryAndTotal();
         }
     }
@@ -1122,6 +1225,7 @@
 
     public void Dispose()
     {
+        persistingSubscription.Dispose();
         Cart.OnChange -= OnCartChanged;
     }
 }

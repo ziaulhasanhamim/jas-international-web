@@ -8,7 +8,8 @@ public record CouponValidationResult(
     bool IsValid,
     string? Code,
     decimal DiscountAmount,
-    string? Message
+    string? Message,
+    CouponDiscountType? DiscountType = null
 );
 
 public sealed class CouponService(AppDbContext db)
@@ -64,7 +65,7 @@ public sealed class CouponService(AppDbContext db)
                 break;
         }
 
-        return new CouponValidationResult(true, coupon.Code, discount, $"Coupon '{coupon.Code}' applied successfully!");
+        return new CouponValidationResult(true, coupon.Code, discount, $"Coupon '{coupon.Code}' applied successfully!", coupon.DiscountType);
     }
 
     public async Task RecordCouponUseAsync(string code)
