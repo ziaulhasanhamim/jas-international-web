@@ -1,5 +1,4 @@
 @page "/admin/orders/{Id:int}"
-@attribute [StreamRendering]
 @inject AppDbContext Db
 @inject IServiceScopeFactory ScopeFactory
 @inject AdminSession Session
@@ -785,13 +784,22 @@ else
     private string? PaymentAction { get; set; }
 
     [SupplyParameterFromForm(FormName = "change-status")]
-    private ChangeStatusForm? StatusForm { get; set; }
+    private string? Status { get; set; }
 
     [SupplyParameterFromForm(FormName = "update-tracking")]
-    private UpdateTrackingForm? TrackingForm { get; set; }
+    private string? CourierName { get; set; }
+
+    [SupplyParameterFromForm(FormName = "update-tracking")]
+    private string? CourierTrackingId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "update-tracking")]
+    private string? ConsignmentId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "update-tracking")]
+    private string? CourierTrackingUrl { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-notes")]
-    private SaveNotesForm? NotesForm { get; set; }
+    private string? AdminNotes { get; set; }
 
     private Order? order;
     private string? error;
@@ -863,14 +871,19 @@ else
 
     private async Task ChangeStatusAsync()
     {
-        if (order is null || StatusForm is null || string.IsNullOrWhiteSpace(StatusForm.Status)) return;
+        if (order is null)
+        {
+            await ReloadOrderAsync();
+        }
+        if (order is null || string.IsNullOrWhiteSpace(Status)) return;
         try
         {
             error = null;
+            var targetStatus = Status.Trim();
             var editForm = new OrderEditForm
             {
                 Id = Id,
-                Status = StatusForm.Status,
+                Status = targetStatus,
                 CourierName = order.CourierName,
                 CourierTrackingId = order.CourierTrackingId,
                 CourierTrackingUrl = order.CourierTrackingUrl,
@@ -881,7 +894,7 @@ else
 
             await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
             alertType = "emerald";
-            alertMessage = $"Order #{Id} status changed to {StatusForm.Status} successfully!";
+            alertMessage = $"Order #{Id} status changed to {targetStatus} successfully!";
             Nav.NavigateTo($"/admin/orders/{Id}?notice={Uri.EscapeDataString(alertMessage)}&type={alertType}");
             return;
         }
@@ -889,7 +902,7 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
     private async Task VerifyPaymentAsync()
@@ -907,7 +920,7 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
     private async Task UnverifyPaymentAsync()
@@ -925,7 +938,7 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
     private async Task RejectPaymentAndCancelAsync()
@@ -943,19 +956,23 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
     private async Task UpdateTrackingAsync()
     {
+        if (order is null)
+        {
+            await ReloadOrderAsync();
+        }
         if (order is null) return;
         try
         {
             error = null;
-            var courierName = TrackingForm?.CourierName?.Trim();
-            var trackingId = TrackingForm?.CourierTrackingId?.Trim();
-            var trackingUrl = TrackingForm?.CourierTrackingUrl?.Trim();
-            var consignmentId = TrackingForm?.ConsignmentId?.Trim();
+            var courierName = CourierName?.Trim();
+            var trackingId = CourierTrackingId?.Trim();
+            var trackingUrl = CourierTrackingUrl?.Trim();
+            var consignmentId = ConsignmentId?.Trim();
 
             if (string.IsNullOrWhiteSpace(trackingUrl) && !string.IsNullOrWhiteSpace(trackingId))
             {
@@ -989,11 +1006,15 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
     private async Task SaveNotesAsync()
     {
+        if (order is null)
+        {
+            await ReloadOrderAsync();
+        }
         if (order is null) return;
         try
         {
@@ -1007,7 +1028,7 @@ else
                 CourierTrackingUrl = order.CourierTrackingUrl,
                 ConsignmentId = order.ConsignmentId,
                 CodAmountToCollect = order.CodAmountToCollect > 0 ? order.CodAmountToCollect : Courier.CalculateCodAmountToCollect(order.Total, order.PaidAmount),
-                AdminNotes = NotesForm?.AdminNotes?.Trim()
+                AdminNotes = AdminNotes?.Trim()
             };
 
             await Session.RunAsync(s => s.ChangeOrderAsync(editForm));
@@ -1020,10 +1041,10 @@ else
         {
             error = ex.Message;
         }
-        await ReloadOrderAsync(forceRefreshForms: true);
+        await ReloadOrderAsync();
     }
 
-    private async Task ReloadOrderAsync(bool forceRefreshForms = false)
+    private async Task ReloadOrderAsync()
     {
         await using var scope = ScopeFactory.CreateAsyncScope();
         var freshDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1035,35 +1056,5 @@ else
             .Include(o => o.TimelineEvents)
             .AsSplitQuery()
             .SingleOrDefaultAsync(o => o.Id == Id);
-
-        if (order != null)
-        {
-            if (forceRefreshForms || StatusForm == null)
-            {
-                StatusForm = new ChangeStatusForm
-                {
-                    Status = order.Status.ToString()
-                };
-            }
-
-            if (forceRefreshForms || TrackingForm == null)
-            {
-                TrackingForm = new UpdateTrackingForm
-                {
-                    CourierName = order.CourierName,
-                    CourierTrackingId = order.CourierTrackingId,
-                    CourierTrackingUrl = order.CourierTrackingUrl,
-                    ConsignmentId = order.ConsignmentId
-                };
-            }
-
-            if (forceRefreshForms || NotesForm == null)
-            {
-                NotesForm = new SaveNotesForm
-                {
-                    AdminNotes = order.AdminNotes
-                };
-            }
-        }
     }
 }
