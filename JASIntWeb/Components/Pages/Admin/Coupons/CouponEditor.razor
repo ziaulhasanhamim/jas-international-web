@@ -1,11 +1,13 @@
 @page "/admin/coupons/new"
 @page "/admin/coupons/{Id:int}/edit"
 @attribute [Authorize(Roles = "Admin")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
+@implements IDisposable
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.EntityFrameworkCore
 @inject AppDbContext Db
 @inject NavigationManager Nav
+@inject PersistentComponentState ApplicationState
 
 <PageTitle>@(Id == 0 ? "Create Coupon" : "Edit Coupon") · JAS Admin</PageTitle>
 
@@ -161,6 +163,7 @@ else
     private string? errorMessage;
     private bool loading = true;
     private bool saving;
+    private PersistingComponentStateSubscription persistingSubscription;
 
     public class CouponFormModel
     {
@@ -190,30 +193,52 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (Id != 0)
-        {
-            var existing = await Db.Coupons.FindAsync(Id);
-            if (existing == null)
-            {
-                Nav.NavigateTo("/admin/coupons");
-                return;
-            }
+        persistingSubscription = ApplicationState.RegisterOnPersisting(PersistCouponState);
 
-            Input = new CouponFormModel
-            {
-                Id = existing.Id,
-                Code = existing.Code,
-                Description = existing.Description,
-                DiscountType = existing.DiscountType,
-                DiscountValue = existing.DiscountValue,
-                MaxDiscountAmount = existing.MaxDiscountAmount,
-                MinOrderAmount = existing.MinOrderAmount,
-                ExpiryDate = existing.ExpiryDate?.LocalDateTime,
-                UsageLimit = existing.UsageLimit,
-                IsActive = existing.IsActive
-            };
+        var stateKey = $"jas_coupon_editor_{Id}";
+        if (ApplicationState.TryTakeFromJson<CouponFormModel>(stateKey, out var restored) && restored is not null)
+        {
+            Input = restored;
+            loading = false;
         }
-        loading = false;
+        else
+        {
+            if (Id != 0)
+            {
+                var existing = await Db.Coupons.FindAsync(Id);
+                if (existing == null)
+                {
+                    Nav.NavigateTo("/admin/coupons");
+                    return;
+                }
+
+                Input = new CouponFormModel
+                {
+                    Id = existing.Id,
+                    Code = existing.Code,
+                    Description = existing.Description,
+                    DiscountType = existing.DiscountType,
+                    DiscountValue = existing.DiscountValue,
+                    MaxDiscountAmount = existing.MaxDiscountAmount,
+                    MinOrderAmount = existing.MinOrderAmount,
+                    ExpiryDate = existing.ExpiryDate?.LocalDateTime,
+                    UsageLimit = existing.UsageLimit,
+                    IsActive = existing.IsActive
+                };
+            }
+            loading = false;
+        }
+    }
+
+    private Task PersistCouponState()
+    {
+        ApplicationState.PersistAsJson($"jas_coupon_editor_{Id}", Input);
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        persistingSubscription.Dispose();
     }
 
     private void OnDiscountTypeChanged()
