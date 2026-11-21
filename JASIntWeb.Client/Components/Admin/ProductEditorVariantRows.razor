@@ -53,14 +53,14 @@
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-50/80 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                        <th class="py-3 px-3.5">Variant / Combination</th>
-                        <th class="py-3 px-3">SKU</th>
-                        <th class="py-3 px-3">Selling Price (৳) *</th>
-                        <th class="py-3 px-3">Compare-At (৳)</th>
-                        <th class="py-3 px-3">Stock &amp; Inventory</th>
-                        <th class="py-3 px-2 text-center">Default</th>
-                        <th class="py-3 px-2 text-center">Active</th>
-                        <th class="py-3 px-3 text-right">Actions</th>
+                        <th class="py-3 px-3.5 min-w-[150px]">Variant / Combination</th>
+                        <th class="py-3 px-3 min-w-[190px]">SKU</th>
+                        <th class="py-3 px-3 min-w-[140px]">Selling Price (৳) *</th>
+                        <th class="py-3 px-3 min-w-[140px]">Compare-At (৳)</th>
+                        <th class="py-3 px-3 min-w-[150px]">Stock &amp; Inventory</th>
+                        <th class="py-3 px-2 text-center w-14">Default</th>
+                        <th class="py-3 px-2 text-center w-14">Active</th>
+                        <th class="py-3 px-3 text-right w-20">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -96,8 +96,8 @@
 
                             <!-- SKU -->
                             <td class="py-3 px-3 align-middle">
-                                <div class="flex items-center gap-1">
-                                    <input class="field text-xs font-mono w-36 !py-1 px-2"
+                                <div class="flex items-center gap-1.5">
+                                    <input class="field text-xs font-mono w-40 !py-1 !px-2.5"
                                            value="@variant.Sku"
                                            maxlength="100"
                                            disabled="@isArchived"
@@ -105,7 +105,7 @@
                                            title="@(string.IsNullOrWhiteSpace(variant.Sku) ? "Auto SKU Preview: " + ProductEditorRules.AutoSku(Draft, variant) : "Stable variant SKU")"
                                            @oninput="@(e => Patch(key, v => v.Sku = Text(e)))" />
                                     <button type="button"
-                                            class="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 cursor-pointer"
+                                            class="size-7 inline-flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md border border-slate-200/80 transition cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                             title="Regenerate automatic SKU"
                                             disabled="@isArchived"
                                             @onclick="@(() => Patch(key, v => v.Sku = ""))">
@@ -116,13 +116,13 @@
 
                             <!-- Selling Price -->
                             <td class="py-3 px-3 align-middle">
-                                <div class="relative w-28">
-                                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">৳</span>
+                                <div class="relative w-32">
+                                    <span class="pointer-events-none select-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">৳</span>
                                     <input type="number"
                                            min="0"
                                            step="1"
                                            disabled="@isArchived"
-                                           class="field text-xs pl-6 w-full !py-1 font-bold text-blue-600 focus:text-blue-700"
+                                           class="field text-xs !pl-8 !pr-2 w-full !py-1 font-bold text-blue-600 focus:text-blue-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                            value="@Number(variant.Price)"
                                            placeholder="0"
                                            @oninput="@(e => Patch(key, v => v.Price = Decimal(e)))" />
@@ -131,13 +131,13 @@
 
                             <!-- Compare-At Price -->
                             <td class="py-3 px-3 align-middle">
-                                <div class="relative w-28">
-                                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">৳</span>
+                                <div class="relative w-32">
+                                    <span class="pointer-events-none select-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">৳</span>
                                     <input type="number"
                                            min="0"
                                            step="1"
                                            disabled="@isArchived"
-                                           class="field text-xs pl-6 w-full !py-1 text-slate-500"
+                                           class="field text-xs !pl-8 !pr-2 w-full !py-1 text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                            value="@Number(variant.CompareAt)"
                                            placeholder="Optional"
                                            @oninput="@(e => Patch(key, v => v.CompareAt = Decimal(e)))" />
@@ -206,15 +206,15 @@
 
                             <!-- Actions -->
                             <td class="py-3 px-3 text-right align-middle">
-                                <div class="flex items-center justify-end gap-1.5">
+                                <div class="flex items-center justify-end gap-1">
                                     <button type="button"
-                                            class="text-xs p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 cursor-pointer"
+                                            class="size-7 inline-flex items-center justify-center text-xs text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition cursor-pointer"
                                             title="Toggle advanced fields (Barcode, Cost)"
                                             @onclick="@(() => ToggleExpand(key))">
                                         @(isExpanded ? "▲" : "▼")
                                     </button>
                                     <button type="button"
-                                            class="text-xs p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                            class="size-7 inline-flex items-center justify-center text-xs text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                             disabled="@(!isArchived && variant.Id > 0 && (variant.OnHand > 0 || variant.Reserved > 0))"
                                             title="@(variant.Id == 0 ? "Remove unsaved variant" : isArchived ? "Restore variant" : "Archive variant")"
                                             @onclick="@(() => Archive.InvokeAsync(key))">
@@ -224,15 +224,19 @@
                             </td>
                         </tr>
 
-                        <!-- Expanded Row for Barcode & Cost Price -->
+                        <!-- Expanded Drawer for Barcode & Cost Price -->
                         @if (isExpanded)
                         {
-                            <tr class="bg-slate-50/50" @key="@($"{key}-expanded")">
-                                <td colspan="8" class="p-3 pl-6 border-b border-slate-100">
-                                    <div class="flex flex-wrap items-center gap-4 text-xs">
+                            <tr class="bg-slate-50/70" @key="@($"{key}-expanded")">
+                                <td colspan="8" class="p-3 px-4 border-b border-slate-200/80">
+                                    <div class="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex flex-wrap items-center gap-5 text-xs">
+                                        <div class="flex items-center gap-1.5 font-bold text-slate-700">
+                                            <span class="inline-flex items-center justify-center size-5 rounded-md bg-blue-50 text-blue-600 text-[11px]">🏷️</span>
+                                            <span>Variant Details:</span>
+                                        </div>
                                         <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-slate-600">Barcode / EAN:</span>
-                                            <input class="field text-xs font-mono w-40 !py-1"
+                                            <label class="font-medium text-slate-600">Barcode / EAN:</label>
+                                            <input class="field text-xs font-mono w-44 !py-1 !px-2.5"
                                                    value="@variant.Barcode"
                                                    maxlength="100"
                                                    placeholder="Barcode number"
@@ -240,18 +244,22 @@
                                                    @oninput="@(e => Patch(key, v => v.Barcode = Text(e)))" />
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-slate-600">Cost Price (৳):</span>
-                                            <input type="number"
-                                                   min="0"
-                                                   step="1"
-                                                   class="field text-xs w-28 !py-1"
-                                                   value="@Number(variant.Cost)"
-                                                   placeholder="Cost"
-                                                   disabled="@isArchived"
-                                                   @oninput="@(e => Patch(key, v => v.Cost = Decimal(e)))" />
+                                            <label class="font-medium text-slate-600">Cost Price:</label>
+                                            <div class="relative w-32">
+                                                <span class="pointer-events-none select-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">৳</span>
+                                                <input type="number"
+                                                       min="0"
+                                                       step="1"
+                                                       class="field text-xs !pl-8 !pr-2 w-full !py-1 font-semibold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                       value="@Number(variant.Cost)"
+                                                       placeholder="Cost"
+                                                       disabled="@isArchived"
+                                                       @oninput="@(e => Patch(key, v => v.Cost = Decimal(e)))" />
+                                            </div>
                                         </div>
-                                        <div class="text-[11px] text-slate-400">
-                                            Recorded movements: @variant.OnHand units on hand.
+                                        <div class="text-[11px] text-slate-500 sm:ml-auto flex items-center gap-2 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
+                                            <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                                            <span>Inventory tracking: <strong class="text-slate-800 font-bold">@variant.OnHand units</strong> on hand</span>
                                         </div>
                                     </div>
                                 </td>
@@ -296,7 +304,13 @@
     private Task Patch(Guid key, Action<EditorVariant> update) => Changed.InvokeAsync(new(key, update));
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
     private static decimal? Decimal(ChangeEventArgs e) => decimal.TryParse(Text(e), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : null;
-    private static string Number(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
+    private static string Number(decimal? value)
+    {
+        if (!value.HasValue) return "";
+        return value.Value % 1 == 0
+            ? value.Value.ToString("0", CultureInfo.InvariantCulture)
+            : value.Value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
 
     private string Label(EditorVariant variant)
     {
