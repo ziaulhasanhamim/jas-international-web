@@ -31,9 +31,5 @@ public sealed class CartRequestMiddleware(RequestDelegate next)
             await Results.BadRequest(new ApiErrorDto("Review the submitted values and try again.", "validation"))
                 .ExecuteAsync(context);
         }
-        catch (ShopException error)
-        {
-            await Results.Conflict(new ApiErrorDto(error.Message, null)).ExecuteAsync(context);
-        }
     }
 }

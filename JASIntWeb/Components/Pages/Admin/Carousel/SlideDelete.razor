@@ -40,14 +40,15 @@
 
     private async Task Delete()
     {
-        try
+        var res = await Session.RunAsync(s => s.DeleteSlideAsync(Id));
+        switch (res)
         {
-            await Session.RunAsync(s => s.DeleteSlideAsync(Id));
-            Nav.NavigateTo("/admin/carousel");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                Nav.NavigateTo("/admin/carousel");
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 }

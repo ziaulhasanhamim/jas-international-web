@@ -386,21 +386,21 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
         var variant = await db.ProductVariants.FirstOrDefaultAsync(v => !v.IsDeleted && v.IsActive);
         if (variant == null) return;
 
-        var resolved = await shop.ResolveAsync([new(variant.Id, 1)]);
+        var resolved = (await shop.ResolveAsync([new(variant.Id, 1)])).Unwrap();
         var stock = resolved.Items[0].Stock;
         if (stock <= 0) return;
 
         var token = Guid.NewGuid();
         // Add quantity equal to stock
-        var initial = await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, stock), add: true);
+        var initialRes = await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, stock), add: true);
+        var initial = initialRes.ValueOrDefault()!;
         await initial.Items.First(i => i.VariantId == variant.Id).Quantity.Should().BeEqualTo(stock);
 
-        // Try adding more - should throw ShopException with friendly message, clamped
-        var ex = await Assert.ThrowsAsync<ShopException>(async () =>
-        {
-            await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, 1), add: true);
-        });
-        await (ex?.Message ?? "").Should().Contain("Maximum available stock");
+        // Try adding more - should return error with friendly message, clamped
+        var res = await shop.ChangeAsync(token, null, new CartLineRequest(variant.Id, 1), add: true);
+        await res.IsFailure.Should().BeTrue();
+        res.TryGet(out _, out var err);
+        await (err?.Message ?? "").Should().Contain("Maximum available stock");
 
         // Now test via HTTP /cart/add endpoint with rapid clicks (never 500)
         var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -414,10 +414,10 @@ public class CartEnhancedFormIntegrationTests : JasIntegrationTestBase
             })
         };
         req.Headers.Add("Cookie", $"jas_cart_id={token}");
-        var res = await client.SendAsync(req);
+        var httpRes = await client.SendAsync(req);
 
         // Must redirect cleanly without crashing or 500 error
-        await ((int)res.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
+        await ((int)httpRes.StatusCode).Should().BeEqualTo((int)HttpStatusCode.Redirect);
     }
 
     [Test]

@@ -1,13 +1,15 @@
+using JASIntWeb.Helpers;
+
 namespace JASIntWeb.Client.Contracts;
 
 public interface IAdminProductWorkspaceBackend
 {
-    Task<ProductWorkspace> LoadAsync(int productId);
-    Task<ProductWorkspace> SaveConfigurationAsync(int productId, ProductConfiguration command);
-    Task<ProductWorkspace> SaveVariantAsync(int productId, WorkspaceVariant command);
-    Task<ProductWorkspace> AdjustStockAsync(int productId, WorkspaceStock command);
-    Task<CombinationPreview> PreviewAsync(int productId, long revision);
-    Task<ProductWorkspace> GenerateAsync(int productId, long revision);
+    Task<Result<ProductWorkspace>> LoadAsync(int productId);
+    Task<Result<ProductWorkspace>> SaveConfigurationAsync(int productId, ProductConfiguration command);
+    Task<Result<ProductWorkspace>> SaveVariantAsync(int productId, WorkspaceVariant command);
+    Task<Result<ProductWorkspace>> AdjustStockAsync(int productId, WorkspaceStock command);
+    Task<Result<CombinationPreview>> PreviewAsync(int productId, long revision);
+    Task<Result<ProductWorkspace>> GenerateAsync(int productId, long revision);
 }
 
 public sealed record AttributeSuggestion(int Id, string Name, List<ValueSuggestion> Values);
@@ -51,5 +53,3 @@ public sealed record ProductConfiguration(long Revision, List<WorkspaceAttribute
 public sealed record WorkspaceStock(long Revision, int VariantId, int ExpectedOnHand, int Quantity, string Reason);
 public sealed record CombinationPreview(int Total, int Missing);
 public sealed record WorkspaceRevision(long Revision);
-public sealed record ContentPreviewRequest(string Source);
-public sealed record ContentPreview(string Html);

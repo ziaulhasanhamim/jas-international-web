@@ -2,6 +2,7 @@ using System.Text.Json;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Client.Services;
+using JASIntWeb.Helpers;
 using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ public class CartServiceTests
     public async Task Initialize_ConcurrentConsumersLoadOnceAndReuseConfirmedCart()
     {
         var backend = Substitute.For<ICartBackend>();
-        var pending = new TaskCompletionSource<CartDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = new TaskCompletionSource<Result<CartDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.GetAsync().Returns(pending.Task);
         var js = Substitute.For<IJSRuntime>();
         var service = new CartService(js, backend);
@@ -41,7 +42,7 @@ public class CartServiceTests
     public async Task Initialize_RestoredSnapshotSkipsBackendAndPreservesItemsAndTotals()
     {
         var originalBackend = Substitute.For<ICartBackend>();
-        originalBackend.GetAsync().Returns(Cart());
+        originalBackend.GetAsync().Returns(Task.FromResult<Result<CartDto>>(Cart()));
         var prerender = new CartService(Substitute.For<IJSRuntime>(), originalBackend);
         await prerender.InitializeAsync();
         var serialized = JsonSerializer.Serialize(prerender.State);
@@ -63,7 +64,7 @@ public class CartServiceTests
     public async Task Initialize_EmptyCartIsLoadedOnce()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.GetAsync().Returns(new CartDto(false, []));
+        backend.GetAsync().Returns(Task.FromResult<Result<CartDto>>(new CartDto(false, [])));
         var service = new CartService(Substitute.For<IJSRuntime>(), backend);
         await service.InitializeAsync();
         await service.InitializeAsync();
@@ -77,13 +78,13 @@ public class CartServiceTests
     public async Task Initialize_RestoredFailureWaitsForExplicitRetry()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.GetAsync().Returns(Task.FromException<CartDto>(new HttpRequestException("Offline")));
+        backend.GetAsync().Returns(Task.FromException<Result<CartDto>>(new HttpRequestException("Offline")));
         var prerender = new CartService(Substitute.For<IJSRuntime>(), backend);
         await prerender.InitializeAsync();
         await prerender.HasCart.Should().BeFalse();
         await prerender.Error.Should().BeEqualTo("Connection interrupted. Please try again.");
         var retryBackend = Substitute.For<ICartBackend>();
-        retryBackend.GetAsync().Returns(Cart(3));
+        retryBackend.GetAsync().Returns(Task.FromResult<Result<CartDto>>(Cart(3)));
         var interactive = new CartService(Substitute.For<IJSRuntime>(), retryBackend)
         {
             State = JsonSerializer.Deserialize<CartState>(JsonSerializer.Serialize(prerender.State))
@@ -100,7 +101,7 @@ public class CartServiceTests
     public async Task Refresh_ReplacesRestoredSnapshotWithCurrentServerCart()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.GetAsync().Returns(new CartDto(false, []));
+        backend.GetAsync().Returns(Task.FromResult<Result<CartDto>>(new CartDto(false, [])));
         var service = new CartService(Substitute.For<IJSRuntime>(), backend) { State = new(Cart()) };
         await service.RefreshAsync();
         await backend.Received(1).GetAsync();
@@ -113,13 +114,13 @@ public class CartServiceTests
     public async Task SetQuantity_PendingAndRejectedUpdatePreserveConfirmedCart()
     {
         var backend = Substitute.For<ICartBackend>();
-        var pending = new TaskCompletionSource<CartDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = new TaskCompletionSource<Result<CartDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.ChangeAsync(Arg.Any<CartLineRequest>(), false).Returns(pending.Task);
         var service = new CartService(Substitute.For<IJSRuntime>(), backend) { State = new(Cart()) };
         var update = service.SetQuantityAsync(7, 5);
         await service.IsBusy.Should().BeTrue();
         await service.ItemCount.Should().BeEqualTo(5); // Optimistically updated
-        pending.SetException(new CommerceException("Insufficient stock."));
+        pending.SetResult(new CommerceError("Insufficient stock."));
         await update;
         await service.Items.Single().Quantity.Should().BeEqualTo(2);
         await service.Total.Should().BeEqualTo(300m);
@@ -131,7 +132,7 @@ public class CartServiceTests
     public async Task SetQuantity_UsesAuthoritativeResponseAndUpdatesBadge()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.ChangeAsync(new CartLineRequest(7, 3), false).Returns(Cart(3));
+        backend.ChangeAsync(new CartLineRequest(7, 3), false).Returns(Task.FromResult<Result<CartDto>>(Cart(3)));
         var js = Substitute.For<IJSRuntime>();
         var service = new CartService(js, backend) { State = new(Cart()) };
         await service.SetQuantityAsync(7, 3);
@@ -147,7 +148,7 @@ public class CartServiceTests
     public async Task RemoveLastItem_InitializesEmptyCartWithoutRefetching()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.ChangeAsync(new CartLineRequest(7, 0), false).Returns(new CartDto(true, []));
+        backend.ChangeAsync(new CartLineRequest(7, 0), false).Returns(Task.FromResult<Result<CartDto>>(new CartDto(true, [])));
         var service = new CartService(Substitute.For<IJSRuntime>(), backend) { State = new(Cart()) };
         await service.SetQuantityAsync(7, 0);
         await service.InitializeAsync();
@@ -161,8 +162,8 @@ public class CartServiceTests
     public async Task AddThenCheckoutCompletion_UseServerResponsesAndRefreshAfterCheckout()
     {
         var backend = Substitute.For<ICartBackend>();
-        backend.ChangeAsync(new CartLineRequest(7, 2), true).Returns(Cart());
-        backend.GetAsync().Returns(new CartDto(true, []));
+        backend.ChangeAsync(new CartLineRequest(7, 2), true).Returns(Task.FromResult<Result<CartDto>>(Cart()));
+        backend.GetAsync().Returns(Task.FromResult<Result<CartDto>>(new CartDto(true, [])));
         var service = new CartService(Substitute.For<IJSRuntime>(), backend);
         await service.AddAsync(7, 2);
         await service.InitializeAsync();

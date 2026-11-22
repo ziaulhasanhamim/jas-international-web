@@ -131,15 +131,16 @@ else
 
     private async Task Save()
     {
-        try
+        Input!.Id = Id;
+        var res = await Session.RunAsync(s => s.SaveSlideAsync(Input));
+        switch (res)
         {
-            Input!.Id = Id;
-            await Session.RunAsync(s => s.SaveSlideAsync(Input));
-            Nav.NavigateTo("/admin/carousel");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                Nav.NavigateTo("/admin/carousel");
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 }

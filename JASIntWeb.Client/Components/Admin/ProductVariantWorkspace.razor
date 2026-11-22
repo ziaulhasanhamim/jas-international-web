@@ -66,19 +66,41 @@ else
     private bool variantDirty;
     private CombinationPreview? preview;
     private WorkspaceVariant? stockVariant;
-    protected override async Task<AdminEditorData<ProductWorkspace>> LoadAsync() => new(await Workspace.LoadAsync(Id), [], [], 0, 0, "");
-    protected override Task<AdminSaveResult> SaveAsync(ProductWorkspace input) => throw new NotSupportedException("Use explicit workspace commands.");
+    protected override async Task<Result<AdminEditorData<ProductWorkspace>>> LoadAsync()
+    {
+        var loadRes = await Workspace.LoadAsync(Id);
+        return loadRes switch
+        {
+            ProductWorkspace ws => new AdminEditorData<ProductWorkspace>(ws, [], [], 0, 0, ""),
+            Error err => err
+        };
+    }
+    protected override Task<Result<AdminSaveResult>> SaveAsync(ProductWorkspace input) => throw new NotSupportedException("Use explicit workspace commands.");
     private void OptionsChanged(List<WorkspaceAttribute> attributes) { Input = Input! with { Attributes = attributes }; MarkDirty(); MarkEdited(); }
     private void VariantChanged(WorkspaceVariant variant) { var index = Input!.Variants.FindIndex(row => row.Id == variant.Id); Input.Variants[index] = variant; variantDirty = true; MarkEdited(); }
     private void MarkDirty() { dirty = true; preview = null; }
     private void Select(WorkspaceVariant variant, int definition, ChangeEventArgs args)
     { variant.Choices[definition] = int.TryParse(args.Value?.ToString(), out var id) ? id : 0; MarkDirty(); MarkEdited(); }
-    private async Task Execute(Func<Task<ProductWorkspace>> action)
+    private async Task Execute(Func<Task<Result<ProductWorkspace>>> action)
     {
         if (Busy) return;
         saving = true; error = null;
-        try { Input = await action(); dirty = false; variantDirty = false; stockVariant = null; preview = null; try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { } await JS.InvokeVoidAsync("jasAdminDrafts.clear"); }
-        catch (AdminCatalogException failure) { error = failure.Message; AccessDenied = failure.Status is 401 or 403; }
+        try
+        {
+            var res = await action();
+            switch (res)
+            {
+                case ProductWorkspace ws:
+                    Input = ws; dirty = false; variantDirty = false; stockVariant = null; preview = null;
+                    try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
+                    await JS.InvokeVoidAsync("jasAdminDrafts.clear");
+                    break;
+                case Error failure:
+                    error = failure.Message;
+                    AccessDenied = failure.Code is 401 or 403;
+                    break;
+            }
+        }
         catch (HttpRequestException) { error = "Connection failed. Your draft is retained. Try again."; }
         catch (JSDisconnectedException) { error = "The operation completed. Reload to reconnect."; }
         finally { saving = false; }
@@ -88,8 +110,19 @@ else
     {
         if (Busy || dirty) return;
         saving = true; error = null;
-        try { preview = await Workspace.PreviewAsync(Id, Input!.Revision); }
-        catch (AdminCatalogException failure) { error = failure.Message; }
+        try
+        {
+            var res = await Workspace.PreviewAsync(Id, Input!.Revision);
+            switch (res)
+            {
+                case CombinationPreview p:
+                    preview = p;
+                    break;
+                case Error failure:
+                    error = failure.Message;
+                    break;
+            }
+        }
         catch (HttpRequestException) { error = "Connection failed. Try previewing again."; }
         finally { saving = false; }
     }

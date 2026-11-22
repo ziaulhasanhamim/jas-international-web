@@ -344,30 +344,28 @@ else
         {
             if (SecurityAction == "toggle-email")
             {
-                try
+                var res = await Session.RunAsync(s => s.ToggleEmailConfirmationAsync(Id));
+                switch (res)
                 {
-                    await Session.RunAsync(s => s.ToggleEmailConfirmationAsync(Id));
-                    Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Email verification status toggled."));
-                    return;
-                }
-                catch (ShopException ex)
-                {
-                    Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
-                    return;
+                    case Success:
+                        Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Email verification status toggled."));
+                        return;
+                    case Error ex:
+                        Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
+                        return;
                 }
             }
             else if (SecurityAction == "toggle-lockout")
             {
-                try
+                var res = await Session.RunAsync((s, actor) => s.ToggleLockoutAsync(Id, actor));
+                switch (res)
                 {
-                    await Session.RunAsync((s, actor) => s.ToggleLockoutAsync(Id, actor));
-                    Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account lockout status toggled."));
-                    return;
-                }
-                catch (ShopException ex)
-                {
-                    Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
-                    return;
+                    case Success:
+                        Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account lockout status toggled."));
+                        return;
+                    case Error ex:
+                        Nav.NavigateTo($"/admin/users/{Id}/edit?error=" + Uri.EscapeDataString(ex.Message));
+                        return;
                 }
             }
         }
@@ -416,15 +414,16 @@ else
     {
         error = null;
         notice = null;
-        try
+        ProfileInput!.Id = Id;
+        var res = await Session.RunAsync(s => s.UpdateUserProfileAsync(ProfileInput));
+        switch (res)
         {
-            ProfileInput!.Id = Id;
-            await Session.RunAsync(s => s.UpdateUserProfileAsync(ProfileInput));
-            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("User profile updated successfully."));
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("User profile updated successfully."));
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 
@@ -432,16 +431,17 @@ else
     {
         error = null;
         notice = null;
-        try
+        PasswordInput!.Id = Id;
+        var res = await Session.RunAsync(s => s.AdminResetPasswordAsync(PasswordInput));
+        switch (res)
         {
-            PasswordInput!.Id = Id;
-            await Session.RunAsync(s => s.AdminResetPasswordAsync(PasswordInput));
-            PasswordInput.NewPassword = "";
-            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Password reset successfully. User's existing sessions were invalidated."));
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                PasswordInput.NewPassword = "";
+                Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Password reset successfully. User's existing sessions were invalidated."));
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 
@@ -449,15 +449,16 @@ else
     {
         error = null;
         notice = null;
-        try
+        RoleInput!.Id = Id;
+        var res = await Session.RunAsync((s, actor) => s.ChangeRoleAsync(RoleInput, actor));
+        switch (res)
         {
-            RoleInput!.Id = Id;
-            await Session.RunAsync((s, actor) => s.ChangeRoleAsync(RoleInput, actor));
-            Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account role updated successfully."));
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                Nav.NavigateTo($"/admin/users/{Id}/edit?notice=" + Uri.EscapeDataString("Account role updated successfully."));
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 

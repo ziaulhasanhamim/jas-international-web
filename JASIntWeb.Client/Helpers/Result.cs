@@ -8,7 +8,9 @@ public class Error
 {
     public string Message { get; init; } = "";
     public int Code { get; init; } = 400;
+    public int Status => Code;
     public Dictionary<string, string[]>? ValidationErrors { get; init; }
+    public Dictionary<string, string[]>? Errors => ValidationErrors;
 
     public Error() { }
 
@@ -44,7 +46,7 @@ public sealed class NotFoundError(string message = "Resource not found.") : Erro
 
 public sealed class ValidationError(string message, Dictionary<string, string[]>? errors = null) : Error(message, 400, errors)
 {
-    public Dictionary<string, string[]> Errors => ValidationErrors ?? [];
+    public new Dictionary<string, string[]> Errors => ValidationErrors ?? [];
 }
 
 public sealed class ConflictError(string message) : Error(message, 409);
@@ -67,6 +69,7 @@ public union Result(Success, Error)
 {
     public bool IsSuccess => Value is Success;
     public bool IsFailure => Value is Error;
+    public Error? Error => Value as Error;
 
     public bool TryGetError([NotNullWhen(true)] out Error? error)
     {
@@ -108,8 +111,23 @@ public union Result<T>(T, Error)
 {
     public bool IsSuccess => Value is T;
     public bool IsFailure => Value is Error;
+    public Error? Error => Value as Error;
+
+    public bool TryGetError([NotNullWhen(true)] out Error? error)
+    {
+        if (Value is Error err)
+        {
+            error = err;
+            return true;
+        }
+
+        error = null;
+        return false;
+    }
 
     public T? ValueOrDefault(T? fallback = default) => Value is T val ? val : fallback;
+    public T Unwrap() => Value is T val ? val : throw new InvalidOperationException($"Result is a failure: {Error?.Message}");
+    public T Ok() => Unwrap();
 
     public bool TryGet([NotNullWhen(true)] out T? value, [NotNullWhen(false)] out Error? error)
     {
@@ -177,6 +195,13 @@ public union Result<T>(T, Error)
     public static Result<T> Success(T value) => value;
     public static Result<T> Failure(Error error) => error;
     public static Result<T> Failure(string message, int code = 400) => new Error(message, code);
+
+    public static implicit operator Result(Result<T> result) =>
+        result switch
+        {
+            T => Helpers.Success.Ok,
+            Error err => err
+        };
 }
 
 public static class ResultExtensions

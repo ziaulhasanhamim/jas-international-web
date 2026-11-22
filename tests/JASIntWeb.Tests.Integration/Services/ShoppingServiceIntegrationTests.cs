@@ -1,4 +1,5 @@
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using JASIntWeb.Services;
@@ -18,7 +19,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var token = Guid.CreateVersion7();
-        var cartDto = await shop.ChangeAsync(token, null, new CartLineRequest(1, 2), add: true);
+        var cartDto = (await shop.ChangeAsync(token, null, new CartLineRequest(1, 2), add: true)).Unwrap();
 
         await cartDto.Should().NotBeNull();
         await cartDto.Items.Count.Should().BeEqualTo(1);
@@ -44,7 +45,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
         await shop.ChangeAsync(token, null, new CartLineRequest(1, 3), add: true);
 
         // Update quantity to 0
-        var updated = await shop.ChangeAsync(token, null, new CartLineRequest(1, 0), add: false);
+        var updated = (await shop.ChangeAsync(token, null, new CartLineRequest(1, 0), add: false)).Unwrap();
         await updated.Items.Count.Should().BeEqualTo(0);
 
         var cartInDb = await db.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.Token == token);
@@ -63,7 +64,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
         var mergeToken = Guid.CreateVersion7();
 
         var mergeRequest = new CartMergeRequest(mergeToken, [new CartLineRequest(1, 2)]);
-        var userCart = await shop.MergeAsync(userId, mergeRequest);
+        var userCart = (await shop.MergeAsync(userId, mergeRequest)).Unwrap();
 
         await userCart.Should().NotBeNull();
         await userCart.Items.Count.Should().BeEqualTo(1);
@@ -104,7 +105,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             ExpectedTotal = 29060m // (14,500 * 2) + 60 delivery fee inside Khulna
         };
 
-        var result = await shop.CheckoutAsync(null, checkoutRequest);
+        var result = (await shop.CheckoutAsync(null, checkoutRequest)).Unwrap();
 
         await result.Should().NotBeNull();
         await result.OrderId.Should().BeGreaterThan(0);
@@ -133,7 +134,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task CheckoutAsync_WhenQuantityExceedsAvailableStock_ThrowsShopException()
+    public async Task CheckoutAsync_WhenQuantityExceedsAvailableStock_ReturnsError()
     {
         await using var scope = CreateScope();
         var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
@@ -159,7 +160,8 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             PaymentMethod = "COD"
         };
 
-        await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, checkoutRequest));
+        var res = await shop.CheckoutAsync(null, checkoutRequest);
+        await res.IsFailure.Should().BeTrue();
     }
 
     [Test]
@@ -188,7 +190,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Items = [new CartLineRequest(1, 1)]
         };
 
-        var result = await shop.CheckoutAsync(null, checkoutRequest);
+        var result = (await shop.CheckoutAsync(null, checkoutRequest)).Unwrap();
         await result.Should().NotBeNull();
 
         // 1. Getting cart after checkout returns empty cart without throwing DbUpdateException
@@ -196,7 +198,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
         await cartAfterCheckout.Items.Count.Should().BeEqualTo(0);
 
         // 2. Adding to cart after checkout generates a fresh active cart and succeeds
-        var newCart = await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true);
+        var newCart = (await shop.ChangeAsync(token, null, new CartLineRequest(1, 1), add: true)).Unwrap();
         await newCart.Items.Count.Should().BeEqualTo(1);
         await newCart.Token.HasValue.Should().BeTrue();
         await newCart.Token!.Value.Should().NotBeEqualTo(token);
@@ -212,7 +214,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task CheckoutAsync_WithPendingPaymentMethod_ThrowsShopException()
+    public async Task CheckoutAsync_WithPendingPaymentMethod_ReturnsError()
     {
         await using var scope = CreateScope();
         var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
@@ -234,12 +236,14 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Items = [new CartLineRequest(1, 1)]
         };
 
-        var ex = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, checkoutRequest));
-        await ex!.Message.Should().Contain("valid payment method");
+        var res = await shop.CheckoutAsync(null, checkoutRequest);
+        await res.IsFailure.Should().BeTrue();
+        res.TryGet(out _, out var err);
+        await err!.Message.Should().Contain("valid payment method");
     }
 
     [Test]
-    public async Task CheckoutAsync_WithBkash_MissingTransactionIdOrSenderPhone_ThrowsShopException()
+    public async Task CheckoutAsync_WithBkash_MissingTransactionIdOrSenderPhone_ReturnsError()
     {
         await using var scope = CreateScope();
         var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
@@ -263,8 +267,10 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Items = [new CartLineRequest(1, 1)]
         };
 
-        var exTrx = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, missingTrx));
-        await exTrx!.Message.Should().Contain("Transaction ID");
+        var resTrx = await shop.CheckoutAsync(null, missingTrx);
+        await resTrx.IsFailure.Should().BeTrue();
+        resTrx.TryGet(out _, out var errTrx);
+        await errTrx!.Message.Should().Contain("Transaction ID");
 
         var missingPhone = new CheckoutRequest
         {
@@ -282,8 +288,10 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Items = [new CartLineRequest(1, 1)]
         };
 
-        var exPhone = await Assert.ThrowsAsync<ShopException>(() => shop.CheckoutAsync(null, missingPhone));
-        await exPhone!.Message.Should().Contain("sender phone number");
+        var resPhone = await shop.CheckoutAsync(null, missingPhone);
+        await resPhone.IsFailure.Should().BeTrue();
+        resPhone.TryGet(out _, out var errPhone);
+        await errPhone!.Message.Should().Contain("sender phone number");
     }
 
     [Test]
@@ -313,7 +321,7 @@ public class ShoppingServiceIntegrationTests : JasIntegrationTestBase
             Items = [new CartLineRequest(1, 1)]
         };
 
-        var result = await shop.CheckoutAsync(null, checkoutRequest);
+        var result = (await shop.CheckoutAsync(null, checkoutRequest)).Unwrap();
         await result.Should().NotBeNull();
 
         var order = await db.Orders

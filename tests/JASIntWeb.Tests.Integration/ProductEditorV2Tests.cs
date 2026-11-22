@@ -197,7 +197,7 @@ public class ProductEditorV2Tests : JasIntegrationTestBase
         await using var scope = CreateScope(); var catalog = scope.ServiceProvider.GetRequiredService<CatalogService>();
         var summary = (await catalog.LatestAsync(null, 20)).Single(p => p.Id == d.Id); await summary.Price.Should().BeEqualTo(12300); await summary.OriginalPrice.Should().BeEqualTo(15000);
         var details = (await catalog.DetailsAsync(d.Information.Slug!))!; await details.Variants.Single(v => v.Id == d.Variants[0].Id).OriginalPrice.Should().BeEqualTo(15000);
-        var cart = await scope.ServiceProvider.GetRequiredService<ShoppingService>().ResolveAsync([new(d.Variants[0].Id, 2)]); await cart.Items.Single().Price.Should().BeEqualTo(12300);
+        var cart = (await scope.ServiceProvider.GetRequiredService<ShoppingService>().ResolveAsync([new(d.Variants[0].Id, 2)])).Unwrap(); await cart.Items.Single().Price.Should().BeEqualTo(12300);
         var feed = await c.GetStringAsync("/feeds/google.xml"); await feed.Contains("12300.00 BDT").Should().BeTrue(); await feed.Contains("15000.00 BDT").Should().BeTrue();
     }
     [Test]

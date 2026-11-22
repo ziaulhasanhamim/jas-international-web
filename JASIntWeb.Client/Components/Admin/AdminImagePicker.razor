@@ -37,11 +37,20 @@
             if (args.FileCount != 1) { message = "Choose one image for this field."; return; }
             var file = args.File;
             await using var stream = file.OpenReadStream((BrandLogo ? 5 : 10) * 1024 * 1024);
-            await ValueChanged.InvokeAsync(await Backend.UploadAsync(stream, file.Name, file.ContentType, BrandLogo));
-            fileName = file.Name;
+            var uploadRes = await Backend.UploadAsync(stream, file.Name, file.ContentType, BrandLogo);
+            switch (uploadRes)
+            {
+                case string url:
+                    await ValueChanged.InvokeAsync(url);
+                    fileName = file.Name;
+                    break;
+                case Error err:
+                    message = err.Message;
+                    break;
+            }
         }
-        catch (Exception failure) when (failure is AdminCatalogException or IOException or HttpRequestException)
-        { message = failure is AdminCatalogException known ? known.Message : "Upload failed. Check the file size and connection."; }
+        catch (Exception failure) when (failure is IOException or HttpRequestException)
+        { message = "Upload failed. Check the file size and connection."; }
         finally { uploading = false; await BusyChanged.InvokeAsync(false); }
     }
 }

@@ -97,15 +97,16 @@ else
 
     private async Task Save()
     {
-        try
+        Input!.Id = Id;
+        var res = await Session.RunAsync((s, _) => s.SaveAttributeAsync(Input));
+        switch (res)
         {
-            Input!.Id = Id;
-            var id = await Session.RunAsync((s, _) => s.SaveAttributeAsync(Input));
-            Nav.NavigateTo($"/admin/attributes/{id}/options");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case int id:
+                Nav.NavigateTo($"/admin/attributes/{id}/options");
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 }

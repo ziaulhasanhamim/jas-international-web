@@ -10,11 +10,17 @@ using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Caching.Hybrid;
 namespace JASIntWeb.Services.ProductEditor;
 
+internal sealed class ProductEditorException(int status, string message, Dictionary<string, string[]>? errors = null) : Exception(message)
+{
+    public int Status { get; } = status;
+    public Dictionary<string, string[]>? Errors { get; } = errors;
+}
+
 public sealed partial class ProductEditorService(AppDbContext db, AdminService admin, CatalogService catalog,
     IOutputCacheStore output, IConfiguration configuration, ILogger<ProductEditorService> logger, IStorageService storage)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static AdminCatalogException Invalid(string field, string message, int status = 422) => new(status, message, new() { [field] = [message] });
+    private static ProductEditorException Invalid(string field, string message, int status = 422) => new(status, message, new() { [field] = [message] });
     private static string Hash<T>(T value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, Json))));
     private async Task<ProductEditorReceipt?> ReceiptAsync(int actor, Guid operation, string? hash, CancellationToken ct)
     {
@@ -58,7 +64,7 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         if (id > 0)
         {
             var p = await db.Products.IgnoreQueryFilters().AsNoTracking().Include(p => p.ProductImages).SingleOrDefaultAsync(p => p.Id == id, ct)
-                ?? throw new AdminCatalogException(404, "Product not found.");
+                ?? throw new ProductEditorException(404, "Product not found.");
             draft.Revision = p.CatalogRevision;
             draft.Information = new() { Name = p.Name, Slug = p.Slug, CategoryId = p.CategoryId, BrandId = p.BrandId, Description = p.Description ?? "", Details = p.Details,
                 Image = p.MainImageUrl, Images = string.Join('\n', p.ProductImages.OrderBy(i => i.SortOrder).Select(i => i.ImageUrl)), Hidden = p.IsDeleted,
@@ -100,7 +106,7 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         if (draft.Id > 0)
         {
             await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Products\" WHERE \"Id\" = {draft.Id} FOR UPDATE", ct);
-            var current = await db.Products.IgnoreQueryFilters().SingleOrDefaultAsync(p => p.Id == draft.Id, ct) ?? throw new AdminCatalogException(404, "Product not found.");
+            var current = await db.Products.IgnoreQueryFilters().SingleOrDefaultAsync(p => p.Id == draft.Id, ct) ?? throw new ProductEditorException(404, "Product not found.");
             if (current.CatalogRevision != draft.Revision) throw Invalid("Revision", "Another editor changed this product. Keep your draft and review the latest version before saving.", 409);
         }
         var id = await admin.SaveProductAsync(ToForm(draft), unifiedEditor: true);
@@ -172,7 +178,7 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         List<ValidationResult> errors = [];
         Validator.TryValidateObject(form, new(form), errors, true);
         var actionable = errors.Where(e => !(form.Hidden && e.MemberNames.All(name => name is nameof(form.Image) or nameof(form.Details)))).ToList();
-        if (actionable.Count > 0) throw new AdminCatalogException(422, "Review the highlighted product fields.", actionable.SelectMany(e => e.MemberNames.Select(name => (name, e.ErrorMessage!))).GroupBy(e => e.name).ToDictionary(g => g.Key, g => g.Select(e => e.Item2).ToArray()));
+        if (actionable.Count > 0) throw new ProductEditorException(422, "Review the highlighted product fields.", actionable.SelectMany(e => e.MemberNames.Select(name => (name, e.ErrorMessage!))).GroupBy(e => e.name).ToDictionary(g => g.Key, g => g.Select(e => e.Item2).ToArray()));
         if (draft.Attributes.Count > 50 || draft.Attributes.Any(a => a is null) || draft.Variants.Any(v => v is null)) throw Invalid("Options", "Use at most 50 attributes.");
     }
     private static ProductEditForm ToForm(ProductEditorDraft d) => new() { Id = d.Id, CatalogRevision = d.Revision,
@@ -190,7 +196,7 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         if (await ReceiptAsync(actor, command.OperationId, hash, ct) is { } previous)
         { await transaction.CommitAsync(ct); return await CompletedAsync(JsonSerializer.Deserialize<EditorReceipt>(previous.ResultJson, Json)!, ct); }
         await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Products\" WHERE \"Id\" = {command.ProductId} FOR UPDATE", ct);
-        var variant = await db.ProductVariants.SingleOrDefaultAsync(v => v.Id == command.VariantId && v.ProductId == command.ProductId && !v.IsDeleted, ct) ?? throw new AdminCatalogException(404, "Variant not found.");
+        var variant = await db.ProductVariants.SingleOrDefaultAsync(v => v.Id == command.VariantId && v.ProductId == command.ProductId && !v.IsDeleted, ct) ?? throw new ProductEditorException(404, "Variant not found.");
         await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {variant.Id} FOR UPDATE", ct);
         var stock = await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == variant.Id, ct);
         if ((stock?.Version ?? 0) != command.ExpectedVersion) throw Invalid("Stock", "Inventory changed. Your quantity and reason are retained; review current stock before retrying.", 409);

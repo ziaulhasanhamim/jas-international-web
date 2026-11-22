@@ -3,6 +3,7 @@
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Services
 @using JASIntWeb.Client.Contracts
+@using JASIntWeb.Helpers
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
@@ -1200,7 +1201,18 @@
             }
 
             // ONLY submit to DB when user confirms payment details
-            var result = await Shop.CheckoutAsync(userId, checkoutRequest);
+            var checkoutRes = await Shop.CheckoutAsync(userId, checkoutRequest);
+            CheckoutResult result = null!;
+            switch (checkoutRes)
+            {
+                case CheckoutResult res:
+                    result = res;
+                    break;
+                case Error err:
+                    error = err.Message;
+                    isSubmitting = false;
+                    return;
+            }
             await Cart.CompleteCheckoutAsync(checkoutToken);
 
             try
@@ -1229,11 +1241,6 @@
             {
                 Nav.NavigateTo($"/order/{result.PublicToken}");
             }
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
-            isSubmitting = false;
         }
         catch (Exception ex)
         {

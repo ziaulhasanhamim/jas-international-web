@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
 namespace JASIntWeb.Services;
 
 public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScopeFactory scopes, IConfiguration configuration) : IAdminCatalogBackend
@@ -8,12 +9,16 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
     private string PublicBaseUrl => configuration["PublicBaseUrl"] ?? "https://www.jasinternational.com.bd";
     private AdminEditorData<T> Data<T>(T input, List<CategoryLinkDto>? categories = null, List<BrandLinkDto>? brands = null, int children = 0, int products = 0)
         => new(input, categories ?? [], brands ?? [], children, products, PublicBaseUrl);
-    private async Task<T> Execute<T>(Func<AdminService, Task<T>> action)
-    {
-        try { return await session.RunAsync((service, _) => action(service)); }
-        catch (ShopException error) { throw new AdminCatalogException(error.Message.Contains("session expired", StringComparison.OrdinalIgnoreCase) ? 401 : 409, error.Message); }
-    }
-    public Task<AdminEditorData<CategoryEditForm>> CategoryAsync(int Id) => Execute(async service =>
+    private Task<Result<T>> Execute<T>(Func<AdminService, Task<Result<T>>> action) =>
+        session.RunAsync((service, _) => action(service));
+    private Task<Result<T>> Execute<T>(Func<AdminService, Task<T>> action) =>
+        session.RunAsync(action);
+    private Task<Result> Execute(Func<AdminService, Task<Result>> action) =>
+        session.RunAsync((service, _) => action(service));
+    private Task<Result> Execute(Func<AdminService, Task> action) =>
+        session.RunAsync(action);
+
+    public Task<Result<AdminEditorData<CategoryEditForm>>> CategoryAsync(int Id) => Execute<AdminEditorData<CategoryEditForm>>(async service =>
     {
         CategoryEditForm? input = null;
         await using var scope = scopes.CreateAsyncScope();
@@ -36,7 +41,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         var c = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == Id);
         if (c is null)
         {
-            throw new AdminCatalogException(404, "Record not found.");
+            return (Result<AdminEditorData<CategoryEditForm>>)new NotFoundError("Record not found.");
         }
         input = new()
         {
@@ -59,19 +64,17 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         return Data(input!, parents, children: childCount);
     });
 
-    public Task<AdminEditorData<BrandEditForm>> BrandAsync(int Id) => Execute(async service =>
+    public Task<Result<AdminEditorData<BrandEditForm>>> BrandAsync(int Id) => Execute<AdminEditorData<BrandEditForm>>(async service =>
     {
         BrandEditForm? input = null;
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var productCount = 0;
 
-
         if (Id != 0)
         {
             productCount = await db.Products.CountAsync(p => p.BrandId == Id && !p.IsDeleted);
         }
-
 
         if (Id == 0)
         {
@@ -85,7 +88,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
             var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == Id);
             if (b is null)
             {
-                throw new AdminCatalogException(404, "Record not found.");
+                return (Result<AdminEditorData<BrandEditForm>>)new NotFoundError("Record not found.");
             }
             input = new BrandEditForm
             {
@@ -108,7 +111,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         return Data(input!, products: productCount);
     });
 
-    public Task<AdminEditorData<ProductEditForm>> ProductAsync(int Id) => Execute(async service =>
+    public Task<Result<AdminEditorData<ProductEditForm>>> ProductAsync(int Id) => Execute<AdminEditorData<ProductEditForm>>(async service =>
     {
         ProductEditForm? input = null;
         await using var scope = scopes.CreateAsyncScope();
@@ -147,7 +150,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
             .SingleOrDefaultAsync(p => p.Id == Id);
         if (p is null)
         {
-            throw new AdminCatalogException(404, "Record not found.");
+            return (Result<AdminEditorData<ProductEditForm>>)new NotFoundError("Record not found.");
         }
 
         var defVariant = p.ProductVariants.FirstOrDefault(v => v.IsDefault && !v.IsDeleted)
@@ -193,9 +196,9 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         return Data(input!, categories, brands);
     });
 
-    private Task<AdminSaveResult> Save<T>(T input, Func<AdminService, Task<int>> save, Func<int, string> next)
+    private Task<Result<AdminSaveResult>> Save<T>(T input, Func<AdminService, Task<int>> save, Func<int, string> next)
     {
-        return Execute(async service =>
+        return Execute<AdminSaveResult>(async service =>
         {
             List<ValidationResult> errors = [];
             if (!Validator.TryValidateObject(input!, new ValidationContext(input!), errors, true))
@@ -203,32 +206,33 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
                 var fields = errors.SelectMany(error => error.MemberNames.Select(name => (name, message: error.ErrorMessage ?? "Invalid value.")))
                     .GroupBy(error => error.name)
                     .ToDictionary(group => group.Key, group => group.Select(error => error.message).ToArray());
-                throw new AdminCatalogException(400, "Review the highlighted fields.", fields);
+                return (Result<AdminSaveResult>)new ValidationError("Review the highlighted fields.", fields);
             }
             var id = await save(service);
-            return new AdminSaveResult(id, next(id));
+            return (Result<AdminSaveResult>)new AdminSaveResult(id, next(id));
         });
     }
 
-    public Task<AdminSaveResult> SaveCategoryAsync(CategoryEditForm input) => Save(input, service => service.SaveCategoryAsync(input), _ => "/admin/categories");
-    public Task<AdminSaveResult> SaveBrandAsync(BrandEditForm input) => Save(input, service => service.SaveBrandAsync(input), _ => "/admin/brands");
-    public Task<AdminSaveResult> SaveProductAsync(ProductEditForm input) => throw new AdminCatalogException(410, "The product editor has been updated. Reload and use Save product.");
-    public Task<ContentPreview> PreviewContentAsync(string source) => Execute(_ =>
+    public Task<Result<AdminSaveResult>> SaveCategoryAsync(CategoryEditForm input) => Save(input, service => service.SaveCategoryAsync(input), _ => "/admin/categories");
+    public Task<Result<AdminSaveResult>> SaveBrandAsync(BrandEditForm input) => Save(input, service => service.SaveBrandAsync(input), _ => "/admin/brands");
+    public Task<Result<AdminSaveResult>> SaveProductAsync(ProductEditForm input) => Task.FromResult<Result<AdminSaveResult>>(new Error("The product editor has been updated. Reload and use Save product.", 410));
+    public Task<Result<ContentPreview>> PreviewContentAsync(string source) => Execute<ContentPreview>(_ =>
     {
-        if (source is null || source.Length > 100_000) throw new AdminCatalogException(400, "Use at most 100,000 characters.");
-        return Task.FromResult(new ContentPreview(new CatalogContentRenderer().Render(source)));
+        if (source is null || source.Length > 100_000) return Task.FromResult<Result<ContentPreview>>(new ValidationError("Use at most 100,000 characters."));
+        return Task.FromResult<Result<ContentPreview>>(new ContentPreview(new CatalogContentRenderer().Render(source)));
     });
-    public async Task DeleteBrandAsync(int id) => await Execute(async service =>
+
+    public Task<Result> DeleteBrandAsync(int id) => Execute(async service =>
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        if (!await db.Brands.AnyAsync(b => b.Id == id)) throw new AdminCatalogException(404, "Brand not found.");
-        if (await db.Products.AnyAsync(p => p.BrandId == id && !p.IsDeleted)) throw new AdminCatalogException(409, "Brands with products cannot be deleted from this editor.");
+        if (!await db.Brands.AnyAsync(b => b.Id == id)) return (Result)new NotFoundError("Brand not found.");
+        if (await db.Products.AnyAsync(p => p.BrandId == id && !p.IsDeleted)) return (Result)new ConflictError("Brands with products cannot be deleted from this editor.");
         await service.DeleteBrandAsync(id);
-        return true;
+        return (Result)Success.Ok;
     });
 
-    public Task<AdminEditorData<GuideEditForm>> GuideAsync(int id) => Execute(async service =>
+    public Task<Result<AdminEditorData<GuideEditForm>>> GuideAsync(int id) => Execute<AdminEditorData<GuideEditForm>>(async service =>
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -253,7 +257,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         var g = await db.Guides.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id);
         if (g is null)
         {
-            throw new AdminCatalogException(404, "Guide not found.");
+            return (Result<AdminEditorData<GuideEditForm>>)new NotFoundError("Guide not found.");
         }
 
         var input = new GuideEditForm
@@ -277,7 +281,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         return Data(input, categories, brands);
     });
 
-    public Task<AdminSaveResult> SaveGuideAsync(GuideEditForm input) => Execute(async service =>
+    public Task<Result<AdminSaveResult>> SaveGuideAsync(GuideEditForm input) => Execute<AdminSaveResult>(async service =>
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -287,7 +291,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         var slugExists = await db.Guides.AnyAsync(g => g.Slug == cleanSlug && g.Id != input.Id && !g.IsDeleted);
         if (slugExists)
         {
-            throw new AdminCatalogException(409, "A guide with this URL slug already exists.");
+            return (Result<AdminSaveResult>)new ConflictError("A guide with this URL slug already exists.");
         }
 
         Guide guide;
@@ -316,7 +320,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
             var existing = await db.Guides.SingleOrDefaultAsync(g => g.Id == input.Id);
             if (existing is null)
             {
-                throw new AdminCatalogException(404, "Guide not found.");
+                return (Result<AdminSaveResult>)new NotFoundError("Guide not found.");
             }
 
             existing.Title = input.Title.Trim();
@@ -337,10 +341,10 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         }
 
         await db.SaveChangesAsync();
-        return new AdminSaveResult(guide.Id, $"/admin/guides/{guide.Id}/edit");
+        return (Result<AdminSaveResult>)new AdminSaveResult(guide.Id, $"/admin/guides/{guide.Id}/edit");
     });
 
-    public async Task DeleteGuideAsync(int id) => await Execute(async service =>
+    public Task<Result> DeleteGuideAsync(int id) => Execute(async service =>
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -351,9 +355,10 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
             existing.DeletedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
-        return true;
+        return (Result)Success.Ok;
     });
-    public Task<string> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo) => Execute(async service =>
+
+    public Task<Result<string>> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo) => Execute<string>(async service =>
     {
         var limit = (brandLogo ? 5 : 10) * 1024 * 1024;
         await using var buffer = new MemoryStream();
@@ -361,13 +366,13 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         int read;
         while ((read = await stream.ReadAsync(chunk)) > 0)
         {
-            if (buffer.Length + read > limit) throw new AdminCatalogException(400, $"Image exceeds {limit / 1024 / 1024}MB.");
+            if (buffer.Length + read > limit) return (Result<string>)new ValidationError($"Image exceeds {limit / 1024 / 1024}MB.");
             await buffer.WriteAsync(chunk.AsMemory(0, read));
         }
-        if (buffer.Length == 0) throw new AdminCatalogException(400, "Select an image.");
+        if (buffer.Length == 0) return (Result<string>)new ValidationError("Select an image.");
         buffer.Position = 0;
         await using var scope = scopes.CreateAsyncScope();
-        try { return await ImageUploadValidator.UploadAsync(scope.ServiceProvider.GetRequiredService<IStorageService>(), buffer, fileName, contentType, CancellationToken.None); }
-        catch (Exception error) when (error is not OperationCanceledException) { throw new AdminCatalogException(400, "The image could not be uploaded. Check its format and try again."); }
+        try { return (Result<string>)await ImageUploadValidator.UploadAsync(scope.ServiceProvider.GetRequiredService<IStorageService>(), buffer, fileName, contentType, CancellationToken.None); }
+        catch (Exception error) when (error is not OperationCanceledException) { return (Result<string>)new ValidationError("The image could not be uploaded. Check its format and try again."); }
     });
 }

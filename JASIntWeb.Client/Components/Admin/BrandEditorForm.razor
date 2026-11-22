@@ -81,8 +81,8 @@ else
 
 @code {
     private bool slugEdited;
-    protected override Task<AdminEditorData<BrandEditForm>> LoadAsync() => Backend.BrandAsync(Id);
-    protected override Task<AdminSaveResult> SaveAsync(BrandEditForm input) => Backend.SaveBrandAsync(input);
+    protected override Task<Result<AdminEditorData<BrandEditForm>>> LoadAsync() => Backend.BrandAsync(Id);
+    protected override Task<Result<AdminSaveResult>> SaveAsync(BrandEditForm input) => Backend.SaveBrandAsync(input);
     private void SlugChanged() => slugEdited = true;
     private void NameChanged()
     {
@@ -92,8 +92,24 @@ else
     private async Task Delete()
     {
         if (Busy) return;
-        try { if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return; saving = true; await Backend.DeleteBrandAsync(Id); HasUnsavedChanges = false; try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { } await JS.InvokeVoidAsync("jasAdminDrafts.clear"); Nav.NavigateTo("/admin/brands"); }
-        catch (AdminCatalogException failure) { error = failure.Message; }
+        try
+        {
+            if (!await JS.InvokeAsync<bool>("confirm", "Delete this brand?")) return;
+            saving = true;
+            var delRes = await Backend.DeleteBrandAsync(Id);
+            switch (delRes)
+            {
+                case Success:
+                    HasUnsavedChanges = false;
+                    try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
+                    await JS.InvokeVoidAsync("jasAdminDrafts.clear");
+                    Nav.NavigateTo("/admin/brands");
+                    break;
+                case Error failure:
+                    error = failure.Message;
+                    break;
+            }
+        }
         catch (JSException) { error = "Confirmation could not be opened. Try again."; }
         catch (HttpRequestException) { error = "Connection failed. Try again."; }
         finally { saving = false; }

@@ -40,12 +40,19 @@
         {
             try
             {
-                var converted = await Backend.PreviewContentAsync(source);
-                if (disposed || previous != source) return;
-                text = converted.Html;
-                conversionFailed = false;
+                var convertedRes = await Backend.PreviewContentAsync(source);
+                if (convertedRes switch { ContentPreview => true, Error => false })
+                {
+                    if (disposed || previous != source) return;
+                    text = convertedRes.ValueOrDefault()!.Html;
+                    conversionFailed = false;
+                }
+                else
+                {
+                    conversionFailed = true;
+                }
             }
-            catch (Exception error) when (error is AdminCatalogException or HttpRequestException)
+            catch (HttpRequestException)
             { conversionFailed = true; }
         }
         pendingUpdate = true;

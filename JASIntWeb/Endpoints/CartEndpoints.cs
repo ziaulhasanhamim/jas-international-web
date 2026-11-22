@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using JASIntWeb.Helpers;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services;
 using JASIntWeb.Services.Meta;
@@ -57,13 +58,7 @@ public static class CartEndpoints
                     .FirstOrDefaultAsync();
             }
 
-            try
-            {
-                await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop, metaApi);
-            }
-            catch (ShopException)
-            {
-            }
+            await ProcessAddToCartAsync(context, productId, vId, quantity ?? 1, db, shop, metaApi);
             return Results.Redirect("/cart", false, false);
         }).DisableAntiforgery().AddEndpointFilter<CartAntiforgeryFilter>();
 
@@ -77,13 +72,7 @@ public static class CartEndpoints
             ShoppingService shop,
             IMetaConversionsApiService metaApi) =>
         {
-            try
-            {
-                await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop, metaApi);
-            }
-            catch (ShopException)
-            {
-            }
+            await ProcessAddToCartAsync(context, productId, variantId, quantity ?? 1, db, shop, metaApi);
 
             var target = AccountNavigation.SafeReturn(returnUrl ?? "/");
 
@@ -112,13 +101,11 @@ public static class CartEndpoints
             var (token, userId) = EnsureCartIdentity(context);
             if (variantId > 0)
             {
-                try
+                var changeRes = await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, Math.Clamp(quantity, 0, 99)), add: false);
+                if (changeRes switch { CartDto => false, Error => true })
                 {
-                    await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, Math.Clamp(quantity, 0, 99)), add: false);
-                }
-                catch (ShopException ex)
-                {
-                    return Results.Redirect($"/cart?error={Uri.EscapeDataString(ex.Message)}", false, false);
+                    changeRes.TryGetError(out var err);
+                    return Results.Redirect($"/cart?error={Uri.EscapeDataString(err!.Message)}", false, false);
                 }
             }
             return Results.Redirect("/cart", false, false);
@@ -189,33 +176,34 @@ public static class CartEndpoints
 
         if (vId > 0)
         {
-            try
+            var cartRes = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
+            switch (cartRes)
             {
-                var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
-                if (cart.Token.HasValue && cart.Token.Value != token)
-                {
-                    SetCartCookie(context, cart.Token.Value);
-                }
-
-                if (metaApi != null)
-                {
-                    var variant = await db.ProductVariants.AsNoTracking()
-                        .Include(v => v.Product).ThenInclude(p => p!.Category)
-                        .FirstOrDefaultAsync(v => v.Id == vId);
-                    if (variant != null)
+                case CartDto cart:
+                    if (cart.Token.HasValue && cart.Token.Value != token)
                     {
-                        var sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
-                        var atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
-                        await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+                        SetCartCookie(context, cart.Token.Value);
                     }
-                }
 
-                return cart.Items.Sum(i => i.Quantity);
+                    if (metaApi != null)
+                    {
+                        var variant = await db.ProductVariants.AsNoTracking()
+                            .Include(v => v.Product).ThenInclude(p => p!.Category)
+                            .FirstOrDefaultAsync(v => v.Id == vId);
+                        if (variant != null)
+                        {
+                            var sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
+                            var atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
+                            await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+                        }
+                    }
+
+                    return cart.Items.Sum(i => i.Quantity);
+                case Error:
+                    break;
             }
-            catch (ShopException)
-            {
-                return await shop.GetCartItemCountAsync(token, userId);
-            }
+
+            return await shop.GetCartItemCountAsync(token, userId);
         }
 
         return await shop.GetCartItemCountAsync(token, userId);
@@ -244,17 +232,21 @@ public static class CartEndpoints
         return cart;
     }
 
-    public static Task<CartDto> Resolve([FromBody] List<CartLineRequest> items, ShoppingService shop) =>
-        shop.ResolveAsync(items);
+    public static async Task<IResult> Resolve([FromBody] List<CartLineRequest> items, ShoppingService shop)
+    {
+        var result = await shop.ResolveAsync(items);
+        return result.ToHttpResult();
+    }
 
-    public static Task<CartDto> Merge([FromBody] CartMergeRequest request, ClaimsPrincipal user, ShoppingService shop)
+    public static async Task<IResult> Merge([FromBody] CartMergeRequest request, ClaimsPrincipal user, ShoppingService shop)
     {
         if (request.Items is null)
         {
             throw new BadHttpRequestException("Cart items are required.");
         }
 
-        return shop.MergeAsync(ShoppingService.UserId(user)!.Value, request);
+        var result = await shop.MergeAsync(ShoppingService.UserId(user)!.Value, request);
+        return result.ToHttpResult();
     }
 
     public static async Task<IResult> Add(
@@ -282,39 +274,38 @@ public static class CartEndpoints
         }
 
         var (token, userId) = EnsureCartIdentity(context, user);
-        try
+        var changeRes = await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, line.Quantity, line.ProductId), true);
+        if (changeRes switch { CartDto => false, Error => true })
         {
-            var cart = await shop.ChangeAsync(token, userId, new CartLineRequest(variantId, line.Quantity, line.ProductId), true);
-            if (cart.Token.HasValue && cart.Token.Value != token)
-            {
-                SetCartCookie(context, cart.Token.Value);
-            }
-
-            var variant = await db.ProductVariants.AsNoTracking()
-                .Include(v => v.Product).ThenInclude(p => p!.Category)
-                .FirstOrDefaultAsync(v => v.Id == variantId);
-
-            string? atcEventId = null;
-            string? sku = null;
-            if (variant != null)
-            {
-                sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
-                atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
-                var qty = line.Quantity > 0 ? line.Quantity : 1;
-                await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
-
-                context.Response.Headers["X-Meta-Event-Id"] = atcEventId;
-                context.Response.Headers["X-Meta-SKU"] = sku;
-
-                cart = cart with { MetaEventId = atcEventId, AddedSku = sku };
-            }
-
-            return Results.Ok(cart);
+            changeRes.TryGet(out _, out var err);
+            return Results.BadRequest(new ApiErrorDto(err!.Message, "shop_error"));
         }
-        catch (ShopException ex)
+        var cart = changeRes.ValueOrDefault()!;
+        if (cart.Token.HasValue && cart.Token.Value != token)
         {
-            return Results.BadRequest(new ApiErrorDto(ex.Message, "shop_error"));
+            SetCartCookie(context, cart.Token.Value);
         }
+
+        var variant = await db.ProductVariants.AsNoTracking()
+            .Include(v => v.Product).ThenInclude(p => p!.Category)
+            .FirstOrDefaultAsync(v => v.Id == variantId);
+
+        string? atcEventId = null;
+        string? sku = null;
+        if (variant != null)
+        {
+            sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
+            atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
+            var qty = line.Quantity > 0 ? line.Quantity : 1;
+            await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+
+            context.Response.Headers["X-Meta-Event-Id"] = atcEventId;
+            context.Response.Headers["X-Meta-SKU"] = sku;
+
+            cart = cart with { MetaEventId = atcEventId, AddedSku = sku };
+        }
+
+        return Results.Ok(cart);
     }
 
     public static async Task<IResult> Update(
@@ -324,18 +315,17 @@ public static class CartEndpoints
         ShoppingService shop)
     {
         var (token, userId) = EnsureCartIdentity(context, user);
-        try
+        var changeRes = await shop.ChangeAsync(token, userId, line, false);
+        if (changeRes switch { CartDto => false, Error => true })
         {
-            var cart = await shop.ChangeAsync(token, userId, line, false);
-            if (cart.Token.HasValue && cart.Token.Value != token)
-            {
-                SetCartCookie(context, cart.Token.Value);
-            }
-            return Results.Ok(cart);
+            changeRes.TryGet(out _, out var err);
+            return Results.BadRequest(new ApiErrorDto(err!.Message, "shop_error"));
         }
-        catch (ShopException ex)
+        var cart = changeRes.ValueOrDefault()!;
+        if (cart.Token.HasValue && cart.Token.Value != token)
         {
-            return Results.BadRequest(new ApiErrorDto(ex.Message, "shop_error"));
+            SetCartCookie(context, cart.Token.Value);
         }
+        return Results.Ok(cart);
     }
 }

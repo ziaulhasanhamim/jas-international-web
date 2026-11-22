@@ -14,14 +14,14 @@ public class ProductEditorTests
         state.Change(d => d.Variants.Add(new() { Price = 123.45m }));
         await state.Busy.Should().BeFalse();
         state.Phase = EditorPhase.Saving;
-        state.Reject(new(422, "Correct the label", new() { ["Options"] = ["Missing label"] }));
+        state.Reject(new("Correct the label", 422, new() { ["Options"] = ["Missing label"] }));
         await state.Busy.Should().BeFalse();
         await state.Draft.Variants.Single().Price.Should().BeEqualTo(123.45m);
         await state.Draft.Attributes.Single().Name.Should().BeEqualTo("Color");
         await state.Dirty.Should().BeTrue();
-        state.Reject(new(401, "Sign in")); await state.Busy.Should().BeFalse();
+        state.Reject(new("Sign in", 401)); await state.Busy.Should().BeFalse();
         await state.Phase.Should().BeEqualTo(EditorPhase.SessionExpired);
-        state.Reject(new(409, "Stale")); await state.Phase.Should().BeEqualTo(EditorPhase.Conflict);
+        state.Reject(new("Stale", 409)); await state.Phase.Should().BeEqualTo(EditorPhase.Conflict);
     }
     [Test]
     public async Task MetadataHasNativeTypesAndOnlyConfiguredColorIsPublic()

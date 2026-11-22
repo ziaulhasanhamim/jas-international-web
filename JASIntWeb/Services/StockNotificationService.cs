@@ -41,15 +41,8 @@ public sealed class StockNotificationService(AppDbContext db, IStockNotification
         return Result.Success;
     }
 
-    public async Task SubscribeAsync(int variantId, string email, CancellationToken ct = default)
-    {
-        var result = await TrySubscribeAsync(variantId, email, ct);
-        if (result switch { Success => false, Error => true })
-        {
-            var err = (Error)result.Value!;
-            throw new ShopException(err.Message);
-        }
-    }
+    public Task<Result> SubscribeAsync(int variantId, string email, CancellationToken ct = default)
+        => TrySubscribeAsync(variantId, email, ct);
 
     public async Task<bool> ChangePreferenceAsync(Guid token, bool confirm, CancellationToken ct = default)
     {

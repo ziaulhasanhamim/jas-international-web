@@ -108,35 +108,53 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try
+        if (ToggleBrandId > 0)
         {
-            if (ToggleBrandId > 0)
+            var res = await Session.RunAsync(service => service.ToggleBrandFeaturedAsync(ToggleBrandId));
+            switch (res)
             {
-                await Session.RunAsync(service => service.ToggleBrandFeaturedAsync(ToggleBrandId));
-                _toast = "Brand homepage featured status updated.";
-                ToggleBrandId = 0;
+                case Success:
+                    _toast = "Brand homepage featured status updated.";
+                    ToggleBrandId = 0;
+                    break;
+                case Error err:
+                    _toast = err.Message;
+                    toastIsError = true;
+                    break;
             }
-            else if (ToggleVisibilityId > 0)
+        }
+        else if (ToggleVisibilityId > 0)
+        {
+            var res = await Session.RunAsync(service => service.ToggleBrandVisibilityAsync(ToggleVisibilityId));
+            switch (res)
             {
-                await Session.RunAsync(service => service.ToggleBrandVisibilityAsync(ToggleVisibilityId));
-                _toast = "Brand visibility updated.";
-                ToggleVisibilityId = 0;
+                case Success:
+                    _toast = "Brand visibility updated.";
+                    ToggleVisibilityId = 0;
+                    break;
+                case Error err:
+                    _toast = err.Message;
+                    toastIsError = true;
+                    break;
             }
-            else if (DeleteBrandId > 0)
+        }
+        else if (DeleteBrandId > 0)
+        {
+            var res = await Session.RunAsync(service => service.DeleteBrandAsync(DeleteBrandId, permanent: true));
+            switch (res)
             {
-                await Session.RunAsync(service => service.DeleteBrandAsync(DeleteBrandId, permanent: true));
-                _toast = "Brand permanently deleted. Any assigned products remain safely in the catalog.";
-                DeleteBrandId = 0;
+                case Success:
+                    _toast = "Brand permanently deleted. Any assigned products remain safely in the catalog.";
+                    DeleteBrandId = 0;
+                    break;
+                case Error err:
+                    _toast = err.Message;
+                    toastIsError = true;
+                    break;
             }
+        }
 
-            await LoadBrands();
-        }
-        catch (ShopException ex)
-        {
-            _toast = ex.Message;
-            toastIsError = true;
-            await LoadBrands();
-        }
+        await LoadBrands();
     }
 
     private async Task LoadBrands()

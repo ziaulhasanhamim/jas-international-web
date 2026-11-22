@@ -1,4 +1,6 @@
 using JASIntWeb.Client.Contracts;
+using JASIntWeb.Helpers;
+
 namespace JASIntWeb.Client.Services;
 
 public enum EditorPhase { Loading, Ready, Saving, Reconciling, Saved, Validation, Conflict, SessionExpired, ConnectionError, Failed }
@@ -23,10 +25,10 @@ public sealed class ProductEditorSession
         else { Draft.Id = commit.Receipt.ProductId; Draft.Revision = commit.Receipt.Revision; Dirty = false; }
         Phase = EditorPhase.Saved; Message = commit.RefreshWarning ?? "Product saved.";
     }
-    public void Reject(AdminCatalogException error)
+    public void Reject(Error error)
     {
-        Message = error.Message; Errors = error.Errors ?? [];
-        Phase = error.Status switch { 401 or 403 => EditorPhase.SessionExpired, 409 => EditorPhase.Conflict, 400 or 422 => EditorPhase.Validation, 504 => EditorPhase.ConnectionError, _ => EditorPhase.Failed };
+        Message = error.Message; Errors = error.ValidationErrors ?? [];
+        Phase = error.Code switch { 401 or 403 => EditorPhase.SessionExpired, 409 => EditorPhase.Conflict, 400 or 422 => EditorPhase.Validation, 504 => EditorPhase.ConnectionError, _ => EditorPhase.Failed };
     }
     public void Stage(IEnumerable<EditorCombination> combinations)
     {

@@ -1,6 +1,7 @@
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
 using JASIntWeb.Endpoints;
+using JASIntWeb.Helpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
@@ -15,7 +16,7 @@ public sealed class ServerCartBackend(
 {
     private Guid? _circuitCartToken;
 
-    private async Task<T> RunAsync<T>(Func<ShoppingService, Guid?, int?, Task<T>> action)
+    private async Task<Result<T>> RunAsync<T>(Func<ShoppingService, Guid?, int?, Task<Result<T>>> action)
     {
         await using var scope = scopes.CreateAsyncScope();
 #pragma warning disable BL0013 // Cart backend queries authentication state per request
@@ -52,37 +53,30 @@ public sealed class ServerCartBackend(
             }
         }
 
-        try
-        {
-            var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
-            return await action(shop, token, userId);
-        }
-        catch (ShopException e)
-        {
-            throw new CommerceException(e.Message);
-        }
+        var shop = scope.ServiceProvider.GetRequiredService<ShoppingService>();
+        return await action(shop, token, userId);
     }
 
-    public Task<AccountDto> AccountAsync() => RunAsync((_, _, id) => Task.FromResult(new AccountDto(id.HasValue, null)));
+    public Task<Result<AccountDto>> AccountAsync() => RunAsync<AccountDto>((_, _, id) => Task.FromResult<Result<AccountDto>>(new AccountDto(id.HasValue, null)));
 
-    public Task<CartDto> GetAsync() => RunAsync((shop, token, id) =>
+    public Task<Result<CartDto>> GetAsync() => RunAsync<CartDto>(async (shop, token, id) =>
     {
         if (!token.HasValue && !id.HasValue)
         {
-            return Task.FromResult(new CartDto(false, []));
+            return new CartDto(false, []);
         }
-        return shop.GetCartAsync(token, id);
+        return await shop.GetCartAsync(token, id);
     });
 
-    public Task<CartDto> ResolveAsync(List<CartLineRequest> items) => RunAsync((shop, _, _) => shop.ResolveAsync(items));
+    public Task<Result<CartDto>> ResolveAsync(List<CartLineRequest> items) => RunAsync<CartDto>((shop, _, _) => shop.ResolveAsync(items));
 
-    public Task<CartDto> MergeAsync(CartMergeRequest request) => RunAsync((shop, _, id) =>
+    public Task<Result<CartDto>> MergeAsync(CartMergeRequest request) => RunAsync<CartDto>(async (shop, _, id) =>
     {
-        if (!id.HasValue) throw new CommerceException("Please sign in again.");
-        return shop.MergeAsync(id.Value, request);
+        if (!id.HasValue) return new CommerceError("Please sign in again.", 401);
+        return await shop.MergeAsync(id.Value, request);
     });
 
-    public Task<CartDto> ChangeAsync(CartLineRequest line, bool add) => RunAsync(async (shop, token, id) =>
+    public Task<Result<CartDto>> ChangeAsync(CartLineRequest line, bool add) => RunAsync<CartDto>(async (shop, token, id) =>
     {
         if (!token.HasValue && !id.HasValue)
         {
@@ -94,18 +88,25 @@ public sealed class ServerCartBackend(
                 CartEndpoints.SetCartCookie(httpContext, token.Value);
             }
         }
-        var cart = await shop.ChangeAsync(token, id, line, add);
-        if (cart.Token.HasValue && _circuitCartToken != cart.Token)
+        var cartRes = await shop.ChangeAsync(token, id, line, add);
+        switch (cartRes)
         {
-            _circuitCartToken = cart.Token;
-            var httpContext = httpContextAccessor.HttpContext;
-            if (httpContext != null && !httpContext.Response.HasStarted)
-            {
-                CartEndpoints.SetCartCookie(httpContext, cart.Token.Value);
-            }
+            case CartDto cart:
+                if (cart.Token.HasValue && _circuitCartToken != cart.Token)
+                {
+                    _circuitCartToken = cart.Token;
+                    var httpContext = httpContextAccessor.HttpContext;
+                    if (httpContext != null && !httpContext.Response.HasStarted)
+                    {
+                        CartEndpoints.SetCartCookie(httpContext, cart.Token.Value);
+                    }
+                }
+                return cart;
+            case Error err:
+                return err;
         }
-        return cart;
+        return cartRes;
     });
 
-    public Task<DeliveryRatesDto> RatesAsync() => RunAsync((shop, _, _) => Task.FromResult(shop.Rates));
+    public Task<Result<DeliveryRatesDto>> RatesAsync() => RunAsync((shop, _, _) => Task.FromResult<Result<DeliveryRatesDto>>(shop.Rates));
 }

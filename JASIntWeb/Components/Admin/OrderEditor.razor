@@ -84,17 +84,18 @@
                 var targetIndex = currentIndex + offset;
                 if (currentIndex >= 0 && targetIndex >= 0 && targetIndex < Items.Count)
                 {
-                    try
+                    var item = Items[currentIndex];
+                    Items.RemoveAt(currentIndex);
+                    Items.Insert(targetIndex, item);
+                    var res = await Session.RunAsync(s => s.ReorderAsync(Kind, ScopeId, Items.Select(r => r.Id).ToList()));
+                    switch (res)
                     {
-                        var item = Items[currentIndex];
-                        Items.RemoveAt(currentIndex);
-                        Items.Insert(targetIndex, item);
-                        await Session.RunAsync(s => s.ReorderAsync(Kind, ScopeId, Items.Select(r => r.Id).ToList()));
-                        Nav.NavigateTo(Nav.Uri);
-                    }
-                    catch (JASIntWeb.Services.ShopException ex)
-                    {
-                        errorMessage = ex.Message;
+                        case Success:
+                            Nav.NavigateTo(Nav.Uri);
+                            break;
+                        case Error ex:
+                            errorMessage = ex.Message;
+                            break;
                     }
                 }
             }

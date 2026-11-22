@@ -26,11 +26,29 @@
         if (previous == Id && loaded) return; previous = Id;
         try
         {
-            if (Suggestion) { var data = await Backend.SuggestionAsync(Id); fields = data.Fields; values = data.Values; }
-            else { var data = await Backend.TemplateAsync(Id); fields = data.Fields; swatch = data.SwatchField; }
+            if (Suggestion)
+            {
+                var res = await Backend.SuggestionAsync(Id);
+                if (res switch { EditorSuggestionData => true, Error => false })
+                {
+                    var data = res.ValueOrDefault()!;
+                    fields = data.Fields; values = data.Values;
+                }
+                else { res.TryGet(out _, out var err); message = err!.Message; }
+            }
+            else
+            {
+                var res = await Backend.TemplateAsync(Id);
+                if (res switch { EditorTemplateData => true, Error => false })
+                {
+                    var data = res.ValueOrDefault()!;
+                    fields = data.Fields; swatch = data.SwatchField;
+                }
+                else { res.TryGet(out _, out var err); message = err!.Message; }
+            }
             loaded = true;
         }
-        catch (AdminCatalogException e) { message = e.Message; }
+        catch (HttpRequestException) { message = "Connection failed. Try again."; }
     }
     private void Change(MetadataPatch change) => values[change.Key] = change.Value;
     private void ChangeFields(List<ValueField> next) => fields = next;
@@ -40,11 +58,26 @@
         if (busy) return; busy = true;
         try
         {
-            if (Suggestion) { var saved = await Backend.SaveSuggestionAsync(new(Id, fields, values)); values = saved.Values; }
-            else await Backend.SaveTemplateAsync(new(Id, fields, swatch));
-            message = "Value data saved. Existing product copies are unchanged.";
+            if (Suggestion)
+            {
+                var saveRes = await Backend.SaveSuggestionAsync(new(Id, fields, values));
+                if (saveRes switch { EditorSuggestionData => true, Error => false })
+                {
+                    values = saveRes.ValueOrDefault()!.Values;
+                    message = "Value data saved. Existing product copies are unchanged.";
+                }
+                else { saveRes.TryGet(out _, out var err); message = err!.Message; }
+            }
+            else
+            {
+                var saveRes = await Backend.SaveTemplateAsync(new(Id, fields, swatch));
+                if (saveRes switch { EditorTemplateData => true, Error => false })
+                {
+                    message = "Value data saved. Existing product copies are unchanged.";
+                }
+                else { saveRes.TryGet(out _, out var err); message = err!.Message; }
+            }
         }
-        catch (AdminCatalogException e) { message = e.Message; }
         catch (Exception) { message = "The save could not be confirmed. Your values are retained; reload before retrying."; }
         finally { busy = false; }
     }

@@ -1,17 +1,19 @@
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
+
 namespace JASIntWeb.Client.Contracts;
 
 public interface IAdminProductEditorBackend
 {
-    Task<EditorTemplateData> TemplateAsync(int id, CancellationToken ct = default);
-    Task<EditorTemplateData> SaveTemplateAsync(EditorTemplateData command, CancellationToken ct = default);
-    Task<EditorSuggestionData> SuggestionAsync(int id, CancellationToken ct = default);
-    Task<EditorSuggestionData> SaveSuggestionAsync(EditorSuggestionData command, CancellationToken ct = default);
-    Task<ProductEditorData> LoadAsync(int id, CancellationToken ct = default);
-    Task<EditorCombinationPage> PreviewAsync(EditorCombinationQuery query, CancellationToken ct = default);
-    Task<EditorCommit> SaveAsync(EditorSave command, CancellationToken ct = default);
-    Task<EditorCommit> AdjustStockAsync(EditorStock command, CancellationToken ct = default);
-    Task<EditorCommit?> OperationAsync(Guid operationId, CancellationToken ct = default);
+    Task<Result<EditorTemplateData>> TemplateAsync(int id, CancellationToken ct = default);
+    Task<Result<EditorTemplateData>> SaveTemplateAsync(EditorTemplateData command, CancellationToken ct = default);
+    Task<Result<EditorSuggestionData>> SuggestionAsync(int id, CancellationToken ct = default);
+    Task<Result<EditorSuggestionData>> SaveSuggestionAsync(EditorSuggestionData command, CancellationToken ct = default);
+    Task<Result<ProductEditorData>> LoadAsync(int id, CancellationToken ct = default);
+    Task<Result<EditorCombinationPage>> PreviewAsync(EditorCombinationQuery query, CancellationToken ct = default);
+    Task<Result<EditorCommit>> SaveAsync(EditorSave command, CancellationToken ct = default);
+    Task<Result<EditorCommit>> AdjustStockAsync(EditorStock command, CancellationToken ct = default);
+    Task<Result<EditorCommit?>> OperationAsync(Guid operationId, CancellationToken ct = default);
 }
 public enum ValueFieldKind { Text, Number, Boolean, HexColor }
 public sealed record ValueField(string Key, string Label, ValueFieldKind Kind);

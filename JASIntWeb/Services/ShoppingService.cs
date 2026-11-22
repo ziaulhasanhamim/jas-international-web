@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace JASIntWeb.Services;
 
-public sealed class ShopException : Exception
-{
-    public ShopError Error { get; }
-    public ShopException(string message, int code = 400) : base(message) => Error = new ShopError(message, code);
-    public ShopException(ShopError error) : base(error.Message) => Error = error;
-    public static implicit operator ShopError(ShopException ex) => ex.Error;
-    public static implicit operator ShopException(ShopError error) => new(error);
-}
-
 public sealed class ShoppingService(
     AppDbContext db,
     IConfiguration config,
@@ -81,29 +72,34 @@ public sealed class ShoppingService(
 
     private Task<Cart> ActiveCartAsync(int userId) => ActiveCartAsync(null, userId);
 
-    public async Task<CartDto> ResolveAsync(List<CartLineRequest> lines, bool authenticated = false)
+    public async Task<Result<CartDto>> ResolveAsync(List<CartLineRequest> lines, bool authenticated = false)
     {
         if (lines.Count > 100)
         {
-            throw new ShopException("A cart can contain at most 100 variants.");
+            return new ShopError("A cart can contain at most 100 variants.");
         }
         if (lines.Any(l => l.VariantId <= 0 || l.Quantity <= 0 || l.Quantity > 99))
         {
-            throw new ShopException("Quantity must be between 1 and 99.");
+            return new ShopError("Quantity must be between 1 and 99.");
         }
+        var errorFound = false;
         var normalized = lines.GroupBy(l => l.VariantId).Select(g =>
             {
                 var total = g.Sum(l => l.Quantity);
                 if (total > 99)
                 {
-                    throw new ShopException("Quantity must be between 1 and 99.");
+                    errorFound = true;
                 }
                 return new CartLineRequest(g.Key, total);
             })
             .ToList();
+        if (errorFound)
+        {
+            return new ShopError("Quantity must be between 1 and 99.");
+        }
         if (normalized.Count == 0)
         {
-            return new(authenticated, []);
+            return new CartDto(authenticated, []);
         }
         var ids = normalized.Select(l => l.VariantId).ToArray();
         var variants = await db.ProductVariants.AsNoTracking().Where(v => ids.Contains(v.Id))
@@ -127,7 +123,7 @@ public sealed class ShoppingService(
                 .ToList()
             })
             .ToDictionaryAsync(v => v.Id);
-        return new(authenticated, [.. normalized.Select(l =>
+        return new CartDto(authenticated, [.. normalized.Select(l =>
                 {
                     var v = variants.GetValueOrDefault(l.VariantId);
                     var available = v?.Available == true;
@@ -240,7 +236,11 @@ public sealed class ShoppingService(
 
         var lines = cart.Items.Select(i => new CartLineRequest(i.ProductVariantId, i.Quantity)).ToList();
         var resolved = await ResolveAsync(lines, userId.HasValue);
-        return resolved with { Token = cart.Token };
+        return resolved switch
+        {
+            CartDto dto => dto with { Token = cart.Token },
+            Error => new CartDto(userId.HasValue, []) with { Token = cart.Token }
+        };
     }
 
     public Task<CartDto> GetCartAsync(int userId) => GetCartAsync(null, userId);
@@ -266,7 +266,7 @@ public sealed class ShoppingService(
         return 0;
     }
 
-    public async Task<CartDto> ChangeAsync(Guid? token, int? userId, CartLineRequest line, bool add)
+    public async Task<Result<CartDto>> ChangeAsync(Guid? token, int? userId, CartLineRequest line, bool add)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
         if (userId.HasValue)
@@ -278,7 +278,7 @@ public sealed class ShoppingService(
         var requestedQuantity = add ? (item?.Quantity ?? 0) + line.Quantity : line.Quantity;
         if (requestedQuantity < 0 || requestedQuantity > 99 || (add && line.Quantity <= 0))
         {
-            throw new ShopException("Quantity must be between 1 and 99.");
+            return new ShopError("Quantity must be between 1 and 99.");
         }
         if (requestedQuantity == 0)
         {
@@ -289,11 +289,20 @@ public sealed class ShoppingService(
         }
         else
         {
-            var resolved = await ResolveAsync([new(line.VariantId, requestedQuantity)]);
+            var resolvedRes = await ResolveAsync([new(line.VariantId, requestedQuantity)]);
+            CartDto resolved = null!;
+            switch (resolvedRes)
+            {
+                case CartDto dto:
+                    resolved = dto;
+                    break;
+                case Error err:
+                    return err;
+            }
             var lineStock = resolved.Items[0].Stock;
             if (!resolved.Items[0].IsAvailable || lineStock <= 0)
             {
-                throw new ShopException("The requested item is currently sold out.");
+                return new ShopError("The requested item is currently sold out.");
             }
 
             int finalQuantity;
@@ -301,7 +310,7 @@ public sealed class ShoppingService(
             {
                 if (item is not null && item.Quantity >= lineStock)
                 {
-                    throw new ShopException($"Maximum available stock ({lineStock}) is already in your cart.");
+                    return new ShopError($"Maximum available stock ({lineStock}) is already in your cart.");
                 }
                 finalQuantity = Math.Min(requestedQuantity, lineStock);
             }
@@ -309,7 +318,7 @@ public sealed class ShoppingService(
             {
                 if (requestedQuantity > lineStock)
                 {
-                    throw new ShopException("The requested quantity is unavailable.");
+                    return new ShopError("The requested quantity is unavailable.");
                 }
                 finalQuantity = requestedQuantity;
             }
@@ -318,7 +327,7 @@ public sealed class ShoppingService(
             {
                 if (cart.Items.Count >= 100)
                 {
-                    throw new ShopException("A cart can contain at most 100 variants.");
+                    return new ShopError("A cart can contain at most 100 variants.");
                 }
                 cart.Items.Add(new CartItem
                 {
@@ -338,15 +347,24 @@ public sealed class ShoppingService(
         return await GetCartAsync(cart.Token, userId);
     }
 
-    public Task<CartDto> ChangeAsync(int userId, CartLineRequest line, bool add) => ChangeAsync(null, userId, line, add);
+    public Task<Result<CartDto>> ChangeAsync(int userId, CartLineRequest line, bool add) => ChangeAsync(null, userId, line, add);
 
-    public async Task<CartDto> MergeAsync(int userId, CartMergeRequest request)
+    public async Task<Result<CartDto>> MergeAsync(int userId, CartMergeRequest request)
     {
         if (request.Token == Guid.Empty)
         {
-            throw new ShopException("The cart merge token is missing.");
+            return new ShopError("The cart merge token is missing.");
         }
-        var resolved = await ResolveAsync(request.Items);
+        var resolvedRes = await ResolveAsync(request.Items);
+        CartDto resolved = null!;
+        switch (resolvedRes)
+        {
+            case CartDto dto:
+                resolved = dto;
+                break;
+            case Error err:
+                return err;
+        }
         await using var tx = await db.Database.BeginTransactionAsync();
         await LockUserAsync(userId);
         if (!await db.CartMergeReceipts.AnyAsync(r => r.UserId == userId && r.Token == request.Token))
@@ -365,7 +383,7 @@ public sealed class ShoppingService(
                     }
                     if (cart.Items.Count >= 100)
                     {
-                        throw new ShopException("A cart can contain at most 100 variants.");
+                        return new ShopError("A cart can contain at most 100 variants.");
                     }
                     cart.Items.Add(new CartItem
                     {
@@ -407,16 +425,16 @@ public sealed class ShoppingService(
 
     public Task ClearAsync(int userId) => ClearAsync(null, userId);
 
-    public async Task<CheckoutResult> CheckoutAsync(int? userId, CheckoutRequest request)
+    public async Task<Result<CheckoutResult>> CheckoutAsync(int? userId, CheckoutRequest request)
     {
         var validation = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
         if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(request, new System.ComponentModel.DataAnnotations.ValidationContext(request), validation, true))
         {
-            throw new ShopException(string.Join(" ", validation.Select(e => e.ErrorMessage)));
+            return new ValidationError(string.Join(" ", validation.Select(e => e.ErrorMessage)));
         }
         if (request.RequestId == Guid.Empty)
         {
-            throw new ShopException("The checkout token is missing.");
+            return new ShopError("The checkout token is missing.");
         }
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
         // One request token cannot create two orders, including guest retries and concurrent requests.
@@ -426,10 +444,10 @@ public sealed class ShoppingService(
         {
             if (existing.UserId != userId)
             {
-                throw new ShopException("This checkout token has already been used.");
+                return new ConflictError("This checkout token has already been used.");
             }
             await tx.CommitAsync();
-            return new(existing.Id, existing.PublicToken, existing.Total);
+            return new CheckoutResult(existing.Id, existing.PublicToken, existing.Total);
         }
         Cart? cart = null;
         if (userId.HasValue)
@@ -457,7 +475,7 @@ public sealed class ShoppingService(
         }
         if (request.Items.Count == 0)
         {
-            throw new ShopException("Your cart is empty.");
+            return new ShopError("Your cart is empty.");
         }
 
         // Strict payment validation
@@ -465,11 +483,11 @@ public sealed class ShoppingService(
         {
             if (string.IsNullOrWhiteSpace(request.SenderPhoneNumber) || !System.Text.RegularExpressions.Regex.IsMatch(request.SenderPhoneNumber.Trim(), @"^(?:\+?88)?01[3-9]\d{8}$"))
             {
-                throw new ShopException("A valid 11-digit bKash sender phone number is required to confirm payment.");
+                return new ValidationError("A valid 11-digit bKash sender phone number is required to confirm payment.");
             }
             if (string.IsNullOrWhiteSpace(request.TransactionId) || request.TransactionId.Trim().Length < 6)
             {
-                throw new ShopException("A valid bKash Transaction ID (TrxID) is required to place your order.");
+                return new ValidationError("A valid bKash Transaction ID (TrxID) is required to place your order.");
             }
         }
         else if (request.PaymentMethod == "COD")
@@ -477,17 +495,26 @@ public sealed class ShoppingService(
             var dSettings = await deliverySettings.GetSettingsAsync();
             if (dSettings.RequireAdvanceForCOD)
             {
-                throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
+                return new ShopError("Advance delivery fee is required for cash on delivery orders.");
             }
         }
         else
         {
-            throw new ShopException("A valid payment method and payment details are required to place an order.");
+            return new ShopError("A valid payment method and payment details are required to place an order.");
         }
-        var summary = await ResolveAsync(request.Items, userId.HasValue);
+        var summaryRes = await ResolveAsync(request.Items, userId.HasValue);
+        CartDto summary = null!;
+        switch (summaryRes)
+        {
+            case CartDto dto:
+                summary = dto;
+                break;
+            case Error err:
+                return err;
+        }
         if (summary.Items.Any(i => !i.IsAvailable))
         {
-            throw new ShopException("One or more cart items are unavailable. Update your cart before checking out.");
+            return new ShopError("One or more cart items are unavailable. Update your cart before checking out.");
         }
         var unitCosts = new Dictionary<int, decimal>();
         foreach (var item in summary.Items.OrderBy(i => i.VariantId))
@@ -507,7 +534,7 @@ public sealed class ShoppingService(
                 || variant.Product.Category!.IsDeleted
                 || variant.Product.Category.ParentCategory?.IsDeleted == true)
             {
-                throw new ShopException($"{item.Name}: the selected quantity is no longer available.");
+                return new ShopError($"{item.Name}: the selected quantity is no longer available.");
             }
             // Do not trust a client price or the earlier quote.
             inventory.QuantityReserved += item.Quantity;
@@ -526,7 +553,7 @@ public sealed class ShoppingService(
             var couponCode = request.CouponCode.Trim().ToUpperInvariant();
             await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Coupons\" WHERE \"Code\" = {couponCode} FOR UPDATE");
             var couponVal = await couponService.ValidateCouponAsync(request.CouponCode, summary.Subtotal, delivery);
-            if (!couponVal.IsValid) throw new ShopException(couponVal.Message ?? "Coupon is no longer available.");
+            if (!couponVal.IsValid) return new ShopError(couponVal.Message ?? "Coupon is no longer available.");
             if (couponVal.IsValid && !string.IsNullOrEmpty(couponVal.Code))
             {
                 discount = couponVal.DiscountAmount;
@@ -538,7 +565,7 @@ public sealed class ShoppingService(
         var calculatedTotal = Math.Max(0, summary.Subtotal + delivery - discount);
         if (request.ExpectedTotal.HasValue && request.ExpectedTotal.Value != calculatedTotal)
         {
-            throw new ShopException("Your cart, delivery charge, or coupon changed. Review your order again before placing it.");
+            return new ConflictError("Your cart, delivery charge, or coupon changed. Review your order again before placing it.");
         }
         var address = new DeliveryAddress
         {
@@ -688,10 +715,10 @@ public sealed class ShoppingService(
             Console.WriteLine($"[Email] Failed to send order placed email: {ex.Message}");
         }
 
-        return new(order.Id, order.PublicToken, order.Total, order.PaymentReferenceCode, order.DeliveryCharge, order.DiscountAmount);
+        return new CheckoutResult(order.Id, order.PublicToken, order.Total, order.PaymentReferenceCode, order.DeliveryCharge, order.DiscountAmount);
     }
 
-    public async Task<Order> ConfirmPaymentAsync(Guid publicToken, ConfirmPaymentRequest request)
+    public async Task<Result<Order>> ConfirmPaymentAsync(Guid publicToken, ConfirmPaymentRequest request)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"PublicToken\" = {publicToken} FOR UPDATE");
@@ -702,28 +729,28 @@ public sealed class ShoppingService(
             .FirstOrDefaultAsync(o => o.PublicToken == publicToken);
         if (order is null)
         {
-            throw new ShopException("Order not found.");
+            return new NotFoundError("Order not found.");
         }
         if (order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)
         {
-            throw new ShopException($"This order cannot be updated because its status is {order.Status}.");
+            return new ConflictError($"This order cannot be updated because its status is {order.Status}.");
         }
 
         await db.Entry(order).ReloadAsync();
-        if (order.PaidAmount > 0) throw new ShopException("This payment is already verified.");
+        if (order.PaidAmount > 0) return new ConflictError("This payment is already verified.");
         if (request.PaymentMethod is not ("COD" or "BkashAdvance" or "FullPayment"))
-            throw new ShopException("Select a supported payment method.");
+            return new ShopError("Select a supported payment method.");
         var dSettings = await deliverySettings.GetSettingsAsync();
 
         if (request.PaymentMethod is "BkashAdvance" or "FullPayment")
         {
             if (string.IsNullOrWhiteSpace(request.SenderPhoneNumber) || !System.Text.RegularExpressions.Regex.IsMatch(request.SenderPhoneNumber.Trim(), @"^(?:\+?88)?01[3-9]\d{8}$"))
             {
-                throw new ShopException("A valid 11-digit bKash sender phone number is required (01xxxxxxxxx).");
+                return new ValidationError("A valid 11-digit bKash sender phone number is required (01xxxxxxxxx).");
             }
             if (string.IsNullOrWhiteSpace(request.TransactionId) || request.TransactionId.Trim().Length < 6)
             {
-                throw new ShopException("A valid bKash Transaction ID (TrxID) is required.");
+                return new ValidationError("A valid bKash Transaction ID (TrxID) is required.");
             }
 
             var isFull = request.PaymentMethod == "FullPayment";
@@ -761,7 +788,7 @@ public sealed class ShoppingService(
         {
             if (dSettings.RequireAdvanceForCOD)
             {
-                throw new ShopException("Advance delivery fee is required for cash on delivery orders.");
+                return new ShopError("Advance delivery fee is required for cash on delivery orders.");
             }
             order.PaidAmount = 0m;
             // Preserve fulfillment progress.
@@ -863,17 +890,10 @@ public sealed class ShoppingService(
         return order;
     }
 
-    public async Task<Order> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
-    {
-        var result = await TryVerifyPaymentAsync(orderId, verifiedAmount, verifiedTrxId);
-        return result switch
-        {
-            Order o => o,
-            Error err => throw new ShopException(err.Message)
-        };
-    }
+    public Task<Result<Order>> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
+        => TryVerifyPaymentAsync(orderId, verifiedAmount, verifiedTrxId);
 
-    public async Task<Order> UnverifyPaymentAsync(int orderId)
+    public async Task<Result<Order>> UnverifyPaymentAsync(int orderId)
     {
         var order = await db.Orders
             .Include(o => o.DeliveryAddress)
@@ -883,7 +903,7 @@ public sealed class ShoppingService(
             .FirstOrDefaultAsync(o => o.Id == orderId);
         if (order is null)
         {
-            throw new ShopException("Order not found.");
+            return new NotFoundError("Order not found.");
         }
 
         order.PaidAmount = 0m;
@@ -905,7 +925,7 @@ public sealed class ShoppingService(
         return order;
     }
 
-    public async Task<Order> RejectPaymentAndCancelOrderAsync(int orderId, string? reason = null)
+    public async Task<Result<Order>> RejectPaymentAndCancelOrderAsync(int orderId, string? reason = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE");
@@ -917,13 +937,13 @@ public sealed class ShoppingService(
             .FirstOrDefaultAsync(o => o.Id == orderId);
         if (order is null)
         {
-            throw new ShopException("Order not found.");
+            return new NotFoundError("Order not found.");
         }
 
         await db.Entry(order).ReloadAsync();
         if (order.Status is OrderStatus.Delivered or OrderStatus.Cancelled)
         {
-            throw new ShopException($"Order #{orderId} is already {order.Status}.");
+            return new ConflictError($"Order #{orderId} is already {order.Status}.");
         }
 
 

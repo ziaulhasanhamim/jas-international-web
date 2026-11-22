@@ -148,7 +148,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task DeleteBrandAsync_WithActiveProducts_ThrowsShopException()
+    public async Task DeleteBrandAsync_WithActiveProducts_Throws()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
@@ -177,7 +177,7 @@ public class BrandLogoIntegrationTests : JasIntegrationTestBase
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        // Attempting to delete brand with active products should throw ShopException!
-        await Assert.ThrowsAsync<ShopException>(() => admin.DeleteBrandAsync(brand.Id, permanent: true));
+        // Attempting to delete brand with active products should throw!
+        await Assert.ThrowsAsync<InvalidOperationException>(() => admin.DeleteBrandAsync(brand.Id, permanent: true));
     }
 }

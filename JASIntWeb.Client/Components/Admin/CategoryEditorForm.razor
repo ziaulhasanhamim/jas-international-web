@@ -95,8 +95,8 @@ else
 
 @code {
     private bool slugEdited;
-    protected override Task<AdminEditorData<CategoryEditForm>> LoadAsync() => Backend.CategoryAsync(Id);
-    protected override Task<AdminSaveResult> SaveAsync(CategoryEditForm input) => Backend.SaveCategoryAsync(input);
+    protected override Task<Result<AdminEditorData<CategoryEditForm>>> LoadAsync() => Backend.CategoryAsync(Id);
+    protected override Task<Result<AdminSaveResult>> SaveAsync(CategoryEditForm input) => Backend.SaveCategoryAsync(input);
     private void SlugChanged() => slugEdited = true;
     private void NameChanged()
     {

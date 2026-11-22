@@ -1,6 +1,7 @@
 using System.Text.Json;
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Services;
+using JASIntWeb.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;
@@ -52,8 +53,23 @@ public partial class ProductEditorForm
         state.Phase = EditorPhase.Loading;
         try
         {
-            var data = Persistent.TryTakeFromJson<ProductEditorData>($"product-editor-v2:{Id}", out var cached) && cached is not null ? cached : await Backend.LoadAsync(Id, lifetime.Token);
-            if (!disposed) state.Load(data);
+            if (Persistent.TryTakeFromJson<ProductEditorData>($"product-editor-v2:{Id}", out var cached) && cached is not null)
+            {
+                if (!disposed) state.Load(cached);
+            }
+            else
+            {
+                var loadRes = await Backend.LoadAsync(Id, lifetime.Token);
+                if (loadRes switch { ProductEditorData => true, Error => false })
+                {
+                    if (!disposed) state.Load(loadRes.ValueOrDefault()!);
+                }
+                else
+                {
+                    loadRes.TryGet(out _, out var err);
+                    Failure(err!);
+                }
+            }
         }
         catch (Exception e) { Failure(e); }
     }
@@ -122,7 +138,20 @@ public partial class ProductEditorForm
     private async Task Preview(PreviewRequest request)
     {
         if (Disabled) return; state.Phase = EditorPhase.Saving; state.Message = null;
-        try { preview = await Backend.PreviewAsync(new(ProductEditorRules.Copy(state.Draft), request.Offset, request.Filters), lifetime.Token); state.Phase = EditorPhase.Ready; }
+        try
+        {
+            var previewRes = await Backend.PreviewAsync(new(ProductEditorRules.Copy(state.Draft), request.Offset, request.Filters), lifetime.Token);
+            switch (previewRes)
+            {
+                case EditorCombinationPage p:
+                    preview = p;
+                    state.Phase = EditorPhase.Ready;
+                    break;
+                case Error failure:
+                    Failure(failure);
+                    break;
+            }
+        }
         catch (Exception e) { Failure(e); }
     }
     private async Task Save()
@@ -139,14 +168,24 @@ public partial class ProductEditorForm
         try
         {
             var result = submittedStock is not null ? await Backend.AdjustStockAsync(submittedStock, timeout.Token) : await Backend.SaveAsync(submitted!, timeout.Token);
-            await Accept(result);
+            if (result switch { EditorCommit => true, Error => false })
+            {
+                await Accept(result.ValueOrDefault()!);
+            }
+            else
+            {
+                result.TryGet(out _, out var error);
+                Failure(error!);
+                retryAllowed = false;
+                uncertain = error!.Code is >= 500 or 401 or 403;
+                if (!uncertain) await Forget();
+            }
         }
         catch (Exception e)
         {
             Failure(e);
             retryAllowed = false;
-            uncertain = e is not AdminCatalogException error || error.Status is >= 500 or 401 or 403;
-            if (!uncertain) await Forget();
+            uncertain = true;
         }
         finally { if (state.Busy) state.Phase = EditorPhase.Failed; }
     }
@@ -165,9 +204,21 @@ public partial class ProductEditorForm
         if (state.Busy) return; state.Phase = EditorPhase.Reconciling;
         try
         {
-            var result = await Backend.OperationAsync(submitted?.OperationId ?? submittedStock!.OperationId, lifetime.Token);
-            if (result is not null) await Accept(result);
-            else { retryAllowed = true; state.Phase = EditorPhase.ConnectionError; state.Message = "No completed operation found yet. Retry the same request safely."; }
+            var res = await Backend.OperationAsync(submitted?.OperationId ?? submittedStock!.OperationId, lifetime.Token);
+            switch (res)
+            {
+                case EditorCommit commit:
+                    await Accept(commit);
+                    break;
+                case Error err:
+                    Failure(err);
+                    break;
+                default:
+                    retryAllowed = true;
+                    state.Phase = EditorPhase.ConnectionError;
+                    state.Message = "No completed operation found yet. Retry the same request safely.";
+                    break;
+            }
         }
         catch (Exception e) { Failure(e); }
         finally { if (state.Busy) state.Phase = EditorPhase.ConnectionError; }
@@ -179,7 +230,19 @@ public partial class ProductEditorForm
     private async Task LoadStock(Guid key)
     {
         state.Phase = EditorPhase.Loading;
-        try { var fresh = await Backend.LoadAsync(state.Draft.Id, lifetime.Token); state.Load(fresh); stockVariant = fresh.Draft.Variants.Single(v => v.ClientId == key); pendingStock = null; stockMessage = null; }
+        try
+        {
+            var freshRes = await Backend.LoadAsync(state.Draft.Id, lifetime.Token);
+            if (freshRes switch { ProductEditorData => true, Error => false })
+            {
+                var fresh = freshRes.ValueOrDefault()!;
+                state.Load(fresh);
+                stockVariant = fresh.Draft.Variants.Single(v => v.ClientId == key);
+                pendingStock = null;
+                stockMessage = null;
+            }
+            else { freshRes.TryGet(out _, out var err); Failure(err!); }
+        }
         catch (Exception e) { Failure(e); }
     }
     private async Task Stock(EditorStock command)
@@ -191,19 +254,61 @@ public partial class ProductEditorForm
     private async Task RefreshStock()
     {
         if (stockVariant is null) return;
-        try { var fresh = await Backend.LoadAsync(state.Draft.Id, lifetime.Token); stockVariant = fresh.Draft.Variants.Single(v => v.Id == stockVariant.Id); stockMessage = "Current stock loaded. Review your retained quantity and reason before confirming."; }
+        try
+        {
+            var freshRes = await Backend.LoadAsync(state.Draft.Id, lifetime.Token);
+            if (freshRes switch { ProductEditorData => true, Error => false })
+            {
+                var fresh = freshRes.ValueOrDefault()!;
+                stockVariant = fresh.Draft.Variants.Single(v => v.Id == stockVariant.Id);
+                stockMessage = "Current stock loaded. Review your retained quantity and reason before confirming.";
+            }
+            else { freshRes.TryGet(out _, out var err); Failure(err!); stockMessage = state.Message; }
+        }
         catch (Exception e) { Failure(e); stockMessage = state.Message; }
     }
-    private async Task RefreshTemplates() { try { var fresh = await Backend.LoadAsync(state.Draft.Id, lifetime.Token); state.UpdateTemplates(fresh.Templates); } catch (Exception e) { Failure(e); } }
-    private async Task ReviewLatest() { try { latest = await Backend.LoadAsync(state.Draft.Id, lifetime.Token); } catch (Exception e) { Failure(e); } }
+    private async Task RefreshTemplates()
+    {
+        try
+        {
+            var freshRes = await Backend.LoadAsync(state.Draft.Id, lifetime.Token);
+            if (freshRes switch { ProductEditorData => true, Error => false }) state.UpdateTemplates(freshRes.ValueOrDefault()!.Templates);
+            else { freshRes.TryGet(out _, out var err); Failure(err!); }
+        }
+        catch (Exception e) { Failure(e); }
+    }
+    private async Task ReviewLatest()
+    {
+        try
+        {
+            var freshRes = await Backend.LoadAsync(state.Draft.Id, lifetime.Token);
+            if (freshRes switch { ProductEditorData => true, Error => false }) latest = freshRes.ValueOrDefault()!;
+            else { freshRes.TryGet(out _, out var err); Failure(err!); }
+        }
+        catch (Exception e) { Failure(e); }
+    }
     private async Task UseLatest() { if (latest is not null && await Confirm("Replace your retained draft with the latest saved product? Download it first if needed.")) { state.Load(latest); latest = null; preview = null; } }
-    private async Task Reload() { try { state.Load(await Backend.LoadAsync(state.Draft.Id == 0 ? Id : state.Draft.Id, lifetime.Token)); reloadRequired = false; } catch (Exception e) { Failure(e); } }
+    private async Task Reload()
+    {
+        try
+        {
+            var freshRes = await Backend.LoadAsync(state.Draft.Id == 0 ? Id : state.Draft.Id, lifetime.Token);
+            if (freshRes switch { ProductEditorData => true, Error => false }) { state.Load(freshRes.ValueOrDefault()!); reloadRequired = false; }
+            else { freshRes.TryGet(out _, out var err); Failure(err!); }
+        }
+        catch (Exception e) { Failure(e); }
+    }
     private void UploadBusy(bool busy) => uploads = Math.Max(0, uploads + (busy ? 1 : -1));
+    private void Failure(Error error)
+    {
+        if (disposed) return;
+        state.Reject(error);
+    }
     private void Failure(Exception e)
     {
         if (disposed) return;
-        if (e is AdminCatalogException error) state.Reject(error);
-        else { state.Phase = e is HttpRequestException or OperationCanceledException ? EditorPhase.ConnectionError : EditorPhase.Failed; state.Message = "The operation could not be confirmed. Your draft is retained. Check the operation status before retrying."; }
+        state.Phase = e is HttpRequestException or OperationCanceledException ? EditorPhase.ConnectionError : EditorPhase.Failed;
+        state.Message = "The operation could not be confirmed. Your draft is retained. Check the operation status before retrying.";
     }
     private async Task DiscardDraft()
     {

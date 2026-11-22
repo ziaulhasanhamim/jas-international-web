@@ -80,13 +80,22 @@
             foreach (var file in args.GetMultipleFiles(10))
             {
                 await using var stream = file.OpenReadStream(10 * 1024 * 1024);
-                var uploaded = await Backend.UploadAsync(stream, file.Name, file.ContentType, false);
-                if (!images.Contains(uploaded)) images.Add(uploaded);
-                await Changed();
+                var uploadRes = await Backend.UploadAsync(stream, file.Name, file.ContentType, false);
+                switch (uploadRes)
+                {
+                    case string uploaded:
+                        if (!images.Contains(uploaded)) images.Add(uploaded);
+                        await Changed();
+                        break;
+                    case Error err:
+                        error = err.Message;
+                        break;
+                }
+                if (uploadRes is Error) break;
             }
         }
-        catch (Exception failure) when (failure is AdminCatalogException or IOException or HttpRequestException or InvalidOperationException)
-        { error = failure is AdminCatalogException known ? known.Message : "One or more images could not be uploaded. Check the file count, size and connection."; }
+        catch (Exception failure) when (failure is IOException or HttpRequestException or InvalidOperationException)
+        { error = "One or more images could not be uploaded. Check the file count, size and connection."; }
         finally { uploading = false; await BusyChanged.InvokeAsync(false); }
     }
 }

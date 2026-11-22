@@ -322,8 +322,8 @@ else
     private bool slugEdited;
     private string copiedToast = "";
 
-    protected override Task<AdminEditorData<GuideEditForm>> LoadAsync() => Backend.GuideAsync(Id);
-    protected override Task<AdminSaveResult> SaveAsync(GuideEditForm input) => Backend.SaveGuideAsync(input);
+    protected override Task<Result<AdminEditorData<GuideEditForm>>> LoadAsync() => Backend.GuideAsync(Id);
+    protected override Task<Result<AdminSaveResult>> SaveAsync(GuideEditForm input) => Backend.SaveGuideAsync(input);
 
     private void TitleChanged()
     {
@@ -385,12 +385,19 @@ else
         {
             if (!await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this guide? It will be removed from storefront and sitemaps.")) return;
             saving = true;
-            await Backend.DeleteGuideAsync(Id);
-            HasUnsavedChanges = false;
-            try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
-            Nav.NavigateTo("/admin/guides");
+            var delRes = await Backend.DeleteGuideAsync(Id);
+            switch (delRes)
+            {
+                case Success:
+                    HasUnsavedChanges = false;
+                    try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (Exception) { }
+                    Nav.NavigateTo("/admin/guides");
+                    break;
+                case Error failure:
+                    error = failure.Message;
+                    break;
+            }
         }
-        catch (AdminCatalogException failure) { error = failure.Message; }
         catch (JSException) { error = "Confirmation dialog could not be opened. Try again."; }
         catch (HttpRequestException) { error = "Connection failed. Try again."; }
         finally { saving = false; }

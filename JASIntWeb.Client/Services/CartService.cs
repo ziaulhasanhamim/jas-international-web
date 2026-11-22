@@ -1,5 +1,6 @@
 using JASIntWeb.Client.Contracts;
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -72,10 +73,19 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             try
             {
                 var result = await backend.ChangeAsync(new CartLineRequest(variantId, clamped), add);
-                _confirmedCart = result;
-                State = new CartState(result, null);
+                switch (result)
+                {
+                    case CartDto cart:
+                        _confirmedCart = cart;
+                        State = new CartState(cart, null);
+                        break;
+                    case Error err:
+                        var rollbackCart = _confirmedCart ?? currentCart;
+                        State = new CartState(rollbackCart, err.Message);
+                        break;
+                }
             }
-            catch (Exception e) when (e is CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+            catch (Exception e) when (e is HttpRequestException or InvalidOperationException or TaskCanceledException)
             {
                 var message = e is HttpRequestException or TaskCanceledException
                     ? "Connection interrupted. Please try again."
@@ -95,7 +105,7 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
         }
     }
 
-    private async Task RunAsync(Func<Task<CartDto>> action, bool initializeOnly = false, bool syncBadge = true)
+    private async Task RunAsync(Func<Task<Result<CartDto>>> action, bool initializeOnly = false, bool syncBadge = true)
     {
         await gate.WaitAsync();
         try
@@ -107,11 +117,19 @@ public sealed class CartService(IJSRuntime js, ICartBackend backend)
             OnChange?.Invoke();
             try
             {
-                var cart = await action();
-                _confirmedCart = cart;
-                State = new CartState(cart);
+                var result = await action();
+                switch (result)
+                {
+                    case CartDto cart:
+                        _confirmedCart = cart;
+                        State = new CartState(cart);
+                        break;
+                    case Error err:
+                        State = new CartState(State?.Cart ?? _confirmedCart, err.Message);
+                        break;
+                }
             }
-            catch (Exception e) when (e is CommerceException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+            catch (Exception e) when (e is HttpRequestException or InvalidOperationException or TaskCanceledException)
             {
                 var message = e is HttpRequestException or TaskCanceledException
                     ? "Connection interrupted. Please try again."

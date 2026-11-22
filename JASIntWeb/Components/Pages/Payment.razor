@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Contracts
+@using JASIntWeb.Helpers
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
@@ -544,14 +545,17 @@
                       : selectedPaymentMode == PaymentModeOption.AdvanceDeliveryFee ? "BkashAdvance" : "COD";
 
             var req = new ConfirmPaymentRequest(pMode, senderPhoneNumber?.Trim(), transactionId?.Trim().ToUpperInvariant(), order.PaymentReferenceCode);
-            await Shop.ConfirmPaymentAsync(order.PublicToken, req);
-
-            Nav.NavigateTo($"/payment-verification?token={order.PublicToken}");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
-            isSubmitting = false;
+            var confirmRes = await Shop.ConfirmPaymentAsync(order.PublicToken, req);
+            switch (confirmRes)
+            {
+                case Order:
+                    Nav.NavigateTo($"/payment-verification?token={order.PublicToken}");
+                    break;
+                case Error err:
+                    error = err.Message;
+                    isSubmitting = false;
+                    return;
+            }
         }
         catch (Exception ex)
         {

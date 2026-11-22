@@ -13,7 +13,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var errors = new List<ValidationResult>();
         if (!Validator.TryValidateObject(input, new ValidationContext(input), errors, true))
         {
-            throw new ShopException(string.Join(" ", errors.Select(e => e.ErrorMessage)));
+            throw new InvalidOperationException(string.Join(" ", errors.Select(e => e.ErrorMessage)));
         }
     }
 
@@ -22,7 +22,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         value = value.Trim().ToLowerInvariant();
         if (!System.Text.RegularExpressions.Regex.IsMatch(value, "^[a-z0-9]+(?:-[a-z0-9]+)*$"))
         {
-            throw new ShopException("Codes and slugs use lowercase letters, digits and hyphens.");
+            throw new InvalidOperationException("Codes and slugs use lowercase letters, digits and hyphens.");
         }
         return value;
     }
@@ -42,14 +42,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             return value;
         }
-        throw new ShopException("Use a site-relative path or HTTPS URL.");
+        throw new InvalidOperationException("Use a site-relative path or HTTPS URL.");
     }
 
     private static void Price(decimal value)
     {
         if (value < 0 || value > 10000000 || decimal.Round(value, 2) != value)
         {
-            throw new ShopException("Prices must be non-negative with at most two decimal places.");
+            throw new InvalidOperationException("Prices must be non-negative with at most two decimal places.");
         }
     }
 
@@ -69,8 +69,8 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             CategoryId = 0
         }
         : (await db.Products.Include(p => p.ProductImages)
-            .SingleOrDefaultAsync(p => p.Id == input.Id)) ?? throw new ShopException("Product not found. Return to the product list.");
-        if (input.Id != 0 && p.CatalogRevision != input.CatalogRevision) throw new ShopException("Product changed in another session. Reload before saving your draft.");
+            .SingleOrDefaultAsync(p => p.Id == input.Id)) ?? throw new InvalidOperationException("Product not found. Return to the product list.");
+        if (input.Id != 0 && p.CatalogRevision != input.CatalogRevision) throw new InvalidOperationException("Product changed in another session. Reload before saving your draft.");
         p.Name = input.Name.Trim();
 
         // Auto-generate or normalize product slug
@@ -115,7 +115,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             if (!await db.Brands.AnyAsync(b => b.Id == input.BrandId.Value && !b.IsDeleted))
             {
-                throw new ShopException("Select a valid brand.");
+                throw new InvalidOperationException("Select a valid brand.");
             }
             p.BrandId = input.BrandId.Value;
         }
@@ -124,7 +124,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             p.BrandId = null;
         }
         if (!unifiedEditor && input.Id != 0 && !input.Hidden && !await db.ProductVariants.AnyAsync(v => v.ProductId == p.Id && v.IsDefault && v.IsActive && !v.IsDeleted && v.SellingPrice > 0))
-            throw new ShopException("Configure an active default variant with a positive price before publishing.");
+            throw new InvalidOperationException("Configure an active default variant with a positive price before publishing.");
         p.IsDeleted = unifiedEditor ? input.Hidden : input.Id == 0 || input.Hidden;
         p.CatalogRevision++;
 
@@ -134,14 +134,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         p.UpdatedAt = DateTimeOffset.UtcNow;
         if (!await db.Categories.AnyAsync(c => c.Id == p.CategoryId && !c.IsDeleted && (c.ParentCategory == null || !c.ParentCategory.IsDeleted)))
         {
-            throw new ShopException("Select a visible category.");
+            throw new InvalidOperationException("Select a visible category.");
         }
         var images = (input.Images ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct()
             .ToArray();
         if (images.Length > 20)
         {
-            throw new ShopException("Use at most 20 gallery images.");
+            throw new InvalidOperationException("Use at most 20 gallery images.");
         }
         foreach (var image in images)
         {
@@ -188,7 +188,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await LockProductAsync(input.ProductId);
         if (!await db.Products.AnyAsync(p => p.Id == input.ProductId))
         {
-            throw new ShopException("Product not found.");
+            throw new InvalidOperationException("Product not found.");
         }
         if (input.Id != 0)
         {
@@ -202,7 +202,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             ||
             input.Choices.Any(c => !definitions.Any(a => a.Id == c.ProductAttributeDefinitionId)))
         {
-            throw new ShopException("Product options changed. Reload this page before saving.");
+            throw new InvalidOperationException("Product options changed. Reload this page before saving.");
         }
         var ids = input.Choices.Where(c => c.ProductAttributeOptionId > 0).Select(c => c.ProductAttributeOptionId).ToList();
         var options = await db.ProductAttributeOptions.Where(o => o.ProductId == input.ProductId && ids.Contains(o.Id))
@@ -213,7 +213,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 && !options.Any(o => o.Id == c.ProductAttributeOptionId
                     && o.ProductAttributeDefinitionId == c.ProductAttributeDefinitionId)))
         {
-            throw new ShopException("Choose one allowed value for every required attribute.");
+            throw new InvalidOperationException("Choose one allowed value for every required attribute.");
         }
         var signature = string.Join("-", ids.Order());
         if (await db.ProductVariants.AnyAsync(v => v.ProductId == input.ProductId
@@ -221,7 +221,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 && !v.IsDeleted
                 && v.OptionSignature == signature))
         {
-            throw new ShopException("That combination already exists. Edit its variant instead.");
+            throw new InvalidOperationException("That combination already exists. Edit its variant instead.");
         }
         var v = input.Id == 0 ? new ProductVariant
         {
@@ -231,7 +231,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         : (await db.ProductVariants.Include(v => v.Options)
             .SingleOrDefaultAsync(v => v.Id == input.Id
-                && v.ProductId == input.ProductId)) ?? throw new ShopException("Variant not found. Return to the variant list.");
+                && v.ProductId == input.ProductId)) ?? throw new InvalidOperationException("Variant not found. Return to the variant list.");
         v.SKU = input.Sku.Trim();
         v.SellingPrice = input.SellingPrice;
         v.CostPrice = input.CostPrice;
@@ -241,13 +241,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         v.UpdatedAt = DateTimeOffset.UtcNow;
         if (await db.ProductVariants.AnyAsync(x => x.SKU == v.SKU && x.Id != v.Id))
         {
-            throw new ShopException("This SKU is already in use.");
+            throw new InvalidOperationException("This SKU is already in use.");
         }
         if (v.IsDefault)
         {
             if (!v.IsActive)
             {
-                throw new ShopException("The default variant must be active.");
+                throw new InvalidOperationException("The default variant must be active.");
             }
             await db.ProductVariants.Where(x => x.ProductId == input.ProductId
                 && x.Id != v.Id)
@@ -255,7 +255,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         else if (!await db.ProductVariants.AnyAsync(x => x.ProductId == input.ProductId && x.Id != v.Id && x.IsDefault && x.IsActive && !x.IsDeleted))
         {
-            throw new ShopException("Select an active default variant. The first variant must be the default.");
+            throw new InvalidOperationException("Select an active default variant. The first variant must be the default.");
         }
         db.ProductVariantOptions.RemoveRange(v.Options);
         v.Options.Clear();
@@ -300,7 +300,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         }
         if (quantity < inventory.QuantityReserved)
         {
-            throw new ShopException($"Stock cannot be below {inventory.QuantityReserved} units already reserved for orders.");
+            throw new InvalidOperationException($"Stock cannot be below {inventory.QuantityReserved} units already reserved for orders.");
         }
         var delta = quantity - inventory.QuantityOnHand;
         inventory.QuantityOnHand = quantity;
@@ -323,7 +323,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await using var tx = await db.Database.BeginTransactionAsync();
         if (!await db.ProductVariants.AnyAsync(v => v.Id == input.VariantId))
         {
-            throw new ShopException("Variant not found.");
+            throw new InvalidOperationException("Variant not found.");
         }
         await SetStockCoreAsync(input.VariantId, input.Quantity, input.Reason.Trim());
         await db.SaveChangesAsync();
@@ -339,13 +339,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Distinct()
             .Count() != input.Attributes.Count)
         {
-            throw new ShopException("Invalid product attribute selection.");
+            throw new InvalidOperationException("Invalid product attribute selection.");
         }
         await using var tx = await db.Database.BeginTransactionAsync();
         await LockProductAsync(input.ProductId);
         if (!await db.Products.AnyAsync(p => p.Id == input.ProductId))
         {
-            throw new ShopException("Product not found.");
+            throw new InvalidOperationException("Product not found.");
         }
         var definitions = await db.AttributeDefinitions.AsNoTracking().Select(a => a.Id).ToListAsync();
         var globalOptions = await db.AttributeOptions.AsNoTracking().ToDictionaryAsync(o => o.Id);
@@ -358,13 +358,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var wanted = input.Attributes.Where(a => a.Enabled).ToList();
         if (wanted.Count > 50)
         {
-            throw new ShopException("Use at most 50 attributes per product.");
+            throw new InvalidOperationException("Use at most 50 attributes per product.");
         }
         foreach (var row in wanted)
         {
             if (!definitions.Contains(row.AttributeDefinitionId))
             {
-                throw new ShopException("Attribute no longer exists.");
+                throw new InvalidOperationException("Attribute no longer exists.");
             }
             var selected = row.Options.Where(o => o.Enabled).Select(o => o.AttributeOptionId).ToList();
             if (selected.Count == 0
@@ -374,7 +374,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 || selected.Any(id => !globalOptions.TryGetValue(id, out var o)
                     || o.AttributeDefinitionId != row.AttributeDefinitionId))
             {
-                throw new ShopException("Select at least one valid option for each enabled attribute.");
+                throw new InvalidOperationException("Select at least one valid option for each enabled attribute.");
             }
             var binding = current.FirstOrDefault(a => a.AttributeDefinitionId == row.AttributeDefinitionId);
             if (binding is null)
@@ -395,14 +395,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     && !v.IsDeleted
                     && !v.Options.Any(o => o.ProductAttributeDefinitionId == binding.Id)))
             {
-                throw new ShopException("An active variant is missing this attribute. Add it as optional first, update the variants, then mark it required.");
+                throw new InvalidOperationException("An active variant is missing this attribute. Add it as optional first, update the variants, then mark it required.");
             }
             binding.IsRequired = row.Required;
             foreach (var removed in binding.Options.Where(o => (!o.AttributeOptionId.HasValue || !selected.Contains(o.AttributeOptionId.Value))).ToList())
             {
                 if (used.Contains(removed.Id))
                 {
-                    throw new ShopException("An option is still used by a variant. Edit that variant before removing the option.");
+                    throw new InvalidOperationException("An option is still used by a variant. Edit that variant before removing the option.");
                 }
                 db.ProductAttributeOptions.Remove(removed);
             }
@@ -424,7 +424,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             if (removed.Options.Any(o => used.Contains(o.Id)))
             {
-                throw new ShopException("An attribute is still used by a variant. Edit its variants before removing it.");
+                throw new InvalidOperationException("An attribute is still used by a variant. Edit its variants before removing it.");
             }
             db.ProductAttributeDefinitions.Remove(removed);
         }
@@ -443,7 +443,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         await LockProductAsync(input.ProductId);
         if (!await db.Products.AnyAsync(p => p.Id == input.ProductId))
         {
-            throw new ShopException("Product not found.");
+            throw new InvalidOperationException("Product not found.");
         }
         var attributes = await db.ProductAttributeDefinitions.Include(a => a.Options)
             .Where(a => a.ProductId == input.ProductId)
@@ -455,7 +455,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Distinct()
             .Count() != attributes.Count)
         {
-            throw new ShopException("Product attributes changed. Reload this page.");
+            throw new InvalidOperationException("Product attributes changed. Reload this page.");
         }
         var combinations = new List<List<ProductAttributeOption>>
         {
@@ -463,11 +463,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         };
         foreach (var attribute in attributes)
         {
-            var group = input.Groups.SingleOrDefault(g => g.ProductAttributeDefinitionId == attribute.Id) ?? throw new ShopException("Invalid attribute.");
+            var group = input.Groups.SingleOrDefault(g => g.ProductAttributeDefinitionId == attribute.Id) ?? throw new InvalidOperationException("Invalid attribute.");
             var ids = group.Options.Where(o => o.Selected).Select(o => o.ProductAttributeOptionId).Distinct().ToList();
             if (ids.Any(id => !attribute.Options.Any(o => o.Id == id)) || (group.IncludeNotApplicable && attribute.IsRequired))
             {
-                throw new ShopException("Invalid option selection.");
+                throw new InvalidOperationException("Invalid option selection.");
             }
             var values = attribute.Options.Where(o => ids.Contains(o.Id)).Cast<ProductAttributeOption?>().ToList();
             if (group.IncludeNotApplicable && !attribute.IsRequired)
@@ -476,11 +476,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             }
             if (values.Count == 0)
             {
-                throw new ShopException("Choose values for every attribute.");
+                throw new InvalidOperationException("Choose values for every attribute.");
             }
             if (combinations.Count * values.Count > 100)
             {
-                throw new ShopException("Generate at most 100 combinations at a time. Select fewer values.");
+                throw new InvalidOperationException("Generate at most 100 combinations at a time. Select fewer values.");
             }
             combinations = [.. combinations.SelectMany(c => values.Select(v => v is null ? c.ToList() : [.. c, v]))];
         }
@@ -501,7 +501,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             var sku = input.SkuPrefix.Trim() + "-" + suffix;
             if (sku.Length > 100 || await db.ProductVariants.AnyAsync(v => v.SKU == sku))
             {
-                throw new ShopException("Generated SKU is too long or already used. Choose a different prefix.");
+                throw new InvalidOperationException("Generated SKU is too long or already used. Choose a different prefix.");
             }
             var variant = new ProductVariant
             {
@@ -546,10 +546,10 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             .Include(o => o.Payments)
             .Include(o => o.DeliveryAddress)
             .Include(o => o.User)
-            .SingleOrDefaultAsync(o => o.Id == id)) ?? throw new ShopException("Order not found.");
+            .SingleOrDefaultAsync(o => o.Id == id)) ?? throw new InvalidOperationException("Order not found.");
         if (!Enum.TryParse<OrderStatus>(input.Status, out var status) || !Enum.IsDefined(status))
         {
-            throw new ShopException("Invalid order status.");
+            throw new InvalidOperationException("Invalid order status.");
         }
 
         order.CourierName = input.CourierName;
@@ -572,17 +572,17 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             };
             if (!valid)
             {
-                throw new ShopException($"Invalid status transition from {order.Status} to {status}. Delivered or cancelled orders cannot be reopened.");
+                throw new InvalidOperationException($"Invalid status transition from {order.Status} to {status}. Delivered or cancelled orders cannot be reopened.");
             }
             if (status is OrderStatus.Delivered or OrderStatus.Cancelled)
             {
                 foreach (var item in order.Items.OrderBy(i => i.ProductVariantId))
                 {
                     await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"InventoryItems\" WHERE \"ProductVariantId\" = {item.ProductVariantId} FOR UPDATE");
-                    var stock = (await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId)) ?? throw new ShopException("Inventory is missing. Review stock before changing this order.");
+                    var stock = (await db.InventoryItems.SingleOrDefaultAsync(i => i.ProductVariantId == item.ProductVariantId)) ?? throw new InvalidOperationException("Inventory is missing. Review stock before changing this order.");
                     if (stock.QuantityReserved < item.Quantity)
                     {
-                        throw new ShopException("Reserved stock is inconsistent. Review inventory before changing this order.");
+                        throw new InvalidOperationException("Reserved stock is inconsistent. Review inventory before changing this order.");
                     }
                     stock.QuantityReserved -= item.Quantity;
                     if (status == OrderStatus.Delivered)
@@ -674,7 +674,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             Name = "",
             Slug = ""
         }
-        : (await db.Categories.SingleOrDefaultAsync(c => c.Id == input.Id)) ?? throw new ShopException("Category not found.");
+        : (await db.Categories.SingleOrDefaultAsync(c => c.Id == input.Id)) ?? throw new InvalidOperationException("Category not found.");
         c.Name = input.Name.Trim();
 
         var baseCategorySlug = string.IsNullOrWhiteSpace(input.Slug)
@@ -716,7 +716,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             if (c.ParentCategoryId == c.Id || !categories.Any(x => x.Id == c.ParentCategoryId && !x.ParentCategoryId.HasValue && !x.IsDeleted))
             {
-                throw new ShopException("Select a visible top-level parent category.");
+                throw new InvalidOperationException("Select a visible top-level parent category.");
             }
             if (c.Id != 0 && categories.Any(x => x.ParentCategoryId == c.Id))
             {
@@ -757,7 +757,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task ToggleCategoryVisibilityAsync(int id)
     {
-        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Category not found.");
         c.IsDeleted = !c.IsDeleted;
         c.DeletedAt = c.IsDeleted ? DateTimeOffset.UtcNow : null;
         if (c.IsDeleted)
@@ -775,7 +775,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task ToggleCategoryFeaturedAsync(int id)
     {
-        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+        var c = await db.Categories.SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Category not found.");
         var placement = await db.CategoryPlacements.SingleOrDefaultAsync(p => p.CategoryId == id && p.PlacementType == CategoryPlacementType.HomepageFeatured);
         if (placement is null)
         {
@@ -803,7 +803,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var c = await db.Categories
             .Include(x => x.ChildCategories)
             .Include(x => x.Products)
-            .SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Category not found.");
+            .SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Category not found.");
 
         var activeProductsCount = c.Products.Count(p => !p.IsDeleted);
 
@@ -812,7 +812,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             if (activeProductsCount > 0)
             {
-                throw new ShopException($"Cannot permanently delete '{c.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first, or click 'Hide' to remove this category from the storefront.");
+                throw new InvalidOperationException($"Cannot permanently delete '{c.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first, or click 'Hide' to remove this category from the storefront.");
             }
 
             // Re-parent any child categories so FK_Categories_Categories_ParentCategoryId restrict doesn't crash
@@ -961,7 +961,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             Name = "",
             Slug = ""
         }
-        : (await db.Brands.SingleOrDefaultAsync(x => x.Id == input.Id)) ?? throw new ShopException("Brand not found.");
+        : (await db.Brands.SingleOrDefaultAsync(x => x.Id == input.Id)) ?? throw new InvalidOperationException("Brand not found.");
         b.Name = input.Name.Trim();
 
         var baseBrandSlug = string.IsNullOrWhiteSpace(input.Slug)
@@ -1003,7 +1003,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         b.UpdatedAt = DateTimeOffset.UtcNow;
         if (await db.Brands.AnyAsync(x => x.Slug == b.Slug && x.Id != b.Id))
         {
-            throw new ShopException("This brand slug already exists.");
+            throw new InvalidOperationException("This brand slug already exists.");
         }
         if (b.Id == 0)
         {
@@ -1019,7 +1019,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task ToggleBrandFeaturedAsync(int id)
     {
-        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Brand not found.");
         b.IsFeatured = !b.IsFeatured;
         b.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
@@ -1028,7 +1028,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task ToggleBrandVisibilityAsync(int id)
     {
-        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        var b = await db.Brands.SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Brand not found.");
         b.IsDeleted = !b.IsDeleted;
         b.DeletedAt = b.IsDeleted ? DateTimeOffset.UtcNow : null;
         b.UpdatedAt = DateTimeOffset.UtcNow;
@@ -1039,11 +1039,11 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task DeleteBrandAsync(int id, bool permanent = false)
     {
-        var b = await db.Brands.Include(x => x.Products).SingleOrDefaultAsync(x => x.Id == id) ?? throw new ShopException("Brand not found.");
+        var b = await db.Brands.Include(x => x.Products).SingleOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException("Brand not found.");
         var activeProductsCount = b.Products.Count(p => !p.IsDeleted);
         if (activeProductsCount > 0)
         {
-            throw new ShopException($"Cannot delete brand '{b.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first.");
+            throw new InvalidOperationException($"Cannot delete brand '{b.Name}' because it contains {activeProductsCount} active products. Please reassign or delete its products first.");
         }
 
         if (permanent || b.IsDeleted)
@@ -1106,13 +1106,13 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             Name = "",
             Code = code
         }
-        : (await db.AttributeDefinitions.SingleOrDefaultAsync(a => a.Id == input.Id)) ?? throw new ShopException("Attribute not found.");
+        : (await db.AttributeDefinitions.SingleOrDefaultAsync(a => a.Id == input.Id)) ?? throw new InvalidOperationException("Attribute not found.");
         if (await db.AttributeDefinitions.AnyAsync(x => x.Code == code && x.Id != input.Id))
         {
-            throw new ShopException("Attribute code already exists.");
+            throw new InvalidOperationException("Attribute code already exists.");
         }
         if (a.Id != 0 && a.Code != code && await db.ProductAttributeDefinitions.AnyAsync(binding => binding.AttributeDefinitionId == a.Id))
-            throw new ShopException("This attribute code is used in product selection URLs and cannot be changed. Edit its display name instead.");
+            throw new InvalidOperationException("This attribute code is used in product selection URLs and cannot be changed. Edit its display name instead.");
         a.Name = input.Name.Trim();
         a.Code = code;
         a.Unit = input.Unit?.Trim();
@@ -1130,7 +1130,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         Validate(input);
         if (!await db.AttributeDefinitions.AnyAsync(a => a.Id == input.AttributeDefinitionId))
         {
-            throw new ShopException("Attribute not found.");
+            throw new InvalidOperationException("Attribute not found.");
         }
         var o = input.Id == 0 ? new AttributeOption
         {
@@ -1139,7 +1139,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             Code = ""
         }
         : (await db.AttributeOptions.SingleOrDefaultAsync(o => o.Id == input.Id
-                && o.AttributeDefinitionId == input.AttributeDefinitionId)) ?? throw new ShopException("Attribute option not found.");
+                && o.AttributeDefinitionId == input.AttributeDefinitionId)) ?? throw new InvalidOperationException("Attribute option not found.");
         o.Value = input.Value.Trim();
         o.Code = Code(input.Code);
         if (await db.AttributeOptions.AnyAsync(x => x.AttributeDefinitionId == o.AttributeDefinitionId
@@ -1147,7 +1147,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                 && (x.Value == o.Value
                     || x.Code == o.Code)))
         {
-            throw new ShopException("This attribute already has that value or code.");
+            throw new InvalidOperationException("This attribute already has that value or code.");
         }
         if (o.Id == 0)
         {
@@ -1165,7 +1165,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             ImageAlt = "",
             SortOrder = (await db.CarouselSlides.MaxAsync(x => (int?)x.SortOrder) ?? -1) + 1
         }
-        : (await db.CarouselSlides.SingleOrDefaultAsync(s => s.Id == input.Id)) ?? throw new ShopException("Carousel slide not found.");
+        : (await db.CarouselSlides.SingleOrDefaultAsync(s => s.Id == input.Id)) ?? throw new InvalidOperationException("Carousel slide not found.");
         s.Title = input.Title?.Trim();
         s.Eyebrow = input.Eyebrow?.Trim();
         s.Copy = input.Copy?.Trim();
@@ -1184,7 +1184,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task DeleteSlideAsync(int id)
     {
-        var slide = (await db.CarouselSlides.SingleOrDefaultAsync(s => s.Id == id)) ?? throw new ShopException("Carousel slide not found.");
+        var slide = (await db.CarouselSlides.SingleOrDefaultAsync(s => s.Id == id)) ?? throw new InvalidOperationException("Carousel slide not found.");
         db.CarouselSlides.Remove(slide);
         await db.SaveChangesAsync();
         await cache.RemoveByTagAsync(CatalogService.TagSlides);
@@ -1194,27 +1194,27 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     {
         if (input.Id == actorId)
         {
-            throw new ShopException("Use a different administrator to change your own role.");
+            throw new InvalidOperationException("Use a different administrator to change your own role.");
         }
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("LOCK TABLE \"AspNetUserRoles\" IN SHARE ROW EXCLUSIVE MODE");
         var actor = await users.FindByIdAsync(actorId.ToString());
         if (actor is null || !await users.IsInRoleAsync(actor, "Admin"))
         {
-            throw new ShopException("Administrator access is required.");
+            throw new InvalidOperationException("Administrator access is required.");
         }
-        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
+        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new InvalidOperationException("User not found.");
         if (await users.IsInRoleAsync(user, "Admin") != input.Admin)
         {
             var result = input.Admin ? await users.AddToRoleAsync(user, "Admin") : await users.RemoveFromRoleAsync(user, "Admin");
             if (!result.Succeeded)
             {
-                throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+                throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
             }
             var stamp = await users.UpdateSecurityStampAsync(user);
             if (!stamp.Succeeded)
             {
-                throw new ShopException("The account changed. Reload before changing access again.");
+                throw new InvalidOperationException("The account changed. Reload before changing access again.");
             }
         }
         await tx.CommitAsync();
@@ -1225,7 +1225,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     {
         if (ids.Count > 500 || ids.Count != ids.Distinct().Count())
         {
-            throw new ShopException("Invalid ordering.");
+            throw new InvalidOperationException("Invalid ordering.");
         }
         await using var tx = await db.Database.BeginTransactionAsync();
         if (kind == OrderableKind.ProductAttributes)
@@ -1236,14 +1236,14 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         {
             var productId = (await db.ProductAttributeDefinitions.Where(a => a.Id == scopeId)
                 .Select(a => (int?)a.ProductId)
-                .SingleOrDefaultAsync()) ?? throw new ShopException("Product attribute no longer exists. Reload the list.");
+                .SingleOrDefaultAsync()) ?? throw new InvalidOperationException("Product attribute no longer exists. Reload the list.");
             await LockProductAsync(productId);
         }
         void Same(IEnumerable<int> existing)
         {
             if (!existing.ToHashSet().SetEquals(ids))
             {
-                throw new ShopException("This list changed. Reload it before saving the order.");
+                throw new InvalidOperationException("This list changed. Reload it before saving the order.");
             }
         }
         switch (kind)
@@ -1284,7 +1284,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
                     p.SortOrder = ids.IndexOf(p.Id);
                 }
                 break;
-            default: throw new ShopException("Unknown ordering list.");
+            default: throw new InvalidOperationException("Unknown ordering list.");
         }
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -1301,7 +1301,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var existing = await users.FindByEmailAsync(email);
         if (existing != null)
         {
-            throw new ShopException("An account with this email address already exists.");
+            throw new InvalidOperationException("An account with this email address already exists.");
         }
 
         var user = new User
@@ -1314,7 +1314,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var result = await users.CreateAsync(user, input.Password);
         if (!result.Succeeded)
         {
-            throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+            throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
         }
 
         if (!string.IsNullOrWhiteSpace(input.FullName))
@@ -1333,7 +1333,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     public async Task UpdateUserProfileAsync(AdminUserEditProfileForm input)
     {
         Validate(input);
-        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
+        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new InvalidOperationException("User not found.");
         var newEmail = input.Email.Trim().ToLowerInvariant();
 
         if (!string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
@@ -1341,7 +1341,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
             var existing = await users.FindByEmailAsync(newEmail);
             if (existing != null && existing.Id != user.Id)
             {
-                throw new ShopException("Another user already has this email address.");
+                throw new InvalidOperationException("Another user already has this email address.");
             }
             user.Email = newEmail;
             user.UserName = newEmail;
@@ -1350,7 +1350,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var updateResult = await users.UpdateAsync(user);
         if (!updateResult.Succeeded)
         {
-            throw new ShopException(string.Join(" ", updateResult.Errors.Select(e => e.Description)));
+            throw new InvalidOperationException(string.Join(" ", updateResult.Errors.Select(e => e.Description)));
         }
 
         var existingClaims = await users.GetClaimsAsync(user);
@@ -1370,21 +1370,21 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     public async Task AdminResetPasswordAsync(AdminUserPasswordResetForm input)
     {
         Validate(input);
-        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new ShopException("User not found.");
+        var user = await users.FindByIdAsync(input.Id.ToString()) ?? throw new InvalidOperationException("User not found.");
 
         if (await users.HasPasswordAsync(user))
         {
             var removeResult = await users.RemovePasswordAsync(user);
             if (!removeResult.Succeeded)
             {
-                throw new ShopException(string.Join(" ", removeResult.Errors.Select(e => e.Description)));
+                throw new InvalidOperationException(string.Join(" ", removeResult.Errors.Select(e => e.Description)));
             }
         }
 
         var addResult = await users.AddPasswordAsync(user, input.NewPassword);
         if (!addResult.Succeeded)
         {
-            throw new ShopException(string.Join(" ", addResult.Errors.Select(e => e.Description)));
+            throw new InvalidOperationException(string.Join(" ", addResult.Errors.Select(e => e.Description)));
         }
 
         await users.UpdateSecurityStampAsync(user);
@@ -1392,12 +1392,12 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
 
     public async Task ToggleEmailConfirmationAsync(int userId)
     {
-        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new ShopException("User not found.");
+        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new InvalidOperationException("User not found.");
         user.EmailConfirmed = !user.EmailConfirmed;
         var result = await users.UpdateAsync(user);
         if (!result.Succeeded)
         {
-            throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+            throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
         }
     }
 
@@ -1405,9 +1405,9 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
     {
         if (userId == actorId)
         {
-            throw new ShopException("You cannot lock out your own administrator account.");
+            throw new InvalidOperationException("You cannot lock out your own administrator account.");
         }
-        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new ShopException("User not found.");
+        var user = await users.FindByIdAsync(userId.ToString()) ?? throw new InvalidOperationException("User not found.");
 
         var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
         if (isLocked)
@@ -1434,7 +1434,7 @@ public sealed class AdminService(AppDbContext db, UserManager<User> users, Hybri
         var result = await users.CreateAsync(user, input.Password);
         if (!result.Succeeded)
         {
-            throw new ShopException(string.Join(" ", result.Errors.Select(e => e.Description)));
+            throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
         }
         return user.Id;
     }

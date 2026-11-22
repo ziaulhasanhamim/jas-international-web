@@ -55,6 +55,12 @@ public static class ResultHttpExtensions
             };
     }
 
+    extension (Error error)
+    {
+        public IResult ToHttpResult() =>
+            ((Result)error).ToHttpResult();
+    }
+
     extension <T>(Task<Result<T>> resultTask)
     {
         public async Task<IResult> ToHttpResultAsync(Func<T, IResult>? onSuccess = null)

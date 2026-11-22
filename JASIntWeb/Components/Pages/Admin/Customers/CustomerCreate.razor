@@ -100,15 +100,16 @@
     private async Task Save()
     {
         error = null;
-        try
+        var res = await Session.RunAsync((s, _) => s.CreateUserByAdminAsync(Input!));
+        switch (res)
         {
-            var id = await Session.RunAsync((s, _) => s.CreateUserByAdminAsync(Input!));
-            Nav.NavigateTo($"/admin/users/{id}/edit");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
-            Input!.Password = "";
+            case int id:
+                Nav.NavigateTo($"/admin/users/{id}/edit");
+                break;
+            case Error ex:
+                error = ex.Message;
+                Input!.Password = "";
+                break;
         }
     }
 }

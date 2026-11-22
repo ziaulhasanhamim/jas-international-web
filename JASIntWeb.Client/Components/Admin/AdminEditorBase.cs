@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.JSInterop;
 using JASIntWeb.Client.Contracts;
+using JASIntWeb.Helpers;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 namespace JASIntWeb.Client.Components.Admin;
@@ -44,26 +45,37 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
     protected bool AccessDenied;
     private int uploads;
     protected bool Busy => AccessDenied || saving || uploads > 0 || !RendererInfo.IsInteractive;
-    protected abstract Task<AdminEditorData<T>> LoadAsync();
-    protected abstract Task<AdminSaveResult> SaveAsync(T input);
+    protected abstract Task<Result<AdminEditorData<T>>> LoadAsync();
+    protected abstract Task<Result<AdminSaveResult>> SaveAsync(T input);
     protected override async Task OnInitializedAsync()
     {
         var key = $"admin-editor:{GetType().Name}:{Id}";
         try
         {
             if (State.TryTakeFromJson<AdminEditorData<T>>(key, out var existing)) Snapshot = existing;
-            Snapshot ??= await LoadAsync();
-            Input = Snapshot!.Input;
-            EditContext = new(Input);
-            messages = new(EditContext);
-            EditContext.OnValidationRequested += ClearServerValidation;
-            subscription = State.RegisterOnPersisting(() => { State.PersistAsJson(key, Snapshot); return Task.CompletedTask; }, new Microsoft.AspNetCore.Components.Web.InteractiveAutoRenderMode());
-        }
-        catch (AdminCatalogException failure)
-        {
-            notFound = failure.Status == 404;
-            AccessDenied = failure.Status is 401 or 403;
-            error = failure.Message;
+            if (Snapshot is null)
+            {
+                var loadRes = await LoadAsync();
+                switch (loadRes)
+                {
+                    case AdminEditorData<T> data:
+                        Snapshot = data;
+                        break;
+                    case Error failure:
+                        notFound = failure.Code == 404;
+                        AccessDenied = failure.Code is 401 or 403;
+                        error = failure.Message;
+                        break;
+                }
+            }
+            if (Snapshot is not null)
+            {
+                Input = Snapshot.Input;
+                EditContext = new(Input);
+                messages = new(EditContext);
+                EditContext.OnValidationRequested += ClearServerValidation;
+                subscription = State.RegisterOnPersisting(() => { State.PersistAsJson(key, Snapshot); return Task.CompletedTask; }, new Microsoft.AspNetCore.Components.Web.InteractiveAutoRenderMode());
+            }
         }
         catch (HttpRequestException)
         {
@@ -125,21 +137,25 @@ public abstract class AdminEditorBase<T> : ComponentBase, IDisposable where T : 
         messages?.Clear();
         try
         {
-            var saved = await SaveAsync(Input);
-            HasUnsavedChanges = false;
-            RestoredFromDraft = false;
-            try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (JSException) { }
-            try { await JS.InvokeVoidAsync("jasAdminDrafts.clear"); } catch (JSException) { }
-            await InvokeAsync(StateHasChanged);
-            Nav.NavigateTo(saved.RedirectUrl);
-        }
-        catch (AdminCatalogException failure)
-        {
-            AccessDenied = failure.Status is 401 or 403;
-            error = failure.Message;
-            if (failure.Errors is not null && EditContext is not null)
-                foreach (var (name, errors) in failure.Errors) messages!.Add(EditContext.Field(name), errors);
-            EditContext?.NotifyValidationStateChanged();
+            var saveRes = await SaveAsync(Input);
+            switch (saveRes)
+            {
+                case AdminSaveResult saved:
+                    HasUnsavedChanges = false;
+                    RestoredFromDraft = false;
+                    try { await JS.InvokeVoidAsync("jasAdminDrafts.remove", GetDraftStorageKey()); } catch (JSException) { }
+                    try { await JS.InvokeVoidAsync("jasAdminDrafts.clear"); } catch (JSException) { }
+                    await InvokeAsync(StateHasChanged);
+                    Nav.NavigateTo(saved.RedirectUrl);
+                    break;
+                case Error failure:
+                    AccessDenied = failure.Code is 401 or 403;
+                    error = failure.Message;
+                    if (failure.ValidationErrors is not null && EditContext is not null)
+                        foreach (var (name, errors) in failure.ValidationErrors) messages!.Add(EditContext.Field(name), errors);
+                    EditContext?.NotifyValidationStateChanged();
+                    break;
+            }
         }
         catch (HttpRequestException) { error = "The connection failed. Your entered values are still here. Try again."; }
         finally { saving = false; }

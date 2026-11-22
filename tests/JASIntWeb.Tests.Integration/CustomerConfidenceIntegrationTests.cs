@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
 using JASIntWeb.Persistence;
 using JASIntWeb.Services;
 using JASIntWeb.Tests.Integration.Infrastructure;
@@ -30,7 +31,7 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
     {
         await using var scope = CreateScope();
         var result = await scope.ServiceProvider.GetRequiredService<ShoppingService>().CheckoutAsync(userId, Request());
-        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Orders.AsNoTracking().SingleAsync(o => o.Id == result.OrderId);
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Orders.AsNoTracking().SingleAsync(o => o.Id == result.Unwrap().OrderId);
     }
 
     [Test]
@@ -108,8 +109,8 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         async Task<bool> Checkout()
         {
             await using var scope = CreateScope();
-            try { await scope.ServiceProvider.GetRequiredService<ShoppingService>().CheckoutAsync(null, Request("LASTONE")); return true; }
-            catch (ShopException) { return false; }
+            var res = await scope.ServiceProvider.GetRequiredService<ShoppingService>().CheckoutAsync(null, Request("LASTONE"));
+            return res.IsSuccess;
         }
         var results = await Task.WhenAll(Checkout(), Checkout());
         await results.Count(x => x).Should().BeEqualTo(1);
@@ -131,8 +132,8 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         async Task<bool> Checkout()
         {
             await using var scope = CreateScope();
-            try { await scope.ServiceProvider.GetRequiredService<ShoppingService>().CheckoutAsync(null, Request()); return true; }
-            catch (ShopException) { return false; }
+            var res = await scope.ServiceProvider.GetRequiredService<ShoppingService>().CheckoutAsync(null, Request());
+            return res.IsSuccess;
         }
         await (await Task.WhenAll(Checkout(), Checkout())).Count(x => x).Should().BeEqualTo(1);
         await using var verify = CreateScope(); var database = verify.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -294,9 +295,9 @@ public class CustomerConfidenceIntegrationTests : JasIntegrationTestBase
         await error.Headers.Location.OriginalString.Contains("private-provider-error").Should().BeFalse();
     }
 
-    private static async Task ExpectShopError(Func<Task<Order>> action)
+    private static async Task ExpectShopError(Func<Task<Result<Order>>> action)
     {
-        var rejected = false; try { await action(); } catch (ShopException) { rejected = true; }
-        await rejected.Should().BeTrue();
+        var result = await action();
+        await result.IsFailure.Should().BeTrue();
     }
 }

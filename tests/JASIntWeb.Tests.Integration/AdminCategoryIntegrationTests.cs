@@ -70,7 +70,7 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
     }
 
     [Test]
-    public async Task DeleteCategoryAsync_WithActiveProducts_ThrowsShopException()
+    public async Task DeleteCategoryAsync_WithActiveProducts_Throws()
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminService>();
@@ -92,8 +92,8 @@ public class AdminCategoryIntegrationTests : JasIntegrationTestBase
         db.Products.Add(prod);
         await db.SaveChangesAsync();
 
-        // Attempting to permanently delete category containing active products should throw ShopException!
-        await Assert.ThrowsAsync<ShopException>(() => admin.DeleteCategoryAsync(cat.Id, permanent: true));
+        // Attempting to permanently delete category containing active products should throw!
+        await Assert.ThrowsAsync<InvalidOperationException>(() => admin.DeleteCategoryAsync(cat.Id, permanent: true));
 
         // Category still exists
         var checkCat = await db.Categories.AsNoTracking().SingleOrDefaultAsync(c => c.Id == cat.Id);

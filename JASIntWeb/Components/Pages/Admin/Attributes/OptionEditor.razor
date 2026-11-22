@@ -105,16 +105,17 @@ else
 
     private async Task Save()
     {
-        try
+        Input!.Id = Id;
+        Input.AttributeDefinitionId = AttributeId;
+        var res = await Session.RunAsync(s => s.SaveOptionAsync(Input));
+        switch (res)
         {
-            Input!.Id = Id;
-            Input.AttributeDefinitionId = AttributeId;
-            await Session.RunAsync(s => s.SaveOptionAsync(Input));
-            Nav.NavigateTo($"/admin/attributes/{AttributeId}/options");
-        }
-        catch (ShopException ex)
-        {
-            error = ex.Message;
+            case Success:
+                Nav.NavigateTo($"/admin/attributes/{AttributeId}/options");
+                break;
+            case Error ex:
+                error = ex.Message;
+                break;
         }
     }
 }

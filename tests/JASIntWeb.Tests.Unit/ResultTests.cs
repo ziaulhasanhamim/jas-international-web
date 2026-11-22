@@ -221,12 +221,10 @@ public class ResultTests
         };
         await shopMsg.Should().BeEqualTo("Shop: Insufficient stock for variant");
 
-        // ShopException <-> ShopError conversion
-        ShopException shopEx = new("Item limit reached");
-        ShopError convertedShopErr = shopEx;
-        await convertedShopErr.Message.Should().BeEqualTo("Item limit reached");
-        ShopException backToShopEx = convertedShopErr;
-        await backToShopEx.Message.Should().BeEqualTo("Item limit reached");
+        // ShopError properties
+        ShopError shopErr = new("Item limit reached", 400);
+        await shopErr.Message.Should().BeEqualTo("Item limit reached");
+        await shopErr.Code.Should().BeEqualTo(400);
 
         // CommerceError
         Result commerceFailure = Error.Commerce("Session timed out", 401);
@@ -238,10 +236,10 @@ public class ResultTests
         };
         await commerceMsg.Should().BeEqualTo("Commerce (401): Session timed out");
 
-        // CommerceException <-> CommerceError conversion
-        CommerceException commEx = new("Cart expired");
-        CommerceError convertedCommErr = commEx;
-        await convertedCommErr.Message.Should().BeEqualTo("Cart expired");
+        // CommerceError properties
+        CommerceError commErr = new("Cart expired", 410);
+        await commErr.Message.Should().BeEqualTo("Cart expired");
+        await commErr.Status.Should().BeEqualTo(410);
 
         // CatalogError
         Result catalogFailure = Error.Catalog("Category slug already taken", 409);
