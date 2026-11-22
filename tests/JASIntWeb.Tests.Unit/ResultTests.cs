@@ -129,6 +129,63 @@ public class ResultTests
     }
 
     [Test]
+    public async Task NonGenericResult_RepresentsSuccessOrError_PatternMatchesExhaustively()
+    {
+        // On valid result, somebody returns Result.Success
+        static Result PerformAction(bool succeed)
+        {
+            if (succeed)
+            {
+                return Result.Success;
+            }
+            return Error.Validation("Action failed");
+        }
+
+        Result ok = PerformAction(true);
+        await ok.IsSuccess.Should().BeTrue();
+        await ok.IsFailure.Should().BeFalse();
+
+        string okMessage = ok switch
+        {
+            Success => "Completed successfully",
+            Error err => $"Failed: {err.Message}"
+        };
+        await okMessage.Should().BeEqualTo("Completed successfully");
+
+        Result fail = PerformAction(false);
+        await fail.IsSuccess.Should().BeFalse();
+        await fail.IsFailure.Should().BeTrue();
+
+        string failMessage = fail switch
+        {
+            Success => "Completed successfully",
+            ValidationError ve => $"Validation error: {ve.Message}",
+            Error err => $"Failed: {err.Message}"
+        };
+        await failMessage.Should().BeEqualTo("Validation error: Action failed");
+    }
+
+    [Test]
+    public async Task NonGenericResult_CombinatorsAndChaining()
+    {
+        var sideEffectRun = false;
+        Result ok = Result.Success;
+        ok.Tap(() => sideEffectRun = true);
+        await sideEffectRun.Should().BeTrue();
+
+        // Chaining Result -> Result<T>
+        var chained = ok.Bind(() => Result<string>.Success("payload"));
+        await chained.IsSuccess.Should().BeTrue();
+        await chained.ValueOrDefault().Should().BeEqualTo("payload");
+
+        // Chaining failure
+        Result fail = Error.NotFound("Resource missing");
+        var failedChain = fail.Bind(() => Result<string>.Success("never called"));
+        await failedChain.IsFailure.Should().BeTrue();
+        await (failedChain.Value as Error)!.Message.Should().BeEqualTo("Resource missing");
+    }
+
+    [Test]
     public async Task CourierLogistics_TrackingResultUnion_PatternMatchesExhaustively()
     {
         var courier = new CourierLogisticsService();

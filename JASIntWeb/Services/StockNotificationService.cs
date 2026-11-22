@@ -19,7 +19,7 @@ public sealed class StockNotificationService(AppDbContext db, IStockNotification
 {
     public bool MailConfigured => mail.IsConfigured;
 
-    public async Task<Result<Success>> TrySubscribeAsync(int variantId, string email, CancellationToken ct = default)
+    public async Task<Result> TrySubscribeAsync(int variantId, string email, CancellationToken ct = default)
     {
         email = email.Trim();
         if (email.Length > 254 || !MailAddress.TryCreate(email, out var address) || address.Address != email)
@@ -30,7 +30,7 @@ public sealed class StockNotificationService(AppDbContext db, IStockNotification
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({$"stock:{variantId}:{normalized}"}, 0))", ct);
         if (await db.StockNotifications.AnyAsync(x => x.ProductVariantId == variantId && x.NormalizedEmail == normalized
             && (x.Status == StockNotificationStatus.Pending || x.Status == StockNotificationStatus.Active || x.Status == StockNotificationStatus.Failed), ct))
-            return Success.Ok;
+            return Result.Success;
         var variant = await db.ProductVariants.AsNoTracking().Where(v => v.Id == variantId && v.IsActive && !v.IsDeleted
             && !v.Product!.IsDeleted && !v.Product.Category!.IsDeleted && (v.Product.Category.ParentCategory == null || !v.Product.Category.ParentCategory.IsDeleted)).SingleOrDefaultAsync(ct);
         if (variant == null) return Error.NotFound("This product option is unavailable.");
@@ -38,7 +38,7 @@ public sealed class StockNotificationService(AppDbContext db, IStockNotification
         db.StockNotifications.Add(new StockNotification { ProductVariantId = variantId, Email = email, NormalizedEmail = normalized, Status = StockNotificationStatus.Pending });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Success.Ok;
+        return Result.Success;
     }
 
     public async Task SubscribeAsync(int variantId, string email, CancellationToken ct = default)

@@ -7,105 +7,110 @@ namespace JASIntWeb.Endpoints;
 
 public static class CustomerConfidenceEndpoints
 {
-    extension (IEndpointRouteBuilder endpoints)
+    extension(IEndpointRouteBuilder endpoints)
     {
         public void MapCustomerConfidenceEndpoints()
         {
-        endpoints.MapPost("/stock-notifications", async (HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>
-        {
-            if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
-            var form = await context.Request.ReadFormAsync(ct);
-            if (!int.TryParse(form["variantId"], out var variantId)) return Results.BadRequest("Choose a product option.");
-            var result = await notifications.TrySubscribeAsync(variantId, form["email"].ToString(), ct);
-            return result switch
+            endpoints.MapPost("/stock-notifications", async (HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>
             {
-                Success => Results.Redirect("/stock-notifications/requested"),
-                Error error => Results.BadRequest(error.Message)
-            };
-        }).WithSummary("Request an email confirmation for a sold-out product option.");
-
-        endpoints.MapPost("/stock-notifications/{token:guid}/{action}", async (Guid token, string action, HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>
-        {
-            if (action is not ("confirm" or "unsubscribe")) return Results.NotFound();
-            if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
-            await notifications.ChangePreferenceAsync(token, action == "confirm", ct);
-            return Results.Redirect($"/stock-notifications/{token}/{action}?done=1");
-        }).WithSummary("Confirm or cancel a stock alert after explicit form submission.");
-
-        endpoints.MapPost("/api/admin/stock-notifications/{id:int}/retry", async (int id, HttpContext context, AppDbContext db, IAntiforgery csrf, CancellationToken ct) =>
-        {
-            if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
-            await db.StockNotifications.Where(x => x.Id == id && x.Status == StockNotificationStatus.Failed)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, x => x.ConfirmedAt == null ? StockNotificationStatus.Pending : StockNotificationStatus.Active)
-                    .SetProperty(x => x.Attempts, 0).SetProperty(x => x.NextAttemptAt, DateTimeOffset.UtcNow)
-                    .SetProperty(x => x.LastError, (string?)null), ct);
-            return Results.Redirect("/admin/stock-notifications");
-        }).RequireAuthorization("AdminOnly");
-
-        endpoints.MapPost("/products/{id:int}/reviews", async (int id, HttpContext context, AppDbContext db, IAntiforgery csrf, CancellationToken ct) =>
-        {
-            var isAjax = IsAjax(context);
-            if (!await ValidFormAsync(context, csrf))
-            {
-                if (isAjax) return Results.BadRequest(new { success = false, message = "Security token expired. Please refresh the page and try again." });
-                return Results.BadRequest("Refresh the page and try again.");
-            }
-            var form = await context.Request.ReadFormAsync(ct);
-            var name = form["Name"].ToString().Trim();
-            var email = form["Email"].ToString().Trim();
-            var title = form["Title"].ToString().Trim();
-            var comment = form["Comment"].ToString().Trim();
-            if (name.Length is < 2 or > 100 || comment.Length is < 10 or > 3000 || title.Length > 150
-                || !int.TryParse(form["Rating"], out var rating) || rating is < 1 or > 5
-                || (email.Length > 0 && (email.Length > 254 || !new EmailAddressAttribute().IsValid(email))))
-            {
-                var msg = "Enter your name, a rating from 1 to 5, and a review between 10 and 3000 characters.";
-                if (isAjax) return Results.BadRequest(new { success = false, message = msg });
-                return Results.BadRequest(msg);
-            }
-            var product = await db.Products.AsNoTracking().Where(p => p.Id == id && !p.IsDeleted && !p.Category!.IsDeleted)
-                .Select(p => new { p.Slug }).SingleOrDefaultAsync(ct);
-            if (product == null)
-            {
-                if (isAjax) return Results.NotFound(new { success = false, message = "Product not found." });
-                return Results.NotFound();
-            }
-            var userId = ShoppingService.UserId(context.User);
-            var verified = userId.HasValue && await db.Orders.AnyAsync(o => o.UserId == userId && o.Status == OrderStatus.Delivered
-                && o.Items.Any(i => i.ProductVariant!.ProductId == id), ct);
-            var review = new ProductReview
-            {
-                ProductId = id, CustomerName = name, CustomerEmail = email.Length == 0 ? null : email,
-                Title = title.Length == 0 ? null : title, Comment = comment, Rating = rating,
-                IsApproved = false, IsVerifiedPurchase = verified
-            };
-            db.ProductReviews.Add(review);
-            await db.SaveChangesAsync(ct);
-
-            if (isAjax)
-            {
-                return Results.Ok(new
+                if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
+                var form = await context.Request.ReadFormAsync(ct);
+                if (!int.TryParse(form["variantId"], out var variantId)) return Results.BadRequest("Choose a product option.");
+                var result = await notifications.TrySubscribeAsync(variantId, form["email"].ToString(), ct);
+                return result switch
                 {
-                    success = true,
-                    message = "Thank you! Your review has been submitted and is awaiting moderation.",
-                    review = new
-                    {
-                        id = review.Id,
-                        customerName = name,
-                        rating = rating,
-                        title = title.Length == 0 ? null : title,
-                        comment = comment,
-                        createdAt = DateTimeOffset.UtcNow.ToString("dd MMM yyyy"),
-                        isApproved = false,
-                        isVerifiedPurchase = verified
-                    }
-                });
-            }
+                    Success => Results.Redirect("/stock-notifications/requested"),
+                    Error error => Results.BadRequest(error.Message)
+                };
+            }).WithSummary("Request an email confirmation for a sold-out product option.");
 
-            return Results.Redirect($"/product/{Uri.EscapeDataString(product.Slug)}?review=submitted#reviews");
-        }).WithSummary("Submit a product review for moderation.");
+            endpoints.MapPost("/stock-notifications/{token:guid}/{action}", async (Guid token, string action, HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>
+            {
+                if (action is not ("confirm" or "unsubscribe")) return Results.NotFound();
+                if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
+                await notifications.ChangePreferenceAsync(token, action == "confirm", ct);
+                return Results.Redirect($"/stock-notifications/{token}/{action}?done=1");
+            }).WithSummary("Confirm or cancel a stock alert after explicit form submission.");
+
+            endpoints.MapPost("/api/admin/stock-notifications/{id:int}/retry", async (int id, HttpContext context, AppDbContext db, IAntiforgery csrf, CancellationToken ct) =>
+            {
+                if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
+                await db.StockNotifications.Where(x => x.Id == id && x.Status == StockNotificationStatus.Failed)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, x => x.ConfirmedAt == null ? StockNotificationStatus.Pending : StockNotificationStatus.Active)
+                        .SetProperty(x => x.Attempts, 0).SetProperty(x => x.NextAttemptAt, DateTimeOffset.UtcNow)
+                        .SetProperty(x => x.LastError, (string?)null), ct);
+                return Results.Redirect("/admin/stock-notifications");
+            }).RequireAuthorization("AdminOnly");
+
+            endpoints.MapPost("/products/{id:int}/reviews", async (int id, HttpContext context, AppDbContext db, IAntiforgery csrf, CancellationToken ct) =>
+            {
+                var isAjax = IsAjax(context);
+                if (!await ValidFormAsync(context, csrf))
+                {
+                    if (isAjax) return Results.BadRequest(new { success = false, message = "Security token expired. Please refresh the page and try again." });
+                    return Results.BadRequest("Refresh the page and try again.");
+                }
+                var form = await context.Request.ReadFormAsync(ct);
+                var name = form["Name"].ToString().Trim();
+                var email = form["Email"].ToString().Trim();
+                var title = form["Title"].ToString().Trim();
+                var comment = form["Comment"].ToString().Trim();
+                if (name.Length is < 2 or > 100 || comment.Length is < 10 or > 3000 || title.Length > 150
+                    || !int.TryParse(form["Rating"], out var rating) || rating is < 1 or > 5
+                    || (email.Length > 0 && (email.Length > 254 || !new EmailAddressAttribute().IsValid(email))))
+                {
+                    var msg = "Enter your name, a rating from 1 to 5, and a review between 10 and 3000 characters.";
+                    if (isAjax) return Results.BadRequest(new { success = false, message = msg });
+                    return Results.BadRequest(msg);
+                }
+                var product = await db.Products.AsNoTracking().Where(p => p.Id == id && !p.IsDeleted && !p.Category!.IsDeleted)
+                    .Select(p => new { p.Slug }).SingleOrDefaultAsync(ct);
+                if (product == null)
+                {
+                    if (isAjax) return Results.NotFound(new { success = false, message = "Product not found." });
+                    return Results.NotFound();
+                }
+                var userId = ShoppingService.UserId(context.User);
+                var verified = userId.HasValue && await db.Orders.AnyAsync(o => o.UserId == userId && o.Status == OrderStatus.Delivered
+                    && o.Items.Any(i => i.ProductVariant!.ProductId == id), ct);
+                var review = new ProductReview
+                {
+                    ProductId = id,
+                    CustomerName = name,
+                    CustomerEmail = email.Length == 0 ? null : email,
+                    Title = title.Length == 0 ? null : title,
+                    Comment = comment,
+                    Rating = rating,
+                    IsApproved = false,
+                    IsVerifiedPurchase = verified
+                };
+                db.ProductReviews.Add(review);
+                await db.SaveChangesAsync(ct);
+
+                if (isAjax)
+                {
+                    return Results.Ok(new
+                    {
+                        success = true,
+                        message = "Thank you! Your review has been submitted and is awaiting moderation.",
+                        review = new
+                        {
+                            id = review.Id,
+                            customerName = name,
+                            rating = rating,
+                            title = title.Length == 0 ? null : title,
+                            comment = comment,
+                            createdAt = DateTimeOffset.UtcNow.ToString("dd MMM yyyy"),
+                            isApproved = false,
+                            isVerifiedPurchase = verified
+                        }
+                    });
+                }
+
+                return Results.Redirect($"/product/{Uri.EscapeDataString(product.Slug)}?review=submitted#reviews");
+            }).WithSummary("Submit a product review for moderation.");
+        }
     }
-}
 
     private static bool IsAjax(HttpContext context) =>
         context.Request.Headers.Accept.ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase)

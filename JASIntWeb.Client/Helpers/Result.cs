@@ -51,6 +51,47 @@ public readonly record struct Success(string Message = "")
     public static readonly Success Ok = new("");
 }
 
+public union Result(Success, Error)
+{
+    public bool IsSuccess => Value is Success;
+    public bool IsFailure => Value is Error;
+
+    public bool TryGetError([NotNullWhen(true)] out Error? error)
+    {
+        if (Value is Error err)
+        {
+            error = err;
+            return true;
+        }
+
+        error = null;
+        return false;
+    }
+
+    public R Match<R>(Func<R> onSuccess, Func<Error, R> onError) =>
+        this switch
+        {
+            JASIntWeb.Helpers.Success => onSuccess(),
+            Error err => onError(err)
+        };
+
+    public Result Tap(Action onSuccess)
+    {
+        if (Value is Success) onSuccess();
+        return this;
+    }
+
+    public Result TapError(Action<Error> onError)
+    {
+        if (Value is Error err) onError(err);
+        return this;
+    }
+
+    public static Success Success => Success.Ok;
+    public static Result Failure(Error error) => error;
+    public static Result Failure(string message, int code = 400) => new Error(message, code);
+}
+
 public union Result<T>(T, Error)
 {
     public bool IsSuccess => Value is T;
@@ -80,6 +121,13 @@ public union Result<T>(T, Error)
         };
 
     public Result<U> Bind<U>(Func<T, Result<U>> binder) =>
+        this switch
+        {
+            T val => binder(val),
+            Error err => err
+        };
+
+    public Result Bind(Func<T, Result> binder) =>
         this switch
         {
             T val => binder(val),
@@ -121,6 +169,80 @@ public union Result<T>(T, Error)
 
 public static class ResultExtensions
 {
+    extension (Result source)
+    {
+        public Result Bind(Func<Result> binder) =>
+            source switch
+            {
+                Success => binder(),
+                Error err => err
+            };
+
+        public Result<T> Bind<T>(Func<Result<T>> binder) =>
+            source switch
+            {
+                Success => binder(),
+                Error err => err
+            };
+
+        public async Task<Result> BindAsync(Func<Task<Result>> binder) =>
+            source switch
+            {
+                Success => await binder(),
+                Error err => err
+            };
+
+        public async Task<Result<T>> BindAsync<T>(Func<Task<Result<T>>> binder) =>
+            source switch
+            {
+                Success => await binder(),
+                Error err => err
+            };
+    }
+
+    extension (Task<Result> task)
+    {
+        public async Task<Result> BindAsync(Func<Result> binder)
+        {
+            var result = await task;
+            return result.Bind(binder);
+        }
+
+        public async Task<Result> BindAsync(Func<Task<Result>> binder)
+        {
+            var result = await task;
+            return await result.BindAsync(binder);
+        }
+
+        public async Task<Result<T>> BindAsync<T>(Func<Result<T>> binder)
+        {
+            var result = await task;
+            return result.Bind(binder);
+        }
+
+        public async Task<Result<T>> BindAsync<T>(Func<Task<Result<T>>> binder)
+        {
+            var result = await task;
+            return await result.BindAsync(binder);
+        }
+
+        public async Task<R> MatchAsync<R>(Func<R> onSuccess, Func<Error, R> onError)
+        {
+            var result = await task;
+            return result.Match(onSuccess, onError);
+        }
+
+        public async Task<R> MatchAsync<R>(Func<Task<R>> onSuccess, Func<Error, Task<R>> onError)
+        {
+            var result = await task;
+            return await (result switch
+            {
+                Success => onSuccess(),
+                Error err => onError(err)
+            });
+        }
+    }
+
     extension <T>(Result<T> source)
     {
         public Result<U> Select<U>(Func<T, U> selector) =>
@@ -137,6 +259,13 @@ public static class ResultExtensions
             };
 
         public async Task<Result<U>> BindAsync<U>(Func<T, Task<Result<U>>> binder) =>
+            source switch
+            {
+                T val => await binder(val),
+                Error err => err
+            };
+
+        public async Task<Result> BindAsync(Func<T, Task<Result>> binder) =>
             source switch
             {
                 T val => await binder(val),
@@ -168,6 +297,26 @@ public static class ResultExtensions
         {
             var result = await task;
             return await result.BindAsync(binder);
+        }
+
+        public async Task<Result> BindAsync(Func<T, Result> binder)
+        {
+            var result = await task;
+            return result switch
+            {
+                T val => binder(val),
+                Error err => err
+            };
+        }
+
+        public async Task<Result> BindAsync(Func<T, Task<Result>> binder)
+        {
+            var result = await task;
+            return await (result switch
+            {
+                T val => binder(val),
+                Error err => Task.FromResult<Result>(err)
+            });
         }
 
         public async Task<R> MatchAsync<R>(Func<T, R> onSuccess, Func<Error, R> onError)

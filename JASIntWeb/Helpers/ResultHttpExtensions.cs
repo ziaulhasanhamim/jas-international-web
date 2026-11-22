@@ -6,6 +6,31 @@ namespace JASIntWeb.Helpers;
 
 public static class ResultHttpExtensions
 {
+    extension (Result result)
+    {
+        public IResult ToHttpResult(Func<IResult>? onSuccess = null) =>
+            result switch
+            {
+                Success => onSuccess != null ? onSuccess() : Results.Ok(),
+                NotFoundError nf => Results.NotFound(new { message = nf.Message }),
+                ValidationError ve => Results.BadRequest(new { message = ve.Message, errors = ve.Errors }),
+                ConflictError ce => Results.Conflict(new { message = ce.Message }),
+                UnauthorizedError => Results.Unauthorized(),
+                ForbiddenError => Results.Forbid(),
+                UnexpectedError ue => Results.Problem(detail: ue.Message, statusCode: 500),
+                Error err => Results.Problem(detail: err.Message, statusCode: err.Code > 0 ? err.Code : 400)
+            };
+    }
+
+    extension (Task<Result> task)
+    {
+        public async Task<IResult> ToHttpResultAsync(Func<IResult>? onSuccess = null)
+        {
+            var result = await task;
+            return result.ToHttpResult(onSuccess);
+        }
+    }
+
     extension <T>(Result<T> result)
     {
         public IResult ToHttpResult(Func<T, IResult>? onSuccess = null) =>
