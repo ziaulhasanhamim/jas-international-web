@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using JASIntWeb.Helpers;
 
 namespace JASIntWeb.Services;
 
@@ -18,25 +19,36 @@ public sealed class StockNotificationService(AppDbContext db, IStockNotification
 {
     public bool MailConfigured => mail.IsConfigured;
 
-    public async Task SubscribeAsync(int variantId, string email, CancellationToken ct = default)
+    public async Task<Result<Success>> TrySubscribeAsync(int variantId, string email, CancellationToken ct = default)
     {
         email = email.Trim();
         if (email.Length > 254 || !MailAddress.TryCreate(email, out var address) || address.Address != email)
-            throw new ShopException("Enter a valid email address.");
-        if (!mail.IsConfigured) throw new ShopException("Email notifications are temporarily unavailable. Please contact the store.");
+            return Error.Validation("Enter a valid email address.");
+        if (!mail.IsConfigured) return Error.Failure("Email notifications are temporarily unavailable. Please contact the store.", 503);
         var normalized = email.ToUpperInvariant();
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({$"stock:{variantId}:{normalized}"}, 0))", ct);
         if (await db.StockNotifications.AnyAsync(x => x.ProductVariantId == variantId && x.NormalizedEmail == normalized
             && (x.Status == StockNotificationStatus.Pending || x.Status == StockNotificationStatus.Active || x.Status == StockNotificationStatus.Failed), ct))
-            return;
+            return Success.Ok;
         var variant = await db.ProductVariants.AsNoTracking().Where(v => v.Id == variantId && v.IsActive && !v.IsDeleted
             && !v.Product!.IsDeleted && !v.Product.Category!.IsDeleted && (v.Product.Category.ParentCategory == null || !v.Product.Category.ParentCategory.IsDeleted)).SingleOrDefaultAsync(ct);
-        if (variant == null) throw new ShopException("This product option is unavailable.");
-        if (await AvailableAsync(variantId, ct)) throw new ShopException("This option is in stock. You can add it to your cart.");
+        if (variant == null) return Error.NotFound("This product option is unavailable.");
+        if (await AvailableAsync(variantId, ct)) return Error.Conflict("This option is in stock. You can add it to your cart.");
         db.StockNotifications.Add(new StockNotification { ProductVariantId = variantId, Email = email, NormalizedEmail = normalized, Status = StockNotificationStatus.Pending });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        return Success.Ok;
+    }
+
+    public async Task SubscribeAsync(int variantId, string email, CancellationToken ct = default)
+    {
+        var result = await TrySubscribeAsync(variantId, email, ct);
+        if (result switch { Success => false, Error => true })
+        {
+            var err = (Error)result.Value!;
+            throw new ShopException(err.Message);
+        }
     }
 
     public async Task<bool> ChangePreferenceAsync(Guid token, bool confirm, CancellationToken ct = default)

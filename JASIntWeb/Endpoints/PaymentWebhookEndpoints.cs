@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using JASIntWeb.Helpers;
 using JASIntWeb.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 namespace JASIntWeb.Endpoints;
@@ -49,18 +50,21 @@ public static class PaymentWebhookEndpoints
         if (matches is not [var orderId])
             return TypedResults.Conflict(new EndpointError("No unambiguous order match. Review this payment manually."));
 
-        try
+        var verifyResult = await shop.TryVerifyPaymentAsync(orderId, notification.Amount, notification.TransactionId);
+        return verifyResult switch
         {
-            var order = await shop.VerifyPaymentAsync(orderId, notification.Amount, notification.TransactionId);
-            logs.CreateLogger(nameof(PaymentWebhookEndpoints)).LogInformation("Payment verified for order {OrderId}.", order.Id);
-            return TypedResults.Ok(new PaymentWebhookResponse(true, true, order.Id, order.PaymentReferenceCode,
-                order.TransactionId, order.PaidAmount, order.Status.ToString(), "Verified",
-                "Payment verified. Fulfillment progress is managed separately by the store."));
-        }
-        catch (ShopException error)
-        {
-            return TypedResults.Conflict(new EndpointError(error.Message));
-        }
+            Order order => OnPaymentVerified(order, logs),
+            ValidationError validation => TypedResults.BadRequest(new EndpointError(validation.Message)),
+            Error error => TypedResults.Conflict(new EndpointError(error.Message))
+        };
+    }
+
+    private static WebhookResult OnPaymentVerified(Order order, ILoggerFactory logs)
+    {
+        logs.CreateLogger(nameof(PaymentWebhookEndpoints)).LogInformation("Payment verified for order {OrderId}.", order.Id);
+        return TypedResults.Ok(new PaymentWebhookResponse(true, true, order.Id, order.PaymentReferenceCode,
+            order.TransactionId, order.PaidAmount, order.Status.ToString(), "Verified",
+            "Payment verified. Fulfillment progress is managed separately by the store."));
     }
 
     private static bool HasValidSecret(string expected, string supplied) => CryptographicOperations.FixedTimeEquals(

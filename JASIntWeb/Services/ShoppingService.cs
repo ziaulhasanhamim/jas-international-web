@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using JASIntWeb.Helpers;
 using JASIntWeb.Middleware;
 using JASIntWeb.Services.Meta;
 using Microsoft.AspNetCore.Http;
@@ -765,7 +766,7 @@ public sealed class ShoppingService(
         return order;
     }
 
-    public async Task<Order> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
+    public async Task<Result<Order>> TryVerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync();
         var transactionId = verifiedTrxId?.Trim().ToUpperInvariant();
@@ -780,19 +781,19 @@ public sealed class ShoppingService(
             .FirstOrDefaultAsync(o => o.Id == orderId);
         if (order is null)
         {
-            throw new ShopException("Order not found.");
+            return Error.NotFound("Order not found.");
         }
 
         await db.Entry(order).ReloadAsync();
         foreach (var payment in order.Payments) await db.Entry(payment).ReloadAsync();
-        if (order.Status == OrderStatus.Cancelled) throw new ShopException("Cancelled orders cannot accept payment.");
+        if (order.Status == OrderStatus.Cancelled) return Error.Conflict("Cancelled orders cannot accept payment.");
         var dSettings = await deliverySettings.GetSettingsAsync();
         var amount = verifiedAmount ?? order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash)?.Amount ?? dSettings.AdvanceAmount;
         if (amount <= 0) amount = verifiedAmount ?? dSettings.AdvanceAmount;
         transactionId ??= order.TransactionId?.Trim().ToUpperInvariant();
-        if (amount <= 0 || amount > order.Total) throw new ShopException("Payment amount must be positive and cannot exceed the order total.");
+        if (amount <= 0 || amount > order.Total) return Error.Validation("Payment amount must be positive and cannot exceed the order total.");
         if (string.IsNullOrWhiteSpace(transactionId) || transactionId.Length < 6)
-            throw new ShopException("A valid transaction ID is required for verification.");
+            return Error.Validation("A valid transaction ID is required for verification.");
         var completed = order.Payments.FirstOrDefault(p => p.Method == PaymentMethod.Bkash && p.Status == PaymentStatus.Completed);
         if (completed != null)
         {
@@ -801,11 +802,11 @@ public sealed class ShoppingService(
                 await tx.CommitAsync();
                 return order;
             }
-            throw new ShopException("This order already has a verified payment. Review it manually.");
+            return Error.Conflict("This order already has a verified payment. Review it manually.");
         }
         if (await db.Payments.AnyAsync(p => p.OrderId != orderId && p.Method == PaymentMethod.Bkash
             && p.Status == PaymentStatus.Completed && p.ExternalReference == transactionId))
-            throw new ShopException("This transaction has already been verified against another order.");
+            return Error.Conflict("This transaction has already been verified against another order.");
         order.TransactionId = transactionId;
         order.PaidAmount = amount;
         order.UpdatedAt = DateTimeOffset.UtcNow;
@@ -853,6 +854,16 @@ public sealed class ShoppingService(
         }
 
         return order;
+    }
+
+    public async Task<Order> VerifyPaymentAsync(int orderId, decimal? verifiedAmount = null, string? verifiedTrxId = null)
+    {
+        var result = await TryVerifyPaymentAsync(orderId, verifiedAmount, verifiedTrxId);
+        return result switch
+        {
+            Order o => o,
+            Error err => throw new ShopException(err.Message)
+        };
     }
 
     public async Task<Order> UnverifyPaymentAsync(int orderId)

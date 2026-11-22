@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Antiforgery;
+using JASIntWeb.Helpers;
 using JASIntWeb.Services;
 using System.ComponentModel.DataAnnotations;
 
@@ -15,9 +16,12 @@ public static class CustomerConfidenceEndpoints
             if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
             var form = await context.Request.ReadFormAsync(ct);
             if (!int.TryParse(form["variantId"], out var variantId)) return Results.BadRequest("Choose a product option.");
-            try { await notifications.SubscribeAsync(variantId, form["email"].ToString(), ct); }
-            catch (ShopException error) { return Results.BadRequest(error.Message); }
-            return Results.Redirect("/stock-notifications/requested");
+            var result = await notifications.TrySubscribeAsync(variantId, form["email"].ToString(), ct);
+            return result switch
+            {
+                Success => Results.Redirect("/stock-notifications/requested"),
+                Error error => Results.BadRequest(error.Message)
+            };
         }).WithSummary("Request an email confirmation for a sold-out product option.");
 
         endpoints.MapPost("/stock-notifications/{token:guid}/{action}", async (Guid token, string action, HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>

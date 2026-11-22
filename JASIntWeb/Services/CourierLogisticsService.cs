@@ -2,6 +2,10 @@ namespace JASIntWeb.Services;
 
 public sealed record CourierOption(string Code, string Name, string BadgeColor, string TrackingUrlPattern);
 
+public sealed record TrackingUrl(string Url, string CourierName);
+public sealed record Untracked(string Reason);
+public union TrackingResult(TrackingUrl, Untracked);
+
 public sealed class CourierLogisticsService
 {
     public static readonly IReadOnlyList<CourierOption> AvailableCouriers =
@@ -14,6 +18,17 @@ public sealed class CourierLogisticsService
         new("inhouse", "JAS Express (In-House Rider)", "indigo", ""),
         new("pickup", "Showroom Pickup", "slate", "")
     ];
+
+    public TrackingResult ResolveTracking(string? courierName, string? trackingCode)
+    {
+        if (string.IsNullOrWhiteSpace(trackingCode))
+            return new Untracked("Missing tracking code.");
+
+        var url = GetTrackingUrl(courierName, trackingCode);
+        return string.IsNullOrEmpty(url)
+            ? new Untracked($"No online tracking page available for courier '{courierName ?? "Unknown"}'.")
+            : new TrackingUrl(url, courierName ?? "Courier");
+    }
 
     public string GetTrackingUrl(string? courierName, string? trackingCode)
     {
