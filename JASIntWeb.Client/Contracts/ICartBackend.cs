@@ -1,4 +1,6 @@
 using JASIntWeb.Client.Dtos;
+using JASIntWeb.Helpers;
+
 namespace JASIntWeb.Client.Contracts;
 
 public interface ICartBackend
@@ -16,4 +18,11 @@ public interface ICartBackend
     Task<DeliveryRatesDto> RatesAsync();
 }
 
-public sealed class CommerceException(string message) : Exception(message);
+public sealed class CommerceException : Exception
+{
+    public CommerceError Error { get; }
+    public CommerceException(string message, int code = 400) : base(message) => Error = new CommerceError(message, code);
+    public CommerceException(CommerceError error) : base(error.Message) => Error = error;
+    public static implicit operator CommerceError(CommerceException ex) => ex.Error;
+    public static implicit operator CommerceException(CommerceError error) => new(error);
+}

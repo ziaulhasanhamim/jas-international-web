@@ -26,7 +26,19 @@ public class Error
     public static UnauthorizedError Unauthorized(string message = "Unauthorized.") => new(message);
     public static ForbiddenError Forbidden(string message = "Forbidden.") => new(message);
     public static UnexpectedError Unexpected(string message, Exception? inner = null) => new(message, inner);
+    public static ShopError Shop(string message, int code = 400) => new(message, code);
+    public static CommerceError Commerce(string message, int code = 400) => new(message, code);
+    public static CatalogError Catalog(string message, int code = 400, Dictionary<string, string[]>? errors = null) => new(message, code, errors);
+    public static ImageValidationError Image(string message, int code = 400) => new(message, code);
 }
+
+public class ShopError(string message, int code = 400) : Error(message, code);
+
+public class CommerceError(string message, int code = 400) : Error(message, code);
+
+public class CatalogError(string message, int code = 400, Dictionary<string, string[]>? errors = null) : Error(message, code, errors);
+
+public class ImageValidationError(string message, int code = 400) : Error(message, code);
 
 public sealed class NotFoundError(string message = "Resource not found.") : Error(message, 404);
 

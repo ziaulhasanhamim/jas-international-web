@@ -17,6 +17,10 @@ public static class ResultHttpExtensions
                 ConflictError ce => Results.Conflict(new { message = ce.Message }),
                 UnauthorizedError => Results.Unauthorized(),
                 ForbiddenError => Results.Forbid(),
+                CatalogError cat => Results.Json(new { message = cat.Message, errors = cat.ValidationErrors }, statusCode: cat.Code),
+                ShopError se => Results.BadRequest(new { message = se.Message }),
+                CommerceError ce => Results.BadRequest(new { message = ce.Message }),
+                ImageValidationError ie => Results.BadRequest(new { message = ie.Message }),
                 UnexpectedError ue => Results.Problem(detail: ue.Message, statusCode: 500),
                 Error err => Results.Problem(detail: err.Message, statusCode: err.Code > 0 ? err.Code : 400)
             };
@@ -42,6 +46,10 @@ public static class ResultHttpExtensions
                 ConflictError ce => Results.Conflict(new { message = ce.Message }),
                 UnauthorizedError => Results.Unauthorized(),
                 ForbiddenError => Results.Forbid(),
+                CatalogError cat => Results.Json(new { message = cat.Message, errors = cat.ValidationErrors }, statusCode: cat.Code),
+                ShopError se => Results.BadRequest(new { message = se.Message }),
+                CommerceError ce => Results.BadRequest(new { message = ce.Message }),
+                ImageValidationError ie => Results.BadRequest(new { message = ie.Message }),
                 UnexpectedError ue => Results.Problem(detail: ue.Message, statusCode: 500),
                 Error err => Results.Problem(detail: err.Message, statusCode: err.Code > 0 ? err.Code : 400)
             };

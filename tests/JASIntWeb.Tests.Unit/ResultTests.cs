@@ -1,3 +1,4 @@
+using JASIntWeb.Client.Contracts;
 using JASIntWeb.Helpers;
 using JASIntWeb.Services;
 
@@ -205,5 +206,61 @@ public class ResultTests
             Untracked u => $"Untracked: {u.Reason}"
         };
         await untrackedMessage.Should().BeEqualTo("Untracked: No online tracking page available for courier 'Showroom Pickup'.");
+    }
+
+    [Test]
+    public async Task DomainErrors_ShopCommerceAndCatalog_ConvertAndMatchCorrectly()
+    {
+        // ShopError
+        Result shopFailure = Error.Shop("Insufficient stock for variant");
+        string shopMsg = shopFailure switch
+        {
+            Success => "ok",
+            ShopError se => $"Shop: {se.Message}",
+            Error e => e.Message
+        };
+        await shopMsg.Should().BeEqualTo("Shop: Insufficient stock for variant");
+
+        // ShopException <-> ShopError conversion
+        ShopException shopEx = new("Item limit reached");
+        ShopError convertedShopErr = shopEx;
+        await convertedShopErr.Message.Should().BeEqualTo("Item limit reached");
+        ShopException backToShopEx = convertedShopErr;
+        await backToShopEx.Message.Should().BeEqualTo("Item limit reached");
+
+        // CommerceError
+        Result commerceFailure = Error.Commerce("Session timed out", 401);
+        string commerceMsg = commerceFailure switch
+        {
+            Success => "ok",
+            CommerceError ce => $"Commerce ({ce.Code}): {ce.Message}",
+            Error e => e.Message
+        };
+        await commerceMsg.Should().BeEqualTo("Commerce (401): Session timed out");
+
+        // CommerceException <-> CommerceError conversion
+        CommerceException commEx = new("Cart expired");
+        CommerceError convertedCommErr = commEx;
+        await convertedCommErr.Message.Should().BeEqualTo("Cart expired");
+
+        // CatalogError
+        Result catalogFailure = Error.Catalog("Category slug already taken", 409);
+        string catMsg = catalogFailure switch
+        {
+            Success => "ok",
+            CatalogError ce => $"Catalog: {ce.Message}",
+            Error e => e.Message
+        };
+        await catMsg.Should().BeEqualTo("Catalog: Category slug already taken");
+
+        // ImageValidationError
+        Result imageFailure = Error.Image("Image size exceeds limit", 400);
+        string imgMsg = imageFailure switch
+        {
+            Success => "ok",
+            ImageValidationError ie => $"Image error: {ie.Message}",
+            Error e => e.Message
+        };
+        await imgMsg.Should().BeEqualTo("Image error: Image size exceeds limit");
     }
 }

@@ -8,7 +8,14 @@ using Microsoft.Extensions.Logging;
 
 namespace JASIntWeb.Services;
 
-public sealed class ShopException(string message) : Exception(message);
+public sealed class ShopException : Exception
+{
+    public ShopError Error { get; }
+    public ShopException(string message, int code = 400) : base(message) => Error = new ShopError(message, code);
+    public ShopException(ShopError error) : base(error.Message) => Error = error;
+    public static implicit operator ShopError(ShopException ex) => ex.Error;
+    public static implicit operator ShopException(ShopError error) => new(error);
+}
 
 public sealed class ShoppingService(
     AppDbContext db,
