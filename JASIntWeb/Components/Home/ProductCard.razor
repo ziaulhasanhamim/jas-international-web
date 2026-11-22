@@ -77,21 +77,26 @@
 
         <StockAvailability Quantity="Product.DefaultVariantStock" />
 
-        <!-- Buy Now Action (Direct JSON Request Body via Client JS) -->
+        <!-- Buy Now Action (Blazor Enhanced Form POST to /cart/buy-now) -->
         <div class="mt-auto pt-2 border-t border-slate-100">
-            <button
-                type="button"
-                data-buy-now
-                data-variant-id="@(Product.DefaultVariantId ?? 0)"
-                data-product-id="@Product.Id"
-                class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled="@(Product.DefaultVariantStock <= 0 || Product.DefaultVariantId is null)"
-                aria-label="Buy @Product.Name now"
-            >
-                <Icon Name="cart" Class="size-3.5" />
-                <span>@(Product.DefaultVariantStock <= 0 ? "Out of Stock" : "Buy Now")</span>
-            </button>
-
+            <form method="post" action="/cart/buy-now" data-enhance class="w-full">
+                <AntiforgeryToken />
+                <input type="hidden" name="productId" value="@Product.Id" />
+                <input type="hidden" name="variantId" value="@(Product.DefaultVariantId ?? 0)" />
+                <input type="hidden" name="quantity" value="1" />
+                <button
+                    type="submit"
+                    data-buy-now
+                    data-variant-id="@(Product.DefaultVariantId ?? 0)"
+                    data-product-id="@Product.Id"
+                    class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled="@(Product.DefaultVariantStock <= 0 || Product.DefaultVariantId is null)"
+                    aria-label="Buy @Product.Name now"
+                >
+                    <Icon Name="cart" Class="size-3.5" />
+                    <span>@(Product.DefaultVariantStock <= 0 ? "Out of Stock" : "Buy Now")</span>
+                </button>
+            </form>
         </div>
     </div>
 </article>

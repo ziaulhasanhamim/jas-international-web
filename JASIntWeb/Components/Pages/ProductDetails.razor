@@ -328,15 +328,20 @@ else
                                     <span>Add to Cart</span>
                                 </button>
 
-                                <!-- Buy Now Button (Pure JS, adds to cart then navigates to /cart at top) -->
-                                <button type="button"
-                                        data-buy-now
-                                        data-variant-id="@selected.Id"
-                                        data-product-id="@product.Id"
-                                        data-quantity-target="#product-qty-input"
-                                        class="flex-1 btn-primary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs bg-blue-600 hover:bg-blue-700 transition cursor-pointer">
-                                    <span>⚡ Buy Now</span>
-                                </button>
+                                <!-- Buy Now Button (SSR Form POST to /cart/buy-now with Blazor Enhanced Navigation) -->
+                                <form method="post" action="/cart/buy-now" data-enhance class="flex-1" onsubmit="const q = document.getElementById('product-qty-input'); if (q) { this.querySelector('input[name=quantity]').value = q.value; }">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="productId" value="@product.Id" />
+                                    <input type="hidden" name="variantId" value="@selected.Id" />
+                                    <input type="hidden" name="quantity" value="1" />
+                                    <button type="submit"
+                                            data-buy-now
+                                            data-variant-id="@selected.Id"
+                                            data-product-id="@product.Id"
+                                            class="w-full btn-primary !py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs bg-blue-600 hover:bg-blue-700 transition cursor-pointer">
+                                        <span>⚡ Buy Now</span>
+                                    </button>
+                                </form>
 
                                 <!-- Wishlist Button -->
                                 <button type="button"
@@ -586,13 +591,19 @@ else
                                 class="btn-secondary !py-2 !px-3 text-xs font-bold cursor-pointer">
                             Add
                         </button>
-                        <button type="button"
-                                data-buy-now
-                                data-variant-id="@selected.Id"
-                                data-product-id="@product.Id"
-                                class="btn-primary !py-2 !px-3.5 text-xs font-bold !bg-blue-600 hover:!bg-blue-700 cursor-pointer">
-                            Buy Now
-                        </button>
+                        <form method="post" action="/cart/buy-now" data-enhance class="inline-block">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="productId" value="@product.Id" />
+                            <input type="hidden" name="variantId" value="@selected.Id" />
+                            <input type="hidden" name="quantity" value="1" />
+                            <button type="submit"
+                                    data-buy-now
+                                    data-variant-id="@selected.Id"
+                                    data-product-id="@product.Id"
+                                    class="btn-primary !py-2 !px-3.5 text-xs font-bold !bg-blue-600 hover:!bg-blue-700 cursor-pointer">
+                                Buy Now
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

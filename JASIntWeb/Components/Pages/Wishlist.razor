@@ -102,14 +102,19 @@
                             <span class="text-base sm:text-lg font-black text-[#ea580c]">Tk. @price.ToString("N0")</span>
                         </div>
                         <div class="mt-auto pt-2 border-t border-slate-100">
-                            <button
-                                type="button"
-                                data-buy-now
-                                data-product-id="@p.Id"
-                                class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
-                            >
-                                <span>⚡ Buy Now</span>
-                            </button>
+                            <form method="post" action="/cart/buy-now" data-enhance class="w-full">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="productId" value="@p.Id" />
+                                <input type="hidden" name="quantity" value="1" />
+                                <button
+                                    type="submit"
+                                    data-buy-now
+                                    data-product-id="@p.Id"
+                                    class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
+                                >
+                                    <span>⚡ Buy Now</span>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </article>

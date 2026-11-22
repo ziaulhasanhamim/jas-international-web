@@ -445,6 +445,12 @@ export function initCartDelegation() {
         // 2. Buy Now button
         const buyBtn = e.target.closest('[data-buy-now]');
         if (buyBtn) {
+            // If the button is inside an SSR form targeting /cart/buy-now, let Blazor enhanced form navigation submit it directly
+            const form = buyBtn.closest ? buyBtn.closest('form') : null;
+            if (form && typeof form.getAttribute === 'function' && form.getAttribute('action')?.includes('/cart/buy-now')) {
+                return;
+            }
+
             e.preventDefault();
             e.stopPropagation();
 
