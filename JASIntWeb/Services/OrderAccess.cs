@@ -3,11 +3,14 @@ namespace JASIntWeb.Services;
 
 public static class OrderAccess
 {
-    public static IQueryable<Order> ForUser(this IQueryable<Order> orders, ClaimsPrincipal user)
+    extension (IQueryable<Order> orders)
     {
-        if (user.IsInRole("Admin")) return orders;
-        var userId = ShoppingService.UserId(user);
-        return orders.Where(o => userId.HasValue && o.UserId == userId);
+        public IQueryable<Order> ForUser(ClaimsPrincipal user)
+        {
+            if (user.IsInRole("Admin")) return orders;
+            var userId = ShoppingService.UserId(user);
+            return orders.Where(o => userId.HasValue && o.UserId == userId);
+        }
     }
 
     public static async Task ProtectAsync(HttpContext context, RequestDelegate next)

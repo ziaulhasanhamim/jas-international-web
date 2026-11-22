@@ -10,14 +10,17 @@ public static class AdminUploadEndpoints
     private static readonly HashSet<string> ImageExtensions =
         [with(StringComparer.OrdinalIgnoreCase), ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg"];
 
-    public static void MapAdminUploadEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
-        var uploads = endpoints.MapGroup("/api/admin/uploads").RequireAuthorization("AdminOnly");
-        uploads.MapGet("/security", Security);
-        uploads.MapPost("/product-images", UploadProductImages);
-        uploads.MapPost("/brand-logo", UploadBrandLogo);
-        uploads.MapPost("/image", UploadImage);
-        uploads.MapPost("/cache/invalidate", InvalidateMediaCacheAsync);
+        public void MapAdminUploadEndpoints()
+        {
+            var uploads = endpoints.MapGroup("/api/admin/uploads").RequireAuthorization("AdminOnly");
+            uploads.MapGet("/security", Security);
+            uploads.MapPost("/product-images", UploadProductImages);
+            uploads.MapPost("/brand-logo", UploadBrandLogo);
+            uploads.MapPost("/image", UploadImage);
+            uploads.MapPost("/cache/invalidate", InvalidateMediaCacheAsync);
+        }
     }
 
     private static async Task<Results<NoContent, BadRequest<EndpointError>>> InvalidateMediaCacheAsync(HttpContext context, IAntiforgery antiforgery,

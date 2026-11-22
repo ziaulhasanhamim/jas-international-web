@@ -11,25 +11,28 @@ public static class MetaFeedEndpoints
 {
     private static readonly XNamespace G = "http://base.google.com/ns/1.0";
 
-    public static IEndpointRouteBuilder MapMetaFeedEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
-        // 1. Meta XML Product Catalog Feed
-        endpoints.MapGet("/feeds/meta.xml", HandleMetaXmlFeed)
-            .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
-        endpoints.MapGet("/api/feeds/meta-products.xml", HandleMetaXmlFeed)
-            .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
+        public IEndpointRouteBuilder MapMetaFeedEndpoints()
+        {
+            // 1. Meta XML Product Catalog Feed
+            endpoints.MapGet("/feeds/meta.xml", HandleMetaXmlFeed)
+                .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
+            endpoints.MapGet("/api/feeds/meta-products.xml", HandleMetaXmlFeed)
+                .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
 
-        // 2. Meta CSV Product Catalog Feed
-        endpoints.MapGet("/feeds/meta.csv", HandleMetaCsvFeed)
-            .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
-        endpoints.MapGet("/api/feeds/meta-products.csv", HandleMetaCsvFeed)
-            .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
+            // 2. Meta CSV Product Catalog Feed
+            endpoints.MapGet("/feeds/meta.csv", HandleMetaCsvFeed)
+                .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
+            endpoints.MapGet("/api/feeds/meta-products.csv", HandleMetaCsvFeed)
+                .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
 
-        // 3. Google Merchant Center XML Feed
-        endpoints.MapGet("/feeds/google.xml", HandleGoogleMerchantXmlFeed)
-            .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
+            // 3. Google Merchant Center XML Feed
+            endpoints.MapGet("/feeds/google.xml", HandleGoogleMerchantXmlFeed)
+                .CacheOutput(p => p.Expire(TimeSpan.FromHours(1)).Tag("catalog"));
 
-        return endpoints;
+            return endpoints;
+        }
     }
 
     private static async Task<IResult> ValidateTokenAsync(HttpContext context, DeliverySettingsService settingsService)

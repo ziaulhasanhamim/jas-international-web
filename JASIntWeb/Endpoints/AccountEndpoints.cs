@@ -7,11 +7,14 @@ namespace JASIntWeb.Endpoints;
 
 public static class AccountEndpoints
 {
-    public static void MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/account/logout", Logout);
-        endpoints.MapGet("/account/external-login", ExternalLogin);
-        endpoints.MapGet("/account/external-login-callback", ExternalLoginCallback);
+        public void MapAccountEndpoints()
+        {
+            endpoints.MapPost("/account/logout", Logout);
+            endpoints.MapGet("/account/external-login", ExternalLogin);
+            endpoints.MapGet("/account/external-login-callback", ExternalLoginCallback);
+        }
     }
 
     private static async Task<IResult> Logout(

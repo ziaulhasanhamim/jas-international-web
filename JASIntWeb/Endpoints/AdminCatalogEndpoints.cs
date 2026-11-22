@@ -6,8 +6,10 @@ namespace JASIntWeb.Endpoints;
 
 public static class AdminCatalogEndpoints
 {
-    public static void MapAdminCatalogEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public void MapAdminCatalogEndpoints()
+        {
         var group = endpoints.MapGroup("/api/admin").RequireAuthorization("AdminOnly").AddEndpointFilter<AdminCatalogFilter>();
         group.MapPost("/content/preview", (ContentPreviewRequest input, IAdminCatalogBackend backend) => backend.PreviewContentAsync(input.Source));
         var workspace = group.MapGroup("/products/{id:int}/workspace");
@@ -28,6 +30,7 @@ public static class AdminCatalogEndpoints
         group.MapDelete("/brands/{id:int}", async (int id, IAdminCatalogBackend backend) => { await backend.DeleteBrandAsync(id); return new AdminSaveResult(id, "/admin/brands"); });
         group.MapDelete("/guides/{id:int}", async (int id, IAdminCatalogBackend backend) => { await backend.DeleteGuideAsync(id); return new AdminSaveResult(id, "/admin/guides"); });
     }
+}
     private static IResult EditorUpdated() => Results.Json(new AdminCatalogError("The product editor has been updated. Reload and use Save product in /admin/products/{id}/edit."), statusCode: 410);
     private static async Task<IResult> Create(int id, Func<Task<AdminSaveResult>> save)
     {

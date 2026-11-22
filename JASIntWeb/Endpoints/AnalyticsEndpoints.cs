@@ -33,8 +33,10 @@ public static class AnalyticsEndpoints
         PropertyNameCaseInsensitive = true
     };
 
-    public static IEndpointRouteBuilder MapAnalyticsEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public IEndpointRouteBuilder MapAnalyticsEndpoints()
+        {
         var group = endpoints.MapGroup("/api/analytics");
 
         group.MapPost("/collect", async (
@@ -150,6 +152,7 @@ public static class AnalyticsEndpoints
         }).DisableAntiforgery();
 
         return endpoints;
+    }
     }
 
     private static string GetClientIp(HttpContext httpContext)

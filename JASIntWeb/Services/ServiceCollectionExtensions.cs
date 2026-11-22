@@ -15,17 +15,20 @@ namespace JASIntWeb.Services;
 
 internal static class ServiceCollectionExtensions
 {
-    public static void AddStoreServices(this WebApplicationBuilder builder)
+    extension (WebApplicationBuilder builder)
     {
-        ConfigurePort(builder);
-        builder.AddStoreHosting();
-        ConfigureForwardedHeaders(builder);
-        builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
-        AddPersistence(builder);
-        AddCaching(builder);
-        AddStorefront(builder);
-        AddAccounts(builder);
-        AddCommerce(builder);
+        public void AddStoreServices()
+        {
+            ConfigurePort(builder);
+            builder.AddStoreHosting();
+            ConfigureForwardedHeaders(builder);
+            builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+            AddPersistence(builder);
+            AddCaching(builder);
+            AddStorefront(builder);
+            AddAccounts(builder);
+            AddCommerce(builder);
+        }
     }
 
     private static void ConfigurePort(WebApplicationBuilder builder)

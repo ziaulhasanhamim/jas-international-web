@@ -16,8 +16,10 @@ public sealed record OrderPaymentSseDto(
 
 public static class OrderEndpoints
 {
-    public static IEndpointRouteBuilder MapOrderEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public IEndpointRouteBuilder MapOrderEndpoints()
+        {
         var group = endpoints.MapGroup("/api/orders");
         endpoints.MapGet("/api/orders/{id:int}/payment-status", GetPaymentStatus);
 
@@ -95,6 +97,7 @@ public static class OrderEndpoints
         });
 
         return endpoints;
+    }
     }
 
     private static async Task<IResult> GetPaymentStatus(int id, AppDbContext db)

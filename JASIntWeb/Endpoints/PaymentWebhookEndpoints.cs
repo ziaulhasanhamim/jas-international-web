@@ -9,10 +9,13 @@ using WebhookResult = Results<Ok<PaymentWebhookResponse>, BadRequest<EndpointErr
 
 public static class PaymentWebhookEndpoints
 {
-    public static void MapPaymentWebhookEndpoints(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/webhooks/mfs-sms", ReceiveSms)
-            .DisableAntiforgery()
-            .WithSummary("Verify a mobile-money payment from an authenticated SMS forwarder.");
+    extension (IEndpointRouteBuilder endpoints)
+    {
+        public void MapPaymentWebhookEndpoints() =>
+            endpoints.MapPost("/api/webhooks/mfs-sms", ReceiveSms)
+                .DisableAntiforgery()
+                .WithSummary("Verify a mobile-money payment from an authenticated SMS forwarder.");
+    }
 
     private static async Task<WebhookResult> ReceiveSms(
         HttpRequest request, AppDbContext db, ShoppingService shop, DeliverySettingsService settings,

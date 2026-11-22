@@ -5,8 +5,10 @@ namespace JASIntWeb.Endpoints;
 
 public static class SeoEndpoints
 {
-    public static IEndpointRouteBuilder MapSeoEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public IEndpointRouteBuilder MapSeoEndpoints()
+        {
         endpoints.MapGet("/sitemap.xml", async (SitemapService sitemap) =>
         {
             var xml = await sitemap.GenerateSitemapIndexAsync();
@@ -68,4 +70,5 @@ public static class SeoEndpoints
 
         return endpoints;
     }
+}
 }

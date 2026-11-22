@@ -5,7 +5,9 @@ namespace JASIntWeb.Persistence;
 
 public static class JsonTestDataSeeder
 {
-    public static async Task SeedTestDataAsync<TContext>(this IServiceProvider services, string jsonPath, CancellationToken ct = default) where TContext : DbContext
+    extension (IServiceProvider services)
+    {
+        public async Task SeedTestDataAsync<TContext>(string jsonPath, CancellationToken ct = default) where TContext : DbContext
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TContext>();
@@ -156,7 +158,7 @@ public static class JsonTestDataSeeder
         await tx.CommitAsync(ct);
     }
 
-    public static async Task SeedAdminAsync(this IServiceProvider services, IConfiguration config)
+        public async Task SeedAdminAsync(IConfiguration config)
     {
         await using var scope = services.CreateAsyncScope();
         var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<int>>>();
@@ -200,7 +202,7 @@ public static class JsonTestDataSeeder
         }
     }
 
-    public static async Task PatchCatalogDataAsync(this IServiceProvider services, CancellationToken ct = default)
+        public async Task PatchCatalogDataAsync(CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -267,7 +269,7 @@ public static class JsonTestDataSeeder
         }
     }
 
-    public static async Task SeedBrandsAsync(this IServiceProvider services, CancellationToken ct = default)
+        public async Task SeedBrandsAsync(CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -401,7 +403,7 @@ public static class JsonTestDataSeeder
         }
     }
 
-    public static async Task SeedCommerceEnhancementsAsync(this IServiceProvider services, CancellationToken ct = default)
+        public async Task SeedCommerceEnhancementsAsync(CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -647,8 +649,7 @@ public static class JsonTestDataSeeder
                 }
             }
         }
-
-
+    }
     }
 
     private sealed class SeedData

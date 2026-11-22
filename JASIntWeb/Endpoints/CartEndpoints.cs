@@ -12,8 +12,10 @@ public static class CartEndpoints
 {
     public const string CartCookieName = "jas_cart_id";
 
-    public static IEndpointRouteBuilder MapCartEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public IEndpointRouteBuilder MapCartEndpoints()
+        {
         var cart = endpoints.MapGroup("/api/cart").AddEndpointFilter<CartAntiforgeryFilter>();
         cart.MapGet("/security", Security);
         cart.MapGet("/account", Account);
@@ -123,6 +125,7 @@ public static class CartEndpoints
         }).DisableAntiforgery().AddEndpointFilter<CartAntiforgeryFilter>();
 
         return endpoints;
+    }
     }
 
     public static (Guid? Token, int? UserId) ResolveCartIdentity(HttpContext context, ClaimsPrincipal? user = null)

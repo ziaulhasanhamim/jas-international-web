@@ -6,8 +6,10 @@ namespace JASIntWeb.Endpoints;
 
 public static class CustomerConfidenceEndpoints
 {
-    public static void MapCustomerConfidenceEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public void MapCustomerConfidenceEndpoints()
+        {
         endpoints.MapPost("/stock-notifications", async (HttpContext context, StockNotificationService notifications, IAntiforgery csrf, CancellationToken ct) =>
         {
             if (!await ValidFormAsync(context, csrf)) return Results.BadRequest("Refresh the page and try again.");
@@ -99,6 +101,7 @@ public static class CustomerConfidenceEndpoints
             return Results.Redirect($"/product/{Uri.EscapeDataString(product.Slug)}?review=submitted#reviews");
         }).WithSummary("Submit a product review for moderation.");
     }
+}
 
     private static bool IsAjax(HttpContext context) =>
         context.Request.Headers.Accept.ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase)

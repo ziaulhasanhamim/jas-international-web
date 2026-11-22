@@ -5,15 +5,18 @@ namespace JASIntWeb.Endpoints;
 
 public static class HealthEndpoints
 {
-    public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
-        var ready = new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready"), ResponseWriter = WriteResponseAsync };
-        var live = new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteResponseAsync };
-        endpoints.MapHealthChecks("/health", ready).AllowAnonymous();
-        endpoints.MapHealthChecks("/healthz", ready).AllowAnonymous();
-        endpoints.MapHealthChecks("/health/ready", ready).AllowAnonymous();
-        endpoints.MapHealthChecks("/health/live", live).AllowAnonymous();
-        return endpoints;
+        public IEndpointRouteBuilder MapHealthEndpoints()
+        {
+            var ready = new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready"), ResponseWriter = WriteResponseAsync };
+            var live = new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteResponseAsync };
+            endpoints.MapHealthChecks("/health", ready).AllowAnonymous();
+            endpoints.MapHealthChecks("/healthz", ready).AllowAnonymous();
+            endpoints.MapHealthChecks("/health/ready", ready).AllowAnonymous();
+            endpoints.MapHealthChecks("/health/live", live).AllowAnonymous();
+            return endpoints;
+        }
     }
 
     private static Task WriteResponseAsync(HttpContext context, HealthReport report)

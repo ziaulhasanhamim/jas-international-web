@@ -5,8 +5,10 @@ namespace JASIntWeb.Services;
 
 internal static class ApplicationPipeline
 {
-    public static void UseStorePipeline(this WebApplication app)
+    extension (WebApplication app)
     {
+        public void UseStorePipeline()
+        {
         app.UseForwardedHeaders();
         app.UseWebSockets();
         if (!app.Environment.IsDevelopment())
@@ -40,4 +42,5 @@ internal static class ApplicationPipeline
         app.UseStaticFiles();
         app.MapStaticAssets();
     }
+}
 }

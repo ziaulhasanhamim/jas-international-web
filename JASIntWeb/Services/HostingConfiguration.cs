@@ -8,8 +8,10 @@ namespace JASIntWeb.Services;
 
 internal static class HostingConfiguration
 {
-    public static void AddStoreHosting(this WebApplicationBuilder builder)
+    extension (WebApplicationBuilder builder)
     {
+        public void AddStoreHosting()
+        {
         var keys = builder.Services.AddDataProtection()
             .SetApplicationName("JASInternational")
             .PersistKeysToDbContext<AppDbContext>();
@@ -57,4 +59,5 @@ internal static class HostingConfiguration
                 };
             });
     }
+}
 }

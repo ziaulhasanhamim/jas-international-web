@@ -3,8 +3,10 @@ namespace JASIntWeb.Endpoints;
 
 public static class AdminProductEditorEndpoints
 {
-    public static void MapAdminProductEditorEndpoints(this IEndpointRouteBuilder endpoints)
+    extension (IEndpointRouteBuilder endpoints)
     {
+        public void MapAdminProductEditorEndpoints()
+        {
         var group = endpoints.MapGroup("/api/admin/product-editor").RequireAuthorization("AdminOnly").AddEndpointFilter<AdminCatalogFilter>();
         group.MapGet("/templates/{id:int}", (int id, IAdminProductEditorBackend b, CancellationToken ct) => b.TemplateAsync(id, ct));
         group.MapPut("/templates/{id:int}", (int id, EditorTemplateData c, IAdminProductEditorBackend b, CancellationToken ct) => id == c.Id ? b.SaveTemplateAsync(c, ct) : throw new AdminCatalogException(400, "Template IDs do not match."));
@@ -33,4 +35,5 @@ public static class AdminProductEditorEndpoints
             return result is null ? Results.NoContent() : Results.Ok(result);
         });
     }
+}
 }
