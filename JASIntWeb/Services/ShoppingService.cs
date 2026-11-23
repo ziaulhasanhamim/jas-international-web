@@ -552,7 +552,7 @@ public sealed class ShoppingService(
         {
             var couponCode = request.CouponCode.Trim().ToUpperInvariant();
             await db.Database.ExecuteSqlAsync($"SELECT \"Id\" FROM \"Coupons\" WHERE \"Code\" = {couponCode} FOR UPDATE");
-            var couponVal = await couponService.ValidateCouponAsync(request.CouponCode, summary.Subtotal, delivery);
+            var couponVal = await couponService.ValidateCouponAsync(request.CouponCode, summary.Subtotal, delivery, request.Items);
             if (!couponVal.IsValid) return new ShopError(couponVal.Message ?? "Coupon is no longer available.");
             if (couponVal.IsValid && !string.IsNullOrEmpty(couponVal.Code))
             {

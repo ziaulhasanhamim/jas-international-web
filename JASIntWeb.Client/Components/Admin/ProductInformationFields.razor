@@ -67,15 +67,66 @@
             <span>Mark as New Arrival</span>
         </label>
     </div>
+
+    <!-- Product Tags & Grouping -->
+    <div class="pt-4 border-t border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Product Tags &amp; Campaigns</label>
+                <p class="text-xs text-slate-500 mt-0.5">Assign promotional badges (Summer/Winter Sale) and internal tags used for coupon rules and admin grouping.</p>
+            </div>
+            <a href="/admin/tags" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline">Manage Tags ↗</a>
+        </div>
+
+        @if (Tags.Count == 0)
+        {
+            <p class="text-xs text-slate-400 italic">No tags configured yet. Create tags in <a href="/admin/tags" target="_blank" class="underline">Catalog &gt; Tags</a>.</p>
+        }
+        else
+        {
+            <div class="flex flex-wrap gap-2 pt-1">
+                @foreach (var tag in Tags)
+                {
+                    var isSelected = Information.TagIds.Contains(tag.Id);
+                    <button type="button"
+                            @onclick="() => ToggleTag(tag.Id)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition border cursor-pointer @(isSelected ? "bg-blue-50 text-blue-800 border-blue-300 shadow-xs ring-1 ring-blue-500/20" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100")">
+                        <span>@(isSelected ? "✓" : "+")</span>
+                        <span>@tag.Name</span>
+                        @if (tag.IsHidden)
+                        {
+                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold" title="Internal tag (hidden from storefront)">🔒 Admin Only</span>
+                        }
+                        else
+                        {
+                            <span class="size-2 rounded-full @(tag.BadgeColor switch { "emerald" => "bg-emerald-500", "amber" => "bg-amber-500", "rose" => "bg-rose-500", "indigo" => "bg-indigo-500", "purple" => "bg-purple-500", _ => "bg-blue-500" })"></span>
+                        }
+                    </button>
+                }
+            </div>
+        }
+    </div>
 </section>
 
 @code {
     [Parameter] public ProductInformation Information { get; set; } = new();
     [Parameter] public List<JASIntWeb.Client.Dtos.CategoryLinkDto> Categories { get; set; } = [];
     [Parameter] public List<JASIntWeb.Client.Dtos.BrandLinkDto> Brands { get; set; } = [];
+    [Parameter] public List<JASIntWeb.Client.Dtos.TagDto> Tags { get; set; } = [];
     [Parameter] public EventCallback<InformationPatch> Changed { get; set; }
     [Parameter] public EventCallback<bool> UploadBusy { get; set; }
     [Parameter] public bool Disabled { get; set; }
+
+    private void ToggleTag(int tagId)
+    {
+        Patch(i =>
+        {
+            var list = i.TagIds.ToList();
+            if (list.Contains(tagId)) list.Remove(tagId);
+            else list.Add(tagId);
+            i.TagIds = list;
+        });
+    }
 
     private Task Patch(Action<ProductInformation> update) => Changed.InvokeAsync(new(update));
     private Task Media(AdminMediaValue value) => Patch(i => { i.Image = value.Cover; i.Images = value.Gallery; });

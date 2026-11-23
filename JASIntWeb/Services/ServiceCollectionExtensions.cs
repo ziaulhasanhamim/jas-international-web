@@ -233,6 +233,7 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddHostedService<CartCleanupBackgroundService>();
         builder.Services.AddScoped<IVisitorAnalyticsService, VisitorAnalyticsService>();
         builder.Services.AddScoped<CatalogService>();
+        builder.Services.AddScoped<CampaignService>();
         builder.Services.AddScoped<ShoppingService>();
         builder.Services.AddScoped<AdminService>();
         builder.Services.AddScoped<SalesMetricsService>();

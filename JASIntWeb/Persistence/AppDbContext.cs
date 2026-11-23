@@ -43,6 +43,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<VisitorLog> VisitorLogs => Set<VisitorLog>();
 
     public DbSet<StockNotification> StockNotifications => Set<StockNotification>();
+    public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<ProductTag> ProductTags => Set<ProductTag>();
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

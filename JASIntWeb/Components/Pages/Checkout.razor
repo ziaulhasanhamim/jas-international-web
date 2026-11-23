@@ -1008,7 +1008,8 @@
     private async Task ApplyCoupon()
     {
         if (string.IsNullOrWhiteSpace(couponInput)) return;
-        var res = await CouponSvc.ValidateCouponAsync(couponInput, Cart.Total, deliveryFee);
+        var cartLines = Cart.Items.Select(i => new CartLineRequest(i.VariantId, i.Quantity)).ToList();
+        var res = await CouponSvc.ValidateCouponAsync(couponInput, Cart.Total, deliveryFee, cartLines);
         if (res.IsValid)
         {
             appliedCouponCode = res.Code;

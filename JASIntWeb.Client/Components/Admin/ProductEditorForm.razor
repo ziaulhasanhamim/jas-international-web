@@ -217,7 +217,7 @@ else
 
             <!-- Tab Content Panes -->
             <div hidden="@(tab != "details")">
-                <ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" />
+                <ProductInformationFields Information="state.Draft.Information" Categories="state.Data.Categories" Brands="state.Data.Brands" Tags="@(state.Data.Tags ?? [])" Changed="InfoChanged" UploadBusy="UploadBusy" Disabled="Disabled" />
             </div>
 
             <div hidden="@(tab != "options")">

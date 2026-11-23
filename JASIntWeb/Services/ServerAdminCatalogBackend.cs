@@ -358,6 +358,74 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
         return (Result)Success.Ok;
     });
 
+    public Task<Result<List<TagDto>>> TagsAsync() => Execute<List<TagDto>>(async _ =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Tags.AsNoTracking()
+            .Where(t => !t.IsDeleted)
+            .OrderBy(t => t.SortOrder)
+            .ThenBy(t => t.Name)
+            .Select(t => new TagDto(t.Id, t.Name, t.Slug, t.IsHidden, t.BadgeColor, t.SortOrder, t.ProductTags.Count(pt => !pt.Product.IsDeleted)))
+            .ToListAsync();
+    });
+
+    public Task<Result<AdminSaveResult>> SaveTagAsync(TagFormModel input) => Execute<AdminSaveResult>(async _ =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        string cleanSlug = SlugAndSkuGenerator.GenerateSlug(string.IsNullOrWhiteSpace(input.Slug) ? input.Name : input.Slug);
+        if (await db.Tags.AnyAsync(t => t.Slug == cleanSlug && t.Id != input.Id && !t.IsDeleted))
+        {
+            return (Result<AdminSaveResult>)new ConflictError($"A tag with slug '{cleanSlug}' already exists.");
+        }
+
+        Tag tag;
+        if (input.Id == 0)
+        {
+            tag = new Tag
+            {
+                Name = input.Name.Trim(),
+                Slug = cleanSlug,
+                Description = input.Description?.Trim(),
+                IsHidden = input.IsHidden,
+                BadgeColor = input.BadgeColor,
+                SortOrder = input.SortOrder
+            };
+            db.Tags.Add(tag);
+        }
+        else
+        {
+            var existing = await db.Tags.SingleOrDefaultAsync(t => t.Id == input.Id && !t.IsDeleted);
+            if (existing is null) return (Result<AdminSaveResult>)new NotFoundError("Tag not found.");
+            existing.Name = input.Name.Trim();
+            existing.Slug = cleanSlug;
+            existing.Description = input.Description?.Trim();
+            existing.IsHidden = input.IsHidden;
+            existing.BadgeColor = input.BadgeColor;
+            existing.SortOrder = input.SortOrder;
+            tag = existing;
+        }
+
+        await db.SaveChangesAsync();
+        return (Result<AdminSaveResult>)new AdminSaveResult(tag.Id, "/admin/tags");
+    });
+
+    public Task<Result> DeleteTagAsync(int id) => Execute(async _ =>
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var existing = await db.Tags.SingleOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+        if (existing is not null)
+        {
+            existing.IsDeleted = true;
+            existing.DeletedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        return (Result)Success.Ok;
+    });
+
     public Task<Result<string>> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo) => Execute<string>(async service =>
     {
         var limit = (brandLogo ? 5 : 10) * 1024 * 1024;

@@ -1,0 +1,169 @@
+@page "/campaigns"
+@page "/offers"
+@inject CampaignService CampaignSvc
+@inject NavigationManager Nav
+
+<PageTitle>Mega Offers &amp; Festival Campaigns · JAS International</PageTitle>
+
+<SeoHead
+    Title="Mega Offers & Festival Campaigns | JAS International"
+    Description="Discover exclusive festival deals, limited-time promotions, voucher discounts, and seasonal clearance events at JAS International Bangladesh."
+    CanonicalPath="/offers"
+    OgType="website"
+/>
+
+<main class="min-h-screen bg-slate-50/70 pb-16">
+    <!-- Top Hero Banner -->
+    <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 py-12 sm:py-16 text-white">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.18),transparent_50%)] pointer-events-none"></div>
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-3">
+                🔥 Exclusive Promotions &amp; Savings
+            </span>
+            <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight font-display text-white">
+                Mega Offers &amp; Campaigns
+            </h1>
+            <p class="mt-3 max-w-2xl mx-auto text-sm sm:text-base text-slate-300">
+                Explore limited-time festival discounts, flash sales, voucher codes, and special product bundles curated for creators, professionals, and tech enthusiasts.
+            </p>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6">
+        @if (campaigns.Count == 0)
+        {
+            <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+                <span class="text-4xl block mb-3">🎁</span>
+                <h2 class="text-lg font-bold text-slate-900">No Active Campaigns Right Now</h2>
+                <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                    We are preparing our next big festival sale! In the meantime, browse our wide selection of original gear and accessories.
+                </p>
+                <div class="mt-6">
+                    <a href="/products" class="shop-button">Browse All Products</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Featured Primary Campaign -->
+            var primary = campaigns[0];
+            <div class="rounded-3xl border border-indigo-100 bg-white p-6 sm:p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 mb-8 overflow-hidden relative">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                    <div class="lg:col-span-7 space-y-4">
+                        @if (!string.IsNullOrWhiteSpace(primary.Eyebrow))
+                        {
+                            <span class="inline-block text-xs font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                                @primary.Eyebrow
+                            </span>
+                        }
+                        <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 font-display">
+                            @primary.Name
+                        </h2>
+                        @if (!string.IsNullOrWhiteSpace(primary.BanglaName))
+                        {
+                            <p class="text-base sm:text-lg font-semibold text-indigo-600">
+                                @primary.BanglaName
+                            </p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(primary.Description))
+                        {
+                            <p class="text-sm sm:text-base text-slate-600 line-clamp-3">
+                                @primary.Description
+                            </p>
+                        }
+
+                        <div class="pt-2 flex flex-wrap items-center gap-4">
+                            <a href="/campaigns/@primary.Slug" class="shop-button flex items-center gap-2">
+                                <span>Shop Campaign Deals</span>
+                                <span>→</span>
+                            </a>
+                            @if (!string.IsNullOrWhiteSpace(primary.HighlightCouponCode))
+                            {
+                                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold">
+                                    <span>🎟️ Use Coupon:</span>
+                                    <span class="font-mono text-sm tracking-wider uppercase text-amber-950 font-extrabold">@primary.HighlightCouponCode</span>
+                                </div>
+                            }
+                            @if (primary.ProductCount > 0)
+                            {
+                                <span class="text-xs font-semibold text-slate-500">
+                                    @primary.ProductCount Deal@(primary.ProductCount == 1 ? "" : "s") Included
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(primary.BannerImageUrl))
+                    {
+                        <div class="lg:col-span-5">
+                            <a href="/campaigns/@primary.Slug" class="block aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-md group">
+                                <img src="@primary.BannerImageUrl"
+                                     alt="@primary.Name"
+                                     class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Other Active Campaigns Grid -->
+            @if (campaigns.Count > 1)
+            {
+                <div class="space-y-4">
+                    <h2 class="text-xl font-bold tracking-tight text-slate-900">More Special Offers</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        @foreach (var c in campaigns.Skip(1))
+                        {
+                            <article class="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden flex flex-col justify-between">
+                                @if (!string.IsNullOrWhiteSpace(c.BannerImageUrl))
+                                {
+                                    <a href="/campaigns/@c.Slug" class="block aspect-video overflow-hidden">
+                                        <img src="@c.BannerImageUrl" alt="@c.Name" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                                    </a>
+                                }
+                                <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
+                                    <div>
+                                        @if (!string.IsNullOrWhiteSpace(c.Eyebrow))
+                                        {
+                                            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 block mb-1">
+                                                @c.Eyebrow
+                                            </span>
+                                        }
+                                        <h3 class="text-lg font-bold text-slate-900 hover:text-blue-600 transition">
+                                            <a href="/campaigns/@c.Slug">@c.Name</a>
+                                        </h3>
+                                        @if (!string.IsNullOrWhiteSpace(c.Description))
+                                        {
+                                            <p class="text-xs text-slate-500 mt-1 line-clamp-2">@c.Description</p>
+                                        }
+                                    </div>
+                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                        @if (!string.IsNullOrWhiteSpace(c.HighlightCouponCode))
+                                        {
+                                            <span class="font-mono text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                                🎟️ @c.HighlightCouponCode
+                                            </span>
+                                        }
+                                        <a href="/campaigns/@c.Slug" class="text-xs font-bold text-blue-600 hover:text-blue-800 ml-auto flex items-center gap-1">
+                                            <span>View Deals</span>
+                                            <span>→</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</main>
+
+@code {
+    private List<CampaignSummaryDto> campaigns = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        campaigns = await CampaignSvc.GetActiveCampaignsAsync();
+    }
+}

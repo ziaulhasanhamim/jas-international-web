@@ -40,7 +40,15 @@
         <div class="table-scroll">
             <QuickGrid Items="@couponsQuery" class="data-table">
                 <TemplateColumn Title="Coupon Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Coupon Code" SortKey="Code" /></HeaderTemplate><ChildContent>
-                    <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
+                    <div class="flex items-center gap-2">
+                        <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
+                        @if (context.HasTargetingRules)
+                        {
+                            <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Restricted to specific categories, brands, or tags">
+                                Targeted
+                            </span>
+                        }
+                    </div>
                     @if (!string.IsNullOrEmpty(context.Description))
                     {
                         <span class="text-xs text-slate-400 block mt-0.5">@context.Description</span>

@@ -23,5 +23,8 @@ public interface IAdminCatalogBackend
     Task<Result<ContentPreview>> PreviewContentAsync(string source);
     Task<Result> DeleteBrandAsync(int id);
     Task<Result> DeleteGuideAsync(int id);
+    Task<Result<List<TagDto>>> TagsAsync();
+    Task<Result<AdminSaveResult>> SaveTagAsync(TagFormModel input);
+    Task<Result> DeleteTagAsync(int id);
     Task<Result<string>> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo);
 }

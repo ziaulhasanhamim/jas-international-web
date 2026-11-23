@@ -243,6 +243,13 @@ public sealed class CatalogService(
                     breadcrumbs.Add(p.Parent);
                 }
                 breadcrumbs.Add(p.Category);
+                var tags = await db.ProductTags.AsNoTracking()
+                    .Where(pt => pt.ProductId == p.Id && !pt.Tag.IsDeleted && !pt.Tag.IsHidden)
+                    .OrderBy(pt => pt.Tag.SortOrder)
+                    .ThenBy(pt => pt.Tag.Name)
+                    .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
+                    .ToListAsync(ct);
+
                 return new ProductDetailsDto(p.Id, p.Name, p.Slug, p.Category.Name, p.Category.Slug, p.Description, p.Details, p.MainImageUrl,
                     [.. p.Images.Prepend(p.MainImageUrl).Distinct()], bindings,
                     [.. variants.Select(v => new ProductVariantDto(v.Id, v.SKU, v.SellingPrice, v.Stock, v.IsDefault,
@@ -252,7 +259,8 @@ public sealed class CatalogService(
                     MetaDescription = p.MetaDescription,
                     OgImageUrl = p.OgImageUrl,
                     Rating = p.Rating > 0 ? p.Rating : 5.0m,
-                    ReviewCount = p.ReviewCount > 0 ? p.ReviewCount : 12
+                    ReviewCount = p.ReviewCount > 0 ? p.ReviewCount : 12,
+                    Tags = tags
                 };
             },
             options: ProductOptions,

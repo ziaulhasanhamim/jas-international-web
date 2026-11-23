@@ -65,5 +65,19 @@ internal static class CommerceModel
         b.Entity<Coupon>().HasIndex(x => new { x.IsActive, x.ExpiryDate });
         b.Entity<Order>().HasIndex(x => x.PaymentReferenceCode);
         b.Entity<Order>().HasIndex(x => x.TransactionId);
+        b.Entity<ProductTag>().HasKey(x => new { x.ProductId, x.TagId });
+        b.Entity<ProductTag>()
+            .HasOne(x => x.Product)
+            .WithMany(x => x.ProductTags)
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ProductTag>()
+            .HasOne(x => x.Tag)
+            .WithMany(x => x.ProductTags)
+            .HasForeignKey(x => x.TagId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<Tag>().HasIndex(x => x.Slug).IsUnique().HasFilter("NOT \"IsDeleted\"");
+        b.Entity<Campaign>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<Campaign>().HasIndex(x => new { x.IsActive, x.SortOrder });
     }
 }

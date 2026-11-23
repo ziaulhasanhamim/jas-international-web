@@ -75,6 +75,7 @@ public sealed class ProductInformation
     public string? BanglaName { get; set; }
     public string? BanglaDescription { get; set; }
     public string? WarrantyInfo { get; set; } = "1 Year Official Brand Warranty";
+    public List<int> TagIds { get; set; } = [];
 }
 public sealed class ProductEditorDraft
 {
@@ -86,7 +87,7 @@ public sealed class ProductEditorDraft
 }
 public sealed record EditorAttributeTemplate(int Id, string Name, List<ValueField> Fields, string? SwatchField, List<EditorOption> Suggestions);
 public sealed record ProductEditorData(ProductEditorDraft Draft, List<CategoryLinkDto> Categories, List<BrandLinkDto> Brands,
-    List<EditorAttributeTemplate> Templates, string PublicBaseUrl);
+    List<EditorAttributeTemplate> Templates, string PublicBaseUrl, List<TagDto>? Tags = null);
 public sealed record EditorSave(Guid OperationId, ProductEditorDraft Draft);
 public sealed record EditorStock(Guid OperationId, int ProductId, int VariantId, uint ExpectedVersion, int Quantity, string Reason);
 public sealed record EditorReceipt(Guid OperationId, int ProductId, long Revision);

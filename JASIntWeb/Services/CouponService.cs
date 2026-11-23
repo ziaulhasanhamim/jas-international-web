@@ -1,3 +1,4 @@
+using JASIntWeb.Client.Dtos;
 using JASIntWeb.Helpers;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
@@ -22,7 +23,11 @@ public record CouponValidationResult(
 
 public sealed class CouponService(AppDbContext db)
 {
-    public async Task<Result<AppliedCoupon>> ApplyCouponAsync(string code, decimal subtotal, decimal deliveryCharge = 0)
+    public async Task<Result<AppliedCoupon>> ApplyCouponAsync(
+        string code,
+        decimal subtotal,
+        decimal deliveryCharge = 0,
+        IReadOnlyList<CartLineRequest>? items = null)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -48,27 +53,110 @@ public sealed class CouponService(AppDbContext db)
             return Error.Validation("This coupon's usage limit has been reached.");
         }
 
-        if (coupon.MinOrderAmount.HasValue && subtotal < coupon.MinOrderAmount.Value)
+        decimal eligibleSubtotal = subtotal;
+
+        if (coupon.HasTargetingRules)
         {
-            return Error.Validation($"Order subtotal must be at least ৳{coupon.MinOrderAmount.Value:N0} to use this coupon.");
+            if (items == null || items.Count == 0)
+            {
+                return Error.Validation("This coupon requires cart items to verify eligibility.");
+            }
+
+            var variantIds = items.Select(i => i.VariantId).Distinct().ToList();
+            var variantData = await db.ProductVariants.AsNoTracking()
+                .Where(v => variantIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    v.SellingPrice,
+                    v.ProductId,
+                    CategoryId = v.Product!.CategoryId,
+                    BrandId = v.Product.BrandId,
+                    TagIds = v.Product.ProductTags.Select(pt => pt.TagId).ToList()
+                })
+                .ToListAsync();
+
+            var variantMap = variantData.ToDictionary(v => v.Id);
+            decimal targetEligibleSubtotal = 0m;
+            bool hasEligibleItem = false;
+
+            bool hasInclusions = coupon.IncludedBrandIds.Count > 0 ||
+                                 coupon.IncludedCategoryIds.Count > 0 ||
+                                 coupon.IncludedTagIds.Count > 0;
+
+            foreach (var item in items)
+            {
+                if (!variantMap.TryGetValue(item.VariantId, out var v))
+                {
+                    continue;
+                }
+
+                // 1. Check exclusions (Exclusions always take precedence)
+                bool isExcluded = (v.BrandId.HasValue && coupon.ExcludedBrandIds.Contains(v.BrandId.Value))
+                    || coupon.ExcludedCategoryIds.Contains(v.CategoryId)
+                    || v.TagIds.Any(tid => coupon.ExcludedTagIds.Contains(tid));
+
+                if (isExcluded)
+                {
+                    continue;
+                }
+
+                // 2. Check inclusions
+                if (hasInclusions)
+                {
+                    bool isIncluded = (v.BrandId.HasValue && coupon.IncludedBrandIds.Contains(v.BrandId.Value))
+                        || coupon.IncludedCategoryIds.Contains(v.CategoryId)
+                        || v.TagIds.Any(tid => coupon.IncludedTagIds.Contains(tid));
+
+                    if (!isIncluded)
+                    {
+                        continue;
+                    }
+                }
+
+                hasEligibleItem = true;
+                targetEligibleSubtotal += v.SellingPrice * item.Quantity;
+            }
+
+            if (!hasEligibleItem || targetEligibleSubtotal <= 0)
+            {
+                return Error.Validation("This coupon is not valid for any items in your cart.");
+            }
+
+            eligibleSubtotal = targetEligibleSubtotal;
+        }
+
+        if (coupon.MinOrderAmount.HasValue && eligibleSubtotal < coupon.MinOrderAmount.Value)
+        {
+            return Error.Validation(coupon.HasTargetingRules
+                ? $"Eligible items subtotal must be at least ৳{coupon.MinOrderAmount.Value:N0} to use this coupon."
+                : $"Order subtotal must be at least ৳{coupon.MinOrderAmount.Value:N0} to use this coupon.");
         }
 
         decimal discount = coupon.DiscountType switch
         {
             CouponDiscountType.Percentage => coupon.MaxDiscountAmount.HasValue
-                ? Math.Min(Math.Round(subtotal * (coupon.DiscountValue / 100m), 2), coupon.MaxDiscountAmount.Value)
-                : Math.Round(subtotal * (coupon.DiscountValue / 100m), 2),
-            CouponDiscountType.FixedAmount => Math.Min(coupon.DiscountValue, subtotal),
+                ? Math.Min(Math.Round(eligibleSubtotal * (coupon.DiscountValue / 100m), 2), coupon.MaxDiscountAmount.Value)
+                : Math.Round(eligibleSubtotal * (coupon.DiscountValue / 100m), 2),
+            CouponDiscountType.FixedAmount => Math.Min(coupon.DiscountValue, eligibleSubtotal),
             CouponDiscountType.FreeDelivery => deliveryCharge,
             _ => 0m
         };
 
-        return new AppliedCoupon(coupon.Code, discount, coupon.DiscountType, $"Coupon '{coupon.Code}' applied successfully!");
+        string successMessage = coupon.HasTargetingRules
+            ? $"Coupon '{coupon.Code}' applied to eligible products!"
+            : $"Coupon '{coupon.Code}' applied successfully!";
+
+        return new AppliedCoupon(coupon.Code, discount, coupon.DiscountType, successMessage);
     }
 
-    public async Task<CouponValidationResult> ValidateCouponAsync(string code, decimal subtotal, decimal deliveryCharge = 0)
+    public async Task<CouponValidationResult> ValidateCouponAsync(
+        string code,
+        decimal subtotal,
+        decimal deliveryCharge = 0,
+        IReadOnlyList<CartLineRequest>? items = null)
     {
-        var result = await ApplyCouponAsync(code, subtotal, deliveryCharge);
+        var result = await ApplyCouponAsync(code, subtotal, deliveryCharge, items);
         return result switch
         {
             AppliedCoupon c => new CouponValidationResult(true, c.Code, c.DiscountAmount, c.Message, c.DiscountType),

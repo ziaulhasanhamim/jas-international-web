@@ -58,6 +58,17 @@ public sealed class HttpAdminCatalogBackend(IHttpClientFactory factory) : IAdmin
             Error err => err
         };
     }
+    public Task<Result<List<TagDto>>> TagsAsync() => Send<List<TagDto>>(HttpMethod.Get, "api/admin/tags");
+    public Task<Result<AdminSaveResult>> SaveTagAsync(TagFormModel input) => Send<AdminSaveResult>(HttpMethod.Post, "api/admin/tags", input);
+    public async Task<Result> DeleteTagAsync(int id)
+    {
+        var res = await Send<AdminSaveResult>(HttpMethod.Delete, $"api/admin/tags/{id}");
+        return res switch
+        {
+            AdminSaveResult => Result.Success,
+            Error err => err
+        };
+    }
     public async Task<Result<string>> UploadAsync(Stream stream, string fileName, string contentType, bool brandLogo)
     {
         using var form = new MultipartFormDataContent();

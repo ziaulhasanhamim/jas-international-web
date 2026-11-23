@@ -1,0 +1,188 @@
+@page "/admin/campaigns"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject CampaignService CampaignSvc
+
+<PageTitle>Mega Campaigns &amp; Special Offers · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">STOREFRONT PROMOTIONS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Campaigns &amp; Special Offers</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage festival sales, mega campaigns, countdown timers, hero banners, and curated promotional deal pages.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/offers" target="_blank" class="btn-secondary shadow-xs flex items-center gap-1.5 text-xs">
+            <span>View Offers Hub ↗</span>
+        </a>
+        <a href="/admin/campaigns/new" class="btn-primary shadow-xs flex items-center gap-1.5">
+            <Icon Name="plus" Class="size-4" />
+            Create Campaign
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 cursor-pointer">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <QuickGrid Items="@campaignsQuery" class="data-table">
+            <TemplateColumn Title="Campaign">
+                <div class="flex items-center gap-3">
+                    @if (!string.IsNullOrWhiteSpace(context.BannerImageUrl))
+                    {
+                        <img src="@context.BannerImageUrl" alt="@context.Name" class="size-12 rounded-lg object-cover border border-slate-200 flex-shrink-0" />
+                    }
+                    else
+                    {
+                        <div class="size-12 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">
+                            🎉
+                        </div>
+                    }
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <strong class="font-bold text-slate-900 text-sm">@context.Name</strong>
+                            @if (!string.IsNullOrWhiteSpace(context.BanglaName))
+                            {
+                                <span class="text-xs text-indigo-600 font-semibold">@context.BanglaName</span>
+                            }
+                        </div>
+                        <span class="text-xs text-slate-400 font-mono block mt-0.5">/campaigns/@context.Slug</span>
+                    </div>
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Coupon Code">
+                @if (!string.IsNullOrWhiteSpace(context.HighlightCouponCode))
+                {
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        🎟️ @context.HighlightCouponCode
+                    </span>
+                }
+                else
+                {
+                    <span class="text-slate-400 text-xs">—</span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Schedule / Countdown">
+                @{
+                    var now = DateTimeOffset.UtcNow;
+                    var isEnded = context.EndDate.HasValue && context.EndDate.Value < now;
+                    var isUpcoming = context.StartDate.HasValue && context.StartDate.Value > now;
+                }
+                @if (isEnded)
+                {
+                    <span class="text-xs text-slate-400">Ended @context.EndDate?.ToString("MMM dd, yyyy")</span>
+                }
+                else if (isUpcoming)
+                {
+                    <span class="text-xs text-blue-600 font-semibold">Starts @context.StartDate?.ToString("MMM dd, yyyy")</span>
+                }
+                else if (context.EndDate.HasValue)
+                {
+                    <span class="text-xs text-emerald-700 font-bold">Ends @context.EndDate?.ToString("MMM dd, yyyy")</span>
+                }
+                else
+                {
+                    <span class="text-xs text-slate-500 font-medium">Ongoing (No end date)</span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Status">
+                @{
+                    var nowTime = DateTimeOffset.UtcNow;
+                    var isExpired = context.EndDate.HasValue && context.EndDate.Value < nowTime;
+                }
+                @if (!context.IsActive)
+                {
+                    <span class="badge badge-rose">Disabled</span>
+                }
+                else if (isExpired)
+                {
+                    <span class="badge badge-amber">Expired</span>
+                }
+                else
+                {
+                    <span class="badge badge-emerald">Live</span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Sort" Class="w-20 text-center">
+                <span class="text-xs font-mono text-slate-600">@context.SortOrder</span>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Actions" Class="w-36 text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                    <a href="/campaigns/@context.Slug" target="_blank" class="p-1.5 text-slate-400 hover:text-blue-600 transition" title="Preview on Storefront">
+                        <Icon Name="external-link" Class="size-4" />
+                    </a>
+                    <a href="/admin/campaigns/@context.Id/edit" class="p-1.5 text-slate-400 hover:text-slate-800 transition" title="Edit Campaign">
+                        <Icon Name="edit" Class="size-4" />
+                    </a>
+                    <button type="button" @onclick="() => ToggleActive(context)" class="p-1.5 text-slate-400 hover:text-amber-600 transition cursor-pointer" title="@(context.IsActive ? "Disable" : "Enable")">
+                        <span>@(context.IsActive ? "⏸" : "▶")</span>
+                    </button>
+                    <button type="button" @onclick="() => DeleteCampaign(context)" class="p-1.5 text-slate-400 hover:text-rose-600 transition cursor-pointer" title="Delete">
+                        <Icon Name="trash" Class="size-4" />
+                    </button>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+</div>
+
+@code {
+    private IQueryable<Campaign> campaignsQuery => Db.Campaigns.AsNoTracking().OrderBy(c => c.SortOrder).ThenByDescending(c => c.CreatedAt);
+    private string? _toast;
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).ContainsKey("saved"))
+        {
+            _toast = "Campaign saved successfully!";
+        }
+    }
+
+    private async Task ToggleActive(Campaign campaign)
+    {
+        var target = await Db.Campaigns.FindAsync(campaign.Id);
+        if (target != null)
+        {
+            target.IsActive = !target.IsActive;
+            await Db.SaveChangesAsync();
+            await CampaignSvc.InvalidateCacheAsync(target.Slug);
+            _toast = $"Campaign '{target.Name}' is now {(target.IsActive ? "Active" : "Disabled")}.";
+        }
+    }
+
+    private async Task DeleteCampaign(Campaign campaign)
+    {
+        var target = await Db.Campaigns.FindAsync(campaign.Id);
+        if (target != null)
+        {
+            Db.Campaigns.Remove(target);
+            await Db.SaveChangesAsync();
+            await CampaignSvc.InvalidateCacheAsync(target.Slug);
+            _toast = $"Campaign '{target.Name}' deleted.";
+        }
+    }
+}

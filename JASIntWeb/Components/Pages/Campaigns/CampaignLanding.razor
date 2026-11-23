@@ -1,0 +1,298 @@
+@page "/campaigns/{Slug}"
+@rendermode InteractiveServer
+@inject CampaignService CampaignSvc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@(campaign != null ? $"{campaign.Name} · Deals &amp; Offers" : "Campaign") · JAS International</PageTitle>
+
+@if (loading)
+{
+    <div class="min-h-[50vh] flex items-center justify-center">
+        <div class="text-center">
+            <span class="inline-block animate-spin text-3xl mb-3">⏳</span>
+            <p class="text-sm font-semibold text-slate-500">Loading campaign deals…</p>
+        </div>
+    </div>
+}
+else if (campaign is null)
+{
+    <div class="max-w-3xl mx-auto px-4 py-20 text-center">
+        <span class="text-5xl block mb-4">🔍</span>
+        <h1 class="text-2xl font-bold text-slate-900">Campaign Not Found</h1>
+        <p class="text-sm text-slate-500 mt-2">The campaign you are looking for has expired or is no longer available.</p>
+        <div class="mt-6 flex justify-center gap-3">
+            <a href="/offers" class="shop-button">View All Offers</a>
+            <a href="/products" class="shop-button-secondary">Browse Catalog</a>
+        </div>
+    </div>
+}
+else
+{
+    <SeoHead
+        Title="@(string.IsNullOrWhiteSpace(campaign.MetaTitle) ? $"{campaign.Name} | Mega Festival Deals | JAS International" : campaign.MetaTitle)"
+        Description="@(string.IsNullOrWhiteSpace(campaign.MetaDescription) ? (campaign.Description ?? $"Shop exclusive {campaign.Name} discounts and deals at JAS International.") : campaign.MetaDescription)"
+        CanonicalPath="@($"/campaigns/{campaign.Slug}")"
+        OgImage="@(string.IsNullOrWhiteSpace(campaign.OgImageUrl) ? campaign.BannerImageUrl : campaign.OgImageUrl)"
+        OgType="website"
+    />
+
+    <main class="min-h-screen bg-slate-50/70 pb-20">
+        <!-- Hero Section with Campaign Theme -->
+        <section class="@GetThemeHeroClasses(campaign.ThemeColor) relative overflow-hidden py-10 sm:py-16 text-white shadow-inner">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_60%)] pointer-events-none"></div>
+
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Breadcrumbs -->
+                <nav class="flex items-center gap-2 text-xs text-white/70 mb-6 font-medium" aria-label="Breadcrumb">
+                    <a href="/" class="hover:text-white transition">Home</a>
+                    <span>/</span>
+                    <a href="/offers" class="hover:text-white transition">Offers</a>
+                    <span>/</span>
+                    <span class="text-white font-semibold truncate max-w-[200px] sm:max-w-none">@campaign.Name</span>
+                </nav>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    <div class="lg:col-span-7 space-y-4">
+                        @if (!string.IsNullOrWhiteSpace(campaign.Eyebrow))
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/15 backdrop-blur-xs text-white border border-white/20">
+                                ⚡ @campaign.Eyebrow
+                            </span>
+                        }
+
+                        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight font-display text-white leading-tight">
+                            @campaign.Name
+                        </h1>
+
+                        @if (!string.IsNullOrWhiteSpace(campaign.BanglaName))
+                        {
+                            <p class="text-lg sm:text-xl font-bold text-amber-300">
+                                @campaign.BanglaName
+                            </p>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(campaign.Description))
+                        {
+                            <p class="text-sm sm:text-base text-white/85 max-w-xl leading-relaxed">
+                                @campaign.Description
+                            </p>
+                        }
+
+                        <!-- Live Countdown Timer -->
+                        @if (campaign.ShowCountdown && campaign.EndDate.HasValue && !hasExpired)
+                        {
+                            <div class="pt-2">
+                                <span class="block text-xs font-bold uppercase tracking-wider text-white/80 mb-2">
+                                    ⏳ Deals Expire In
+                                </span>
+                                <div class="flex items-center gap-2 sm:gap-3 text-center">
+                                    <div class="px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 min-w-[56px] sm:min-w-[64px]">
+                                        <span class="block text-xl sm:text-2xl font-black font-mono text-white">@daysRemaining.ToString("D2")</span>
+                                        <span class="block text-[10px] font-bold text-white/70 uppercase">Days</span>
+                                    </div>
+                                    <span class="text-xl font-black text-white/60">:</span>
+                                    <div class="px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 min-w-[56px] sm:min-w-[64px]">
+                                        <span class="block text-xl sm:text-2xl font-black font-mono text-white">@hoursRemaining.ToString("D2")</span>
+                                        <span class="block text-[10px] font-bold text-white/70 uppercase">Hours</span>
+                                    </div>
+                                    <span class="text-xl font-black text-white/60">:</span>
+                                    <div class="px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 min-w-[56px] sm:min-w-[64px]">
+                                        <span class="block text-xl sm:text-2xl font-black font-mono text-white">@minsRemaining.ToString("D2")</span>
+                                        <span class="block text-[10px] font-bold text-white/70 uppercase">Mins</span>
+                                    </div>
+                                    <span class="text-xl font-black text-white/60">:</span>
+                                    <div class="px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 min-w-[56px] sm:min-w-[64px]">
+                                        <span class="block text-xl sm:text-2xl font-black font-mono text-white">@secsRemaining.ToString("D2")</span>
+                                        <span class="block text-[10px] font-bold text-white/70 uppercase">Secs</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Highlighted Coupon Promo Code Box -->
+                        @if (!string.IsNullOrWhiteSpace(campaign.HighlightCouponCode))
+                        {
+                            <div class="pt-3">
+                                <div class="inline-flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/25">
+                                    <div class="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white">
+                                        <span>🎟️ Promo Voucher:</span>
+                                        <span class="font-mono text-sm tracking-wider uppercase font-extrabold text-amber-300">
+                                            @campaign.HighlightCouponCode
+                                        </span>
+                                    </div>
+                                    <button type="button"
+                                            @onclick="CopyCouponCode"
+                                            class="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-sm transition active:scale-95 cursor-pointer">
+                                        @if (copiedCode)
+                                        {
+                                            <span>✓ Copied!</span>
+                                        }
+                                        else
+                                        {
+                                            <Icon Name="copy" Class="size-3.5" />
+                                            <span>Copy Code</span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Banner Graphic -->
+                    @if (!string.IsNullOrWhiteSpace(campaign.BannerImageUrl))
+                    {
+                        <div class="lg:col-span-5">
+                            <div class="aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+                                <img src="@campaign.BannerImageUrl"
+                                     alt="@campaign.Name"
+                                     class="w-full h-full object-cover" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- Deals Products Grid Section -->
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+            <div class="flex items-center justify-between mb-6 pb-3 border-b border-slate-200">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
+                        Featured Campaign Deals
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+                        Grab verified original gear at special promotional prices.
+                    </p>
+                </div>
+                <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                    @campaign.Products.Count Product@(campaign.Products.Count == 1 ? "" : "s")
+                </span>
+            </div>
+
+            @if (campaign.Products.Count == 0)
+            {
+                <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+                    <span class="text-4xl block mb-2">📦</span>
+                    <h3 class="text-base font-bold text-slate-800">Deals Coming Soon</h3>
+                    <p class="text-xs text-slate-500 mt-1">Products for this campaign are being loaded. Please check back shortly!</p>
+                </div>
+            }
+            else
+            {
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                    @foreach (var p in campaign.Products)
+                    {
+                        <ProductCard Product="@p" />
+                    }
+                </div>
+            }
+        </section>
+    </main>
+}
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = "";
+
+    private CampaignDetailsDto? campaign;
+    private bool loading = true;
+    private bool copiedCode;
+
+    private int daysRemaining;
+    private int hoursRemaining;
+    private int minsRemaining;
+    private int secsRemaining;
+    private bool hasExpired;
+
+    private PeriodicTimer? timer;
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        campaign = await CampaignSvc.GetCampaignBySlugAsync(Slug);
+        loading = false;
+
+        if (campaign?.EndDate.HasValue == true)
+        {
+            UpdateCountdown();
+            StartTimer();
+        }
+    }
+
+    private void UpdateCountdown()
+    {
+        if (campaign?.EndDate == null) return;
+        var diff = campaign.EndDate.Value - DateTimeOffset.UtcNow;
+        if (diff <= TimeSpan.Zero)
+        {
+            hasExpired = true;
+            daysRemaining = 0;
+            hoursRemaining = 0;
+            minsRemaining = 0;
+            secsRemaining = 0;
+        }
+        else
+        {
+            hasExpired = false;
+            daysRemaining = (int)diff.TotalDays;
+            hoursRemaining = diff.Hours;
+            minsRemaining = diff.Minutes;
+            secsRemaining = diff.Seconds;
+        }
+    }
+
+    private void StartTimer()
+    {
+        cts?.Cancel();
+        cts = new CancellationTokenSource();
+        timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        _ = RunTimerAsync(cts.Token);
+    }
+
+    private async Task RunTimerAsync(CancellationToken token)
+    {
+        try
+        {
+            while (await timer!.WaitForNextTickAsync(token))
+            {
+                UpdateCountdown();
+                await InvokeAsync(StateHasChanged);
+                if (hasExpired) break;
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task CopyCouponCode()
+    {
+        if (string.IsNullOrWhiteSpace(campaign?.HighlightCouponCode)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", campaign.HighlightCouponCode);
+            copiedCode = true;
+            await Task.Delay(2000);
+            copiedCode = false;
+        }
+        catch { }
+    }
+
+    private static string GetThemeHeroClasses(string? theme) => theme?.ToLowerInvariant() switch
+    {
+        "crimson" or "red" => "bg-gradient-to-br from-rose-950 via-red-950 to-slate-950",
+        "emerald" or "green" => "bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950",
+        "amber" or "orange" => "bg-gradient-to-br from-amber-950 via-orange-950 to-slate-950",
+        "purple" => "bg-gradient-to-br from-purple-950 via-violet-950 to-slate-950",
+        "navy" => "bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900",
+        _ => "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950"
+    };
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        cts?.Dispose();
+        timer?.Dispose();
+    }
+}

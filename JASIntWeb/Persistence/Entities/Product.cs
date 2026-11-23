@@ -28,6 +28,7 @@ public sealed class Product : SoftDeletableEntity
     public ICollection<ProductImage> ProductImages { get; init; } = [];
     public ICollection<ProductVariant> ProductVariants { get; init; } = [];
     public ICollection<ProductReview> Reviews { get; set; } = [];
+    public ICollection<ProductTag> ProductTags { get; set; } = [];
 }
 
 public sealed class ProductImage

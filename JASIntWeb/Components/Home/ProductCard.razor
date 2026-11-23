@@ -36,7 +36,14 @@
     <!-- Product Card Details -->
     <div class="px-4 pb-4 pt-1 flex flex-col flex-1 text-center">
         <!-- Brand Badge -->
-        <div class="flex items-center justify-center mb-1.5 min-h-[22px]">
+        <div class="flex items-center justify-center gap-1.5 mb-1.5 min-h-[22px] flex-wrap">
+            @if (Product.Tags.Count > 0)
+            {
+                var topTag = Product.Tags[0];
+                <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border @TagDto.GetBadgeClasses(topTag.BadgeColor)">
+                    @topTag.Name
+                </span>
+            }
             @if (!string.IsNullOrWhiteSpace(Product.BrandName))
             {
                 <span class="inline-block text-[11px] font-black uppercase tracking-wider text-slate-800 bg-slate-100 px-2 py-0.5 rounded">

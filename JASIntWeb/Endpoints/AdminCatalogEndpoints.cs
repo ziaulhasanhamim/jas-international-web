@@ -46,6 +46,25 @@ public static class AdminCatalogEndpoints
                     Error err => err.ToHttpResult()
                 };
             });
+            group.MapGet("/tags", async (IAdminCatalogBackend backend) => (await backend.TagsAsync()).ToHttpResult());
+            group.MapPost("/tags", async (TagFormModel input, IAdminCatalogBackend backend) =>
+            {
+                var result = await backend.SaveTagAsync(input);
+                return result switch
+                {
+                    AdminSaveResult res => Results.Ok(res),
+                    Error err => err.ToHttpResult()
+                };
+            });
+            group.MapDelete("/tags/{id:int}", async (int id, IAdminCatalogBackend backend) =>
+            {
+                var res = await backend.DeleteTagAsync(id);
+                return res switch
+                {
+                    Success => Results.Ok(new AdminSaveResult(id, "/admin/tags")),
+                    Error err => err.ToHttpResult()
+                };
+            });
         }
     }
     private static IResult EditorUpdated() => Results.Json(new AdminCatalogError("The product editor has been updated. Reload and use Save product in /admin/products/{id}/edit."), statusCode: 410);

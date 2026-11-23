@@ -1,0 +1,312 @@
+@page "/admin/tags"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Client.Dtos
+@inject AppDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Product Tags &amp; Labels · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">CATALOG &amp; PROMOTIONS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Product Tags &amp; Labels</h1>
+        <p class="text-sm text-slate-500 mt-1">Create storefront promotional badges (Summer Sale, Winter Fest) and hidden admin tags for grouping and coupon targeting.</p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <button type="button" @onclick="OpenCreate" class="btn-primary shadow-xs cursor-pointer flex items-center gap-1.5">
+            <Icon Name="plus" Class="size-4" />
+            Create Tag
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 cursor-pointer">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <QuickGrid Items="@tagsQuery" class="data-table">
+            <TemplateColumn Title="Tag Name">
+                <div class="flex items-center gap-2">
+                    <span class="size-2.5 rounded-full @GetColorDotClass(context.BadgeColor)"></span>
+                    <strong class="font-bold text-slate-900 text-sm">@context.Name</strong>
+                    @if (context.IsHidden)
+                    {
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold" title="Hidden from storefront; used for admin grouping and coupon rules">🔒 Hidden / Admin Only</span>
+                    }
+                    else
+                    {
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider @GetBadgeStyle(context.BadgeColor)">Storefront Badge</span>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(context.Description))
+                {
+                    <span class="text-xs text-slate-400 block mt-0.5">@context.Description</span>
+                }
+            </TemplateColumn>
+
+            <PropertyColumn Property="@(t => t.Slug)" Title="Slug" Class="font-mono text-xs text-slate-500" />
+
+            <TemplateColumn Title="Products Assigned">
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                    📦 @context.ProductTags.Count(pt => !pt.Product.IsDeleted) products
+                </span>
+            </TemplateColumn>
+
+            <PropertyColumn Property="@(t => t.SortOrder)" Title="Sort" Sortable="true" Class="text-xs text-slate-500" />
+
+            <TemplateColumn Title="Actions" Class="text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                    <button type="button" @onclick="() => OpenEdit(context)" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-blue-600 hover:bg-blue-50 transition cursor-pointer">
+                        Edit
+                    </button>
+                    <button type="button" @onclick="() => DeleteTag(context.Id)" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-rose-600 hover:bg-rose-50 transition cursor-pointer">
+                        Delete
+                    </button>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+</div>
+
+@if (showEditor && formModel is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-fadeIn space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">@(formModel.Id == 0 ? "Create New Tag" : "Edit Tag")</h3>
+                <button type="button" @onclick="CloseEditor" class="text-slate-400 hover:text-slate-700 font-bold text-lg cursor-pointer">✕</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+                    @errorMessage
+                </div>
+            }
+
+            <EditForm Model="formModel" OnValidSubmit="SaveTag" class="space-y-4">
+                <DataAnnotationsValidator />
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" for="tag-name">Tag Name *</label>
+                    <InputText id="tag-name" @bind-Value="formModel.Name" class="shop-input text-xs" placeholder="e.g. Summer Sale / Creator Essentials" />
+                    <ValidationMessage For="@(() => formModel.Name)" class="text-xs text-rose-600 mt-1" />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" for="tag-slug">URL Slug</label>
+                    <InputText id="tag-slug" @bind-Value="formModel.Slug" class="shop-input text-xs font-mono" placeholder="Auto-generated from name if empty" />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" for="tag-desc">Description (optional)</label>
+                    <InputTextArea id="tag-desc" @bind-Value="formModel.Description" class="shop-input text-xs" rows="2" placeholder="Internal or promo details..." />
+                </div>
+
+                <!-- Hidden Tag vs Public Storefront Badge -->
+                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                    <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                        <InputCheckbox @bind-Value="formModel.IsHidden" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5" />
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block">🔒 Hidden Admin Tag</span>
+                            <span class="text-[11px] text-slate-500 block leading-tight">When checked, this tag will NOT be shown on public storefront cards. It will be used exclusively for internal admin grouping and coupon targeting rules.</span>
+                        </div>
+                    </label>
+
+                    @if (!formModel.IsHidden)
+                    {
+                        <div class="pt-2 border-t border-slate-200/80 animate-fadeIn">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Badge Color Theme</label>
+                            <div class="flex items-center gap-2">
+                                @foreach (var color in new[] { ("blue", "bg-blue-500"), ("emerald", "bg-emerald-500"), ("amber", "bg-amber-500"), ("rose", "bg-rose-500"), ("indigo", "bg-indigo-500"), ("purple", "bg-purple-500") })
+                                {
+                                    <button type="button"
+                                            @onclick="() => formModel.BadgeColor = color.Item1"
+                                            class="size-6 rounded-full @color.Item2 transition border-2 cursor-pointer @(formModel.BadgeColor == color.Item1 ? "border-slate-900 scale-110 shadow-xs" : "border-transparent opacity-70 hover:opacity-100")"
+                                            title="@color.Item1">
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" for="tag-sort">Display Sort Order</label>
+                    <InputNumber id="tag-sort" @bind-Value="formModel.SortOrder" class="shop-input text-xs" />
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" @onclick="CloseEditor" class="btn-secondary text-xs">Cancel</button>
+                    <button type="submit" disabled="@saving" class="btn-primary text-xs font-bold !bg-blue-600 hover:!bg-blue-700">
+                        @(saving ? "Saving..." : (formModel.Id == 0 ? "Create Tag" : "Save Changes"))
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private IQueryable<Tag> tagsQuery = default!;
+    private TagFormModel? formModel;
+    private bool showEditor;
+    private bool saving;
+    private string? _toast;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        LoadTags();
+    }
+
+    private void LoadTags()
+    {
+        tagsQuery = Db.Tags.AsNoTracking()
+            .Where(t => !t.IsDeleted)
+            .Include(t => t.ProductTags)
+            .OrderBy(t => t.SortOrder)
+            .ThenBy(t => t.Name);
+    }
+
+    private void OpenCreate()
+    {
+        formModel = new TagFormModel();
+        errorMessage = null;
+        showEditor = true;
+    }
+
+    private void OpenEdit(Tag tag)
+    {
+        formModel = new TagFormModel
+        {
+            Id = tag.Id,
+            Name = tag.Name,
+            Slug = tag.Slug,
+            Description = tag.Description,
+            IsHidden = tag.IsHidden,
+            BadgeColor = tag.BadgeColor ?? "blue",
+            SortOrder = tag.SortOrder
+        };
+        errorMessage = null;
+        showEditor = true;
+    }
+
+    private void CloseEditor()
+    {
+        showEditor = false;
+        formModel = null;
+        errorMessage = null;
+    }
+
+    private async Task SaveTag()
+    {
+        if (formModel is null) return;
+        saving = true;
+        errorMessage = null;
+
+        try
+        {
+            var cleanSlug = SlugAndSkuGenerator.GenerateSlug(string.IsNullOrWhiteSpace(formModel.Slug) ? formModel.Name : formModel.Slug);
+            if (await Db.Tags.AnyAsync(t => t.Slug == cleanSlug && t.Id != formModel.Id && !t.IsDeleted))
+            {
+                errorMessage = $"A tag with slug '{cleanSlug}' already exists.";
+                saving = false;
+                return;
+            }
+
+            if (formModel.Id == 0)
+            {
+                var newTag = new Tag
+                {
+                    Name = formModel.Name.Trim(),
+                    Slug = cleanSlug,
+                    Description = formModel.Description?.Trim(),
+                    IsHidden = formModel.IsHidden,
+                    BadgeColor = formModel.BadgeColor,
+                    SortOrder = formModel.SortOrder
+                };
+                Db.Tags.Add(newTag);
+                _toast = $"Tag '{newTag.Name}' created successfully.";
+            }
+            else
+            {
+                var existing = await Db.Tags.SingleOrDefaultAsync(t => t.Id == formModel.Id && !t.IsDeleted);
+                if (existing is null)
+                {
+                    errorMessage = "Tag not found.";
+                    saving = false;
+                    return;
+                }
+                existing.Name = formModel.Name.Trim();
+                existing.Slug = cleanSlug;
+                existing.Description = formModel.Description?.Trim();
+                existing.IsHidden = formModel.IsHidden;
+                existing.BadgeColor = formModel.BadgeColor;
+                existing.SortOrder = formModel.SortOrder;
+                _toast = $"Tag '{existing.Name}' updated successfully.";
+            }
+
+            await Db.SaveChangesAsync();
+            CloseEditor();
+            LoadTags();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task DeleteTag(int id)
+    {
+        var tag = await Db.Tags.SingleOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+        if (tag is not null)
+        {
+            tag.IsDeleted = true;
+            tag.DeletedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            _toast = $"Tag '{tag.Name}' deleted.";
+            LoadTags();
+        }
+    }
+
+    private static string GetColorDotClass(string? color) => color switch
+    {
+        "emerald" => "bg-emerald-500",
+        "amber" => "bg-amber-500",
+        "rose" => "bg-rose-500",
+        "indigo" => "bg-indigo-500",
+        "purple" => "bg-purple-500",
+        _ => "bg-blue-500"
+    };
+
+    private static string GetBadgeStyle(string? color) => color switch
+    {
+        "emerald" => "bg-emerald-50 text-emerald-700 border border-emerald-200",
+        "amber" => "bg-amber-50 text-amber-700 border border-amber-200",
+        "rose" => "bg-rose-50 text-rose-700 border border-rose-200",
+        "indigo" => "bg-indigo-50 text-indigo-700 border border-indigo-200",
+        "purple" => "bg-purple-50 text-purple-700 border border-purple-200",
+        _ => "bg-blue-50 text-blue-700 border border-blue-200"
+    };
+}

@@ -1,0 +1,493 @@
+@page "/admin/campaigns/new"
+@page "/admin/campaigns/{Id:int}/edit"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Client.Dtos
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject CampaignService CampaignSvc
+
+<PageTitle>@(Id == 0 ? "Create Campaign" : "Edit Campaign") · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Create Campaign" : "Edit Campaign")"
+    Description="Configure festival mega campaigns, countdown timers, hero banners, deal products, and promotional coupons."
+    ActionHref="/admin/campaigns"
+    ActionText="Back to campaigns"
+/>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <span class="text-base">⚠️</span>
+            @errorMessage
+        </span>
+        <button type="button" @onclick="() => errorMessage = null" class="text-rose-600 hover:text-rose-950 font-bold cursor-pointer">✕</button>
+    </div>
+}
+
+@if (loading || Input is null)
+{
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-500">Loading campaign editor…</p>
+    </div>
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="Save" class="shop-panel admin-form space-y-6">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 space-y-1 mb-4" />
+
+        <!-- Section 1: Campaign Identity -->
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Campaign Name <span class="admin-required">Required</span>
+                <InputText @bind-Value="Input.Name" class="shop-input font-bold" placeholder="e.g. Mega Eid Festival 2026" />
+                <small>Public campaign name shown in navigation and headers.</small>
+            </label>
+
+            <label class="shop-label">
+                Bangla Name (optional)
+                <InputText @bind-Value="Input.BanglaName" class="shop-input" placeholder="e.g. মেগা ঈদ উৎসব ২০২৬" />
+                <small>Localized Bangla subtitle for national sales.</small>
+            </label>
+        </div>
+
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Slug (URL identifier)
+                <InputText @bind-Value="Input.Slug" class="shop-input font-mono" placeholder="e.g. mega-eid-2026 (leave empty to auto-generate)" />
+                <small>Storefront link: /campaigns/<strong>@(string.IsNullOrWhiteSpace(Input.Slug) ? "slug" : Input.Slug)</strong></small>
+            </label>
+
+            <label class="shop-label">
+                Eyebrow Badge
+                <InputText @bind-Value="Input.Eyebrow" class="shop-input uppercase font-semibold text-xs tracking-wider" placeholder="e.g. LIMITED TIME · UP TO 50% OFF" />
+                <small>High-contrast promo badge displayed above the title.</small>
+            </label>
+        </div>
+
+        <label class="shop-label">
+            Campaign Description
+            <InputTextArea @bind-Value="Input.Description" class="shop-input" rows="3" placeholder="Explain the festival promotions, gifts, and bundle discounts included in this sale…" />
+        </label>
+
+        <!-- Section 2: Banner & Visual Theme -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+            <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>🎨</span> Visuals &amp; Theme
+            </h3>
+
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Desktop Banner Image URL
+                    <InputText @bind-Value="Input.BannerImageUrl" class="shop-input font-mono text-xs" placeholder="https://… or /images/banners/eid-sale.webp" />
+                    <small>High resolution hero graphic (1920×600 or 1200×630 recommended).</small>
+                </label>
+
+                <label class="shop-label">
+                    Mobile Banner Image URL (optional)
+                    <InputText @bind-Value="Input.MobileBannerImageUrl" class="shop-input font-mono text-xs" placeholder="https://… or /images/banners/eid-sale-mobile.webp" />
+                    <small>Optimized vertical graphic for smartphone viewports.</small>
+                </label>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Input.BannerImageUrl))
+            {
+                <div class="pt-2">
+                    <span class="block text-xs font-bold text-slate-700 mb-1">Banner Preview:</span>
+                    <div class="aspect-video sm:aspect-21/9 max-w-lg rounded-xl overflow-hidden border border-slate-300 shadow-xs bg-slate-100">
+                        <img src="@Input.BannerImageUrl" alt="Banner Preview" class="w-full h-full object-cover" />
+                    </div>
+                </div>
+            }
+
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Hero Theme Color
+                    <InputSelect @bind-Value="Input.ThemeColor" class="shop-input font-medium cursor-pointer">
+                        <option value="indigo">Indigo / Royal Violet</option>
+                        <option value="crimson">Crimson / Festival Red</option>
+                        <option value="emerald">Emerald / Eid Green</option>
+                        <option value="amber">Amber / Gold Flash Sale</option>
+                        <option value="navy">Navy / Tech Blue</option>
+                        <option value="purple">Purple / Glamour</option>
+                    </InputSelect>
+                    <small>Gradient mood applied to the campaign hero banner.</small>
+                </label>
+
+                <label class="shop-label">
+                    Highlighted Coupon Code (optional)
+                    <div class="flex gap-2">
+                        <InputText @bind-Value="Input.HighlightCouponCode" class="shop-input uppercase font-mono font-bold tracking-wider" placeholder="e.g. EID2026" />
+                    </div>
+                    <small>Prominently featured with a 1-click copy badge.</small>
+                    @if (activeCoupons.Count > 0)
+                    {
+                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <span class="text-[11px] text-slate-500">Quick pick:</span>
+                            @foreach (var c in activeCoupons)
+                            {
+                                <button type="button" @onclick="() => Input.HighlightCouponCode = c.Code"
+                                        class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-bold hover:bg-amber-100 transition cursor-pointer">
+                                    @c.Code
+                                </button>
+                            }
+                        </div>
+                    }
+                </label>
+            </div>
+        </div>
+
+        <!-- Section 3: Schedule & Countdown -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+            <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>⏱️</span> Schedule &amp; Live Countdown
+            </h3>
+
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Start Date &amp; Time (optional)
+                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="Input.StartDate" class="shop-input" />
+                    <small>When this campaign begins.</small>
+                </label>
+
+                <label class="shop-label">
+                    End Date &amp; Time (optional)
+                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="Input.EndDate" class="shop-input" />
+                    <small>Used for the real-time live countdown timer (Days : Hours : Mins : Secs).</small>
+                </label>
+            </div>
+
+            <div class="flex items-center gap-6 pt-1">
+                <label class="check-label flex items-center gap-2.5 cursor-pointer select-none">
+                    <InputCheckbox @bind-Value="Input.ShowCountdown" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    <span class="font-bold text-slate-800 text-sm">Show Live Countdown Timer on Landing Page</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Section 4: Products Deals Source (Tags + Curated) -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+            <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>📦</span> Campaign Products &amp; Deals
+            </h3>
+            <p class="text-xs text-slate-500">
+                You can automatically populate products using a <strong>Product Tag</strong> (e.g. Summer Sale / Winter Fest), and/or hand-pick specific <strong>Curated Products</strong> to pin at the top.
+            </p>
+
+            <label class="shop-label">
+                Link to Product Tag (Dynamic Source)
+                <InputSelect @bind-Value="Input.TagId" class="shop-input font-medium cursor-pointer">
+                    <option value="">-- No Tag (Curated Products Only) --</option>
+                    @foreach (var t in availableTags)
+                    {
+                        <option value="@t.Id">@t.Name @(t.IsHidden ? "(Admin Tag)" : "")</option>
+                    }
+                </InputSelect>
+                <small>All active products tagged with this label will automatically show on the campaign page.</small>
+            </label>
+
+            <!-- Curated Products Picker -->
+            <div class="pt-3 border-t border-slate-200">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Pinned Curated Products (@Input.CuratedProductIds.Count selected)
+                </label>
+
+                <div class="flex gap-2 mb-2">
+                    <input type="text" @bind="productSearchTerm" @bind:event="oninput"
+                           placeholder="Search products by name or SKU to pin…"
+                           class="shop-input text-xs" />
+                </div>
+
+                <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl bg-white p-2 divide-y divide-slate-100">
+                    @foreach (var prod in FilteredProducts)
+                    {
+                        var isSelected = Input.CuratedProductIds.Contains(prod.Id);
+                        <div class="flex items-center justify-between py-1.5 px-2 hover:bg-slate-50 rounded-lg text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-slate-800">@prod.Name</span>
+                                <span class="text-slate-400 font-mono">৳@prod.Price.ToString("N0")</span>
+                            </div>
+                            <button type="button" @onclick="() => ToggleCuratedProduct(prod.Id)"
+                                    class="px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer @(isSelected ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-blue-50 text-blue-700 hover:bg-blue-100")">
+                                @(isSelected ? "✕ Remove" : "+ Pin Deal")
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: Visibility & Sorting -->
+        <div class="admin-form-grid">
+            <div class="flex items-center pt-3">
+                <label class="check-label flex items-center gap-2.5 cursor-pointer select-none">
+                    <InputCheckbox @bind-Value="Input.IsActive" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    <span class="font-bold text-slate-800 text-sm">Campaign is Active / Live</span>
+                </label>
+            </div>
+
+            <label class="shop-label">
+                Display Sort Order
+                <InputNumber @bind-Value="Input.SortOrder" class="shop-input font-mono" />
+                <small>Lower numbers display first in the /offers hub (0 = highest priority).</small>
+            </label>
+        </div>
+
+        <!-- Section 6: SEO & Social Sharing -->
+        <details class="p-4 bg-slate-50 border border-slate-200 rounded-2xl group">
+            <summary class="font-bold text-xs uppercase tracking-wider text-slate-700 cursor-pointer flex items-center justify-between">
+                <span>🔍 SEO &amp; OpenGraph Social Sharing (Optional)</span>
+                <span class="text-slate-400 group-open:rotate-180 transition">▼</span>
+            </summary>
+            <div class="space-y-4 pt-4">
+                <label class="shop-label">
+                    SEO Meta Title
+                    <InputText @bind-Value="Input.MetaTitle" class="shop-input" placeholder="e.g. Mega Eid Festival 2026 Deals | JAS International" />
+                </label>
+                <label class="shop-label">
+                    SEO Meta Description
+                    <InputTextArea @bind-Value="Input.MetaDescription" class="shop-input" rows="2" placeholder="Catch huge discounts on DJI, Ulanzi, Boya, and creator gadgets during the Mega Eid Festival…" />
+                </label>
+                <label class="shop-label">
+                    Social Sharing Image URL (og:image)
+                    <InputText @bind-Value="Input.OgImageUrl" class="shop-input font-mono text-xs" placeholder="https://…" />
+                </label>
+            </div>
+        </details>
+
+        <div class="form-actions pt-4 border-t border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <button type="submit" disabled="@saving" class="shop-button flex items-center gap-2">
+                    @if (saving)
+                    {
+                        <span class="inline-block animate-spin">⏳</span>
+                        <span>Saving campaign…</span>
+                    }
+                    else
+                    {
+                        <span>@(Id == 0 ? "Create Campaign" : "Save Changes")</span>
+                    }
+                </button>
+                <a href="/admin/campaigns" class="shop-button-secondary">Cancel</a>
+            </div>
+
+            @if (Id > 0)
+            {
+                <span class="text-xs text-slate-400">Campaign ID: #@Id</span>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [PersistentState]
+    public CampaignFormModel? Input { get; set; }
+
+    private string? errorMessage;
+    private bool loading = true;
+    private bool saving;
+    private string productSearchTerm = "";
+
+    private List<CouponItem> activeCoupons = [];
+    private List<TagItem> availableTags = [];
+    private List<ProductPickItem> allProducts = [];
+
+    public sealed record CouponItem(string Code, string? Description);
+    public sealed record TagItem(int Id, string Name, bool IsHidden);
+    public sealed record ProductPickItem(int Id, string Name, decimal Price);
+
+    private IEnumerable<ProductPickItem> FilteredProducts =>
+        string.IsNullOrWhiteSpace(productSearchTerm)
+            ? allProducts.Take(20)
+            : allProducts.Where(p => p.Name.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)).Take(20);
+
+    protected override async Task OnInitializedAsync()
+    {
+        activeCoupons = await Db.Coupons.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Code)
+            .Select(c => new CouponItem(c.Code, c.Description))
+            .ToListAsync();
+
+        availableTags = await Db.Tags.AsNoTracking()
+            .Where(t => !t.IsDeleted)
+            .OrderBy(t => t.SortOrder)
+            .ThenBy(t => t.Name)
+            .Select(t => new TagItem(t.Id, t.Name, t.IsHidden))
+            .ToListAsync();
+
+        allProducts = await Db.Products.AsNoTracking()
+            .Where(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new ProductPickItem(
+                p.Id,
+                p.Name,
+                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).Select(v => v.SellingPrice).FirstOrDefault()))
+            .ToListAsync();
+
+        if (Input is null)
+        {
+            if (Id != 0)
+            {
+                var existing = await Db.Campaigns.FindAsync(Id);
+                if (existing == null)
+                {
+                    Nav.NavigateTo("/admin/campaigns");
+                    return;
+                }
+
+                Input = new CampaignFormModel
+                {
+                    Id = existing.Id,
+                    Name = existing.Name,
+                    Slug = existing.Slug,
+                    BanglaName = existing.BanglaName,
+                    Eyebrow = existing.Eyebrow,
+                    Description = existing.Description,
+                    BannerImageUrl = existing.BannerImageUrl,
+                    MobileBannerImageUrl = existing.MobileBannerImageUrl,
+                    StartDate = existing.StartDate?.LocalDateTime,
+                    EndDate = existing.EndDate?.LocalDateTime,
+                    ShowCountdown = existing.ShowCountdown,
+                    ThemeColor = existing.ThemeColor,
+                    HighlightCouponCode = existing.HighlightCouponCode,
+                    TagId = existing.TagId,
+                    CuratedProductIds = [.. existing.CuratedProductIds],
+                    IsActive = existing.IsActive,
+                    SortOrder = existing.SortOrder,
+                    MetaTitle = existing.MetaTitle,
+                    MetaDescription = existing.MetaDescription,
+                    OgImageUrl = existing.OgImageUrl
+                };
+            }
+            else
+            {
+                Input = new CampaignFormModel();
+            }
+        }
+        loading = false;
+    }
+
+    private void ToggleCuratedProduct(int productId)
+    {
+        if (Input is null) return;
+        if (Input.CuratedProductIds.Contains(productId))
+        {
+            Input.CuratedProductIds.Remove(productId);
+        }
+        else
+        {
+            Input.CuratedProductIds.Add(productId);
+        }
+    }
+
+    private async Task Save()
+    {
+        if (saving || Input is null) return;
+        errorMessage = null;
+
+        var cleanName = (Input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(cleanName))
+        {
+            errorMessage = "Campaign name is required.";
+            return;
+        }
+
+        var cleanSlug = string.IsNullOrWhiteSpace(Input.Slug)
+            ? SlugAndSkuGenerator.GenerateSlug(cleanName)
+            : SlugAndSkuGenerator.GenerateSlug(Input.Slug);
+
+        var isDuplicateSlug = await Db.Campaigns.AnyAsync(c => c.Slug == cleanSlug && c.Id != Id);
+        if (isDuplicateSlug)
+        {
+            errorMessage = $"A campaign with slug '{cleanSlug}' already exists. Please customize the slug.";
+            return;
+        }
+
+        DateTimeOffset? startOffset = Input.StartDate.HasValue
+            ? new DateTimeOffset(DateTime.SpecifyKind(Input.StartDate.Value, DateTimeKind.Utc))
+            : null;
+
+        DateTimeOffset? endOffset = Input.EndDate.HasValue
+            ? new DateTimeOffset(DateTime.SpecifyKind(Input.EndDate.Value, DateTimeKind.Utc))
+            : null;
+
+        saving = true;
+        try
+        {
+            if (Id == 0)
+            {
+                var newCampaign = new Campaign
+                {
+                    Name = cleanName,
+                    Slug = cleanSlug,
+                    BanglaName = string.IsNullOrWhiteSpace(Input.BanglaName) ? null : Input.BanglaName.Trim(),
+                    Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim(),
+                    Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
+                    BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim(),
+                    MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim(),
+                    StartDate = startOffset,
+                    EndDate = endOffset,
+                    ShowCountdown = Input.ShowCountdown,
+                    ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim(),
+                    HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant(),
+                    TagId = Input.TagId,
+                    CuratedProductIds = [.. Input.CuratedProductIds],
+                    IsActive = Input.IsActive,
+                    SortOrder = Input.SortOrder,
+                    MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim(),
+                    MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim(),
+                    OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim()
+                };
+                Db.Campaigns.Add(newCampaign);
+            }
+            else
+            {
+                var existing = await Db.Campaigns.FindAsync(Id);
+                if (existing != null)
+                {
+                    existing.Name = cleanName;
+                    existing.Slug = cleanSlug;
+                    existing.BanglaName = string.IsNullOrWhiteSpace(Input.BanglaName) ? null : Input.BanglaName.Trim();
+                    existing.Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim();
+                    existing.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
+                    existing.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
+                    existing.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
+                    existing.StartDate = startOffset;
+                    existing.EndDate = endOffset;
+                    existing.ShowCountdown = Input.ShowCountdown;
+                    existing.ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim();
+                    existing.HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant();
+                    existing.TagId = Input.TagId;
+                    existing.CuratedProductIds = [.. Input.CuratedProductIds];
+                    existing.IsActive = Input.IsActive;
+                    existing.SortOrder = Input.SortOrder;
+                    existing.MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim();
+                    existing.MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim();
+                    existing.OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim();
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            await CampaignSvc.InvalidateCacheAsync(cleanSlug);
+            Nav.NavigateTo("/admin/campaigns?saved=true");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save campaign: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

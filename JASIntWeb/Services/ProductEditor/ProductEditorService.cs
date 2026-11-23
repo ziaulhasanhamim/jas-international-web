@@ -63,13 +63,14 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         var draft = new ProductEditorDraft { Id = id };
         if (id > 0)
         {
-            var p = await db.Products.IgnoreQueryFilters().AsNoTracking().Include(p => p.ProductImages).SingleOrDefaultAsync(p => p.Id == id, ct)
+            var p = await db.Products.IgnoreQueryFilters().AsNoTracking().Include(p => p.ProductImages).Include(p => p.ProductTags).SingleOrDefaultAsync(p => p.Id == id, ct)
                 ?? throw new ProductEditorException(404, "Product not found.");
             draft.Revision = p.CatalogRevision;
             draft.Information = new() { Name = p.Name, Slug = p.Slug, CategoryId = p.CategoryId, BrandId = p.BrandId, Description = p.Description ?? "", Details = p.Details,
                 Image = p.MainImageUrl, Images = string.Join('\n', p.ProductImages.OrderBy(i => i.SortOrder).Select(i => i.ImageUrl)), Hidden = p.IsDeleted,
                 Featured = p.IsFeatured, NewArrival = p.IsNewArrival, MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription, OgImageUrl = p.OgImageUrl,
-                Synonyms = p.Synonyms, BanglaName = p.BanglaName, BanglaDescription = p.BanglaDescription, WarrantyInfo = p.WarrantyInfo };
+                Synonyms = p.Synonyms, BanglaName = p.BanglaName, BanglaDescription = p.BanglaDescription, WarrantyInfo = p.WarrantyInfo,
+                TagIds = p.ProductTags.Select(pt => pt.TagId).ToList() };
             var attributes = await db.ProductAttributeDefinitions.AsNoTracking().Include(a => a.AttributeDefinition).Include(a => a.Options).Where(a => a.ProductId == id).OrderBy(a => a.SortOrder).ThenBy(a => a.Id).ToListAsync(ct);
             draft.Attributes = attributes.Select(a => new EditorAttribute { DefinitionId = a.AttributeDefinitionId, Name = a.AttributeDefinition!.Name, Required = a.IsRequired,
                 Retired = a.IsRetired, Fields = ProductEditorRules.DecodeFields(a.MetadataSchemaJson), SwatchField = a.SwatchFieldKey,
@@ -87,7 +88,9 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         var global = await db.AttributeDefinitions.AsNoTracking().Include(a => a.Options).OrderBy(a => a.Name).ToListAsync(ct);
         var templates = global.Select(a => new EditorAttributeTemplate(a.Id, a.Name, ProductEditorRules.DecodeFields(a.MetadataSchemaJson), a.SwatchFieldKey,
             a.Options.OrderBy(o => o.Value).Select(o => new EditorOption { SuggestionId = o.Id, Value = o.Value, Code = o.Code, Metadata = ProductEditorRules.DecodeMetadata(o.MetadataJson) }).ToList())).ToList();
-        return new(draft, await catalog.CategoriesAsync(), await catalog.BrandsAsync(), templates, configuration["PublicBaseUrl"] ?? "https://www.jasinternational.com.bd");
+        var tags = await db.Tags.AsNoTracking().Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
+            .Select(t => new TagDto(t.Id, t.Name, t.Slug, t.IsHidden, t.BadgeColor, t.SortOrder, 0)).ToListAsync(ct);
+        return new(draft, await catalog.CategoriesAsync(), await catalog.BrandsAsync(), templates, configuration["PublicBaseUrl"] ?? "https://www.jasinternational.com.bd", tags);
     }
     public async Task<EditorCommit> SaveAsync(int actor, EditorSave command, CancellationToken ct)
     {
@@ -115,6 +118,16 @@ public sealed partial class ProductEditorService(AppDbContext db, AdminService a
         await SaveVariantsAsync(id, draft, options, command.OperationId, actor, ct);
         if (!draft.Information.Hidden && !await db.ProductVariants.AnyAsync(v => v.ProductId == id && !v.IsDeleted && v.IsActive && v.IsDefault && v.SellingPrice > 0, ct))
             throw Invalid("Publish", "Publishing needs exactly one active default variant with a positive price.");
+
+        // Synchronize product tags
+        var existingTags = await db.ProductTags.Where(pt => pt.ProductId == id).ToListAsync(ct);
+        var desiredTagIds = draft.Information.TagIds?.ToHashSet() ?? [];
+        var tagsToRemove = existingTags.Where(pt => !desiredTagIds.Contains(pt.TagId)).ToList();
+        var currentTagIds = existingTags.Select(pt => pt.TagId).ToHashSet();
+        var tagsToAdd = desiredTagIds.Where(tid => !currentTagIds.Contains(tid)).Select(tid => new ProductTag { ProductId = id, TagId = tid }).ToList();
+        if (tagsToRemove.Count > 0) db.ProductTags.RemoveRange(tagsToRemove);
+        if (tagsToAdd.Count > 0) db.ProductTags.AddRange(tagsToAdd);
+
         Record(actor, command.OperationId, id, product.CatalogRevision, "product", hash);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

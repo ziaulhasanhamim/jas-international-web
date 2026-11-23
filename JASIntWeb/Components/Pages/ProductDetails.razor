@@ -201,7 +201,7 @@ else
 
             <!-- Right: Product Information & Purchase -->
             <div>
-                <div class="flex items-center gap-2 mb-2">
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
                     <span class="text-xs font-bold uppercase tracking-widest text-blue-600">@product.Category</span>
                     @if (!string.IsNullOrEmpty(product.BrandName))
                     {
@@ -209,6 +209,16 @@ else
                         <a href="/products?brand=@product.BrandSlug" class="text-xs font-semibold text-slate-500 hover:text-blue-600 transition">
                             @product.BrandName
                         </a>
+                    }
+                    @if (product.Tags.Count > 0)
+                    {
+                        <span class="text-slate-300">•</span>
+                        @foreach (var tag in product.Tags)
+                        {
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border @TagDto.GetBadgeClasses(tag.BadgeColor)">
+                                @tag.Name
+                            </span>
+                        }
                     }
                 </div>
                 <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 leading-snug">@product.Name</h1>
