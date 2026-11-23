@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace JASIntWeb.Persistence.Migrations;
 
 /// <inheritdoc />
-public partial class _20261123111453_AddProductTagsCouponRulesAndCampaigns : Migration
+public partial class _20261123123925_AddProductTagsCouponRulesAndCampaigns : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,37 +17,43 @@ public partial class _20261123111453_AddProductTagsCouponRulesAndCampaigns : Mig
             name: "ExcludedBrandIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.AddColumn<List<int>>(
             name: "ExcludedCategoryIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.AddColumn<List<int>>(
             name: "ExcludedTagIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.AddColumn<List<int>>(
             name: "IncludedBrandIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.AddColumn<List<int>>(
             name: "IncludedCategoryIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.AddColumn<List<int>>(
             name: "IncludedTagIds",
             table: "Coupons",
             type: "integer[]",
-            nullable: false);
+            nullable: false,
+            defaultValueSql: "'{}'");
 
         migrationBuilder.CreateTable(
             name: "Tags",
@@ -92,7 +98,7 @@ public partial class _20261123111453_AddProductTagsCouponRulesAndCampaigns : Mig
                 ThemeColor = table.Column<string>(type: "text", nullable: false),
                 HighlightCouponCode = table.Column<string>(type: "text", nullable: true),
                 TagId = table.Column<int>(type: "integer", nullable: true),
-                CuratedProductIds = table.Column<List<int>>(type: "integer[]", nullable: false),
+                CuratedProductIds = table.Column<List<int>>(type: "integer[]", nullable: false, defaultValueSql: "'{}'"),
                 IsActive = table.Column<bool>(type: "boolean", nullable: false),
                 SortOrder = table.Column<int>(type: "integer", nullable: false),
                 MetaTitle = table.Column<string>(type: "text", nullable: true),

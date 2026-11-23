@@ -63,6 +63,12 @@ internal static class CommerceModel
         b.Entity<Product>().HasIndex(x => new { x.IsDeleted, x.BrandId, x.CreatedAt });
         b.Entity<Coupon>().HasIndex(x => x.Code).IsUnique();
         b.Entity<Coupon>().HasIndex(x => new { x.IsActive, x.ExpiryDate });
+        b.Entity<Coupon>().Property(x => x.IncludedCategoryIds).HasDefaultValueSql("'{}'");
+        b.Entity<Coupon>().Property(x => x.ExcludedCategoryIds).HasDefaultValueSql("'{}'");
+        b.Entity<Coupon>().Property(x => x.IncludedBrandIds).HasDefaultValueSql("'{}'");
+        b.Entity<Coupon>().Property(x => x.ExcludedBrandIds).HasDefaultValueSql("'{}'");
+        b.Entity<Coupon>().Property(x => x.IncludedTagIds).HasDefaultValueSql("'{}'");
+        b.Entity<Coupon>().Property(x => x.ExcludedTagIds).HasDefaultValueSql("'{}'");
         b.Entity<Order>().HasIndex(x => x.PaymentReferenceCode);
         b.Entity<Order>().HasIndex(x => x.TransactionId);
         b.Entity<ProductTag>().HasKey(x => new { x.ProductId, x.TagId });
@@ -79,5 +85,6 @@ internal static class CommerceModel
         b.Entity<Tag>().HasIndex(x => x.Slug).IsUnique().HasFilter("NOT \"IsDeleted\"");
         b.Entity<Campaign>().HasIndex(x => x.Slug).IsUnique();
         b.Entity<Campaign>().HasIndex(x => new { x.IsActive, x.SortOrder });
+        b.Entity<Campaign>().Property(x => x.CuratedProductIds).HasDefaultValueSql("'{}'");
     }
 }

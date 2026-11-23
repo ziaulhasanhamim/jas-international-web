@@ -18,7 +18,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261123111453_AddProductTagsCouponRulesAndCampaigns";
+    public override string LastMigrationId => "20261123123925_AddProductTagsCouponRulesAndCampaigns";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -189,9 +189,11 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("CreatedByUserId")
                     .HasColumnType("integer");
 
-                b.PrimitiveCollection<List<int>>("CuratedProductIds")
+                b.Property<List<int>>("CuratedProductIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
                 b.Property<string>("Description")
                     .HasColumnType("text");
@@ -580,32 +582,44 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<decimal>("DiscountValue")
                     .HasColumnType("numeric");
 
-                b.PrimitiveCollection<List<int>>("ExcludedBrandIds")
+                b.Property<List<int>>("ExcludedBrandIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
-                b.PrimitiveCollection<List<int>>("ExcludedCategoryIds")
+                b.Property<List<int>>("ExcludedCategoryIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
-                b.PrimitiveCollection<List<int>>("ExcludedTagIds")
+                b.Property<List<int>>("ExcludedTagIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
                 b.Property<DateTimeOffset?>("ExpiryDate")
                     .HasColumnType("timestamp with time zone");
 
-                b.PrimitiveCollection<List<int>>("IncludedBrandIds")
+                b.Property<List<int>>("IncludedBrandIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
-                b.PrimitiveCollection<List<int>>("IncludedCategoryIds")
+                b.Property<List<int>>("IncludedCategoryIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
-                b.PrimitiveCollection<List<int>>("IncludedTagIds")
+                b.Property<List<int>>("IncludedTagIds")
                     .IsRequired()
-                    .HasColumnType("integer[]");
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer[]")
+                    .HasDefaultValueSql("'{}'");
 
                 b.Property<bool>("IsActive")
                     .HasColumnType("boolean");
