@@ -203,9 +203,9 @@
     private string searchQuery = "";
     private System.Threading.Timer? _debounceTimer;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadTags();
+        await LoadTagsAsync();
     }
 
     private void OnSearchInput()
@@ -213,21 +213,21 @@
         _debounceTimer?.Dispose();
         _debounceTimer = new System.Threading.Timer(_ =>
         {
-            InvokeAsync(() =>
+            InvokeAsync(async () =>
             {
-                LoadTags();
+                await LoadTagsAsync();
                 StateHasChanged();
             });
         }, null, 300, Timeout.Infinite);
     }
 
-    private void ClearSearch()
+    private async Task ClearSearch()
     {
         searchQuery = "";
-        LoadTags();
+        await LoadTagsAsync();
     }
 
-    private void LoadTags()
+    private async Task LoadTagsAsync()
     {
         var q = Db.Tags.AsNoTracking()
             .Where(t => !t.IsDeleted);
@@ -238,7 +238,7 @@
             q = q.Where(t => t.Name.ToLower().Contains(term) || t.Slug.ToLower().Contains(term) || (t.Description != null && t.Description.ToLower().Contains(term)));
         }
 
-        tagsQuery = q.OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
+        var list = await q.OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
             .Select(t => new AdminTagRow(
                 t.Id,
                 t.Name,
@@ -248,7 +248,10 @@
                 t.BadgeColor,
                 t.SortOrder,
                 t.ProductTags.Count(pt => !pt.Product.IsDeleted)
-            ));
+            ))
+            .ToListAsync();
+
+        tagsQuery = list.AsQueryable();
     }
 
     public void Dispose()
@@ -336,7 +339,7 @@
 
             await Db.SaveChangesAsync();
             CloseEditor();
-            LoadTags();
+            await LoadTagsAsync();
         }
         catch (Exception ex)
         {
@@ -357,7 +360,7 @@
             tag.DeletedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
             _toast = $"Tag '{tag.Name}' deleted.";
-            LoadTags();
+            await LoadTagsAsync();
         }
     }
 
