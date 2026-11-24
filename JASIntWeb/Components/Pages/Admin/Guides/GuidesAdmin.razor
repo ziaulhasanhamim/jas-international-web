@@ -67,7 +67,7 @@
         <div class="rounded-xl border border-slate-200/90 overflow-hidden">
             <div class="table-scroll">
                 <QuickGrid Items="@guidesQuery" class="data-table">
-                    <PropertyColumn Property="@(g => g.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+                    <PropertyColumn Property="@(g => g.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                     <TemplateColumn Title="Guide">
                         <div class="flex items-center gap-3">

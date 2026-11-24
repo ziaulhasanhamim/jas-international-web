@@ -35,13 +35,13 @@
             <AntiforgeryToken />
             <div class="table-scroll brands-desktop">
                 <QuickGrid Items="brandsQuery" class="data-table brand-table">
-                    <PropertyColumn Property="@(b => b.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
-                    <TemplateColumn Title="Brand"><HeaderTemplate><AdminSortHeader Label="Brand" SortKey="Name" /></HeaderTemplate><ChildContent><BrandIdentity Id="context.Id" Name="@context.Name" Slug="@context.Slug" Logo="@context.LogoUrl" /></ChildContent></TemplateColumn>
-                    <TemplateColumn Title="Homepage"><ChildContent><BrandFeaturedToggle Id="context.Id" Name="@context.Name" Featured="context.IsFeatured" /></ChildContent></TemplateColumn>
-                    <PropertyColumn Property="@(b => b.SortOrder)" Title="Position"><HeaderTemplate><AdminSortHeader Label="Position" SortKey="SortOrder" /></HeaderTemplate></PropertyColumn>
-                    <PropertyColumn Property="@(b => b.ProductCount)" Title="Products"><HeaderTemplate><AdminSortHeader Label="Products" SortKey="ProductCount" /></HeaderTemplate></PropertyColumn>
-                    <TemplateColumn Title="Status"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsDeleted" /></HeaderTemplate><ChildContent><span class="brand-status @(context.IsDeleted ? "is-hidden" : "")">@(context.IsDeleted ? "Hidden" : "Active")</span></ChildContent></TemplateColumn>
-                    <TemplateColumn Title="Actions" Align="Align.End"><ChildContent><BrandActions Id="context.Id" Name="@context.Name" Hidden="context.IsDeleted" ProductCount="context.ProductCount" /></ChildContent></TemplateColumn>
+                    <PropertyColumn Property="@(b => b.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
+                    <TemplateColumn Title="Brand" Class="col-brand min-w-[220px]"><HeaderTemplate><AdminSortHeader Label="Brand" SortKey="Name" /></HeaderTemplate><ChildContent><BrandIdentity Id="context.Id" Name="@context.Name" Slug="@context.Slug" Logo="@context.LogoUrl" /></ChildContent></TemplateColumn>
+                    <TemplateColumn Title="Homepage" Class="w-28 text-center" Align="Align.Center"><ChildContent><BrandFeaturedToggle Id="context.Id" Name="@context.Name" Featured="context.IsFeatured" /></ChildContent></TemplateColumn>
+                    <PropertyColumn Property="@(b => b.SortOrder)" Title="Position" Class="w-20 text-center" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Position" SortKey="SortOrder" /></HeaderTemplate></PropertyColumn>
+                    <PropertyColumn Property="@(b => b.ProductCount)" Title="Products" Class="w-24 text-center font-semibold" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Products" SortKey="ProductCount" /></HeaderTemplate></PropertyColumn>
+                    <TemplateColumn Title="Status" Class="w-24 text-center" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Status" SortKey="IsDeleted" /></HeaderTemplate><ChildContent><span class="brand-status @(context.IsDeleted ? "is-hidden" : "")">@(context.IsDeleted ? "Hidden" : "Active")</span></ChildContent></TemplateColumn>
+                    <TemplateColumn Title="Actions" Class="w-44 text-right" Align="Align.End"><ChildContent><BrandActions Id="context.Id" Name="@context.Name" Hidden="context.IsDeleted" ProductCount="context.ProductCount" /></ChildContent></TemplateColumn>
                 </QuickGrid>
             </div>
             <div class="brands-mobile">

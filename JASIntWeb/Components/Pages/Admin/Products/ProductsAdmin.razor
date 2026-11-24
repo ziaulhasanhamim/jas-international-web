@@ -136,7 +136,7 @@
                     </ChildContent>
                 </TemplateColumn>
 
-                <PropertyColumn Property="@(p => p.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+                <PropertyColumn Property="@(p => p.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                 <TemplateColumn Title="Product Name & Slug" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product Name & Slug" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-3">

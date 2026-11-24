@@ -26,6 +26,7 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@optionsQuery" class="data-table">
+            <PropertyColumn Property="@(o => o.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
             <TemplateColumn Title="Display Value" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Display Value" SortKey="Value" /></HeaderTemplate><ChildContent>
                 <strong class="text-slate-900 block font-semibold text-xs">@context.Value</strong>
             </ChildContent></TemplateColumn>

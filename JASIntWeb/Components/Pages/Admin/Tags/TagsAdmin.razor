@@ -58,9 +58,9 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@tagsQuery" class="data-table">
-            <PropertyColumn Property="@(t => t.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+            <PropertyColumn Property="@(t => t.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
-            <TemplateColumn Title="Tag Name">
+            <TemplateColumn Title="Tag Name" Class="min-w-[180px]">
                 <div class="flex items-center gap-2">
                     <span class="size-2.5 rounded-full @GetColorDotClass(context.BadgeColor)"></span>
                     <strong class="font-bold text-slate-900 text-sm">@context.Name</strong>
@@ -79,17 +79,17 @@
                 }
             </TemplateColumn>
 
-            <PropertyColumn Property="@(t => t.Slug)" Title="Slug" Class="font-mono text-xs text-slate-500" />
+            <PropertyColumn Property="@(t => t.Slug)" Title="Slug" Class="font-mono text-xs text-slate-500 w-36" />
 
-            <TemplateColumn Title="Products Assigned">
+            <TemplateColumn Title="Products Assigned" Class="text-center w-36" Align="Align.Center">
                 <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-                    📦 @context.ProductTags.Count(pt => !pt.Product.IsDeleted) products
+                    📦 @context.ProductCount products
                 </span>
             </TemplateColumn>
 
-            <PropertyColumn Property="@(t => t.SortOrder)" Title="Sort" Sortable="true" Class="text-xs text-slate-500" />
+            <PropertyColumn Property="@(t => t.SortOrder)" Title="Sort" Sortable="true" Class="text-xs text-slate-500 text-center w-20" Align="Align.Center" />
 
-            <TemplateColumn Title="Actions" Class="text-right">
+            <TemplateColumn Title="Actions" Class="text-right w-32" Align="Align.End">
                 <div class="flex items-center justify-end gap-1.5">
                     <button type="button" @onclick="() => OpenEdit(context)" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-blue-600 hover:bg-blue-50 transition cursor-pointer">
                         Edit
@@ -183,7 +183,18 @@
 }
 
 @code {
-    private IQueryable<Tag> tagsQuery = default!;
+    public sealed record AdminTagRow(
+        int Id,
+        string Name,
+        string Slug,
+        string? Description,
+        bool IsHidden,
+        string? BadgeColor,
+        int SortOrder,
+        int ProductCount
+    );
+
+    private IQueryable<AdminTagRow> tagsQuery = default!;
     private TagFormModel? formModel;
     private bool showEditor;
     private bool saving;
@@ -218,9 +229,8 @@
 
     private void LoadTags()
     {
-        IQueryable<Tag> q = Db.Tags.AsNoTracking()
-            .Where(t => !t.IsDeleted)
-            .Include(t => t.ProductTags);
+        var q = Db.Tags.AsNoTracking()
+            .Where(t => !t.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
@@ -228,7 +238,17 @@
             q = q.Where(t => t.Name.ToLower().Contains(term) || t.Slug.ToLower().Contains(term) || (t.Description != null && t.Description.ToLower().Contains(term)));
         }
 
-        tagsQuery = q.OrderBy(t => t.SortOrder).ThenBy(t => t.Name);
+        tagsQuery = q.OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
+            .Select(t => new AdminTagRow(
+                t.Id,
+                t.Name,
+                t.Slug,
+                t.Description,
+                t.IsHidden,
+                t.BadgeColor,
+                t.SortOrder,
+                t.ProductTags.Count(pt => !pt.Product.IsDeleted)
+            ));
     }
 
     public void Dispose()
@@ -243,7 +263,7 @@
         showEditor = true;
     }
 
-    private void OpenEdit(Tag tag)
+    private void OpenEdit(AdminTagRow tag)
     {
         formModel = new TagFormModel
         {

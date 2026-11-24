@@ -201,7 +201,7 @@ body {
     }
 
     .data-table {
-        @apply w-full text-left text-sm;
+        @apply w-full text-left text-sm border-collapse;
     }
 
     .data-table thead {
@@ -209,15 +209,61 @@ body {
     }
 
     .data-table th {
-        @apply px-4 py-3 sm:px-5 font-semibold border-b border-slate-200;
+        @apply px-4 py-3 sm:px-5 font-semibold border-b border-slate-200 text-slate-600;
     }
 
     .data-table td {
-        @apply px-4 py-3 sm:px-5 sm:py-3.5 text-slate-600 border-b border-slate-100;
+        @apply px-4 py-3 sm:px-5 sm:py-3.5 text-slate-600 border-b border-slate-100 align-middle;
     }
 
     .data-table tbody tr {
         @apply hover:bg-indigo-50/20 transition-colors;
+    }
+
+    /* QuickGrid column alignments */
+    .data-table th.col-justify-center,
+    .data-table td.col-justify-center {
+        text-align: center;
+    }
+    .data-table th.col-justify-center .col-header-content {
+        justify-content: center;
+    }
+    .data-table th.col-justify-end,
+    .data-table td.col-justify-end {
+        text-align: right;
+    }
+    .data-table th.col-justify-end .col-header-content {
+        justify-content: flex-end;
+    }
+
+    /* Compact #ID column */
+    .data-table .col-id,
+    .data-table th.col-id,
+    .data-table td.col-id {
+        width: 4.5rem;
+        min-width: 4rem;
+        max-width: 5.5rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    /* QuickGrid built-in header content & buttons */
+    .data-table .col-header-content {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .data-table button.col-title,
+    .data-table a.col-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border: none;
+        background: none;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
     }
 
     /* Status Badges */

@@ -53,6 +53,7 @@
 
         <div class="table-scroll">
             <QuickGrid Items="@cartsQuery" class="data-table">
+                <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
                 <TemplateColumn Title="Customer / Contact">
                     <strong class="font-bold text-slate-900 text-xs block">@(string.IsNullOrWhiteSpace(context.Name) ? "Guest Customer" : context.Name)</strong>
                     <span class="font-mono text-2xs text-blue-600 mt-0.5 block">@context.Phone</span>

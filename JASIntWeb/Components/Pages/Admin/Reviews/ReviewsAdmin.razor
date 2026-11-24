@@ -91,7 +91,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@reviewsQuery" class="data-table">
-                <TemplateColumn Class="w-10 text-center">
+                <TemplateColumn Class="w-10 text-center" Align="Align.Center">
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-reviews"
                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -103,6 +103,8 @@
                                class="rev-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                     </ChildContent>
                 </TemplateColumn>
+
+                <PropertyColumn Property="@(r => r.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                 <TemplateColumn Title="Rating &amp; Title" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Rating &amp; Title" SortKey="Rating" /></HeaderTemplate><ChildContent>
                     <div class="space-y-1">

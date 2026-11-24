@@ -24,6 +24,7 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@slidesQuery" class="data-table">
+            <PropertyColumn Property="@(s => s.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
             <TemplateColumn Title="Slide Preview" Class="w-36">
                 <PictureImage Src="@context.ImageUrl" Alt="@context.ImageAlt" Class="h-14 w-28 object-cover rounded-lg border border-slate-200" Loading="lazy" Width="112" Height="56" />
             </TemplateColumn>

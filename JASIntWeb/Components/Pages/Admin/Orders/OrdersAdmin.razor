@@ -86,7 +86,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@ordersQuery" class="data-table">
-                <TemplateColumn Title="Order #" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Order #" SortKey="Id" /></HeaderTemplate><ChildContent>
+                <TemplateColumn Title="Order #" Sortable="false" Class="col-id font-mono text-xs w-20 text-center" Align="Align.Center"><HeaderTemplate><AdminSortHeader Label="Order #" SortKey="Id" /></HeaderTemplate><ChildContent>
                     <a href="/admin/orders/@context.Id" class="font-bold text-blue-600 hover:underline">
                         #@context.Id
                     </a>

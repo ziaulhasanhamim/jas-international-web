@@ -30,7 +30,7 @@
         <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <div class="table-scroll">
                 <QuickGrid Items="@notificationsQuery" class="data-table">
-                    <PropertyColumn Property="@(r => r.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+                    <PropertyColumn Property="@(r => r.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                     <TemplateColumn Title="Product / Option">
                         <div>

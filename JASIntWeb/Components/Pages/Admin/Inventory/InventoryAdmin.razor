@@ -75,6 +75,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@inventoryQuery" class="data-table">
+                <PropertyColumn Property="@(i => i.VariantId)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
                 <TemplateColumn Title="Product &amp; Variant SKU" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product &amp; Variant SKU" SortKey="ProductName" /></HeaderTemplate><ChildContent>
                     <div>
                         <strong class="text-slate-900 block font-semibold text-xs">@context.ProductName</strong>

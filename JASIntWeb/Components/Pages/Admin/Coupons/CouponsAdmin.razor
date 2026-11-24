@@ -55,7 +55,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@couponsQuery" class="data-table">
-                <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+                <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                 <TemplateColumn Title="Coupon Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Coupon Code" SortKey="Code" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-2">

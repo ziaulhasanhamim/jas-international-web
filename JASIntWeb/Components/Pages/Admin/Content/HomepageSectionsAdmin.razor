@@ -43,7 +43,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden mb-8">
         <div class="table-scroll">
             <QuickGrid Items="@sectionsQuery" class="data-table">
-                <PropertyColumn Property="@(s => s.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+                <PropertyColumn Property="@(s => s.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
 
                 <TemplateColumn Title="Order" Class="w-24 text-center">
                     <div class="flex items-center justify-center gap-1 font-mono font-bold text-slate-700">

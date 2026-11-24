@@ -82,6 +82,7 @@
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@featuredProductsQuery" class="data-table">
+                <PropertyColumn Property="@(p => p.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
                 <TemplateColumn Title="Product" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-3">
                         <PictureImage
