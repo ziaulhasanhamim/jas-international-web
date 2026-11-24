@@ -85,6 +85,7 @@
             value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Search categories..."
+            oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
         />
         <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
@@ -127,6 +128,8 @@
                                class="cat-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                     </ChildContent>
                 </TemplateColumn>
+
+                <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
 
                 <TemplateColumn Title="Category Name" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Category Name" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex min-w-0 items-center gap-2.5">

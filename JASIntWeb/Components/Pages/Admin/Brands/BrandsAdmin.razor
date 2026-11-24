@@ -17,7 +17,7 @@
         <form method="get" data-enhance class="brand-search" role="search">
             <input type="hidden" name="status" value="@Filter" />
             <label class="sr-only" for="brand-search">Search brands</label>
-            <input id="brand-search" name="q" value="@Query" placeholder="Search brands…" />
+            <input id="brand-search" name="q" value="@Query" placeholder="Search brands…" oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" />
             <button type="submit" aria-label="Search brands"><Icon Name="search" Class="size-4" /></button>
         </form>
     </div>
@@ -35,6 +35,7 @@
             <AntiforgeryToken />
             <div class="table-scroll brands-desktop">
                 <QuickGrid Items="brandsQuery" class="data-table brand-table">
+                    <PropertyColumn Property="@(b => b.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
                     <TemplateColumn Title="Brand"><HeaderTemplate><AdminSortHeader Label="Brand" SortKey="Name" /></HeaderTemplate><ChildContent><BrandIdentity Id="context.Id" Name="@context.Name" Slug="@context.Slug" Logo="@context.LogoUrl" /></ChildContent></TemplateColumn>
                     <TemplateColumn Title="Homepage"><ChildContent><BrandFeaturedToggle Id="context.Id" Name="@context.Name" Featured="context.IsFeatured" /></ChildContent></TemplateColumn>
                     <PropertyColumn Property="@(b => b.SortOrder)" Title="Position"><HeaderTemplate><AdminSortHeader Label="Position" SortKey="SortOrder" /></HeaderTemplate></PropertyColumn>

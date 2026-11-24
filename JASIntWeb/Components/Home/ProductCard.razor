@@ -37,12 +37,12 @@
     <div class="px-4 pb-4 pt-1 flex flex-col flex-1 text-center">
         <!-- Brand Badge -->
         <div class="flex items-center justify-center gap-1.5 mb-1.5 min-h-[22px] flex-wrap">
-            @if (Product.Tags.Count > 0)
+            @if (Product.TopTag is not null)
             {
-                var topTag = Product.Tags[0];
-                <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border @TagDto.GetBadgeClasses(topTag.BadgeColor)">
+                var topTag = Product.TopTag;
+                <a href="/products?tag=@topTag.Slug" @onclick:stopPropagation="true" class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border hover:opacity-85 transition @TagDto.GetBadgeClasses(topTag.BadgeColor)" title="View all @topTag.Name products">
                     @topTag.Name
-                </span>
+                </a>
             }
             @if (!string.IsNullOrWhiteSpace(Product.BrandName))
             {

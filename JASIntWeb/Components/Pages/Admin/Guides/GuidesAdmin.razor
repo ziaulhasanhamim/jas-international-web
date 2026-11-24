@@ -2,12 +2,13 @@
 @using JASIntWeb.Persistence
 @using JASIntWeb.Persistence.Entities
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
 @inject AppDbContext Db
 @inject NavigationManager Nav
 
 <PageTitle>Buying Guides · JAS Admin</PageTitle>
 
-<AdminPageHeader Title="Buying Guides" Eyebrow="Storefront Content & SEO" Description="Create and manage comprehensive tech buying guides, model comparisons and product recommendations." ActionHref="/admin/guides/new" ActionText="Write guide" ActionEnhance="false" />
+<AdminPageHeader Title="Buying Guides" Eyebrow="Storefront Content & SEO" Description="Create and manage comprehensive tech buying guides, model comparisons and product recommendations using database QuickGrid." ActionHref="/admin/guides/new" ActionText="Write guide" ActionEnhance="false" />
 
 @if (!string.IsNullOrWhiteSpace(_toast))
 {
@@ -36,14 +37,18 @@
         <!-- Search Form -->
         <form method="get" data-enhance class="relative max-w-xs w-full">
             <input type="hidden" name="status" value="@Filter" />
-            <input name="q" value="@Query" placeholder="Search guides…" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition" />
+            <input name="q" value="@Query" placeholder="Search guides…" oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition" />
             <span class="absolute left-3 top-2.5 text-slate-400">
                 <Icon Name="search" Class="size-3.5" />
             </span>
+            @if (!string.IsNullOrWhiteSpace(Query))
+            {
+                <a href="@FilterUrl(Filter)" class="absolute right-3 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs">✕</a>
+            }
         </form>
     </div>
 
-    <!-- Guides List / Table -->
+    <!-- Guides QuickGrid Table -->
     @if (filteredGuides.Count == 0)
     {
         <div class="py-12 text-center">
@@ -59,64 +64,71 @@
     }
     else
     {
-        <div class="divide-y divide-slate-100">
-            @foreach (var g in filteredGuides)
-            {
-                <article class="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:bg-slate-50/60 -mx-2 px-2 rounded-xl transition" @key="g.Id">
-                    <div class="flex items-center gap-4 min-w-0">
-                        @if (!string.IsNullOrWhiteSpace(g.FeaturedImageUrl))
-                        {
-                            <img src="@g.FeaturedImageUrl" alt="@g.Title" class="size-16 rounded-xl object-cover bg-slate-100 shrink-0 border border-slate-200/80" loading="lazy" />
-                        }
-                        else
-                        {
-                            <div class="size-16 rounded-xl bg-slate-100 shrink-0 border border-slate-200/80 flex items-center justify-center text-slate-400 font-bold text-xs">
-                                No cover
-                            </div>
-                        }
+        <div class="rounded-xl border border-slate-200/90 overflow-hidden">
+            <div class="table-scroll">
+                <QuickGrid Items="@guidesQuery" class="data-table">
+                    <PropertyColumn Property="@(g => g.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
 
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                <a href="/admin/guides/@g.Id/edit" data-enhance-nav="false" data-enhance="false" class="text-sm font-bold text-slate-900 hover:text-blue-600 transition truncate max-w-md">
-                                    @g.Title
-                                </a>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold @(g.IsPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")">
-                                    @(g.IsPublished ? "Published" : "Draft")
-                                </span>
-                                @if (g.HasBangla)
-                                {
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Includes Bangla translation">
-                                        বাংলা
-                                    </span>
-                                }
-                            </div>
-                            <div class="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-                                <span class="font-mono text-slate-500">/guides/@g.Slug</span>
-                                <span>•</span>
-                                <span>@g.PublishedAt.ToString("dd MMM yyyy")</span>
-                                <span>•</span>
-                                <span>@g.Author</span>
+                    <TemplateColumn Title="Guide">
+                        <div class="flex items-center gap-3">
+                            @if (!string.IsNullOrWhiteSpace(context.FeaturedImageUrl))
+                            {
+                                <img src="@context.FeaturedImageUrl" alt="@context.Title" class="size-12 rounded-lg object-cover bg-slate-100 shrink-0 border border-slate-200/80" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="size-12 rounded-lg bg-slate-100 shrink-0 border border-slate-200/80 flex items-center justify-center text-slate-400 font-bold text-[10px]">
+                                    No cover
+                                </div>
+                            }
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <a href="/admin/guides/@context.Id/edit" data-enhance-nav="false" data-enhance="false" class="text-sm font-bold text-slate-900 hover:text-blue-600 transition truncate max-w-sm">
+                                        @context.Title
+                                    </a>
+                                    @if (context.HasBangla)
+                                    {
+                                        <span class="inline-flex items-center px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Includes Bangla translation">
+                                            বাংলা
+                                        </span>
+                                    }
+                                </div>
+                                <span class="font-mono text-xs text-slate-400 block truncate max-w-xs">/guides/@context.Slug</span>
                             </div>
                         </div>
-                    </div>
+                    </TemplateColumn>
 
-                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        <a href="/guides/@g.Slug" target="_blank" class="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition" title="View live on storefront">
-                            <span class="text-xs font-semibold">Live ↗</span>
-                        </a>
-                        <a href="/admin/guides/@g.Id/edit" data-enhance-nav="false" data-enhance="false" class="btn-secondary text-xs !px-3 !py-1.5">
-                            Edit
-                        </a>
-                        <form method="post" @formname="@($"delete-guide-{g.Id}")" data-enhance class="inline">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="deleteId" value="@g.Id" />
-                            <button type="submit" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" onclick="return confirm('Delete this guide?');" title="Delete guide">
-                                <Icon Name="close" Class="size-4" />
-                            </button>
-                        </form>
-                    </div>
-                </article>
-            }
+                    <TemplateColumn Title="Status" Class="w-28 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold @(context.IsPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")">
+                            @(context.IsPublished ? "Published" : "Draft")
+                        </span>
+                    </TemplateColumn>
+
+                    <PropertyColumn Property="@(g => g.Author)" Title="Author" Class="text-xs text-slate-600" />
+
+                    <TemplateColumn Title="Published" Class="text-xs text-slate-500 w-32">
+                        @context.PublishedAt.ToString("dd MMM yyyy")
+                    </TemplateColumn>
+
+                    <TemplateColumn Title="Actions" Class="text-right w-36">
+                        <div class="flex items-center justify-end gap-1.5">
+                            <a href="/guides/@context.Slug" target="_blank" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition" title="View live on storefront">
+                                <span class="text-xs font-semibold">Live ↗</span>
+                            </a>
+                            <a href="/admin/guides/@context.Id/edit" data-enhance-nav="false" data-enhance="false" class="btn-secondary text-xs !px-2.5 !py-1">
+                                Edit
+                            </a>
+                            <form method="post" @formname="@($"delete-guide-{context.Id}")" data-enhance class="inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="deleteId" value="@context.Id" />
+                                <button type="submit" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" onclick="return confirm('Delete this guide?');" title="Delete guide">
+                                    <Icon Name="close" Class="size-3.5" />
+                                </button>
+                            </form>
+                        </div>
+                    </TemplateColumn>
+                </QuickGrid>
+            </div>
         </div>
     }
 </div>
@@ -137,6 +149,7 @@
     private string? _toast;
 
     private List<GuideRow> filteredGuides = [];
+    private IQueryable<GuideRow> guidesQuery => filteredGuides.AsQueryable();
 
     private record GuideRow(int Id, string Title, string Slug, string Author, DateTimeOffset PublishedAt, bool IsPublished, bool HasBangla, string? FeaturedImageUrl);
 

@@ -215,9 +215,9 @@ else
                         <span class="text-slate-300">•</span>
                         @foreach (var tag in product.Tags)
                         {
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border @TagDto.GetBadgeClasses(tag.BadgeColor)">
+                            <a href="/products?tag=@tag.Slug" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border hover:opacity-85 transition @TagDto.GetBadgeClasses(tag.BadgeColor)" title="View all @tag.Name products">
                                 @tag.Name
-                            </span>
+                            </a>
                         }
                     }
                 </div>

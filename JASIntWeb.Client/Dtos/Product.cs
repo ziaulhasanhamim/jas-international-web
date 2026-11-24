@@ -4,7 +4,7 @@ public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal
     int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,
     decimal? OriginalPrice = null, decimal Rating = 0m, int ReviewCount = 0, bool IsNewArrival = false, bool IsFeatured = false, bool RequiresVariantSelection = false)
 {
-    public List<TagDto> Tags { get; init; } = [];
+    public TagDto? TopTag { get; init; }
 }
 
 public sealed record HomepageSectionDto(

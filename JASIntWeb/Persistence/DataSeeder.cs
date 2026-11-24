@@ -579,6 +579,155 @@ public static class JsonTestDataSeeder
         }
         if (variantsWithoutCompare.Count > 0) await db.SaveChangesAsync(ct);
 
+        if (!await db.Tags.AnyAsync(ct))
+        {
+            var summerTag = new Tag
+            {
+                Name = "Summer Sale",
+                Slug = "summer-sale",
+                Description = "Special seasonal discounts on top summer tech essentials.",
+                BadgeColor = "amber",
+                SortOrder = 1,
+                IsHidden = false
+            };
+            var winterTag = new Tag
+            {
+                Name = "Winter Fest",
+                Slug = "winter-fest",
+                Description = "Warm up your winter with premium audio and wearables.",
+                BadgeColor = "blue",
+                SortOrder = 2,
+                IsHidden = false
+            };
+            var creatorTag = new Tag
+            {
+                Name = "Creator Essentials",
+                Slug = "creator-essentials",
+                Description = "Microphones, lights, and gear designed for content creators.",
+                BadgeColor = "indigo",
+                SortOrder = 3,
+                IsHidden = false
+            };
+            var flashTag = new Tag
+            {
+                Name = "Flash Deal",
+                Slug = "flash-deal",
+                Description = "Limited time fast-selling deals with extra markdowns.",
+                BadgeColor = "rose",
+                SortOrder = 4,
+                IsHidden = false
+            };
+            var b2bTag = new Tag
+            {
+                Name = "Clearance / B2B",
+                Slug = "clearance-b2b",
+                Description = "Internal wholesale & bulk inventory tag (hidden from customer store badges).",
+                BadgeColor = "slate",
+                SortOrder = 5,
+                IsHidden = true
+            };
+
+            db.Tags.AddRange(summerTag, winterTag, creatorTag, flashTag, b2bTag);
+            await db.SaveChangesAsync(ct);
+
+            var products = await db.Products.Take(12).ToListAsync(ct);
+            if (products.Count > 0)
+            {
+                var ptList = new List<ProductTag>();
+                for (var i = 0; i < products.Count; i++)
+                {
+                    var p = products[i];
+                    var assignedTag = (i % 4) switch
+                    {
+                        0 => summerTag,
+                        1 => creatorTag,
+                        2 => flashTag,
+                        3 => winterTag,
+                        _ => summerTag
+                    };
+                    ptList.Add(new ProductTag { ProductId = p.Id, TagId = assignedTag.Id });
+                }
+                db.ProductTags.AddRange(ptList);
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        if (!await db.Campaigns.AnyAsync(ct))
+        {
+            var summerTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "summer-sale", ct);
+            var creatorTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "creator-essentials", ct);
+            var flashTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "flash-deal", ct);
+
+            var sampleProducts = await db.Products.Take(8).Select(p => p.Id).ToListAsync(ct);
+
+            db.Campaigns.AddRange(
+                new Campaign
+                {
+                    Name = "Summer Tech Fest 2026",
+                    Slug = "summer-tech-fest",
+                    BanglaName = "সামার টেক ফেস্টিভ্যাল ২০২৬",
+                    Eyebrow = "SEASONAL MEGA EVENT",
+                    Description = "Up to 35% off on official AMOLED smartwatches, ANC wireless earbuds, and GaN fast chargers.",
+                    BannerImageUrl = "/jas-og-card.webp",
+                    MobileBannerImageUrl = "/jas-og-card.webp",
+                    StartDate = DateTimeOffset.UtcNow.AddDays(-1),
+                    EndDate = DateTimeOffset.UtcNow.AddDays(14),
+                    ShowCountdown = true,
+                    ThemeColor = "amber",
+                    HighlightCouponCode = "WELCOME200",
+                    TagId = summerTag?.Id,
+                    CuratedProductIds = sampleProducts.Take(6).ToList(),
+                    IsActive = true,
+                    SortOrder = 1,
+                    MetaTitle = "Summer Tech Fest 2026 - Jas International",
+                    MetaDescription = "Massive summer savings on genuine gadgets and tech accessories with 100% official brand warranty."
+                },
+                new Campaign
+                {
+                    Name = "Creator Audio Mega Sale",
+                    Slug = "creator-audio-mega-sale",
+                    BanglaName = "ক্রিয়েটর অডিও মেগা সেল",
+                    Eyebrow = "STUDIO & STREAMING GEAR",
+                    Description = "Exclusive discounts on studio microphones, audio interfaces, and noise-cancelling headphones.",
+                    BannerImageUrl = "/jas-og-card.webp",
+                    MobileBannerImageUrl = "/jas-og-card.webp",
+                    StartDate = DateTimeOffset.UtcNow.AddDays(-3),
+                    EndDate = DateTimeOffset.UtcNow.AddDays(7),
+                    ShowCountdown = true,
+                    ThemeColor = "indigo",
+                    HighlightCouponCode = "SAVE10",
+                    TagId = creatorTag?.Id,
+                    CuratedProductIds = sampleProducts.Skip(2).Take(6).ToList(),
+                    IsActive = true,
+                    SortOrder = 2,
+                    MetaTitle = "Creator Audio Mega Sale - Jas International",
+                    MetaDescription = "Equip your creative setup with studio-quality audio gear at unbeatable prices."
+                },
+                new Campaign
+                {
+                    Name = "Flash Weekend Deals",
+                    Slug = "flash-weekend-deals",
+                    BanglaName = "ফ্ল্যাশ উইকেন্ড ডিলস",
+                    Eyebrow = "LIMITED 48-HOUR FLASH",
+                    Description = "Supercharged weekend markdowns on high-capacity power banks and fast chargers.",
+                    BannerImageUrl = "/jas-og-card.webp",
+                    MobileBannerImageUrl = "/jas-og-card.webp",
+                    StartDate = DateTimeOffset.UtcNow,
+                    EndDate = DateTimeOffset.UtcNow.AddDays(2),
+                    ShowCountdown = true,
+                    ThemeColor = "crimson",
+                    HighlightCouponCode = "FREESHIP",
+                    TagId = flashTag?.Id,
+                    CuratedProductIds = sampleProducts.Skip(4).Take(4).ToList(),
+                    IsActive = true,
+                    SortOrder = 3,
+                    MetaTitle = "Flash Weekend Deals - Jas International",
+                    MetaDescription = "Grab genuine power banks and travel chargers before weekend deals expire."
+                }
+            );
+            await db.SaveChangesAsync(ct);
+        }
+
         // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery
         var hasPlaceholders = await db.Products.AnyAsync(p => p.MainImageUrl != null && p.MainImageUrl.Contains("placehold.co"), ct);
         var hasOldSlides = await db.CarouselSlides.AnyAsync(s => s.Title != null && (s.Title.Contains("Your tech") || s.Title.Contains("Find your everyday") || s.Title.Contains("iPhone") || s.Title.Contains("Galaxy S25")), ct);

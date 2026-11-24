@@ -103,7 +103,7 @@
             <input type="hidden" name="filter" value="@Filter" />
         }
         <div class="relative flex-1 min-w-[240px]">
-            <input name="q" value="@Query" class="field pr-9" placeholder="Search by email, name, or phone number..." />
+            <input name="q" value="@Query" class="field pr-9" placeholder="Search by email, name, or phone number..." oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" />
             <span class="absolute right-3 top-3 text-slate-400">
                 <Icon Name="search" Class="size-4" />
             </span>
@@ -120,6 +120,7 @@
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@usersQuery" class="data-table">
+            <PropertyColumn Property="@(u => u.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
             <TemplateColumn Title="User / Account" Sortable="false"><HeaderTemplate><AdminSortHeader Label="User / Account" SortKey="Email" /></HeaderTemplate><ChildContent>
                 <div class="flex items-center gap-3">
                     <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">

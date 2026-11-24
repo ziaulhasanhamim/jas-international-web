@@ -342,7 +342,14 @@ public sealed class CatalogService(
                 db.ProductReviews.Where(r => r.ProductId == p.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
                 db.ProductReviews.Count(r => r.ProductId == p.Id && r.IsApproved),
                 p.IsNewArrival,
-                p.IsFeatured, p.Attributes.Any()))
+                p.IsFeatured, p.Attributes.Any())
+            {
+                TopTag = p.ProductTags
+                    .Where(pt => !pt.Tag.IsDeleted && !pt.Tag.IsHidden)
+                    .OrderBy(pt => pt.Tag.SortOrder)
+                    .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
+                    .FirstOrDefault()
+            })
             .ToListAsync();
     }
 
@@ -467,8 +474,19 @@ public sealed class CatalogService(
     public void InvalidateAll() =>
         _ = InvalidateAllAsync();
 
+    public async Task<TagDto?> GetTagBySlugAsync(string slug, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(slug)) return null;
+        var normalized = slug.Trim().ToLowerInvariant();
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Tags.AsNoTracking()
+            .Where(t => t.Slug == normalized && !t.IsDeleted && !t.IsHidden)
+            .Select(t => new TagDto(t.Id, t.Name, t.Slug, t.IsHidden, t.BadgeColor, t.SortOrder, 0))
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<(List<ProductSummaryDto> Items, int Total)> SearchAsync(string? category, string? term,
-        string? sort, decimal? min, decimal? max, int page, int pageSize = 18, string? brand = null)
+        string? sort, decimal? min, decimal? max, int page, int pageSize = 18, string? brand = null, string? tag = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         pageSize = Math.Clamp(pageSize, 1, 48);
@@ -476,6 +494,10 @@ public sealed class CatalogService(
         if (!string.IsNullOrWhiteSpace(brand))
         {
             q = q.Where(p => p.Brand != null && p.Brand.Slug == brand);
+        }
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            q = q.Where(p => p.ProductTags.Any(pt => pt.Tag.Slug == tag && !pt.Tag.IsDeleted && !pt.Tag.IsHidden));
         }
         term = term?.Trim();
         if (!string.IsNullOrEmpty(term))
@@ -537,7 +559,14 @@ public sealed class CatalogService(
                     db.ProductReviews.Where(r => r.ProductId == p.Product.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 0m,
                     db.ProductReviews.Count(r => r.ProductId == p.Product.Id && r.IsApproved),
                     p.Product.IsNewArrival,
-                    p.Product.IsFeatured, p.Product.Attributes.Any()))
+                    p.Product.IsFeatured, p.Product.Attributes.Any())
+            {
+                TopTag = p.Product.ProductTags
+                    .Where(pt => !pt.Tag.IsDeleted && !pt.Tag.IsHidden)
+                    .OrderBy(pt => pt.Tag.SortOrder)
+                    .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
+                    .FirstOrDefault()
+            })
             .ToListAsync(), count);
     }
 }

@@ -140,14 +140,20 @@ else
                         }
                     </div>
 
-                    <!-- Banner Graphic -->
+                    <!-- Banner Graphic (Responsive Picture with Mobile Fallback) -->
                     @if (!string.IsNullOrWhiteSpace(campaign.BannerImageUrl))
                     {
                         <div class="lg:col-span-5">
-                            <div class="aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-white/20">
-                                <img src="@campaign.BannerImageUrl"
-                                     alt="@campaign.Name"
-                                     class="w-full h-full object-cover" />
+                            <div class="aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black/20">
+                                <picture>
+                                    @if (!string.IsNullOrWhiteSpace(campaign.MobileBannerImageUrl))
+                                    {
+                                        <source media="(max-width: 640px)" srcset="@campaign.MobileBannerImageUrl" />
+                                    }
+                                    <img src="@campaign.BannerImageUrl"
+                                         alt="@campaign.Name"
+                                         class="w-full h-full object-cover" />
+                                </picture>
                             </div>
                         </div>
                     }
@@ -155,19 +161,62 @@ else
             </div>
         </section>
 
+        @if (campaign.Products.Count > 0)
+        {
+            <!-- Category Chips & Social Share Toolbar -->
+            <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                    <!-- Category Filter Chips -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                        <button type="button" @onclick="() => selectedCategory = null"
+                                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer @(string.IsNullOrWhiteSpace(selectedCategory) ? "bg-slate-900 text-white shadow-2xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+                            All Deals (@campaign.Products.Count)
+                        </button>
+                        @foreach (var cat in AvailableCategories)
+                        {
+                            var count = campaign.Products.Count(p => p.Category == cat);
+                            <button type="button" @onclick="() => selectedCategory = cat"
+                                    class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer @(selectedCategory == cat ? "bg-slate-900 text-white shadow-2xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200")">
+                                @cat (@count)
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Social Sharing -->
+                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <span class="text-xs font-bold text-slate-400 mr-1">Share:</span>
+                        <a href="@($"https://api.whatsapp.com/send?text={Uri.EscapeDataString($"{campaign.Name} Deal: {Nav.Uri}")}")"
+                           target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition" title="Share via WhatsApp">
+                            <span>💬</span> WhatsApp
+                        </a>
+                        <a href="@($"https://www.facebook.com/sharer/sharer.php?u={Uri.EscapeDataString(Nav.Uri)}")"
+                           target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition" title="Share on Facebook">
+                            <span>👍</span> Facebook
+                        </a>
+                        <button type="button" @onclick="CopyShareLink"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer" title="Copy campaign link">
+                            <span>@(copiedLink ? "✓ Copied!" : "🔗 Copy Link")</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        }
+
         <!-- Deals Products Grid Section -->
-        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
             <div class="flex items-center justify-between mb-6 pb-3 border-b border-slate-200">
                 <div>
                     <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
-                        Featured Campaign Deals
+                        @(string.IsNullOrWhiteSpace(selectedCategory) ? "Featured Campaign Deals" : $"{selectedCategory} Deals")
                     </h2>
                     <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
-                        Grab verified original gear at special promotional prices.
+                        Grab verified original gear at special promotional prices with official warranty.
                     </p>
                 </div>
                 <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                    @campaign.Products.Count Product@(campaign.Products.Count == 1 ? "" : "s")
+                    @FilteredProducts.Count() Product@(FilteredProducts.Count() == 1 ? "" : "s")
                 </span>
             </div>
 
@@ -179,15 +228,45 @@ else
                     <p class="text-xs text-slate-500 mt-1">Products for this campaign are being loaded. Please check back shortly!</p>
                 </div>
             }
+            else if (!FilteredProducts.Any())
+            {
+                <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+                    <span class="text-3xl block mb-2">🔍</span>
+                    <h3 class="text-base font-bold text-slate-800">No deals in this category</h3>
+                    <p class="text-xs text-slate-500 mt-1">Select another category or view all deals.</p>
+                    <button type="button" @onclick="() => selectedCategory = null" class="btn-secondary text-xs mt-3">View All Deals</button>
+                </div>
+            }
             else
             {
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                    @foreach (var p in campaign.Products)
+                    @foreach (var p in FilteredProducts)
                     {
                         <ProductCard Product="@p" />
                     }
                 </div>
             }
+        </section>
+
+        <!-- Trust & Official Guarantee Banner -->
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-6 rounded-3xl bg-white border border-slate-200/90 shadow-2xs text-center">
+                <div class="space-y-1">
+                    <span class="text-2xl">🛡️</span>
+                    <h4 class="font-bold text-slate-900 text-sm">Official Warranty</h4>
+                    <p class="text-xs text-slate-500">100% authentic tech with manufacturer replacement warranty.</p>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-2xl">🚚</span>
+                    <h4 class="font-bold text-slate-900 text-sm">Fast Courier Delivery</h4>
+                    <p class="text-xs text-slate-500">Khulna local delivery in 24h, nationwide 64 districts in 48-72h.</p>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-2xl">⚡</span>
+                    <h4 class="font-bold text-slate-900 text-sm">Best Price Guarantee</h4>
+                    <p class="text-xs text-slate-500">Exclusive campaign discount pricing directly from authorized imports.</p>
+                </div>
+            </div>
         </section>
     </main>
 }
@@ -199,6 +278,16 @@ else
     private CampaignDetailsDto? campaign;
     private bool loading = true;
     private bool copiedCode;
+    private bool copiedLink;
+    private string? selectedCategory;
+
+    private IEnumerable<string> AvailableCategories =>
+        campaign?.Products.Select(p => p.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct() ?? [];
+
+    private IEnumerable<ProductSummaryDto> FilteredProducts =>
+        string.IsNullOrWhiteSpace(selectedCategory)
+            ? campaign?.Products ?? []
+            : (campaign?.Products.Where(p => p.Category == selectedCategory) ?? []);
 
     private int daysRemaining;
     private int hoursRemaining;
@@ -275,6 +364,18 @@ else
             copiedCode = true;
             await Task.Delay(2000);
             copiedCode = false;
+        }
+        catch { }
+    }
+
+    private async Task CopyShareLink()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Nav.Uri);
+            copiedLink = true;
+            await Task.Delay(2000);
+            copiedLink = false;
         }
         catch { }
     }

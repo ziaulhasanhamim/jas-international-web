@@ -79,6 +79,7 @@
                 value="@Query"
                 class="field pr-9 !py-1.5 text-xs"
                 placeholder="Search name, slug, SKU..."
+                oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
             />
             <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
                 <Icon Name="search" Class="size-3.5" />
@@ -134,6 +135,8 @@
                                class="prod-select-cb rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                     </ChildContent>
                 </TemplateColumn>
+
+                <PropertyColumn Property="@(p => p.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
 
                 <TemplateColumn Title="Product Name & Slug" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Product Name & Slug" SortKey="Name" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-3">

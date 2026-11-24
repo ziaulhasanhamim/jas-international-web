@@ -1,6 +1,7 @@
 @page "/admin/tags"
 @attribute [Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
+@implements IDisposable
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Persistence.Entities
@@ -38,9 +39,27 @@
     </div>
 }
 
+<!-- Search Bar with Debounce -->
+<div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="relative w-full max-w-xs">
+        <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
+               placeholder="Search tags by name, slug..."
+               class="shop-input text-xs pl-8 pr-8" />
+        <span class="absolute left-2.5 top-2.5 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+        @if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+        }
+    </div>
+</div>
+
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@tagsQuery" class="data-table">
+            <PropertyColumn Property="@(t => t.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+
             <TemplateColumn Title="Tag Name">
                 <div class="flex items-center gap-2">
                     <span class="size-2.5 rounded-full @GetColorDotClass(context.BadgeColor)"></span>
@@ -170,19 +189,51 @@
     private bool saving;
     private string? _toast;
     private string? errorMessage;
+    private string searchQuery = "";
+    private System.Threading.Timer? _debounceTimer;
 
     protected override void OnInitialized()
     {
         LoadTags();
     }
 
+    private void OnSearchInput()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                LoadTags();
+                StateHasChanged();
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
+        LoadTags();
+    }
+
     private void LoadTags()
     {
-        tagsQuery = Db.Tags.AsNoTracking()
+        IQueryable<Tag> q = Db.Tags.AsNoTracking()
             .Where(t => !t.IsDeleted)
-            .Include(t => t.ProductTags)
-            .OrderBy(t => t.SortOrder)
-            .ThenBy(t => t.Name);
+            .Include(t => t.ProductTags);
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            var term = searchQuery.Trim().ToLower();
+            q = q.Where(t => t.Name.ToLower().Contains(term) || t.Slug.ToLower().Contains(term) || (t.Description != null && t.Description.ToLower().Contains(term)));
+        }
+
+        tagsQuery = q.OrderBy(t => t.SortOrder).ThenBy(t => t.Name);
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
     }
 
     private void OpenCreate()

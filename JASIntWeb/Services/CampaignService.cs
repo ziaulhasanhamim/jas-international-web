@@ -143,11 +143,11 @@ public sealed class CampaignService(
                             p.IsNewArrival,
                             p.IsFeatured,
                             HasVariants = p.Attributes.Any(),
-                            Tags = p.ProductTags
+                            TopTag = p.ProductTags
                                 .Where(pt => !pt.Tag.IsDeleted && !pt.Tag.IsHidden)
                                 .OrderBy(pt => pt.Tag.SortOrder)
                                 .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
-                                .ToList()
+                                .FirstOrDefault()
                         });
 
                     var rawProducts = await query.ToListAsync(token);
@@ -164,7 +164,7 @@ public sealed class CampaignService(
                                 p.CompareAtPrice, p.Rating, p.ReviewCount, p.IsNewArrival,
                                 p.IsFeatured, p.HasVariants)
                             {
-                                Tags = p.Tags
+                                TopTag = p.TopTag
                             });
                         }
                     }

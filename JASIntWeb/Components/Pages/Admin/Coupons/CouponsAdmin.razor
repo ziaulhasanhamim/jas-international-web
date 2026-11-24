@@ -34,11 +34,29 @@
     </div>
 }
 
+<!-- Search Bar with Debounce -->
+<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <form method="get" data-enhance class="relative w-full max-w-xs">
+        <input name="q" value="@Query" placeholder="Search coupons by code, description..."
+               oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
+               class="shop-input text-xs pl-8 pr-8" />
+        <span class="absolute left-2.5 top-2.5 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+        @if (!string.IsNullOrWhiteSpace(Query))
+        {
+            <a href="/admin/coupons" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs">✕</a>
+        }
+    </form>
+</div>
+
 <form method="post" @formname="coupons-table-action" data-enhance>
     <AntiforgeryToken />
     <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
         <div class="table-scroll">
             <QuickGrid Items="@couponsQuery" class="data-table">
+                <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+
                 <TemplateColumn Title="Coupon Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Coupon Code" SortKey="Code" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-2">
                         <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
@@ -130,6 +148,9 @@
     [SupplyParameterFromQuery(Name = "page")]
     public int Page { get; set; } = 1;
 
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Query { get; set; }
+
     [SupplyParameterFromQuery(Name = "saved")]
     public bool Saved { get; set; }
 
@@ -162,6 +183,13 @@
 
         Page = Math.Max(1, Page);
         var q = Db.Coupons.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(Query))
+        {
+            var term = Query.Trim().ToLower();
+            q = q.Where(c => c.Code.ToLower().Contains(term) || (c.Description != null && c.Description.ToLower().Contains(term)));
+        }
+
         totalFiltered = await q.CountAsync();
 
         var list = await AdminSorting.Apply(q.OrderByDescending(c => c.CreatedAt), Nav, ("Code", c => c.Code), ("DiscountValue", c => c.DiscountValue), ("MinOrderAmount", c => c.MinOrderAmount ?? 0), ("MaxDiscountAmount", c => c.MaxDiscountAmount ?? 0), ("TimesUsed", c => c.TimesUsed), ("IsActive", c => c.IsActive))

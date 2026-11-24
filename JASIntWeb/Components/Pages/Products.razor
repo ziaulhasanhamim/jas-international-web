@@ -11,7 +11,8 @@
 @{
     var isSearch = !string.IsNullOrWhiteSpace(Query);
     var isCategory = !string.IsNullOrWhiteSpace(CategorySlug);
-    var hasFilterParams = !string.IsNullOrWhiteSpace(BrandSlug) || !string.IsNullOrWhiteSpace(Sort) || MinPrice.HasValue || MaxPrice.HasValue;
+    var isTag = !string.IsNullOrWhiteSpace(TagSlug);
+    var hasFilterParams = !string.IsNullOrWhiteSpace(BrandSlug) || !string.IsNullOrWhiteSpace(TagSlug) || !string.IsNullOrWhiteSpace(Sort) || MinPrice.HasValue || MaxPrice.HasValue;
 
     string seoTitle;
     string seoDesc;
@@ -22,6 +23,12 @@
     {
         seoTitle = $"“{Query}” Search Results | JAS International";
         seoDesc = $"Search results for “{Query}” at JAS International. Authentic tech gadgets, smartwatches, and accessories in Bangladesh.";
+        canonicalPath = "/products";
+    }
+    else if (isTag)
+    {
+        seoTitle = $"{activeTagName ?? "Tagged"} Products & Deals | JAS International";
+        seoDesc = $"Explore authentic gadgets and deals tagged with {activeTagName ?? "special offers"} at JAS International with warranty in Bangladesh.";
         canonicalPath = "/products";
     }
     else if (isCategory)
@@ -42,7 +49,11 @@
         ("Home", Seo.PublicBaseUrl),
         ("Products", $"{Seo.PublicBaseUrl}/products")
     };
-    if (isCategory && !string.IsNullOrWhiteSpace(activeCategoryName))
+    if (isTag && !string.IsNullOrWhiteSpace(activeTagName))
+    {
+        crumbs.Add(($"{activeTagName}", $"{Seo.PublicBaseUrl}/products?tag={TagSlug}"));
+    }
+    else if (isCategory && !string.IsNullOrWhiteSpace(activeCategoryName))
     {
         crumbs.Add((activeCategoryName, $"{Seo.PublicBaseUrl}{canonicalPath}"));
     }
@@ -83,10 +94,10 @@ else if (isCategory)
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
             <span class="text-xs font-bold uppercase tracking-widest text-blue-600 block mb-1">
-                @(CategorySlug != null ? "CATEGORY VIEW" : "PRODUCT CATALOG")
+                @(isTag ? "TAGGED COLLECTION" : (CategorySlug != null ? "CATEGORY VIEW" : "PRODUCT CATALOG"))
             </span>
             <h1 class="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900">
-                @(string.IsNullOrWhiteSpace(Query) ? (activeCategoryName ?? "All Gadgets & Gear") : $"Results for “{Query}”")
+                @(activeTagName != null ? $"{activeTagName} Deals" : (string.IsNullOrWhiteSpace(Query) ? (activeCategoryName ?? "All Gadgets & Gear") : $"Results for “{Query}”"))
             </h1>
         </div>
         <div class="flex items-center gap-2">
@@ -265,6 +276,15 @@ else if (isCategory)
                             <span class="text-blue-500 font-bold group-hover:text-blue-800">✕</span>
                         </a>
                     }
+                    @if (!string.IsNullOrWhiteSpace(TagSlug))
+                    {
+                        <a href="@TagRemovalUrl()"
+                           class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200/80 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 transition shadow-2xs group"
+                           title="Remove tag filter">
+                            <span>Tag: <strong>@(activeTagName ?? TagSlug)</strong></span>
+                            <span class="text-amber-600 font-bold group-hover:text-amber-900">✕</span>
+                        </a>
+                    }
                     @if (MinPrice.HasValue || MaxPrice.HasValue)
                     {
                         <a href="@PriceRemovalUrl()"
@@ -295,6 +315,10 @@ else if (isCategory)
                     @if (!string.IsNullOrWhiteSpace(BrandSlug))
                     {
                         <input type="hidden" name="brand" value="@BrandSlug" />
+                    }
+                    @if (!string.IsNullOrWhiteSpace(TagSlug))
+                    {
+                        <input type="hidden" name="tag" value="@TagSlug" />
                     }
                     <div class="relative flex-1 min-w-[200px]">
                         <input name="q" value="@Query" class="field pr-9" placeholder="Search by model or name..." />
@@ -555,6 +579,8 @@ else if (isCategory)
     public string? Query { get; set; }
     [SupplyParameterFromQuery(Name = "brand")]
     public string? BrandSlug { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")]
+    public string? TagSlug { get; set; }
     [SupplyParameterFromQuery(Name = "sort")]
     public string? Sort { get; set; }
     [SupplyParameterFromQuery(Name = "min-price")]
@@ -571,6 +597,8 @@ else if (isCategory)
     private Dictionary<int, List<CategoryLinkDto>> children = [];
     private string? activeCategoryName;
     private CategoryLinkDto? activeCategory;
+    private TagDto? activeTag;
+    private string? activeTagName => activeTag?.Name;
     private int total;
 
     private string? ActiveBrandName => brands.FirstOrDefault(b => b.Slug == BrandSlug)?.Name ?? BrandSlug;
@@ -580,7 +608,11 @@ else if (isCategory)
         try
         {
             Page = Math.Clamp(Page, 1, 10000);
-            (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page, pageSize: 18, brand: BrandSlug);
+            if (!string.IsNullOrWhiteSpace(TagSlug))
+            {
+                activeTag = await Catalog.GetTagBySlugAsync(TagSlug);
+            }
+            (products, total) = await Catalog.SearchAsync(CategorySlug, Query, Sort, MinPrice, MaxPrice, Page, pageSize: 18, brand: BrandSlug, tag: TagSlug);
 
             categories = await Catalog.CategoriesAsync();
             brands = await Catalog.BrandsAsync();
@@ -600,9 +632,10 @@ else if (isCategory)
         }
     }
 
-    private string CategoryUrl(string? slug) => FilterUrl(slug, BrandSlug);
-    private string CategoryRemovalUrl() => FilterUrl(null, BrandSlug);
-    private string BrandRemovalUrl() => FilterUrl(CategorySlug, null);
+    private string CategoryUrl(string? slug) => FilterUrl(slug, BrandSlug, TagSlug);
+    private string CategoryRemovalUrl() => FilterUrl(null, BrandSlug, TagSlug);
+    private string BrandRemovalUrl() => FilterUrl(CategorySlug, null, TagSlug);
+    private string TagRemovalUrl() => FilterUrl(CategorySlug, BrandSlug, null);
 
     private string PriceRemovalUrl()
     {
@@ -610,6 +643,7 @@ else if (isCategory)
         var query = new Dictionary<string, string?>();
         if (!string.IsNullOrWhiteSpace(Query)) query["q"] = Query;
         if (!string.IsNullOrWhiteSpace(BrandSlug)) query["brand"] = BrandSlug;
+        if (!string.IsNullOrWhiteSpace(TagSlug)) query["tag"] = TagSlug;
         if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
         return QueryHelpers.AddQueryString(baseUri, query);
     }
@@ -619,18 +653,21 @@ else if (isCategory)
         var baseUri = CategorySlug is null ? "/products" : $"/category/{CategorySlug}";
         var query = new Dictionary<string, string?>();
         if (!string.IsNullOrWhiteSpace(BrandSlug)) query["brand"] = BrandSlug;
+        if (!string.IsNullOrWhiteSpace(TagSlug)) query["tag"] = TagSlug;
         if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
         if (MinPrice.HasValue) query["min-price"] = MinPrice.Value.ToString();
         if (MaxPrice.HasValue) query["max-price"] = MaxPrice.Value.ToString();
         return QueryHelpers.AddQueryString(baseUri, query);
     }
 
-    private string FilterUrl(string? catSlug, string? brand)
+    private string FilterUrl(string? catSlug, string? brand, string? tag = null)
     {
         var baseUri = catSlug is null ? "/products" : $"/category/{catSlug}";
         var query = new Dictionary<string, string?>();
         if (!string.IsNullOrWhiteSpace(Query)) query["q"] = Query;
         if (!string.IsNullOrWhiteSpace(brand)) query["brand"] = brand;
+        tag ??= TagSlug;
+        if (!string.IsNullOrWhiteSpace(tag)) query["tag"] = tag;
         if (!string.IsNullOrWhiteSpace(Sort)) query["sort"] = Sort;
         if (MinPrice.HasValue) query["min-price"] = MinPrice.Value.ToString();
         if (MaxPrice.HasValue) query["max-price"] = MaxPrice.Value.ToString();

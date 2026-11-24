@@ -1,6 +1,7 @@
 @page "/admin/campaigns"
 @attribute [Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
+@implements IDisposable
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Persistence.Entities
@@ -41,9 +42,27 @@
     </div>
 }
 
+<!-- Search Bar with Debounce -->
+<div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="relative w-full max-w-xs">
+        <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
+               placeholder="Search campaigns by name, coupon..."
+               class="shop-input text-xs pl-8 pr-8" />
+        <span class="absolute left-2.5 top-2.5 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+        @if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+        }
+    </div>
+</div>
+
 <div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
     <div class="table-scroll">
         <QuickGrid Items="@campaignsQuery" class="data-table">
+            <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="font-mono text-xs text-slate-500 w-16" />
+
             <TemplateColumn Title="Campaign">
                 <div class="flex items-center gap-3">
                     @if (!string.IsNullOrWhiteSpace(context.BannerImageUrl))
@@ -150,8 +169,45 @@
 </div>
 
 @code {
-    private IQueryable<Campaign> campaignsQuery => Db.Campaigns.AsNoTracking().OrderBy(c => c.SortOrder).ThenByDescending(c => c.CreatedAt);
+    private string searchQuery = "";
+    private System.Threading.Timer? _debounceTimer;
     private string? _toast;
+
+    private IQueryable<Campaign> campaignsQuery
+    {
+        get
+        {
+            var q = Db.Campaigns.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                var term = searchQuery.Trim().ToLower();
+                q = q.Where(c => c.Name.ToLower().Contains(term) ||
+                                 c.Slug.ToLower().Contains(term) ||
+                                 (c.HighlightCouponCode != null && c.HighlightCouponCode.ToLower().Contains(term)) ||
+                                 (c.BanglaName != null && c.BanglaName.ToLower().Contains(term)));
+            }
+            return q.OrderBy(c => c.SortOrder).ThenByDescending(c => c.CreatedAt);
+        }
+    }
+
+    private void OnSearchInput()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(StateHasChanged);
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
 
     protected override void OnInitialized()
     {
