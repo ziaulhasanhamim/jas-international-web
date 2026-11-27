@@ -1,0 +1,61 @@
+@* Compact 1.91:1 Open Graph link card preview so admins can verify edge text/logos will not be cropped by Facebook/WhatsApp/X. *@
+@{
+    var usingCustom = !string.IsNullOrWhiteSpace(ImageUrl);
+    var usingBannerFallback = !usingCustom && !string.IsNullOrWhiteSpace(FallbackBannerUrl);
+    var previewSrc = usingCustom
+        ? ImageUrl!
+        : (usingBannerFallback ? FallbackBannerUrl! : "/jas-og-card.png");
+    var previewTitle = string.IsNullOrWhiteSpace(Title) ? "JAS International" : Title.Trim();
+    var previewDesc = string.IsNullOrWhiteSpace(Description)
+        ? "Authentic gadgets with official warranty and nationwide delivery."
+        : Description.Trim();
+}
+
+<div class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2.5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600">Social Link Preview (1.91:1 Crop Check)</span>
+        @if (usingCustom)
+        {
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Custom og:image active
+            </span>
+        }
+        else if (usingBannerFallback)
+        {
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                Falling back to Desktop Banner (may crop edges)
+            </span>
+        }
+        else
+        {
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                Default site share card
+            </span>
+        }
+    </div>
+
+    <div class="max-w-md rounded-xl border border-slate-200 overflow-hidden bg-slate-50 shadow-2xs">
+        <div class="aspect-[1200/630] w-full bg-slate-100 overflow-hidden">
+            <img src="@previewSrc" alt="OpenGraph 1.91:1 Preview" class="size-full object-cover object-center" />
+        </div>
+        <div class="p-3 bg-white border-t border-slate-200 space-y-0.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">JASINTERNATIONAL.COM.BD</span>
+            <p class="text-xs font-bold text-slate-900 line-clamp-1">@previewTitle</p>
+            <p class="text-[11px] text-slate-500 line-clamp-1">@previewDesc</p>
+        </div>
+    </div>
+
+    @if (usingBannerFallback)
+    {
+        <p class="text-[11px] text-amber-700 leading-relaxed">
+            <strong>Heads up:</strong> Facebook &amp; WhatsApp crop wide <code class="font-mono">1920 × 600</code> banners to <code class="font-mono">1.91:1</code>. Upload a dedicated <strong class="font-semibold">1200 × 630 px</strong> social sharing image so left/right text stays intact.
+        </p>
+    }
+</div>
+
+@code {
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public string? FallbackBannerUrl { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+}

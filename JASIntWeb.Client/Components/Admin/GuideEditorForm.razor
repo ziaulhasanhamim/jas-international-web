@@ -253,7 +253,7 @@ else
                         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
                             <h2 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Featured Cover Image</h2>
                             <p class="text-xs text-slate-500">Appears on the guides archive, social media share cards, and at the top of the guide.</p>
-                            <AdminImagePicker Label="Cover image" @bind-Value="Input.FeaturedImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
+                            <AdminImagePicker Label="Cover &amp; social sharing image (1200 × 630 px recommended)" HelpText="1.91:1 aspect ratio (~1100 × 580 px center safe area) ensures Facebook, WhatsApp & X link previews won't crop edges." @bind-Value="Input.FeaturedImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
                         </section>
 
                         <!-- Visibility & Publishing Card -->

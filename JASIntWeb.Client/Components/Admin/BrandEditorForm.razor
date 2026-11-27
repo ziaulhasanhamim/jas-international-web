@@ -55,7 +55,7 @@ else
                             <summary><span>Search &amp; social sharing</span><span class="admin-optional">Optional</span></summary>
                             <p class="brand-section-description">Customize search results and link previews. Leave blank to use the store’s defaults.</p>
                             <AdminSeoFields Kind="brand" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@Input.Description" BaseUrl="@Snapshot!.PublicBaseUrl" />
-                            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
+                            <AdminImagePicker Label="Social sharing image (1200 × 630 px recommended)" HelpText="1.91:1 aspect ratio prevents Facebook, WhatsApp & X from cropping edge text or logos." @bind-Value="Input!.OgImageUrl" @bind-Value:after="MarkEdited" BusyChanged="UploadBusy" />
                         </details>
                     </div>
                     <div class="brand-editor-sidebar">

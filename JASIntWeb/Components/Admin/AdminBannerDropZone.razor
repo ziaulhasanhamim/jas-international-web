@@ -6,30 +6,37 @@
 @inject IStorageService Storage
 
 <div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-2">
         <label class="font-bold text-slate-900 text-xs sm:text-sm">@Title</label>
         @if (!string.IsNullOrWhiteSpace(SizeHint))
         {
-            <span class="text-[11px] text-slate-400">@SizeHint</span>
+            <span class="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md shrink-0">@SizeHint</span>
         }
     </div>
+    @if (!string.IsNullOrWhiteSpace(HelpText))
+    {
+        <p class="text-[11px] text-slate-500 leading-relaxed">@HelpText</p>
+    }
 
     <div @ref="dropZoneRef"
-         class="border-2 border-dashed border-slate-200 hover:border-blue-400 [&.is-dragging]:border-blue-500 [&.is-dragging]:bg-blue-50/70 rounded-xl p-3.5 text-center bg-slate-50/50 transition @(uploading ? "is-disabled opacity-75" : "")">
-        <div class="min-h-[120px] max-h-56 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3 p-1">
-            @if (!string.IsNullOrWhiteSpace(Value))
-            {
-                <img src="@Value" alt="@Title Preview" class="w-full h-auto max-h-52 object-contain mx-auto block" />
-            }
-            else
-            {
-                <div class="text-center p-3 text-slate-400">
-                    <Icon Name="camera" Class="size-6 mx-auto mb-1 opacity-50" />
-                    <span class="text-[11px] font-medium block">@EmptyHint</span>
-                    <span class="text-[10px] text-slate-400 block mt-0.5">Drag &amp; drop an image here</span>
-                </div>
-            }
-        </div>
+         class="border-2 border-dashed border-slate-200 hover:border-blue-400 [&.is-dragging]:border-blue-500 [&.is-dragging]:bg-blue-50/70 rounded-xl @(Compact ? "p-3" : "p-3.5") text-center bg-slate-50/50 transition @(uploading ? "is-disabled opacity-75" : "")">
+        @if (!Compact)
+        {
+            <div class="min-h-[120px] max-h-56 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3 p-1">
+                @if (!string.IsNullOrWhiteSpace(Value))
+                {
+                    <img src="@Value" alt="@Title Preview" class="w-full h-auto max-h-52 object-contain mx-auto block" />
+                }
+                else
+                {
+                    <div class="text-center p-3 text-slate-400">
+                        <Icon Name="camera" Class="size-6 mx-auto mb-1 opacity-50" />
+                        <span class="text-[11px] font-medium block">@EmptyHint</span>
+                        <span class="text-[10px] text-slate-400 block mt-0.5">Drag &amp; drop an image here</span>
+                    </div>
+                }
+            </div>
+        }
 
         <div class="flex flex-wrap items-center justify-center gap-2">
             <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5 select-none shadow-2xs @(uploading ? "pointer-events-none opacity-60" : "")">
@@ -81,8 +88,10 @@
 
     [Parameter, EditorRequired] public string Title { get; set; } = "Banner Image";
     [Parameter] public string? SizeHint { get; set; }
+    [Parameter] public string? HelpText { get; set; }
     [Parameter] public string EmptyHint { get; set; } = "No image set";
     [Parameter] public string UrlLabel { get; set; } = "Direct Image URL / Path:";
+    [Parameter] public bool Compact { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
 

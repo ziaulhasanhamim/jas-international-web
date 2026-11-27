@@ -102,18 +102,27 @@ else
         <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
             <h3 class="font-display text-base font-bold text-slate-900">🖼️ Collection Banners</h3>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 <AdminBannerDropZone Title="Desktop Hero Banner"
                                      SizeHint="1920 × 600 px"
                                      EmptyHint="No desktop banner uploaded"
+                                     HelpText="Shown on the collection landing page header (wide 3.2:1 banner)."
                                      UrlLabel="Direct Image URL / Path:"
                                      @bind-Value="Input.BannerImageUrl" />
 
                 <AdminBannerDropZone Title="Mobile Hero Banner (Optional)"
                                      SizeHint="1080 × 1080 px"
                                      EmptyHint="Uses desktop banner on mobile"
+                                     HelpText="Square mobile hero shown below 640px screen width."
                                      UrlLabel="Direct Mobile URL / Path:"
                                      @bind-Value="Input.MobileBannerImageUrl" />
+
+                <AdminBannerDropZone Title="Social Sharing Image (og:image)"
+                                     SizeHint="1200 × 630 px (1.91:1)"
+                                     EmptyHint="Falls back to desktop banner if empty"
+                                     HelpText="Used on Facebook, WhatsApp & X link previews. Keep text/logos inside the center safe zone (~1100 × 580 px) so edges aren't cropped."
+                                     UrlLabel="Direct Social Image URL / Path:"
+                                     @bind-Value="Input.OgImageUrl" />
             </div>
         </div>
 
@@ -149,10 +158,19 @@ else
                     SEO Meta Description
                     <InputTextArea @bind-Value="Input.MetaDescription" class="shop-input" rows="2" />
                 </label>
-                <label class="shop-label">
-                    OpenGraph Image URL
-                    <InputText @bind-Value="Input.OgImageUrl" class="shop-input font-mono text-xs" />
-                </label>
+                <div class="space-y-3">
+                    <SocialSharePreview ImageUrl="@Input.OgImageUrl"
+                                        FallbackBannerUrl="@Input.BannerImageUrl"
+                                        Title="@(string.IsNullOrWhiteSpace(Input.MetaTitle) ? $"{(string.IsNullOrWhiteSpace(Input.Title) ? "Collection" : Input.Title)} | JAS International" : Input.MetaTitle)"
+                                        Description="@(string.IsNullOrWhiteSpace(Input.MetaDescription) ? Input.Description : Input.MetaDescription)" />
+
+                    <AdminBannerDropZone Title="OpenGraph Social Sharing Image (og:image)"
+                                         SizeHint="1200 × 630 px (1.91:1)"
+                                         HelpText="Recommended: 1200 × 630 px (1.91:1). Keep key text & logos inside the center ~1100 × 580 px safe area so social previews don't crop edges."
+                                         UrlLabel="OpenGraph Image URL / Path:"
+                                         Compact="true"
+                                         @bind-Value="Input.OgImageUrl" />
+                </div>
             </div>
         </details>
 

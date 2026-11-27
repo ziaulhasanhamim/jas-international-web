@@ -14,11 +14,13 @@
             <input class="shop-input" value="@Value" @oninput="ChangedUrl" placeholder="@(Emoji ? "https://… or an emoji" : "https://… or /uploads/…")" />
         </label>
     </details>
+    @if (!string.IsNullOrWhiteSpace(HelpText)) { <p class="admin-help">@HelpText</p> }
     @if (uploading) { <p role="status" class="admin-help">Uploading image…</p> }
     @if (message is not null) { <p class="form-error" role="alert">@message</p> }
 </div>
 @code {
     [Parameter] public string Label { get; set; } = "Image";
+    [Parameter] public string? HelpText { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<bool> BusyChanged { get; set; }

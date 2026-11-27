@@ -43,7 +43,7 @@
     <!-- Social Image -->
     <div class="pt-4 border-t border-slate-100">
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">OpenGraph Social Sharing Card</label>
-        <AdminImagePicker Label="Social preview image (1200x630px recommended)" Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
+        <AdminImagePicker Label="Social preview image (1200 × 630 px recommended)" HelpText="Use 1200 × 630 px (1.91:1) with text centered so Facebook/WhatsApp link cards don't crop edges. Leave empty to use the main product photo." Value="@Information.OgImageUrl" ValueChanged="value => Patch(i => i.OgImageUrl = value)" BusyChanged="UploadBusy" />
     </div>
 </section>
 

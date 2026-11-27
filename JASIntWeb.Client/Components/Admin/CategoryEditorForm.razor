@@ -79,7 +79,7 @@ else
             <AdminSeoFields Kind="category" Name="@Input!.Name" Slug="@Input.Slug" @bind-Title="Input.MetaTitle" @bind-Description="Input.MetaDescription" FallbackDescription="@($"Browse authentic {Input.Name} gadgets with official warranty, nationwide delivery and Khulna showroom support.")" BaseUrl="@Snapshot!.PublicBaseUrl"  />
             <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Intro overview — above the product grid" Height="360" @bind-Value="Input!.IntroText" @bind-Value:after="MarkEdited" />
             <AdminRichText ConvertLegacyContent="true" Disabled="Busy" Label="Buyer guide — below the product grid" Height="500" @bind-Value="Input!.BottomSeoCopy" @bind-Value:after="MarkEdited" />
-            <AdminImagePicker Label="Social sharing image" @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
+            <AdminImagePicker Label="Social sharing image (1200 × 630 px recommended)" HelpText="1.91:1 aspect ratio prevents Facebook, WhatsApp & X from cropping edge text or logos." @bind-Value="Input!.OgImageUrl" BusyChanged="UploadBusy" />
             <div class="form-actions">
                 <button type="submit" disabled="@Busy" class="shop-button" data-pending-text="Saving category...">
                     <span class="form-submit-spinner" hidden></span>
