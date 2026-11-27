@@ -1,8 +1,6 @@
 @page "/campaigns"
 @page "/offers"
-@rendermode InteractiveServer
 @inject CampaignService CampaignSvc
-@inject NavigationManager Nav
 
 <PageTitle>Mega Offers &amp; Festival Campaigns · JAS International</PageTitle>
 
@@ -49,164 +47,162 @@
             <!-- Search & Filter Bar -->
             <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
                 <div class="relative flex-1 max-w-md">
-                    <input @bind="searchTerm" @bind:event="oninput"
+                    <input type="search"
+                           data-campaign-hub-search
                            class="shop-input !mt-0 text-xs pr-9 pl-9"
                            placeholder="Search offers & festival sales..." />
                     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Icon Name="search" Class="size-4" />
                     </span>
-                    @if (!string.IsNullOrWhiteSpace(searchTerm))
-                    {
-                        <button type="button" @onclick="() => searchTerm = string.Empty" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
-                    }
+                    <button type="button"
+                            data-campaign-hub-clear
+                            class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer"
+                            aria-label="Clear search">✕</button>
                 </div>
-                <span class="text-xs font-semibold text-slate-500">
-                    Showing @FilteredCampaigns.Count() Campaign@(FilteredCampaigns.Count() == 1 ? "" : "s")
+                <span data-campaign-count class="text-xs font-semibold text-slate-500">
+                    Showing @campaigns.Count Campaign@(campaigns.Count == 1 ? "" : "s")
                 </span>
             </div>
 
-            @if (!FilteredCampaigns.Any())
-            {
-                <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs mb-8">
-                    <span class="text-3xl block mb-2">🔍</span>
-                    <h3 class="text-base font-bold text-slate-800">No campaigns match “@searchTerm”</h3>
-                    <p class="text-xs text-slate-500 mt-1">Try another keyword or view all active promotions.</p>
-                    <button type="button" @onclick="() => searchTerm = string.Empty" class="btn-secondary text-xs mt-3">Reset Search</button>
-                </div>
-            }
-            else
-            {
-                <!-- Featured Primary Campaign -->
-                var primary = FilteredCampaigns.First();
-                var primaryUpcoming = primary.StartDate.HasValue && primary.StartDate.Value > DateTimeOffset.UtcNow;
-                var primaryBanner = !string.IsNullOrWhiteSpace(primary.BannerImageUrl) ? primary.BannerImageUrl : primary.MobileBannerImageUrl;
-                <div class="rounded-3xl border border-indigo-100 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 mb-8 overflow-hidden relative">
-                    @if (!string.IsNullOrWhiteSpace(primaryBanner))
-                    {
-                        <a href="/campaigns/@primary.Slug" class="block w-full overflow-hidden bg-slate-100 group">
-                            <picture class="block w-full">
-                                @if (!string.IsNullOrWhiteSpace(primary.MobileBannerImageUrl))
-                                {
-                                    <source media="(max-width: 640px)" srcset="@primary.MobileBannerImageUrl" />
-                                }
-                                <img src="@primaryBanner"
-                                     alt="@primary.Name"
-                                     class="w-full h-auto block transition-transform duration-500 group-hover:scale-[1.01]" />
-                            </picture>
-                        </a>
-                    }
-                    <div class="p-6 sm:p-8 space-y-4">
-                        <div class="flex flex-wrap items-center gap-2">
-                            @if (!string.IsNullOrWhiteSpace(primary.Eyebrow))
-                            {
-                                <span class="inline-block text-xs font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
-                                    @primary.Eyebrow
-                                </span>
-                            }
-                            <span class="inline-flex items-center gap-1 text-xs font-extrabold px-2.5 py-1 rounded-full @(primaryUpcoming ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-rose-50 text-rose-700 border border-rose-200")">
-                                @(primaryUpcoming ? $"🕒 Starts {primary.StartDate!.Value.ToLocalTime():MMM dd}" : "🔥 Live Now")
-                            </span>
-                            @if (primary.DiscountScenario != CampaignDiscountScenario.MarketingOnly)
-                            {
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                    @GetScenarioLabel(primary)
-                                </span>
-                            }
-                        </div>
-                        <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 font-display">
-                            @primary.Name
-                        </h2>
-                        @if (!string.IsNullOrWhiteSpace(primary.BanglaName))
-                        {
-                            <p class="text-base sm:text-lg font-semibold text-indigo-600">
-                                @primary.BanglaName
-                            </p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(primary.Description))
-                        {
-                            <p class="text-sm sm:text-base text-slate-600 max-w-4xl">
-                                @primary.Description
-                            </p>
-                        }
+            <div data-campaign-hub-empty class="hidden rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs mb-8">
+                <span class="text-3xl block mb-2">🔍</span>
+                <h3 class="text-base font-bold text-slate-800">No campaigns match “<span data-campaign-hub-empty-term></span>”</h3>
+                <p class="text-xs text-slate-500 mt-1">Try another keyword or view all active promotions.</p>
+                <button type="button" data-campaign-hub-reset class="btn-secondary text-xs mt-3 cursor-pointer">Reset Search</button>
+            </div>
 
-                        <div class="pt-2 flex flex-wrap items-center gap-4">
-                            <a href="/campaigns/@primary.Slug" class="shop-button flex items-center gap-2">
-                                <span>Shop Campaign Deals</span>
-                                <span>→</span>
-                            </a>
-                            @if (!string.IsNullOrWhiteSpace(primary.HighlightCouponCode))
-                            {
-                                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold">
-                                    <span>🎟️ Use Coupon:</span>
-                                    <span class="font-mono text-sm tracking-wider uppercase text-amber-950 font-extrabold">@primary.HighlightCouponCode</span>
-                                </div>
-                            }
-                            @if (primary.ProductCount > 0)
-                            {
-                                <span class="text-xs font-semibold text-slate-500">
-                                    @primary.ProductCount Deal@(primary.ProductCount == 1 ? "" : "s") Included
-                                </span>
-                            }
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Other Active Campaigns Grid -->
-                @if (FilteredCampaigns.Count() > 1)
+            <!-- Featured Primary Campaign -->
+            var primary = campaigns.First();
+            var primaryUpcoming = primary.StartDate.HasValue && primary.StartDate.Value > DateTimeOffset.UtcNow;
+            var primaryBanner = !string.IsNullOrWhiteSpace(primary.BannerImageUrl) ? primary.BannerImageUrl : primary.MobileBannerImageUrl;
+            var primarySearchIndex = $"{primary.Name} {primary.BanglaName} {primary.Eyebrow} {primary.Description} {primary.HighlightCouponCode}";
+            <div data-campaign-card data-search-index="@primarySearchIndex" class="rounded-3xl border border-indigo-100 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 mb-8 overflow-hidden relative">
+                @if (!string.IsNullOrWhiteSpace(primaryBanner))
                 {
-                    <div class="space-y-4">
-                        <h2 class="text-xl font-bold tracking-tight text-slate-900">More Special Offers</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            @foreach (var c in FilteredCampaigns.Skip(1))
+                    <a href="/campaigns/@primary.Slug" class="block w-full overflow-hidden bg-slate-100 group">
+                        <picture class="block w-full">
+                            @if (!string.IsNullOrWhiteSpace(primary.MobileBannerImageUrl))
                             {
-                                var cardBanner = !string.IsNullOrWhiteSpace(c.BannerImageUrl) ? c.BannerImageUrl : c.MobileBannerImageUrl;
-                                <article class="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden flex flex-col justify-between">
-                                    @if (!string.IsNullOrWhiteSpace(cardBanner))
-                                    {
-                                        <a href="/campaigns/@c.Slug" class="block w-full bg-slate-100 overflow-hidden">
-                                            <picture class="block w-full">
-                                                @if (!string.IsNullOrWhiteSpace(c.MobileBannerImageUrl))
-                                                {
-                                                    <source media="(max-width: 640px)" srcset="@c.MobileBannerImageUrl" />
-                                                }
-                                                <img src="@cardBanner" alt="@c.Name" class="w-full h-auto block hover:scale-[1.02] transition-transform duration-300" />
-                                            </picture>
-                                        </a>
-                                    }
-                                    <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
-                                        <div>
-                                            @if (!string.IsNullOrWhiteSpace(c.Eyebrow))
-                                            {
-                                                <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 block mb-1">
-                                                    @c.Eyebrow
-                                                </span>
-                                            }
-                                            <h3 class="text-lg font-bold text-slate-900 hover:text-blue-600 transition">
-                                                <a href="/campaigns/@c.Slug">@c.Name</a>
-                                            </h3>
-                                            @if (!string.IsNullOrWhiteSpace(c.Description))
-                                            {
-                                                <p class="text-xs text-slate-500 mt-1 line-clamp-2">@c.Description</p>
-                                            }
-                                        </div>
-                                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
-                                            @if (!string.IsNullOrWhiteSpace(c.HighlightCouponCode))
-                                            {
-                                                <span class="font-mono text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                                                    🎟️ @c.HighlightCouponCode
-                                                </span>
-                                            }
-                                            <a href="/campaigns/@c.Slug" class="text-xs font-bold text-blue-600 hover:text-blue-800 ml-auto flex items-center gap-1">
-                                                <span>View Deals</span>
-                                                <span>→</span>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </article>
+                                <source media="(max-width: 640px)" srcset="@primary.MobileBannerImageUrl" />
                             }
-                        </div>
-                    </div>
+                            <img src="@primaryBanner"
+                                 alt="@primary.Name"
+                                 class="w-full h-auto block transition-transform duration-500 group-hover:scale-[1.01]" />
+                        </picture>
+                    </a>
                 }
+                <div class="p-6 sm:p-8 space-y-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (!string.IsNullOrWhiteSpace(primary.Eyebrow))
+                        {
+                            <span class="inline-block text-xs font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                                @primary.Eyebrow
+                            </span>
+                        }
+                        <span class="inline-flex items-center gap-1 text-xs font-extrabold px-2.5 py-1 rounded-full @(primaryUpcoming ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-rose-50 text-rose-700 border border-rose-200")">
+                            @(primaryUpcoming ? $"🕒 Starts {primary.StartDate!.Value.ToLocalTime():MMM dd}" : "🔥 Live Now")
+                        </span>
+                        @if (primary.DiscountScenario != CampaignDiscountScenario.MarketingOnly)
+                        {
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                @GetScenarioLabel(primary)
+                            </span>
+                        }
+                    </div>
+                    <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 font-display">
+                        @primary.Name
+                    </h2>
+                    @if (!string.IsNullOrWhiteSpace(primary.BanglaName))
+                    {
+                        <p class="text-base sm:text-lg font-semibold text-indigo-600">
+                            @primary.BanglaName
+                        </p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(primary.Description))
+                    {
+                        <p class="text-sm sm:text-base text-slate-600 max-w-4xl">
+                            @primary.Description
+                        </p>
+                    }
+
+                    <div class="pt-2 flex flex-wrap items-center gap-4">
+                        <a href="/campaigns/@primary.Slug" class="shop-button flex items-center gap-2">
+                            <span>Shop Campaign Deals</span>
+                            <span>→</span>
+                        </a>
+                        @if (!string.IsNullOrWhiteSpace(primary.HighlightCouponCode))
+                        {
+                            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold">
+                                <span>🎟️ Use Coupon:</span>
+                                <span class="font-mono text-sm tracking-wider uppercase text-amber-950 font-extrabold">@primary.HighlightCouponCode</span>
+                            </div>
+                        }
+                        @if (primary.ProductCount > 0)
+                        {
+                            <span class="text-xs font-semibold text-slate-500">
+                                @primary.ProductCount Deal@(primary.ProductCount == 1 ? "" : "s") Included
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Active Campaigns Grid -->
+            @if (campaigns.Count > 1)
+            {
+                <div data-campaign-more-section class="space-y-4">
+                    <h2 class="text-xl font-bold tracking-tight text-slate-900">More Special Offers</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        @foreach (var c in campaigns.Skip(1))
+                        {
+                            var cardBanner = !string.IsNullOrWhiteSpace(c.BannerImageUrl) ? c.BannerImageUrl : c.MobileBannerImageUrl;
+                            var cardSearchIndex = $"{c.Name} {c.BanglaName} {c.Eyebrow} {c.Description} {c.HighlightCouponCode}";
+                            <article data-campaign-card data-search-index="@cardSearchIndex" class="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden flex flex-col justify-between">
+                                @if (!string.IsNullOrWhiteSpace(cardBanner))
+                                {
+                                    <a href="/campaigns/@c.Slug" class="block w-full bg-slate-100 overflow-hidden">
+                                        <picture class="block w-full">
+                                            @if (!string.IsNullOrWhiteSpace(c.MobileBannerImageUrl))
+                                            {
+                                                <source media="(max-width: 640px)" srcset="@c.MobileBannerImageUrl" />
+                                            }
+                                            <img src="@cardBanner" alt="@c.Name" class="w-full h-auto block hover:scale-[1.02] transition-transform duration-300" />
+                                        </picture>
+                                    </a>
+                                }
+                                <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
+                                    <div>
+                                        @if (!string.IsNullOrWhiteSpace(c.Eyebrow))
+                                        {
+                                            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 block mb-1">
+                                                @c.Eyebrow
+                                            </span>
+                                        }
+                                        <h3 class="text-lg font-bold text-slate-900 hover:text-blue-600 transition">
+                                            <a href="/campaigns/@c.Slug">@c.Name</a>
+                                        </h3>
+                                        @if (!string.IsNullOrWhiteSpace(c.Description))
+                                        {
+                                            <p class="text-xs text-slate-500 mt-1 line-clamp-2">@c.Description</p>
+                                        }
+                                    </div>
+                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                        @if (!string.IsNullOrWhiteSpace(c.HighlightCouponCode))
+                                        {
+                                            <span class="font-mono text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                                🎟️ @c.HighlightCouponCode
+                                            </span>
+                                        }
+                                        <a href="/campaigns/@c.Slug" class="text-xs font-bold text-blue-600 hover:text-blue-800 ml-auto flex items-center gap-1">
+                                            <span>View Deals</span>
+                                            <span>→</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </div>
             }
         }
     </div>
@@ -214,14 +210,6 @@
 
 @code {
     private List<CampaignSummaryDto> campaigns = [];
-    private string searchTerm = "";
-
-    private IEnumerable<CampaignSummaryDto> FilteredCampaigns =>
-        string.IsNullOrWhiteSpace(searchTerm)
-            ? campaigns
-            : campaigns.Where(c => c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                  (c.Description != null && c.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                                  (c.Eyebrow != null && c.Eyebrow.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
 
     protected override async Task OnInitializedAsync()
     {

@@ -11,6 +11,7 @@ import { initCartPage } from './modules/cart-page.js';
 import { initOverlayDelegation, closeAllOverlays } from './core/overlay.js';
 import { initGallery } from './modules/gallery.js';
 import { initReviews } from './modules/reviews.js';
+import { initCampaignPages, cleanupCampaignPages } from './modules/campaign.js';
 
 async function initOrderTracking() {
     if (!document.querySelector('#live-order-tracker, #payment-verification-stream')) return;
@@ -35,6 +36,7 @@ function initModules() {
     initCartPage();
     initGallery();
     initReviews();
+    initCampaignPages();
 
     const JAS = window.JAS;
     JAS?.Carousel?.init();
@@ -50,6 +52,7 @@ function initModules() {
  */
 function onEnhancedNavigationStart() {
     closeAllOverlays();
+    cleanupCampaignPages();
     const JAS = window.JAS;
     JAS?.Navigation?.start();
     JAS?.OrderTracking?.cleanup();
@@ -69,6 +72,7 @@ function onEnhancedNavigationEnd() {
  * Handles page dismissal (preserves bfcache).
  */
 function onPageHide() {
+    cleanupCampaignPages();
     window.JAS?.OrderTracking?.cleanup();
     window.JAS?.Carousel?.cleanup();
 }
