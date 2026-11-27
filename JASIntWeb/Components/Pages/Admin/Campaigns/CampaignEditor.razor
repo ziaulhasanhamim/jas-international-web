@@ -92,19 +92,11 @@ else
                 <span>🎨</span> Visuals &amp; Theme
             </h3>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AdminBannerDropZone Title="Desktop Hero Banner"
-                                     SizeHint="1920×600 / 1200×630"
-                                     EmptyHint="No desktop banner set"
-                                     UrlLabel="Direct Image URL / Path:"
-                                     @bind-Value="Input.BannerImageUrl" />
-
-                <AdminBannerDropZone Title="Mobile Hero Banner (Optional)"
-                                     SizeHint="Portrait 640×640 or 750×1000"
-                                     EmptyHint="Uses desktop banner if empty"
-                                     UrlLabel="Direct Mobile URL / Path:"
-                                     @bind-Value="Input.MobileBannerImageUrl" />
-            </div>
+            <AdminBannerDropZone Title="Hero Banner Image"
+                                 SizeHint="Recommended: 1920 × 600 px (Wide Full-Width · Used on Desktop & Mobile)"
+                                 EmptyHint="No hero banner uploaded"
+                                 UrlLabel="Direct Banner URL / Path:"
+                                 @bind-Value="Input.BannerImageUrl" />
 
             <div class="admin-form-grid">
                 <label class="shop-label">
@@ -709,8 +701,8 @@ else
                     Eyebrow = existing.Eyebrow,
                     BadgeText = existing.BadgeText,
                     Description = existing.Description,
-                    BannerImageUrl = existing.BannerImageUrl,
-                    MobileBannerImageUrl = existing.MobileBannerImageUrl,
+                    BannerImageUrl = !string.IsNullOrWhiteSpace(existing.BannerImageUrl) ? existing.BannerImageUrl : existing.MobileBannerImageUrl,
+                    MobileBannerImageUrl = null,
                     StartDate = existing.StartDate?.ToLocalTime().DateTime,
                     EndDate = existing.EndDate?.ToLocalTime().DateTime,
                     ShowCountdown = existing.ShowCountdown,
@@ -935,7 +927,7 @@ else
                     BadgeText = string.IsNullOrWhiteSpace(Input.BadgeText) ? null : Input.BadgeText.Trim(),
                     Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
                     BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim(),
-                    MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim(),
+                    MobileBannerImageUrl = null,
                     StartDate = startOffset,
                     EndDate = endOffset,
                     ShowCountdown = Input.ShowCountdown,
@@ -972,7 +964,7 @@ else
                 targetCampaign.BadgeText = string.IsNullOrWhiteSpace(Input.BadgeText) ? null : Input.BadgeText.Trim();
                 targetCampaign.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
                 targetCampaign.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
-                targetCampaign.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
+                targetCampaign.MobileBannerImageUrl = null;
                 targetCampaign.StartDate = startOffset;
                 targetCampaign.EndDate = endOffset;
                 targetCampaign.ShowCountdown = Input.ShowCountdown;
