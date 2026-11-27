@@ -532,9 +532,19 @@
                                     <div class="min-w-0">
                                         <strong class="text-slate-900 block font-semibold truncate">@item.Name</strong>
                                         <span class="text-slate-400 block mt-0.5">@item.Variant · Qty: @item.Quantity</span>
+                                        @if (!string.IsNullOrWhiteSpace(item.CampaignName))
+                                        {
+                                            <span class="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200/80 text-[10px] font-bold">⚡ @item.CampaignName</span>
+                                        }
                                     </div>
                                 </div>
-                                <span class="font-bold text-slate-900 tabular-nums shrink-0">৳@item.LineTotal.ToString("N0")</span>
+                                <div class="text-right shrink-0">
+                                    <span class="font-bold text-slate-900 tabular-nums block">৳@item.LineTotal.ToString("N0")</span>
+                                    @if (item.RegularPrice.HasValue && item.RegularPrice > item.Price)
+                                    {
+                                        <span class="block text-[10px] text-slate-400 line-through tabular-nums">৳@((item.RegularPrice.Value * item.Quantity).ToString("N0"))</span>
+                                    }
+                                </div>
                             </div>
                         }
                     </div>

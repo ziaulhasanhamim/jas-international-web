@@ -21,7 +21,10 @@ public record CouponValidationResult(
     CouponDiscountType? DiscountType = null
 );
 
-public sealed class CouponService(AppDbContext db, CollectionService collectionService)
+public sealed class CouponService(
+    AppDbContext db,
+    CollectionService collectionService,
+    CampaignPricingService? campaignPricing = null)
 {
     public async Task<Result<AppliedCoupon>> ApplyCouponAsync(
         string code,
@@ -70,12 +73,23 @@ public sealed class CouponService(AppDbContext db, CollectionService collectionS
                 {
                     v.Id,
                     v.SellingPrice,
+                    v.CompareAtPrice,
                     v.ProductId,
                     CategoryId = v.Product!.CategoryId,
                     BrandId = v.Product.BrandId,
                     TagIds = v.Product.ProductTags.Select(pt => pt.TagId).ToList()
                 })
                 .ToListAsync();
+
+            var variantOffers = campaignPricing is not null && variantData.Count > 0
+                ? await campaignPricing.ResolveVariantOffersAsync(
+                    variantData.Select(v => (v.ProductId, v.Id, v.SellingPrice, v.CompareAtPrice)).ToList())
+                : new Dictionary<int, ActiveCampaignDiscountDto>();
+
+            decimal EffectiveUnitPrice(int variantId, decimal regularSellingPrice) =>
+                variantOffers.TryGetValue(variantId, out var offer) && offer.EffectivePrice < regularSellingPrice
+                    ? offer.EffectivePrice
+                    : regularSellingPrice;
 
             var variantMap = variantData.ToDictionary(v => v.Id);
             decimal targetEligibleSubtotal = 0m;
@@ -98,7 +112,7 @@ public sealed class CouponService(AppDbContext db, CollectionService collectionS
                     if (!allowedProductIds.Contains(v.ProductId)) continue;
 
                     hasEligibleItem = true;
-                    targetEligibleSubtotal += v.SellingPrice * item.Quantity;
+                    targetEligibleSubtotal += EffectiveUnitPrice(v.Id, v.SellingPrice) * item.Quantity;
                 }
 
                 if (!hasEligibleItem || targetEligibleSubtotal <= 0)
@@ -132,7 +146,7 @@ public sealed class CouponService(AppDbContext db, CollectionService collectionS
                     }
 
                     hasEligibleItem = true;
-                    targetEligibleSubtotal += v.SellingPrice * item.Quantity;
+                    targetEligibleSubtotal += EffectiveUnitPrice(v.Id, v.SellingPrice) * item.Quantity;
                 }
 
                 if (!hasEligibleItem || targetEligibleSubtotal <= 0)

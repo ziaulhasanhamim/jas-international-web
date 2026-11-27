@@ -91,6 +91,30 @@ internal static class CommerceModel
             .WithMany()
             .HasForeignKey(x => x.CollectionId)
             .OnDelete(DeleteBehavior.SetNull);
+        b.Entity<Campaign>()
+            .HasOne(x => x.Coupon)
+            .WithMany()
+            .HasForeignKey(x => x.CouponId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<CampaignProduct>().HasIndex(x => new { x.CampaignId, x.ProductId }).IsUnique().HasFilter("\"ProductVariantId\" IS NULL");
+        b.Entity<CampaignProduct>().HasIndex(x => new { x.CampaignId, x.ProductVariantId }).IsUnique().HasFilter("\"ProductVariantId\" IS NOT NULL");
+        b.Entity<CampaignProduct>().HasIndex(x => new { x.CampaignId, x.SortOrder });
+        b.Entity<CampaignProduct>()
+            .HasOne(x => x.Campaign)
+            .WithMany(c => c.CampaignProducts)
+            .HasForeignKey(x => x.CampaignId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<CampaignProduct>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<CampaignProduct>()
+            .HasOne(x => x.ProductVariant)
+            .WithMany()
+            .HasForeignKey(x => x.ProductVariantId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<Coupon>()
             .HasOne(x => x.Collection)

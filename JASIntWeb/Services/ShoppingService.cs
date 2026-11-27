@@ -17,7 +17,8 @@ public sealed class ShoppingService(
     IMetaConversionsApiService? metaApi = null,
     IHttpContextAccessor? httpContextAccessor = null,
     ILogger<ShoppingService>? logger = null,
-    CatalogService? catalog = null)
+    CatalogService? catalog = null,
+    CampaignPricingService? campaignPricing = null)
 {
     public static int? UserId(ClaimsPrincipal user) => int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
     public DeliveryRatesDto Rates => new(config.GetValue<decimal>("Delivery:Khulna", 50), config.GetValue<decimal>("Delivery:OutsideKhulna", 150));
@@ -106,8 +107,10 @@ public sealed class ShoppingService(
             .Select(v => new
             {
                 v.Id,
+                v.ProductId,
                 v.SKU,
                 v.SellingPrice,
+                v.CompareAtPrice,
                 v.Product!.Name,
                 v.Product.Slug,
                 v.Product.MainImageUrl,
@@ -123,14 +126,28 @@ public sealed class ShoppingService(
                 .ToList()
             })
             .ToDictionaryAsync(v => v.Id);
+
+        var offers = campaignPricing is not null && variants.Count > 0
+            ? await campaignPricing.ResolveVariantOffersAsync(
+                variants.Values.Select(v => (v.ProductId, v.Id, v.SellingPrice, v.CompareAtPrice)).ToList())
+            : new Dictionary<int, ActiveCampaignDiscountDto>();
+
         return new CartDto(authenticated, [.. normalized.Select(l =>
                 {
                     var v = variants.GetValueOrDefault(l.VariantId);
                     var available = v?.Available == true;
                     var sku = (!string.IsNullOrWhiteSpace(v?.SKU) ? v.SKU : (v != null ? $"V{v.Id}" : $"V{l.VariantId}")).Trim().ToUpperInvariant();
+                    var offer = v is not null && offers.TryGetValue(v.Id, out var o) ? o : null;
+                    var unitPrice = offer is not null && v is not null && offer.EffectivePrice < v.SellingPrice
+                        ? offer.EffectivePrice
+                        : (v?.SellingPrice ?? 0);
+                    decimal? regularPrice = offer is not null && v is not null && offer.EffectivePrice < v.SellingPrice
+                        ? v.SellingPrice
+                        : (v?.CompareAtPrice > v?.SellingPrice ? v.CompareAtPrice : null);
                     return new CartItemDto(l.VariantId, v?.Name ?? "Unavailable product", v?.Slug ?? "",
                         v?.MainImageUrl ?? "", v is null ? "" : string.Join(" / ", v.Options),
-                        v?.SellingPrice ?? 0, l.Quantity, available ? v!.Stock : 0, available, sku);
+                        unitPrice, l.Quantity, available ? v!.Stock : 0, available, sku,
+                        regularPrice, offer?.CampaignName, offer?.CampaignSlug);
                 })]);
     }
 
@@ -517,6 +534,7 @@ public sealed class ShoppingService(
             return new ShopError("One or more cart items are unavailable. Update your cart before checking out.");
         }
         var unitCosts = new Dictionary<int, decimal>();
+        var lockedVariantList = new List<(int ProductId, int VariantId, decimal SellingPrice, decimal? CompareAtPrice)>();
         foreach (var item in summary.Items.OrderBy(i => i.VariantId))
         {
             // Lock inventory in a stable order. The available quantity is checked again after acquiring the lock.
@@ -539,10 +557,33 @@ public sealed class ShoppingService(
             // Do not trust a client price or the earlier quote.
             inventory.QuantityReserved += item.Quantity;
             unitCosts[item.VariantId] = variant.CostPrice;
+            lockedVariantList.Add((variant.ProductId, variant.Id, variant.SellingPrice, variant.CompareAtPrice));
             summary.Items[summary.Items.IndexOf(item)] = item with
             {
                 Price = variant.SellingPrice
             };
+        }
+
+        if (campaignPricing is not null && lockedVariantList.Count > 0)
+        {
+            var authoritativeOffers = await campaignPricing.ResolveVariantOffersAsync(lockedVariantList);
+            var variantSellPrices = lockedVariantList.ToDictionary(v => v.VariantId);
+            for (var i = 0; i < summary.Items.Count; i++)
+            {
+                var line = summary.Items[i];
+                if (authoritativeOffers.TryGetValue(line.VariantId, out var offer)
+                    && variantSellPrices.TryGetValue(line.VariantId, out var vInfo)
+                    && offer.EffectivePrice < vInfo.SellingPrice)
+                {
+                    summary.Items[i] = line with
+                    {
+                        Price = offer.EffectivePrice,
+                        RegularPrice = vInfo.SellingPrice,
+                        CampaignName = offer.CampaignName,
+                        CampaignSlug = offer.CampaignSlug
+                    };
+                }
+            }
         }
         var delivery = await deliverySettings.CalculateDeliveryChargeAsync(request.District, summary.Subtotal);
 

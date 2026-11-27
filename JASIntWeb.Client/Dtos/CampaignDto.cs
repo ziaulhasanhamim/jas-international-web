@@ -1,6 +1,24 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace JASIntWeb.Client.Dtos;
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum CampaignDiscountScenario
+{
+    MarketingOnly = 0,
+    DirectDiscount = 1,
+    CouponOnly = 2,
+    DirectAndCoupon = 3
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum CampaignProductDiscountType
+{
+    Percentage = 0,
+    FixedDiscount = 1,
+    FixedPrice = 2
+}
 
 public sealed record CampaignSummaryDto(
     int Id,
@@ -18,7 +36,11 @@ public sealed record CampaignSummaryDto(
     string? HighlightCouponCode,
     int ProductCount,
     bool IsActive,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    CampaignDiscountScenario DiscountScenario = CampaignDiscountScenario.MarketingOnly,
+    string? BadgeText = null,
+    CampaignProductDiscountType? DefaultDiscountType = null,
+    decimal? DefaultDiscountValue = null);
 
 public sealed record CampaignDetailsDto(
     int Id,
@@ -37,7 +59,11 @@ public sealed record CampaignDetailsDto(
     string? MetaTitle,
     string? MetaDescription,
     string? OgImageUrl,
-    List<ProductSummaryDto> Products);
+    List<ProductSummaryDto> Products,
+    CampaignDiscountScenario DiscountScenario = CampaignDiscountScenario.MarketingOnly,
+    string? BadgeText = null,
+    CampaignProductDiscountType? DefaultDiscountType = null,
+    decimal? DefaultDiscountValue = null);
 
 public sealed class CampaignFormModel
 {
@@ -54,6 +80,9 @@ public sealed class CampaignFormModel
 
     [StringLength(100, ErrorMessage = "Eyebrow cannot exceed 100 characters.")]
     public string? Eyebrow { get; set; } = "MEGA FESTIVAL SALE · LIMITED TIME";
+
+    [StringLength(60, ErrorMessage = "Badge label cannot exceed 60 characters.")]
+    public string? BadgeText { get; set; }
 
     [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters.")]
     public string? Description { get; set; }
@@ -72,6 +101,16 @@ public sealed class CampaignFormModel
 
     [StringLength(50)]
     public string ThemeColor { get; set; } = "indigo"; // indigo, crimson, emerald, amber, navy, purple
+
+    public CampaignDiscountScenario DiscountScenario { get; set; } = CampaignDiscountScenario.MarketingOnly;
+
+    public CampaignProductDiscountType? DefaultDiscountType { get; set; }
+
+    public decimal? DefaultDiscountValue { get; set; }
+
+    public decimal? MaxDiscountAmount { get; set; }
+
+    public int? CouponId { get; set; }
 
     [StringLength(50)]
     public string? HighlightCouponCode { get; set; }

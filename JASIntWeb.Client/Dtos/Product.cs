@@ -1,10 +1,23 @@
 namespace JASIntWeb.Client.Dtos;
 
+public sealed record ActiveCampaignDiscountDto(
+    int CampaignId,
+    string CampaignName,
+    string CampaignSlug,
+    string BadgeLabel,
+    string ThemeColor,
+    decimal EffectivePrice,
+    decimal RegularPrice,
+    decimal SavingsAmount,
+    int DiscountPercent,
+    DateTimeOffset? EndsAt);
+
 public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal Price, string Category, string Image,
     int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,
     decimal? OriginalPrice = null, decimal Rating = 0m, int ReviewCount = 0, bool IsNewArrival = false, bool IsFeatured = false, bool RequiresVariantSelection = false)
 {
     public TagDto? TopTag { get; init; }
+    public ActiveCampaignDiscountDto? CampaignOffer { get; init; }
 }
 
 public sealed record HomepageSectionDto(
@@ -39,7 +52,7 @@ public sealed record ProductAttributeDto(string Code, string Name, List<Attribut
 public sealed record AttributeOptionDto(int Id, string Code, string Value, int SortOrder, string? SwatchHex = null);
 
 public sealed record ProductVariantDto(int Id, string Sku, decimal Price, int Stock, bool IsDefault,
-    Dictionary<string, string> Options, decimal? OriginalPrice = null);
+    Dictionary<string, string> Options, decimal? OriginalPrice = null, ActiveCampaignDiscountDto? CampaignOffer = null);
 
 public sealed record CategoryLinkDto(int Id, string Name, string Slug, int? ParentId)
 {

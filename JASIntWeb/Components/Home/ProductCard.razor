@@ -1,5 +1,17 @@
 <article class="product-card group relative flex flex-col justify-between h-full bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden">
-    @if (Product.IsNewArrival)
+    @if (Product.CampaignOffer is { } offer)
+    {
+        <a href="/campaigns/@offer.CampaignSlug"
+           @onclick:stopPropagation="true"
+           class="absolute top-2.5 left-2.5 z-20 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide shadow-sm @GetCampaignBadgeClasses(offer.ThemeColor) hover:opacity-90 transition">
+            <span>🔥 @offer.BadgeLabel</span>
+            @if (offer.DiscountPercent > 0)
+            {
+                <span>· -@offer.DiscountPercent%</span>
+            }
+        </a>
+    }
+    else if (Product.IsNewArrival)
     {
         <span class="product-new-label">New arrival</span>
     }
@@ -65,7 +77,13 @@
 
         <!-- Savings Pill -->
         <div class="flex items-center justify-center mt-2.5 mb-1 min-h-[24px]">
-            @if (Product.OriginalPrice.HasValue && Product.OriginalPrice > Product.Price)
+            @if (Product.CampaignOffer is { } cardOffer && Product.OriginalPrice.HasValue && Product.OriginalPrice > Product.Price)
+            {
+                <a href="/campaigns/@cardOffer.CampaignSlug" @onclick:stopPropagation="true" class="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200/90 px-2.5 py-0.5 rounded-md hover:bg-rose-100 transition">
+                    <span>⚡ @cardOffer.CampaignName · SAVE ৳@((Product.OriginalPrice.Value - Product.Price).ToString("N0"))</span>
+                </a>
+            }
+            else if (Product.OriginalPrice.HasValue && Product.OriginalPrice > Product.Price)
             {
                 <span class="inline-flex items-center text-[11px] font-extrabold text-slate-900 bg-orange-50 border border-orange-200/90 px-2.5 py-0.5 rounded-md">
                     SAVE ৳ @((Product.OriginalPrice.Value - Product.Price).ToString("N0"))
@@ -75,7 +93,7 @@
 
         <!-- Price Row -->
         <div class="flex items-baseline justify-center gap-1.5 my-1 mb-3">
-            <span class="text-base sm:text-lg font-black text-slate-900">Tk. @Product.Price.ToString("N0")</span>
+            <span class="text-base sm:text-lg font-black @(Product.CampaignOffer is not null ? "text-rose-600" : "text-slate-900")">Tk. @Product.Price.ToString("N0")</span>
             @if (Product.OriginalPrice.HasValue && Product.OriginalPrice > Product.Price)
             {
                 <span class="text-xs text-slate-400 line-through">Tk. @Product.OriginalPrice.Value.ToString("N0")</span>
@@ -112,4 +130,14 @@
 {
     [Parameter, EditorRequired]
     public ProductSummaryDto Product { get; set; } = default!;
+
+    private static string GetCampaignBadgeClasses(string? theme) => theme?.ToLowerInvariant() switch
+    {
+        "indigo" => "bg-indigo-600 text-white",
+        "emerald" or "green" => "bg-emerald-600 text-white",
+        "amber" or "orange" => "bg-amber-500 text-slate-950",
+        "purple" => "bg-purple-600 text-white",
+        "navy" => "bg-slate-900 text-white",
+        _ => "bg-rose-600 text-white"
+    };
 }

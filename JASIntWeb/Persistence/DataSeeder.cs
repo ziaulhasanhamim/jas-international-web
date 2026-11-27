@@ -787,81 +787,120 @@ public static class JsonTestDataSeeder
             var audioCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == "in-stock-studio-audio" && !c.IsDeleted, ct);
             var under3kCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == "creator-summer-under-3000" && !c.IsDeleted, ct);
 
+            var welcomeCoupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == "WELCOME200", ct);
+            var save10Coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == "SAVE10", ct);
+
             var summerTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "summer-sale", ct);
             var creatorTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "creator-essentials", ct);
             var flashTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "flash-deal", ct);
 
-            var sampleProducts = await db.Products.Take(8).Select(p => p.Id).ToListAsync(ct);
+            var sampleProducts = await db.Products.OrderBy(p => p.Id).Take(8).Select(p => p.Id).ToListAsync(ct);
 
-            db.Campaigns.AddRange(
-                new Campaign
-                {
-                    Name = "Summer Tech Fest 2026",
-                    Slug = "summer-tech-fest",
-                    BanglaName = "সামার টেক ফেস্টিভ্যাল ২০২৬",
-                    Eyebrow = "SEASONAL MEGA EVENT",
-                    Description = "Up to 35% off on official AMOLED smartwatches, ANC wireless earbuds, and GaN fast chargers.",
-                    BannerImageUrl = "/jas-og-card.webp",
-                    MobileBannerImageUrl = "/jas-og-card.webp",
-                    StartDate = DateTimeOffset.UtcNow.AddDays(-1),
-                    EndDate = DateTimeOffset.UtcNow.AddDays(14),
-                    ShowCountdown = true,
-                    ThemeColor = "amber",
-                    HighlightCouponCode = "WELCOME200",
-                    CollectionId = featuredCol?.Id,
-                    TagId = summerTag?.Id,
-                    CuratedProductIds = sampleProducts.Take(6).ToList(),
-                    IsActive = true,
-                    SortOrder = 1,
-                    MetaTitle = "Summer Tech Fest 2026 - Jas International",
-                    MetaDescription = "Massive summer savings on genuine gadgets and tech accessories with 100% official brand warranty."
-                },
-                new Campaign
-                {
-                    Name = "Creator Audio Mega Sale",
-                    Slug = "creator-audio-mega-sale",
-                    BanglaName = "ক্রিয়েটর অডিও মেগা সেল",
-                    Eyebrow = "STUDIO & STREAMING GEAR",
-                    Description = "Exclusive discounts on studio microphones, audio interfaces, and noise-cancelling headphones.",
-                    BannerImageUrl = "/jas-og-card.webp",
-                    MobileBannerImageUrl = "/jas-og-card.webp",
-                    StartDate = DateTimeOffset.UtcNow.AddDays(-3),
-                    EndDate = DateTimeOffset.UtcNow.AddDays(7),
-                    ShowCountdown = true,
-                    ThemeColor = "indigo",
-                    HighlightCouponCode = "SAVE10",
-                    CollectionId = audioCol?.Id,
-                    TagId = creatorTag?.Id,
-                    CuratedProductIds = sampleProducts.Skip(2).Take(6).ToList(),
-                    IsActive = true,
-                    SortOrder = 2,
-                    MetaTitle = "Creator Audio Mega Sale - Jas International",
-                    MetaDescription = "Equip your creative setup with studio-quality audio gear at unbeatable prices."
-                },
-                new Campaign
-                {
-                    Name = "Flash Weekend Deals",
-                    Slug = "flash-weekend-deals",
-                    BanglaName = "ফ্ল্যাশ উইকেন্ড ডিলস",
-                    Eyebrow = "LIMITED 48-HOUR FLASH",
-                    Description = "Supercharged weekend markdowns on high-capacity power banks and fast chargers.",
-                    BannerImageUrl = "/jas-og-card.webp",
-                    MobileBannerImageUrl = "/jas-og-card.webp",
-                    StartDate = DateTimeOffset.UtcNow,
-                    EndDate = DateTimeOffset.UtcNow.AddDays(2),
-                    ShowCountdown = true,
-                    ThemeColor = "crimson",
-                    HighlightCouponCode = "FREESHIP",
-                    CollectionId = under3kCol?.Id,
-                    TagId = flashTag?.Id,
-                    CuratedProductIds = sampleProducts.Skip(4).Take(4).ToList(),
-                    IsActive = true,
-                    SortOrder = 3,
-                    MetaTitle = "Flash Weekend Deals - Jas International",
-                    MetaDescription = "Grab genuine power banks and travel chargers before weekend deals expire."
-                }
-            );
+            var mega1111 = new Campaign
+            {
+                Name = "11.11 Mega Tech Festival",
+                Slug = "11-11-mega-festival",
+                BanglaName = "১১.১১ মেগা টেক ফেস্টিভ্যাল",
+                Eyebrow = "BIGGEST SALE OF THE YEAR",
+                BadgeText = "11.11 DEAL",
+                Description = "Flat 11% direct price markdowns plus extra flash deal overrides and stackable promo vouchers across top creator gear.",
+                BannerImageUrl = "/jas-og-card.webp",
+                MobileBannerImageUrl = "/jas-og-card.webp",
+                StartDate = DateTimeOffset.UtcNow.AddDays(-1),
+                EndDate = DateTimeOffset.UtcNow.AddDays(11),
+                ShowCountdown = true,
+                ThemeColor = "crimson",
+                DiscountScenario = CampaignDiscountScenario.DirectAndCoupon,
+                DefaultDiscountType = CampaignProductDiscountType.Percentage,
+                DefaultDiscountValue = 11m,
+                MaxDiscountAmount = 2500m,
+                CouponId = welcomeCoupon?.Id,
+                HighlightCouponCode = welcomeCoupon?.Code ?? "WELCOME200",
+                CollectionId = featuredCol?.Id,
+                TagId = summerTag?.Id,
+                CuratedProductIds = sampleProducts.Take(6).ToList(),
+                IsActive = true,
+                SortOrder = 1,
+                MetaTitle = "11.11 Mega Tech Festival - Jas International",
+                MetaDescription = "11.11 flash deals and stackable discounts on genuine tech accessories across Bangladesh."
+            };
+
+            var creatorSale = new Campaign
+            {
+                Name = "Creator Audio Mega Sale",
+                Slug = "creator-audio-mega-sale",
+                BanglaName = "ক্রিয়েটর অডিও মেগা সেল",
+                Eyebrow = "COUPON EXCLUSIVE",
+                BadgeText = "AUDIO DEAL",
+                Description = "Use promo coupon SAVE10 at checkout for 10% savings on studio microphones and wireless audio gear.",
+                BannerImageUrl = "/jas-og-card.webp",
+                MobileBannerImageUrl = "/jas-og-card.webp",
+                StartDate = DateTimeOffset.UtcNow.AddDays(-3),
+                EndDate = DateTimeOffset.UtcNow.AddDays(7),
+                ShowCountdown = true,
+                ThemeColor = "indigo",
+                DiscountScenario = CampaignDiscountScenario.CouponOnly,
+                CouponId = save10Coupon?.Id,
+                HighlightCouponCode = save10Coupon?.Code ?? "SAVE10",
+                CollectionId = audioCol?.Id,
+                TagId = creatorTag?.Id,
+                CuratedProductIds = sampleProducts.Skip(2).Take(6).ToList(),
+                IsActive = true,
+                SortOrder = 2,
+                MetaTitle = "Creator Audio Mega Sale - Jas International",
+                MetaDescription = "Equip your creative setup with studio-quality audio gear at unbeatable prices."
+            };
+
+            var flagshipShowcase = new Campaign
+            {
+                Name = "Flagship New Arrivals Showcase",
+                Slug = "flagship-showcase",
+                BanglaName = "ফ্ল্যাগশিপ নিউ অ্যারাইভাল",
+                Eyebrow = "OFFICIAL LAUNCH SHOWCASE",
+                BadgeText = "LAUNCH",
+                Description = "Discover the latest official releases with 100% brand warranty and express nationwide dispatch.",
+                BannerImageUrl = "/jas-og-card.webp",
+                MobileBannerImageUrl = "/jas-og-card.webp",
+                StartDate = DateTimeOffset.UtcNow,
+                EndDate = DateTimeOffset.UtcNow.AddDays(14),
+                ShowCountdown = false,
+                ThemeColor = "navy",
+                DiscountScenario = CampaignDiscountScenario.MarketingOnly,
+                CollectionId = under3kCol?.Id,
+                TagId = flashTag?.Id,
+                CuratedProductIds = sampleProducts.Skip(4).Take(4).ToList(),
+                IsActive = true,
+                SortOrder = 3,
+                MetaTitle = "Flagship New Arrivals Showcase - Jas International",
+                MetaDescription = "Shop newly launched authentic smartwatches, audio gear, and creator accessories."
+            };
+
+            db.Campaigns.AddRange(mega1111, creatorSale, flagshipShowcase);
             await db.SaveChangesAsync(ct);
+
+            if (sampleProducts.Count > 0)
+            {
+                db.CampaignProducts.Add(new CampaignProduct
+                {
+                    CampaignId = mega1111.Id,
+                    ProductId = sampleProducts[0],
+                    DiscountType = CampaignProductDiscountType.Percentage,
+                    DiscountValue = 20m,
+                    SortOrder = 1
+                });
+                if (sampleProducts.Count > 1)
+                {
+                    db.CampaignProducts.Add(new CampaignProduct
+                    {
+                        CampaignId = mega1111.Id,
+                        ProductId = sampleProducts[1],
+                        DiscountType = CampaignProductDiscountType.FixedDiscount,
+                        DiscountValue = 300m,
+                        SortOrder = 2
+                    });
+                }
+                await db.SaveChangesAsync(ct);
+            }
         }
 
         // Upgrade any existing placeholder images or outdated slides to authentic Gadget & Gear imagery

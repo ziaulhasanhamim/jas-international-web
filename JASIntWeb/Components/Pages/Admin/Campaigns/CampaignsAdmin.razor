@@ -5,9 +5,12 @@
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using Microsoft.EntityFrameworkCore
 @using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Client.Dtos
 @inject AppDbContext Db
 @inject NavigationManager Nav
 @inject CampaignService CampaignSvc
+@inject CampaignPricingService PricingSvc
+@inject CatalogService CatalogSvc
 
 <PageTitle>Mega Campaigns &amp; Special Offers · JAS Admin</PageTitle>
 
@@ -47,13 +50,13 @@
     <div class="relative w-full max-w-xs">
         <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
                placeholder="Search campaigns by name, coupon..."
-               class="shop-input text-xs pl-8 pr-8" />
-        <span class="absolute left-2.5 top-2.5 text-slate-400">
+               class="shop-input !mt-0 text-xs pl-9 pr-9" />
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <Icon Name="search" Class="size-3.5" />
         </span>
         @if (!string.IsNullOrWhiteSpace(searchQuery))
         {
-            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+            <button type="button" @onclick="ClearSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
         }
     </div>
 </div>
@@ -94,17 +97,42 @@
                 </div>
             </TemplateColumn>
 
-            <TemplateColumn Title="Coupon Code">
-                @if (!string.IsNullOrWhiteSpace(context.HighlightCouponCode))
-                {
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                        🎟️ @context.HighlightCouponCode
-                    </span>
-                }
-                else
-                {
-                    <span class="text-slate-400 text-xs">—</span>
-                }
+            <TemplateColumn Title="Offer / Scenario">
+                <div class="space-y-1">
+                    @switch (context.DiscountScenario)
+                    {
+                        case CampaignDiscountScenario.DirectDiscount:
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                ⚡ Direct Sale @(context.DefaultDiscountValue > 0 ? $"({context.DefaultDiscountValue:0.##}{(context.DefaultDiscountType == CampaignProductDiscountType.Percentage ? "%" : "৳")})" : "")
+                            </span>
+                            break;
+                        case CampaignDiscountScenario.DirectAndCoupon:
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                                🔥 Direct + Coupon
+                            </span>
+                            break;
+                        case CampaignDiscountScenario.CouponOnly:
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                🎟️ Coupon Only
+                            </span>
+                            break;
+                        default:
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                                ✨ Showcase
+                            </span>
+                            break;
+                    }
+                    @if (context.CampaignProducts.Count > 0)
+                    {
+                        <span class="block text-[10px] font-semibold text-slate-500">@context.CampaignProducts.Count product deal override(s)</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(context.HighlightCouponCode))
+                    {
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            🎟️ @context.HighlightCouponCode
+                        </span>
+                    }
+                </div>
             </TemplateColumn>
 
             <TemplateColumn Title="Schedule / Countdown">
@@ -183,7 +211,10 @@
     {
         get
         {
-            var q = Db.Campaigns.AsNoTracking().Include(c => c.Collection).AsQueryable();
+            var q = Db.Campaigns.AsNoTracking()
+                .Include(c => c.Collection)
+                .Include(c => c.CampaignProducts)
+                .AsQueryable();
             if (!string.IsNullOrWhiteSpace(searchQuery))
             {
                 var term = searchQuery.Trim().ToLower();
@@ -231,7 +262,9 @@
         {
             target.IsActive = !target.IsActive;
             await Db.SaveChangesAsync();
+            await PricingSvc.InvalidateCacheAsync();
             await CampaignSvc.InvalidateCacheAsync(target.Slug);
+            await CatalogSvc.InvalidateAllAsync();
             _toast = $"Campaign '{target.Name}' is now {(target.IsActive ? "Active" : "Disabled")}.";
         }
     }
@@ -243,7 +276,9 @@
         {
             Db.Campaigns.Remove(target);
             await Db.SaveChangesAsync();
+            await PricingSvc.InvalidateCacheAsync();
             await CampaignSvc.InvalidateCacheAsync(target.Slug);
+            await CatalogSvc.InvalidateAllAsync();
             _toast = $"Campaign '{target.Name}' deleted.";
         }
     }

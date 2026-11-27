@@ -8,7 +8,8 @@ public sealed class CatalogService(
     IDbContextFactory<AppDbContext> dbFactory,
     HybridCache cache,
     IOutputCacheStore? outputCache = null,
-    CollectionService? collectionService = null)
+    CollectionService? collectionService = null,
+    CampaignPricingService? campaignPricing = null)
 {
     public const string TagCatalog = "catalog";
     public const string TagCategories = "categories";
@@ -178,7 +179,7 @@ public sealed class CatalogService(
         var normalizedSlug = slug.Trim().ToLowerInvariant();
         var key = ProductDetailsCacheKey(normalizedSlug);
 
-        return await cache.GetOrCreateAsync(
+        var details = await cache.GetOrCreateAsync(
             key,
             async ct =>
             {
@@ -269,10 +270,45 @@ public sealed class CatalogService(
             },
             options: ProductOptions,
             tags: [TagCatalog, TagProducts, $"product:{normalizedSlug}"]);
+
+        if (details is null || campaignPricing is null || details.Variants.Count == 0)
+        {
+            return details;
+        }
+
+        var offers = await campaignPricing.ResolveVariantOffersAsync(
+            details.Variants.Select(v => (details.Id, v.Id, v.Price, v.OriginalPrice)).ToList());
+
+        if (offers.Count == 0)
+        {
+            return details;
+        }
+
+        var updatedVariants = details.Variants.Select(v =>
+        {
+            if (offers.TryGetValue(v.Id, out var offer) && offer.EffectivePrice < v.Price)
+            {
+                var crossedOut = v.OriginalPrice.HasValue && v.OriginalPrice.Value > v.Price ? v.OriginalPrice.Value : v.Price;
+                return v with
+                {
+                    Price = offer.EffectivePrice,
+                    OriginalPrice = crossedOut,
+                    CampaignOffer = offer with
+                    {
+                        RegularPrice = crossedOut,
+                        SavingsAmount = crossedOut - offer.EffectivePrice
+                    }
+                };
+            }
+            return v;
+        }).ToList();
+
+        return details with { Variants = updatedVariants };
     }
 
     public async Task InvalidateProductCacheAsync(string? slug = null)
     {
+        campaignPricing?.InvalidateCache();
         if (!string.IsNullOrWhiteSpace(slug))
         {
             var normalized = slug.Trim().ToLowerInvariant();
@@ -326,7 +362,7 @@ public sealed class CatalogService(
         await using var db = await dbFactory.CreateDbContextAsync();
         var q = await InCategoryAsync(VisibleProducts(db), category);
         if (excludeProductId.HasValue) q = q.Where(p => p.Id != excludeProductId.Value);
-        return await q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id).Take(Math.Clamp(take, 1, 24))
+        var latestItems = await q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id).Take(Math.Clamp(take, 1, 24))
             .Select(p => new ProductSummaryDto(p.Id, p.Name, p.Slug,
                 p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault)
                 .ThenBy(v => v.Id)
@@ -356,10 +392,15 @@ public sealed class CatalogService(
                     .FirstOrDefault()
             })
             .ToListAsync();
+
+        return campaignPricing is not null
+            ? await campaignPricing.ApplyCampaignPricingAsync(latestItems)
+            : latestItems;
     }
 
-    public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync() =>
-        await cache.GetOrCreateAsync(
+    public async Task<List<HomepageSectionDto>> GetHomepageSectionsAsync()
+    {
+        var sections = await cache.GetOrCreateAsync(
             HomepageSectionsCacheKey,
             async ct =>
             {
@@ -409,6 +450,20 @@ public sealed class CatalogService(
             },
             options: StandardOptions,
             tags: [TagCatalog, TagSections, CollectionService.TagCollections]);
+
+        if (campaignPricing is null || sections.Count == 0)
+        {
+            return sections;
+        }
+
+        var enriched = new List<HomepageSectionDto>(sections.Count);
+        foreach (var sec in sections)
+        {
+            var pricedProducts = await campaignPricing.ApplyCampaignPricingAsync(sec.Products);
+            enriched.Add(sec with { Products = pricedProducts });
+        }
+        return enriched;
+    }
 
     public async Task InvalidateHomepageSectionsCacheAsync()
     {
@@ -490,6 +545,7 @@ public sealed class CatalogService(
 
     public async Task InvalidateAllAsync()
     {
+        campaignPricing?.InvalidateCache();
         await cache.RemoveByTagAsync(TagCatalog);
         await EvictHomePageOutputCacheAsync();
     }
@@ -564,7 +620,7 @@ public sealed class CatalogService(
                 .ThenBy(p => p.Product.Id),
             _ => priced.OrderByDescending(p => p.Product.CreatedAt).ThenBy(p => p.Product.Id)
         };
-        return (await priced.Skip((Math.Clamp(page, 1, 10000) - 1) * pageSize).Take(pageSize)
+        var searchItems = await priced.Skip((Math.Clamp(page, 1, 10000) - 1) * pageSize).Take(pageSize)
             .Select(p => new ProductSummaryDto(p.Product.Id, p.Product.Name, p.Product.Slug, p.Price,
                     p.Product.Category!.Name, p.Product.MainImageUrl,
                     p.Product.ProductVariants.Where(v => v.IsDefault && v.IsActive && !v.IsDeleted)
@@ -590,6 +646,13 @@ public sealed class CatalogService(
                     .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
                     .FirstOrDefault()
             })
-            .ToListAsync(), count);
+            .ToListAsync();
+
+        if (campaignPricing is not null && searchItems.Count > 0)
+        {
+            searchItems = await campaignPricing.ApplyCampaignPricingAsync(searchItems);
+        }
+
+        return (searchItems, count);
     }
 }

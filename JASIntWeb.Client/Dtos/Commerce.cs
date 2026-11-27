@@ -6,7 +6,8 @@ public sealed record CartLineRequest(int VariantId, int Quantity, int ProductId 
 public sealed record CartMergeRequest(Guid Token, List<CartLineRequest> Items);
 
 public sealed record CartItemDto(int VariantId, string Name, string Slug, string Image, string Variant,
-    decimal Price, int Quantity, int Stock, bool IsAvailable, string? Sku = null)
+    decimal Price, int Quantity, int Stock, bool IsAvailable, string? Sku = null,
+    decimal? RegularPrice = null, string? CampaignName = null, string? CampaignSlug = null)
 {
     public decimal LineTotal => Price * Quantity;
 }

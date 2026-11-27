@@ -9,7 +9,8 @@ namespace JASIntWeb.Services;
 public sealed class CampaignService(
     IDbContextFactory<AppDbContext> dbFactory,
     HybridCache cache,
-    CollectionService collectionService)
+    CollectionService collectionService,
+    CampaignPricingService? campaignPricing = null)
 {
     public const string TagCampaigns = "campaigns";
     private const string ActiveCampaignsCacheKey = "campaigns:active";
@@ -21,14 +22,14 @@ public sealed class CampaignService(
 
     public async Task<List<CampaignSummaryDto>> GetActiveCampaignsAsync(CancellationToken ct = default)
     {
-        return await cache.GetOrCreateAsync(
+        var list = await cache.GetOrCreateAsync(
             ActiveCampaignsCacheKey,
             async token =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync(token);
-                var now = DateTimeOffset.UtcNow;
                 var campaigns = await db.Campaigns.AsNoTracking()
-                    .Where(c => c.IsActive && (!c.EndDate.HasValue || c.EndDate > now))
+                    .Include(c => c.CampaignProducts)
+                    .Where(c => c.IsActive)
                     .OrderBy(c => c.SortOrder)
                     .ThenByDescending(c => c.CreatedAt)
                     .ToListAsync(token);
@@ -36,24 +37,23 @@ public sealed class CampaignService(
                 var summaries = new List<CampaignSummaryDto>(campaigns.Count);
                 foreach (var c in campaigns)
                 {
-                    int productCount = 0;
+                    var distinctProductIds = new HashSet<int>(c.CampaignProducts.Select(cp => cp.ProductId));
                     if (c.CollectionId.HasValue)
                     {
                         var ids = await collectionService.GetCollectionProductIdsAsync(c.CollectionId.Value, token);
-                        productCount = ids.Count;
+                        foreach (var id in ids) distinctProductIds.Add(id);
                     }
                     else
                     {
                         if (c.TagId.HasValue)
                         {
-                            productCount += await db.ProductTags
-                                .CountAsync(pt => pt.TagId == c.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted), token);
+                            var taggedIds = await db.ProductTags.AsNoTracking()
+                                .Where(pt => pt.TagId == c.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
+                                .Select(pt => pt.ProductId)
+                                .ToListAsync(token);
+                            foreach (var id in taggedIds) distinctProductIds.Add(id);
                         }
-                        if (c.CuratedProductIds.Count > 0)
-                        {
-                            var curatedDistinct = c.CuratedProductIds.Distinct().Count();
-                            productCount = Math.Max(productCount, curatedDistinct);
-                        }
+                        foreach (var id in c.CuratedProductIds) distinctProductIds.Add(id);
                     }
 
                     summaries.Add(new CampaignSummaryDto(
@@ -70,9 +70,13 @@ public sealed class CampaignService(
                         c.ShowCountdown,
                         c.ThemeColor,
                         c.HighlightCouponCode,
-                        productCount,
+                        distinctProductIds.Count,
                         c.IsActive,
-                        c.SortOrder));
+                        c.SortOrder,
+                        c.DiscountScenario,
+                        c.BadgeText,
+                        c.DefaultDiscountType,
+                        c.DefaultDiscountValue));
                 }
 
                 return summaries;
@@ -80,6 +84,9 @@ public sealed class CampaignService(
             StandardOptions,
             tags: [TagCampaigns, CollectionService.TagCollections, CatalogService.TagCatalog],
             cancellationToken: ct);
+
+        var now = DateTimeOffset.UtcNow;
+        return list.Where(c => !c.EndDate.HasValue || c.EndDate.Value > now).ToList();
     }
 
     public async Task<CampaignDetailsDto?> GetCampaignBySlugAsync(string slug, CancellationToken ct = default)
@@ -88,27 +95,42 @@ public sealed class CampaignService(
         var normalizedSlug = slug.Trim().ToLowerInvariant();
         var cacheKey = $"campaign:{normalizedSlug}";
 
-        return await cache.GetOrCreateAsync(
+        var details = await cache.GetOrCreateAsync(
             cacheKey,
             async token =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync(token);
                 var campaign = await db.Campaigns.AsNoTracking()
+                    .Include(c => c.CampaignProducts)
                     .FirstOrDefaultAsync(c => c.Slug == normalizedSlug && c.IsActive, token);
 
                 if (campaign == null) return null;
 
-                List<ProductSummaryDto> products;
+                var orderedIds = new List<int>();
+                var seen = new HashSet<int>();
+
+                // Explicit campaign product overrides take showcase priority in SortOrder
+                foreach (var cp in campaign.CampaignProducts.OrderBy(cp => cp.SortOrder).ThenBy(cp => cp.Id))
+                {
+                    if (seen.Add(cp.ProductId))
+                    {
+                        orderedIds.Add(cp.ProductId);
+                    }
+                }
+
                 if (campaign.CollectionId.HasValue)
                 {
-                    products = await collectionService.GetCollectionProductsAsync(campaign.CollectionId.Value, ct: token);
+                    var colIds = await collectionService.GetCollectionProductIdsAsync(campaign.CollectionId.Value, token);
+                    foreach (var id in colIds)
+                    {
+                        if (seen.Add(id)) orderedIds.Add(id);
+                    }
                 }
                 else
                 {
-                    var productIds = new List<int>();
-                    if (campaign.CuratedProductIds.Count > 0)
+                    foreach (var id in campaign.CuratedProductIds)
                     {
-                        productIds.AddRange(campaign.CuratedProductIds);
+                        if (seen.Add(id)) orderedIds.Add(id);
                     }
 
                     if (campaign.TagId.HasValue)
@@ -118,14 +140,16 @@ public sealed class CampaignService(
                             .Select(pt => pt.ProductId)
                             .ToListAsync(token);
 
-                        productIds.AddRange(taggedProductIds);
+                        foreach (var id in taggedProductIds)
+                        {
+                            if (seen.Add(id)) orderedIds.Add(id);
+                        }
                     }
-
-                    var distinctProductIds = productIds.Distinct().ToList();
-                    products = distinctProductIds.Count > 0
-                        ? await CollectionService.LoadOrderedProductSummariesAsync(db, distinctProductIds, token)
-                        : [];
                 }
+
+                var products = orderedIds.Count > 0
+                    ? await CollectionService.LoadOrderedProductSummariesAsync(db, orderedIds, token)
+                    : [];
 
                 return new CampaignDetailsDto(
                     campaign.Id,
@@ -144,15 +168,28 @@ public sealed class CampaignService(
                     campaign.MetaTitle,
                     campaign.MetaDescription,
                     campaign.OgImageUrl,
-                    products);
+                    products,
+                    campaign.DiscountScenario,
+                    campaign.BadgeText,
+                    campaign.DefaultDiscountType,
+                    campaign.DefaultDiscountValue);
             },
             StandardOptions,
             tags: [TagCampaigns, CollectionService.TagCollections, CatalogService.TagCatalog],
             cancellationToken: ct);
+
+        if (details is not null && campaignPricing is not null && details.Products.Count > 0)
+        {
+            var pricedProducts = await campaignPricing.ApplyCampaignPricingAsync(details.Products, ct);
+            return details with { Products = pricedProducts };
+        }
+
+        return details;
     }
 
     public async ValueTask InvalidateCacheAsync(string? slug = null)
     {
+        campaignPricing?.InvalidateCache();
         await cache.RemoveAsync(ActiveCampaignsCacheKey);
         await cache.RemoveByTagAsync(TagCampaigns);
         if (!string.IsNullOrWhiteSpace(slug))

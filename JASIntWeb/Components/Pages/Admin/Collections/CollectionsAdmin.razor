@@ -65,13 +65,13 @@
     <div class="relative w-full max-w-xs">
         <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
                placeholder="Search collections by name, slug..."
-               class="shop-input text-xs pl-8 pr-8" />
-        <span class="absolute left-2.5 top-2.5 text-slate-400">
+               class="shop-input !mt-0 text-xs pl-9 pr-9" />
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <Icon Name="search" Class="size-3.5" />
         </span>
         @if (!string.IsNullOrWhiteSpace(searchQuery))
         {
-            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+            <button type="button" @onclick="ClearSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
         }
     </div>
 </div>

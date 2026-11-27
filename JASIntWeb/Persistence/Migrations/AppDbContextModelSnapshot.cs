@@ -18,7 +18,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261125190916_AddCollectionsAndCollectionPages";
+    public override string LastMigrationId => "20261127125426_AddCampaignPricingAndCampaignProducts";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -177,6 +177,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<string>("BadgeText")
+                    .HasColumnType("text");
+
                 b.Property<string>("BanglaName")
                     .HasColumnType("text");
 
@@ -184,6 +187,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("text");
 
                 b.Property<int?>("CollectionId")
+                    .HasColumnType("integer");
+
+                b.Property<int?>("CouponId")
                     .HasColumnType("integer");
 
                 b.Property<DateTimeOffset>("CreatedAt")
@@ -198,8 +204,17 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer[]")
                     .HasDefaultValueSql("'{}'");
 
+                b.Property<int?>("DefaultDiscountType")
+                    .HasColumnType("integer");
+
+                b.Property<decimal?>("DefaultDiscountValue")
+                    .HasColumnType("numeric");
+
                 b.Property<string>("Description")
                     .HasColumnType("text");
+
+                b.Property<int>("DiscountScenario")
+                    .HasColumnType("integer");
 
                 b.Property<DateTimeOffset?>("EndDate")
                     .HasColumnType("timestamp with time zone");
@@ -212,6 +227,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<bool>("IsActive")
                     .HasColumnType("boolean");
+
+                b.Property<decimal?>("MaxDiscountAmount")
+                    .HasColumnType("numeric");
 
                 b.Property<string>("MetaDescription")
                     .HasColumnType("text");
@@ -259,6 +277,8 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("CollectionId");
 
+                b.HasIndex("CouponId");
+
                 b.HasIndex("Slug")
                     .IsUnique();
 
@@ -267,6 +287,54 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("IsActive", "SortOrder");
 
                 b.ToTable("Campaigns");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CampaignProduct", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<int>("CampaignId")
+                    .HasColumnType("integer");
+
+                b.Property<int>("DiscountType")
+                    .HasColumnType("integer");
+
+                b.Property<decimal>("DiscountValue")
+                    .HasColumnType("numeric");
+
+                b.Property<decimal?>("MaxDiscountAmount")
+                    .HasColumnType("numeric");
+
+                b.Property<int>("ProductId")
+                    .HasColumnType("integer");
+
+                b.Property<int?>("ProductVariantId")
+                    .HasColumnType("integer");
+
+                b.Property<int>("SortOrder")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("ProductId");
+
+                b.HasIndex("ProductVariantId");
+
+                b.HasIndex("CampaignId", "ProductId")
+                    .IsUnique()
+                    .HasFilter("\"ProductVariantId\" IS NULL");
+
+                b.HasIndex("CampaignId", "ProductVariantId")
+                    .IsUnique()
+                    .HasFilter("\"ProductVariantId\" IS NOT NULL");
+
+                b.HasIndex("CampaignId", "SortOrder");
+
+                b.ToTable("CampaignProducts");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.CarouselSlide", b =>
@@ -2502,13 +2570,46 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasForeignKey("CollectionId")
                     .OnDelete(DeleteBehavior.SetNull);
 
+                b.HasOne("JASIntWeb.Persistence.Entities.Coupon", "Coupon")
+                    .WithMany()
+                    .HasForeignKey("CouponId")
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 b.HasOne("JASIntWeb.Persistence.Entities.Tag", "Tag")
                     .WithMany()
                     .HasForeignKey("TagId");
 
                 b.Navigation("Collection");
 
+                b.Navigation("Coupon");
+
                 b.Navigation("Tag");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CampaignProduct", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.Campaign", "Campaign")
+                    .WithMany("CampaignProducts")
+                    .HasForeignKey("CampaignId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
+                b.HasOne("JASIntWeb.Persistence.Entities.Product", "Product")
+                    .WithMany()
+                    .HasForeignKey("ProductId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
+                b.HasOne("JASIntWeb.Persistence.Entities.ProductVariant", "ProductVariant")
+                    .WithMany()
+                    .HasForeignKey("ProductVariantId")
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                b.Navigation("Campaign");
+
+                b.Navigation("Product");
+
+                b.Navigation("ProductVariant");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Cart", b =>
@@ -2903,6 +3004,11 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Brand", b =>
             {
                 b.Navigation("Products");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.Campaign", b =>
+            {
+                b.Navigation("CampaignProducts");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Cart", b =>

@@ -10,6 +10,8 @@
 @inject AppDbContext Db
 @inject NavigationManager Nav
 @inject CampaignService CampaignSvc
+@inject CampaignPricingService PricingSvc
+@inject CatalogService CatalogSvc
 @inject IStorageService Storage
 
 <PageTitle>@(Id == 0 ? "Create Campaign" : "Edit Campaign") · JAS Admin</PageTitle>
@@ -69,7 +71,13 @@ else
             <label class="shop-label">
                 Eyebrow Badge
                 <InputText @bind-Value="Input.Eyebrow" class="shop-input uppercase font-semibold text-xs tracking-wider" placeholder="e.g. LIMITED TIME · UP TO 50% OFF" />
-                <small>High-contrast promo badge displayed above the title.</small>
+                <small>High-contrast promo badge displayed above the hero title.</small>
+            </label>
+
+            <label class="shop-label">
+                Product Card Corner Badge (optional)
+                <InputText @bind-Value="Input.BadgeText" class="shop-input uppercase font-bold text-xs tracking-wider" placeholder="e.g. 11.11 DEAL or FLASH SALE" />
+                <small>Compact badge shown on discounted product cards (falls back to Campaign Name).</small>
             </label>
         </div>
 
@@ -210,30 +218,119 @@ else
                     <small>Gradient mood applied to the campaign hero banner.</small>
                 </label>
 
-                <label class="shop-label">
-                    Highlighted Coupon Code (optional)
-                    <div class="flex gap-2">
-                        <InputText @bind-Value="Input.HighlightCouponCode" class="shop-input uppercase font-mono font-bold tracking-wider" placeholder="e.g. EID2026" />
-                    </div>
-                    <small>Prominently featured with a 1-click copy badge.</small>
-                    @if (activeCoupons.Count > 0)
-                    {
-                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                            <span class="text-[11px] text-slate-500">Quick pick:</span>
-                            @foreach (var c in activeCoupons)
-                            {
-                                <button type="button" @onclick="() => Input.HighlightCouponCode = c.Code"
-                                        class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-bold hover:bg-amber-100 transition cursor-pointer">
-                                    @c.Code
-                                </button>
-                            }
-                        </div>
-                    }
-                </label>
+                <div class="text-xs text-slate-500 flex items-center bg-white rounded-xl border border-slate-200 p-3">
+                    Configure automatic scheduled price cuts, per-product flash prices, or exclusive coupons in the <strong class="mx-1 text-slate-800">Offer Pricing &amp; Coupon Scenario</strong> section below.
+                </div>
             </div>
         </div>
 
-        <!-- Section 3: Schedule & Countdown -->
+        <!-- Section 3: Campaign Offer Pricing & Coupon Scenario -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-5">
+            <div>
+                <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>⚡</span> Offer Pricing &amp; Coupon Scenario
+                </h3>
+                <p class="text-xs text-slate-500 mt-1">
+                    Choose how this campaign prices products across the storefront, carts, and checkout (e.g. 11.11 flash markdowns, coupon-gated sales, or launch showcases).
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                @foreach (var opt in ScenarioOptions)
+                {
+                    var selected = Input.DiscountScenario == opt.Scenario;
+                    <button type="button"
+                            @onclick="() => SelectScenario(opt.Scenario)"
+                            class="text-left p-4 rounded-xl border-2 transition cursor-pointer @(selected ? "border-blue-600 bg-blue-50/70 shadow-xs" : "border-slate-200 bg-white hover:border-slate-300")">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-bold text-xs sm:text-sm text-slate-900">@opt.Icon @opt.Title</span>
+                            @if (selected)
+                            {
+                                <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-600 text-white">Selected</span>
+                            }
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-relaxed">@opt.Description</p>
+                    </button>
+                }
+            </div>
+
+            @if (UsesDirectPricing)
+            {
+                <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">Collection-Wide Default Discount (Optional)</h4>
+                            <p class="text-[11px] text-slate-500 mt-0.5">
+                                Automatically applies to every product in the selected Campaign Collection during [Start Date, End Date) unless overridden per product below.
+                            </p>
+                        </div>
+                        <button type="button" @onclick="ApplyElevenElevenPreset" class="btn-secondary text-[11px] py-1 px-2.5 font-bold cursor-pointer">
+                            ✨ Preset 11.11 (-11%)
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="shop-label">
+                            Default Discount Rule
+                            <select value="@(Input.DefaultDiscountType?.ToString() ?? "")" @onchange="OnDefaultDiscountTypeChanged" class="shop-input text-xs font-semibold cursor-pointer">
+                                <option value="">None (Per-product overrides only)</option>
+                                <option value="@CampaignProductDiscountType.Percentage">Percentage Off (%)</option>
+                                <option value="@CampaignProductDiscountType.FixedDiscount">Fixed Taka Off (৳)</option>
+                                <option value="@CampaignProductDiscountType.FixedPrice">Fixed Offer Price (৳)</option>
+                            </select>
+                        </label>
+
+                        <label class="shop-label">
+                            Discount Value @(Input.DefaultDiscountType == CampaignProductDiscountType.Percentage ? "(%)" : "(৳)")
+                            <InputNumber @bind-Value="Input.DefaultDiscountValue" class="shop-input text-xs font-mono" disabled="@(!Input.DefaultDiscountType.HasValue)" placeholder="e.g. 11" />
+                        </label>
+
+                        <label class="shop-label">
+                            Max Discount Cap (৳, Optional)
+                            <InputNumber @bind-Value="Input.MaxDiscountAmount" class="shop-input text-xs font-mono" disabled="@(!Input.DefaultDiscountType.HasValue || Input.DefaultDiscountType == CampaignProductDiscountType.FixedPrice)" placeholder="e.g. 2000" />
+                        </label>
+                    </div>
+                </div>
+            }
+
+            @if (UsesCoupon)
+            {
+                <div class="bg-white rounded-xl border border-amber-200 p-4 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-extrabold uppercase tracking-wider text-amber-900">🎟️ Linked Promotional Coupon</h4>
+                            <p class="text-[11px] text-amber-800/80 mt-0.5">
+                                @(Input.DiscountScenario == CampaignDiscountScenario.DirectAndCoupon
+                                    ? "Shoppers get direct sale prices immediately AND can stack this coupon at checkout."
+                                    : "Products stay at regular prices on catalog; customers enter this coupon at checkout for the discount.")
+                            </p>
+                        </div>
+                        <a href="/admin/coupons/new" target="_blank" class="text-xs font-bold text-blue-600 hover:underline">+ New Coupon ↗</a>
+                    </div>
+
+                    <div class="admin-form-grid">
+                        <label class="shop-label">
+                            Select Active Coupon
+                            <select value="@(Input.CouponId?.ToString() ?? "")" @onchange="OnLinkedCouponChanged" class="shop-input text-xs font-semibold cursor-pointer">
+                                <option value="">-- Select Coupon (Optional) --</option>
+                                @foreach (var c in activeCoupons)
+                                {
+                                    <option value="@c.Id">@c.Code — @c.Summary</option>
+                                }
+                            </select>
+                        </label>
+
+                        <label class="shop-label">
+                            Highlighted Banner Voucher Code
+                            <InputText @bind-Value="Input.HighlightCouponCode" class="shop-input uppercase font-mono font-bold tracking-wider" placeholder="e.g. MEGA11" />
+                            <small>Prominently featured with a 1-click copy badge on the hero banner.</small>
+                        </label>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Section 4: Schedule & Countdown -->
         <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
             <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>⏱️</span> Schedule &amp; Live Countdown
@@ -290,6 +387,159 @@ else
                 </InputSelect>
                 <small>All products in the selected collection will display on this campaign page in your configured order. Manage collections in <a href="/admin/collections" target="_blank" class="text-blue-600 font-semibold underline">Catalog &gt; Collections</a>.</small>
             </label>
+        </div>
+
+        <!-- Section 4b: Per-Product / Variant Deal Overrides (CampaignProducts) -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span>🏷️</span> Per-Product &amp; Variant Offer Deals (@offerRows.Count)
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">
+                        @(UsesDirectPricing
+                            ? "Set custom %, fixed ৳ discount, or exact deal prices (e.g. ৳1,111) per product or variant. Overrides the Collection default above."
+                            : "Curate spotlight products for this campaign page (switch Scenario to Direct Discount above to apply automatic price cuts).")
+                    </p>
+                </div>
+            </div>
+
+            <!-- Batched Product Picker (max 15 rows per search) -->
+            <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div class="relative flex-1">
+                        <input value="@productSearchQuery"
+                               @oninput="OnProductSearchChanged"
+                               placeholder="Search products by name or SKU to add offer deal..."
+                               class="shop-input !mt-0 text-xs pl-9 pr-9" />
+                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                            <Icon Name="search" Class="size-3.5" />
+                        </span>
+                        @if (!string.IsNullOrWhiteSpace(productSearchQuery))
+                        {
+                            <button type="button" @onclick="ClearProductSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer">✕</button>
+                        }
+                    </div>
+                    <span class="text-[11px] text-slate-400 shrink-0">Showing @(searchResults.Count) of @(searchTotalCount)</span>
+                </div>
+
+                @if (searchResults.Count > 0)
+                {
+                    <div class="max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl">
+                        @foreach (var p in searchResults)
+                        {
+                            <div class="p-2.5 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 text-xs">
+                                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <img src="@p.ImageUrl" alt="@p.Name" class="size-9 rounded-lg object-contain bg-slate-50 border p-0.5 shrink-0" />
+                                    <div class="min-w-0">
+                                        <span class="font-bold text-slate-900 block truncate">@p.Name</span>
+                                        <span class="text-[11px] text-slate-500">Default Price: ৳@p.DefaultPrice.ToString("N0") · @p.Variants.Count variant(s)</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button type="button"
+                                            @onclick="() => AddOfferProduct(p, null)"
+                                            class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 cursor-pointer">
+                                        + All Variants
+                                    </button>
+                                    @if (p.Variants.Count > 1)
+                                    {
+                                        @foreach (var v in p.Variants.Take(3))
+                                        {
+                                            <button type="button"
+                                                    @onclick="() => AddOfferProduct(p, v)"
+                                                    class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold cursor-pointer"
+                                                    title="Override just @v.Label (৳@v.Price:N0)">
+                                                + @v.Label
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (offerRows.Count > 0)
+            {
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-50 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="py-2.5 px-3">Product / Variant</th>
+                                    <th class="py-2.5 px-3">Regular</th>
+                                    <th class="py-2.5 px-3">Discount Type</th>
+                                    <th class="py-2.5 px-3">Value</th>
+                                    <th class="py-2.5 px-3">Cap (৳)</th>
+                                    <th class="py-2.5 px-3">Live Preview</th>
+                                    <th class="py-2.5 px-3 text-right">Order</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @for (var idx = 0; idx < offerRows.Count; idx++)
+                                {
+                                    var rowIdx = idx;
+                                    var row = offerRows[rowIdx];
+                                    var previewPrice = CampaignPricingService.ComputeDiscountedPrice(row.RegularPrice, row.DiscountType, row.DiscountValue, row.MaxDiscountAmount);
+                                    var savePct = row.RegularPrice > 0 ? (int)Math.Round((row.RegularPrice - previewPrice) / row.RegularPrice * 100m, 0, MidpointRounding.AwayFromZero) : 0;
+                                    <tr>
+                                        <td class="py-2.5 px-3">
+                                            <div class="flex items-center gap-2">
+                                                <img src="@row.ImageUrl" alt="@row.ProductName" class="size-8 rounded object-contain bg-slate-50 border p-0.5 shrink-0" />
+                                                <div class="min-w-0">
+                                                    <strong class="block text-slate-900 truncate max-w-[200px]">@row.ProductName</strong>
+                                                    <span class="inline-block text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                                        @(row.ProductVariantId.HasValue ? row.VariantLabel : "All Variants")
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-2.5 px-3 font-mono text-slate-600">৳@row.RegularPrice.ToString("N0")</td>
+                                        <td class="py-2.5 px-3">
+                                            <select @bind="row.DiscountType" class="shop-input !mt-0 text-xs py-1 px-2 min-w-[130px]">
+                                                <option value="@CampaignProductDiscountType.Percentage">% Off</option>
+                                                <option value="@CampaignProductDiscountType.FixedDiscount">৳ Fixed Off</option>
+                                                <option value="@CampaignProductDiscountType.FixedPrice">৳ Exact Price</option>
+                                            </select>
+                                        </td>
+                                        <td class="py-2.5 px-3">
+                                            <input type="number" step="0.01" min="0" @bind="row.DiscountValue" class="shop-input !mt-0 text-xs py-1 px-2 w-24 font-mono" />
+                                        </td>
+                                        <td class="py-2.5 px-3">
+                                            <input type="number" step="1" min="0" @bind="row.MaxDiscountAmount"
+                                                   disabled="@(row.DiscountType == CampaignProductDiscountType.FixedPrice)"
+                                                   placeholder="None"
+                                                   class="shop-input !mt-0 text-xs py-1 px-2 w-20 font-mono" />
+                                        </td>
+                                        <td class="py-2.5 px-3 whitespace-nowrap">
+                                            @if (UsesDirectPricing && previewPrice < row.RegularPrice)
+                                            {
+                                                <span class="font-extrabold text-rose-600">৳@previewPrice.ToString("N0")</span>
+                                                <span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700">-@savePct%</span>
+                                            }
+                                            else if (!UsesDirectPricing)
+                                            {
+                                                <span class="text-[11px] text-slate-400">Spotlight only</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-slate-400">No reduction</span>
+                                            }
+                                        </td>
+                                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                                            <button type="button" @onclick="() => MoveOfferRow(rowIdx, -1)" disabled="@(rowIdx == 0)" class="px-1.5 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer" title="Move up">↑</button>
+                                            <button type="button" @onclick="() => MoveOfferRow(rowIdx, 1)" disabled="@(rowIdx == offerRows.Count - 1)" class="px-1.5 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer" title="Move down">↓</button>
+                                            <button type="button" @onclick="() => offerRows.RemoveAt(rowIdx)" class="px-1.5 py-1 text-rose-500 hover:text-rose-800 cursor-pointer" title="Remove">✕</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
         </div>
 
         <!-- Section 5: Visibility & Sorting -->
@@ -432,16 +682,129 @@ else
 
     private List<CouponItem> activeCoupons = [];
     private List<CollectionItem> availableCollections = [];
+    private List<CampaignProductEditorRow> offerRows = [];
+    private List<ProductSearchHit> searchResults = [];
+    private int searchTotalCount;
+    private string productSearchQuery = "";
 
-    public sealed record CouponItem(string Code, string? Description);
+    public sealed record CouponItem(int Id, string Code, string? Description, CouponDiscountType DiscountType, decimal DiscountValue)
+    {
+        public string Summary => DiscountType switch
+        {
+            CouponDiscountType.Percentage => $"{DiscountValue:0.##}% Off",
+            CouponDiscountType.FixedAmount => $"৳{DiscountValue:N0} Off",
+            CouponDiscountType.FreeDelivery => "Free Delivery",
+            _ => Description ?? ""
+        };
+    }
+
     public sealed record CollectionItem(int Id, string Name, CollectionType Type, bool IsActive);
+    public sealed record VariantOptionHit(int Id, string Label, decimal Price);
+    public sealed record ProductSearchHit(int Id, string Name, string Slug, string ImageUrl, decimal DefaultPrice, List<VariantOptionHit> Variants);
+
+    public sealed class CampaignProductEditorRow
+    {
+        public int? ExistingId { get; set; }
+        public int ProductId { get; set; }
+        public int? ProductVariantId { get; set; }
+        public string ProductName { get; set; } = "";
+        public string VariantLabel { get; set; } = "";
+        public string ImageUrl { get; set; } = "/jas-logo.png";
+        public decimal RegularPrice { get; set; }
+        public CampaignProductDiscountType DiscountType { get; set; } = CampaignProductDiscountType.Percentage;
+        public decimal DiscountValue { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
+    }
+
+    private sealed record ScenarioMeta(CampaignDiscountScenario Scenario, string Icon, string Title, string Description);
+
+    private static readonly IReadOnlyList<ScenarioMeta> ScenarioOptions =
+    [
+        new(CampaignDiscountScenario.DirectDiscount, "⚡", "Direct Scheduled Price Cuts",
+            "Automatically lowers product prices during [Start, End) via Collection default %/৳ and per-product overrides (e.g. 11.11 Mega Sale)."),
+        new(CampaignDiscountScenario.DirectAndCoupon, "🔥", "Direct Discount + Extra Coupon Stack",
+            "Products show scheduled sale prices AND shoppers can apply an extra campaign coupon at checkout on the sale price."),
+        new(CampaignDiscountScenario.CouponOnly, "🎟️", "Coupon-Gated Offer",
+            "Catalog displays regular prices; customers unlock campaign savings exclusively using a promo coupon at checkout."),
+        new(CampaignDiscountScenario.MarketingOnly, "✨", "Marketing / Launch Showcase",
+            "Showcase campaign page & optional teaser countdown without automatic price cuts or coupons (e.g. iPhone Launch / Summer Showcase).")
+    ];
+
+    private bool UsesDirectPricing => Input?.DiscountScenario is CampaignDiscountScenario.DirectDiscount or CampaignDiscountScenario.DirectAndCoupon;
+    private bool UsesCoupon => Input?.DiscountScenario is CampaignDiscountScenario.CouponOnly or CampaignDiscountScenario.DirectAndCoupon;
+
+    private void SelectScenario(CampaignDiscountScenario scenario)
+    {
+        if (Input is null) return;
+        Input.DiscountScenario = scenario;
+        if (scenario == CampaignDiscountScenario.MarketingOnly)
+        {
+            Input.DefaultDiscountType = null;
+            Input.DefaultDiscountValue = null;
+            Input.MaxDiscountAmount = null;
+            Input.CouponId = null;
+        }
+        else if (scenario == CampaignDiscountScenario.CouponOnly)
+        {
+            Input.DefaultDiscountType = null;
+            Input.DefaultDiscountValue = null;
+            Input.MaxDiscountAmount = null;
+        }
+    }
+
+    private void OnDefaultDiscountTypeChanged(ChangeEventArgs e)
+    {
+        if (Input is null) return;
+        var val = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(val))
+        {
+            Input.DefaultDiscountType = null;
+            Input.DefaultDiscountValue = null;
+            Input.MaxDiscountAmount = null;
+        }
+        else if (Enum.TryParse<CampaignProductDiscountType>(val, out var parsed))
+        {
+            Input.DefaultDiscountType = parsed;
+            if (!Input.DefaultDiscountValue.HasValue || Input.DefaultDiscountValue.Value <= 0)
+            {
+                Input.DefaultDiscountValue = parsed == CampaignProductDiscountType.Percentage ? 10 : 500;
+            }
+        }
+    }
+
+    private void OnLinkedCouponChanged(ChangeEventArgs e)
+    {
+        if (Input is null) return;
+        if (int.TryParse(e.Value?.ToString(), out var couponId))
+        {
+            Input.CouponId = couponId;
+            var picked = activeCoupons.FirstOrDefault(c => c.Id == couponId);
+            if (picked != null)
+            {
+                Input.HighlightCouponCode = picked.Code;
+            }
+        }
+        else
+        {
+            Input.CouponId = null;
+        }
+    }
+
+    private void ApplyElevenElevenPreset()
+    {
+        if (Input is null) return;
+        Input.DiscountScenario = CampaignDiscountScenario.DirectDiscount;
+        Input.DefaultDiscountType = CampaignProductDiscountType.Percentage;
+        Input.DefaultDiscountValue = 11;
+        if (string.IsNullOrWhiteSpace(Input.BadgeText)) Input.BadgeText = "11.11 DEAL";
+    }
 
     protected override async Task OnInitializedAsync()
     {
         activeCoupons = await Db.Coupons.AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.Code)
-            .Select(c => new CouponItem(c.Code, c.Description))
+            .Select(c => new CouponItem(c.Id, c.Code, c.Description, c.DiscountType, c.DiscountValue))
             .ToListAsync();
 
         availableCollections = await Db.Collections.AsNoTracking()
@@ -454,7 +817,14 @@ else
         {
             if (Id != 0)
             {
-                var existing = await Db.Campaigns.FindAsync(Id);
+                var existing = await Db.Campaigns
+                    .Include(c => c.CampaignProducts)
+                        .ThenInclude(cp => cp.Product)
+                            .ThenInclude(p => p!.ProductVariants)
+                    .Include(c => c.CampaignProducts)
+                        .ThenInclude(cp => cp.ProductVariant)
+                    .FirstOrDefaultAsync(c => c.Id == Id);
+
                 if (existing == null)
                 {
                     Nav.NavigateTo("/admin/campaigns");
@@ -468,13 +838,19 @@ else
                     Slug = existing.Slug,
                     BanglaName = existing.BanglaName,
                     Eyebrow = existing.Eyebrow,
+                    BadgeText = existing.BadgeText,
                     Description = existing.Description,
                     BannerImageUrl = existing.BannerImageUrl,
                     MobileBannerImageUrl = existing.MobileBannerImageUrl,
-                    StartDate = existing.StartDate?.LocalDateTime,
-                    EndDate = existing.EndDate?.LocalDateTime,
+                    StartDate = existing.StartDate?.ToLocalTime().DateTime,
+                    EndDate = existing.EndDate?.ToLocalTime().DateTime,
                     ShowCountdown = existing.ShowCountdown,
                     ThemeColor = existing.ThemeColor,
+                    DiscountScenario = existing.DiscountScenario,
+                    DefaultDiscountType = existing.DefaultDiscountType,
+                    DefaultDiscountValue = existing.DefaultDiscountValue,
+                    MaxDiscountAmount = existing.MaxDiscountAmount,
+                    CouponId = existing.CouponId,
                     HighlightCouponCode = existing.HighlightCouponCode,
                     CollectionId = existing.CollectionId,
                     TagId = existing.TagId,
@@ -485,13 +861,106 @@ else
                     MetaDescription = existing.MetaDescription,
                     OgImageUrl = existing.OgImageUrl
                 };
+
+                offerRows = existing.CampaignProducts
+                    .OrderBy(cp => cp.SortOrder)
+                    .ThenBy(cp => cp.Id)
+                    .Where(cp => cp.Product != null)
+                    .Select(cp =>
+                    {
+                        var defaultVar = cp.ProductVariant
+                            ?? cp.Product!.ProductVariants.OrderByDescending(v => v.IsDefault).ThenBy(v => v.Id).FirstOrDefault();
+                        return new CampaignProductEditorRow
+                        {
+                            ExistingId = cp.Id,
+                            ProductId = cp.ProductId,
+                            ProductVariantId = cp.ProductVariantId,
+                            ProductName = cp.Product!.Name,
+                            VariantLabel = cp.ProductVariant != null ? (!string.IsNullOrWhiteSpace(cp.ProductVariant.SKU) ? cp.ProductVariant.SKU : $"Variant #{cp.ProductVariant.Id}") : "All Variants",
+                            ImageUrl = cp.Product.MainImageUrl ?? "/jas-logo.png",
+                            RegularPrice = defaultVar?.SellingPrice ?? 0m,
+                            DiscountType = cp.DiscountType,
+                            DiscountValue = cp.DiscountValue,
+                            MaxDiscountAmount = cp.MaxDiscountAmount
+                        };
+                    })
+                    .ToList();
             }
             else
             {
                 Input = new CampaignFormModel();
             }
         }
+        await LoadProductSearchBatchAsync();
         loading = false;
+    }
+
+    private async Task OnProductSearchChanged(ChangeEventArgs e)
+    {
+        productSearchQuery = e.Value?.ToString() ?? "";
+        await LoadProductSearchBatchAsync();
+    }
+
+    private async Task ClearProductSearch()
+    {
+        productSearchQuery = "";
+        await LoadProductSearchBatchAsync();
+    }
+
+    private async Task LoadProductSearchBatchAsync()
+    {
+        var q = Db.Products.AsNoTracking()
+            .Where(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted));
+
+        if (!string.IsNullOrWhiteSpace(productSearchQuery))
+        {
+            var term = productSearchQuery.Trim().ToLower();
+            q = q.Where(p => p.Name.ToLower().Contains(term)
+                || p.ProductVariants.Any(v => !v.IsDeleted && v.SKU != null && v.SKU.ToLower().Contains(term)));
+        }
+
+        searchTotalCount = await q.CountAsync();
+        searchResults = await q.OrderBy(p => p.Name)
+            .Take(15)
+            .Select(p => new ProductSearchHit(
+                p.Id,
+                p.Name,
+                p.Slug,
+                p.MainImageUrl ?? "/jas-logo.png",
+                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).ThenBy(v => v.Id).Select(v => v.SellingPrice).FirstOrDefault(),
+                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).ThenBy(v => v.Id)
+                    .Select(v => new VariantOptionHit(v.Id, !string.IsNullOrWhiteSpace(v.SKU) ? v.SKU : $"Variant #{v.Id}", v.SellingPrice))
+                    .ToList()))
+            .ToListAsync();
+    }
+
+    private void AddOfferProduct(ProductSearchHit product, VariantOptionHit? variant)
+    {
+        int? variantId = variant?.Id;
+        if (offerRows.Any(r => r.ProductId == product.Id && r.ProductVariantId == variantId))
+        {
+            return;
+        }
+
+        offerRows.Add(new CampaignProductEditorRow
+        {
+            ProductId = product.Id,
+            ProductVariantId = variantId,
+            ProductName = product.Name,
+            VariantLabel = variant?.Label ?? "All Variants",
+            ImageUrl = product.ImageUrl,
+            RegularPrice = variant?.Price ?? product.DefaultPrice,
+            DiscountType = Input?.DefaultDiscountType ?? CampaignProductDiscountType.Percentage,
+            DiscountValue = Input?.DefaultDiscountValue is > 0 ? Input.DefaultDiscountValue.Value : 15m,
+            MaxDiscountAmount = Input?.MaxDiscountAmount
+        });
+    }
+
+    private void MoveOfferRow(int index, int delta)
+    {
+        var next = index + delta;
+        if (next < 0 || next >= offerRows.Count) return;
+        (offerRows[index], offerRows[next]) = (offerRows[next], offerRows[index]);
     }
 
     private async Task Save()
@@ -518,24 +987,26 @@ else
         }
 
         DateTimeOffset? startOffset = Input.StartDate.HasValue
-            ? new DateTimeOffset(DateTime.SpecifyKind(Input.StartDate.Value, DateTimeKind.Utc))
+            ? new DateTimeOffset(DateTime.SpecifyKind(Input.StartDate.Value, DateTimeKind.Local)).ToUniversalTime()
             : null;
 
         DateTimeOffset? endOffset = Input.EndDate.HasValue
-            ? new DateTimeOffset(DateTime.SpecifyKind(Input.EndDate.Value, DateTimeKind.Utc))
+            ? new DateTimeOffset(DateTime.SpecifyKind(Input.EndDate.Value, DateTimeKind.Local)).ToUniversalTime()
             : null;
 
         saving = true;
         try
         {
+            Campaign targetCampaign;
             if (Id == 0)
             {
-                var newCampaign = new Campaign
+                targetCampaign = new Campaign
                 {
                     Name = cleanName,
                     Slug = cleanSlug,
                     BanglaName = string.IsNullOrWhiteSpace(Input.BanglaName) ? null : Input.BanglaName.Trim(),
                     Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim(),
+                    BadgeText = string.IsNullOrWhiteSpace(Input.BadgeText) ? null : Input.BadgeText.Trim(),
                     Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
                     BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim(),
                     MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim(),
@@ -543,7 +1014,12 @@ else
                     EndDate = endOffset,
                     ShowCountdown = Input.ShowCountdown,
                     ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim(),
-                    HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant(),
+                    DiscountScenario = Input.DiscountScenario,
+                    DefaultDiscountType = UsesDirectPricing ? Input.DefaultDiscountType : null,
+                    DefaultDiscountValue = UsesDirectPricing && Input.DefaultDiscountType.HasValue ? Input.DefaultDiscountValue : null,
+                    MaxDiscountAmount = UsesDirectPricing && Input.DefaultDiscountType.HasValue ? Input.MaxDiscountAmount : null,
+                    CouponId = UsesCoupon ? Input.CouponId : null,
+                    HighlightCouponCode = UsesCoupon && !string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? Input.HighlightCouponCode.Trim().ToUpperInvariant() : null,
                     CollectionId = Input.CollectionId,
                     TagId = null,
                     CuratedProductIds = [],
@@ -553,38 +1029,65 @@ else
                     MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim(),
                     OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim()
                 };
-                Db.Campaigns.Add(newCampaign);
+                Db.Campaigns.Add(targetCampaign);
+                await Db.SaveChangesAsync();
             }
             else
             {
-                var existing = await Db.Campaigns.FindAsync(Id);
-                if (existing != null)
+                targetCampaign = await Db.Campaigns
+                    .Include(c => c.CampaignProducts)
+                    .FirstOrDefaultAsync(c => c.Id == Id)
+                    ?? throw new InvalidOperationException("Campaign not found.");
+
+                targetCampaign.Name = cleanName;
+                targetCampaign.Slug = cleanSlug;
+                targetCampaign.BanglaName = string.IsNullOrWhiteSpace(Input.BanglaName) ? null : Input.BanglaName.Trim();
+                targetCampaign.Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim();
+                targetCampaign.BadgeText = string.IsNullOrWhiteSpace(Input.BadgeText) ? null : Input.BadgeText.Trim();
+                targetCampaign.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
+                targetCampaign.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
+                targetCampaign.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
+                targetCampaign.StartDate = startOffset;
+                targetCampaign.EndDate = endOffset;
+                targetCampaign.ShowCountdown = Input.ShowCountdown;
+                targetCampaign.ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim();
+                targetCampaign.DiscountScenario = Input.DiscountScenario;
+                targetCampaign.DefaultDiscountType = UsesDirectPricing ? Input.DefaultDiscountType : null;
+                targetCampaign.DefaultDiscountValue = UsesDirectPricing && Input.DefaultDiscountType.HasValue ? Input.DefaultDiscountValue : null;
+                targetCampaign.MaxDiscountAmount = UsesDirectPricing && Input.DefaultDiscountType.HasValue ? Input.MaxDiscountAmount : null;
+                targetCampaign.CouponId = UsesCoupon ? Input.CouponId : null;
+                targetCampaign.HighlightCouponCode = UsesCoupon && !string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? Input.HighlightCouponCode.Trim().ToUpperInvariant() : null;
+                targetCampaign.CollectionId = Input.CollectionId;
+                targetCampaign.TagId = null;
+                targetCampaign.CuratedProductIds = [];
+                targetCampaign.IsActive = Input.IsActive;
+                targetCampaign.SortOrder = Input.SortOrder;
+                targetCampaign.MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim();
+                targetCampaign.MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim();
+                targetCampaign.OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim();
+
+                Db.CampaignProducts.RemoveRange(targetCampaign.CampaignProducts);
+            }
+
+            for (var i = 0; i < offerRows.Count; i++)
+            {
+                var r = offerRows[i];
+                Db.CampaignProducts.Add(new CampaignProduct
                 {
-                    existing.Name = cleanName;
-                    existing.Slug = cleanSlug;
-                    existing.BanglaName = string.IsNullOrWhiteSpace(Input.BanglaName) ? null : Input.BanglaName.Trim();
-                    existing.Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim();
-                    existing.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
-                    existing.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
-                    existing.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
-                    existing.StartDate = startOffset;
-                    existing.EndDate = endOffset;
-                    existing.ShowCountdown = Input.ShowCountdown;
-                    existing.ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim();
-                    existing.HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant();
-                    existing.CollectionId = Input.CollectionId;
-                    existing.TagId = null;
-                    existing.CuratedProductIds = [];
-                    existing.IsActive = Input.IsActive;
-                    existing.SortOrder = Input.SortOrder;
-                    existing.MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim();
-                    existing.MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim();
-                    existing.OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim();
-                }
+                    CampaignId = targetCampaign.Id,
+                    ProductId = r.ProductId,
+                    ProductVariantId = r.ProductVariantId,
+                    DiscountType = r.DiscountType,
+                    DiscountValue = r.DiscountValue,
+                    MaxDiscountAmount = r.MaxDiscountAmount,
+                    SortOrder = i + 1
+                });
             }
 
             await Db.SaveChangesAsync();
+            await PricingSvc.InvalidateCacheAsync();
             await CampaignSvc.InvalidateCacheAsync(cleanSlug);
+            await CatalogSvc.InvalidateAllAsync();
             Nav.NavigateTo("/admin/campaigns?saved=true");
         }
         catch (Exception ex)

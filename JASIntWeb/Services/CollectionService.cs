@@ -2,6 +2,7 @@ using JASIntWeb.Client.Dtos;
 using JASIntWeb.Persistence;
 using JASIntWeb.Persistence.Entities;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 
@@ -12,7 +13,8 @@ public sealed record CollectionMetaInfo(int Id, string Name, string Slug, bool I
 public sealed class CollectionService(
     IDbContextFactory<AppDbContext> dbFactory,
     HybridCache cache,
-    IOutputCacheStore? outputCache = null)
+    IOutputCacheStore? outputCache = null,
+    IServiceProvider? services = null)
 {
     public const string TagCollections = "collections";
 
@@ -106,7 +108,11 @@ public sealed class CollectionService(
 
         var targetIds = limit.HasValue && limit.Value > 0 ? ids.Take(limit.Value).ToList() : ids;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await LoadOrderedProductSummariesAsync(db, targetIds, ct);
+        var items = await LoadOrderedProductSummariesAsync(db, targetIds, ct);
+        var pricing = services?.GetService<CampaignPricingService>();
+        return pricing is not null && items.Count > 0
+            ? await pricing.ApplyCampaignPricingAsync(items, ct)
+            : items;
     }
 
     public async Task<(int TotalMatches, List<ProductSummaryDto> PreviewItems)> PreviewRuleMatchesAsync(
@@ -128,6 +134,12 @@ public sealed class CollectionService(
         var items = previewIds.Count > 0
             ? await LoadOrderedProductSummariesAsync(db, previewIds, ct)
             : [];
+
+        var pricing = services?.GetService<CampaignPricingService>();
+        if (pricing is not null && items.Count > 0)
+        {
+            items = await pricing.ApplyCampaignPricingAsync(items, ct);
+        }
 
         return (matched.Count, items);
     }
@@ -171,6 +183,11 @@ public sealed class CollectionService(
         var allProducts = orderedIds.Count > 0
             ? await LoadOrderedProductSummariesAsync(db, orderedIds, ct)
             : [];
+        var pricing = services?.GetService<CampaignPricingService>();
+        if (pricing is not null && allProducts.Count > 0)
+        {
+            allProducts = await pricing.ApplyCampaignPricingAsync(allProducts, ct);
+        }
 
         var brandSlugsInCollection = allProducts
             .Where(p => !string.IsNullOrWhiteSpace(p.BrandSlug))
@@ -258,6 +275,7 @@ public sealed class CollectionService(
 
     public async Task InvalidateCacheAsync(int? collectionId = null, CancellationToken ct = default)
     {
+        services?.GetService<CampaignPricingService>()?.InvalidateCache();
         if (collectionId.HasValue)
         {
             await cache.RemoveAsync($"collection:ids:{collectionId.Value}", ct);

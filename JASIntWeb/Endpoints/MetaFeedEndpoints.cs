@@ -58,6 +58,7 @@ public static class MetaFeedEndpoints
 
         var baseUrl = "https://www.jasinternational.com.bd/";
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var campaignPricing = scope.ServiceProvider.GetService<CampaignPricingService>();
 
         var inventoryMap = await db.InventoryItems.AsNoTracking()
             .ToDictionaryAsync(i => i.ProductVariantId, i => i.AvailableQuantity);
@@ -71,6 +72,11 @@ public static class MetaFeedEndpoints
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
             .ToListAsync();
+
+        var offers = campaignPricing is not null && variants.Count > 0
+            ? await campaignPricing.ResolveVariantOffersAsync(
+                variants.Select(v => (v.ProductId, v.Id, v.SellingPrice, v.CompareAtPrice)).ToList())
+            : new Dictionary<int, JASIntWeb.Client.Dtos.ActiveCampaignDiscountDto>();
 
         var channel = new XElement("channel",
             new XElement("title", "JAS International · Meta Advantage+ Catalog"),
@@ -134,7 +140,13 @@ public static class MetaFeedEndpoints
                 item.Add(new XElement(G + "identifier_exists", "false"));
             }
 
-            if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
+            if (offers.TryGetValue(v.Id, out var offer) && offer.EffectivePrice < v.SellingPrice)
+            {
+                var regular = offer.RegularPrice > v.SellingPrice ? offer.RegularPrice : v.SellingPrice;
+                item.SetElementValue(G + "price", $"{regular:0.00} BDT");
+                item.Add(new XElement(G + "sale_price", $"{offer.EffectivePrice:0.00} BDT"));
+            }
+            else if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
             {
                 item.Add(new XElement(G + "sale_price", $"{v.SellingPrice:0.00} BDT"));
                 item.SetElementValue(G + "price", $"{v.CompareAtPrice.Value:0.00} BDT");
@@ -175,6 +187,7 @@ public static class MetaFeedEndpoints
 
         var baseUrl = "https://www.jasinternational.com.bd/";
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var campaignPricing = scope.ServiceProvider.GetService<CampaignPricingService>();
 
         var inventoryMap = await db.InventoryItems.AsNoTracking()
             .ToDictionaryAsync(i => i.ProductVariantId, i => i.AvailableQuantity);
@@ -188,6 +201,11 @@ public static class MetaFeedEndpoints
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
             .ToListAsync();
+
+        var offers = campaignPricing is not null && variants.Count > 0
+            ? await campaignPricing.ResolveVariantOffersAsync(
+                variants.Select(v => (v.ProductId, v.Id, v.SellingPrice, v.CompareAtPrice)).ToList())
+            : new Dictionary<int, JASIntWeb.Client.Dtos.ActiveCampaignDiscountDto>();
 
         var sb = new StringBuilder();
         sb.AppendLine("id,title,description,availability,condition,price,link,image_link,brand,item_group_id,google_product_category,gtin,identifier_exists,custom_label_0,custom_label_1,custom_label_2,custom_label_3,custom_label_4");
@@ -218,7 +236,10 @@ public static class MetaFeedEndpoints
             if (description.Length > 2000) description = description[..2000];
 
             var availability = inStock ? "in stock" : "out of stock";
-            var price = $"{v.SellingPrice:0.00} BDT";
+            var effectiveCsvPrice = offers.TryGetValue(v.Id, out var csvOffer) && csvOffer.EffectivePrice < v.SellingPrice
+                ? csvOffer.EffectivePrice
+                : v.SellingPrice;
+            var price = $"{effectiveCsvPrice:0.00} BDT";
             var itemGroupId = $"P{prod.Id}";
             var googleCat = ResolveGoogleProductCategory(prod.Category?.Slug);
             var gtin = !string.IsNullOrWhiteSpace(v.Barcode) ? v.Barcode.Trim() : "";
@@ -241,6 +262,7 @@ public static class MetaFeedEndpoints
 
         var baseUrl = "https://www.jasinternational.com.bd/";
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var campaignPricing = scope.ServiceProvider.GetService<CampaignPricingService>();
 
         var inventoryMap = await db.InventoryItems.AsNoTracking()
             .ToDictionaryAsync(i => i.ProductVariantId, i => i.AvailableQuantity);
@@ -254,6 +276,11 @@ public static class MetaFeedEndpoints
             .OrderBy(v => v.ProductId)
             .ThenBy(v => v.Id)
             .ToListAsync();
+
+        var offers = campaignPricing is not null && variants.Count > 0
+            ? await campaignPricing.ResolveVariantOffersAsync(
+                variants.Select(v => (v.ProductId, v.Id, v.SellingPrice, v.CompareAtPrice)).ToList())
+            : new Dictionary<int, JASIntWeb.Client.Dtos.ActiveCampaignDiscountDto>();
 
         var channel = new XElement("channel",
             new XElement("title", "JAS International · Google Merchant Center Feed"),
@@ -328,7 +355,13 @@ public static class MetaFeedEndpoints
                 item.Add(new XElement(G + "identifier_exists", "false"));
             }
 
-            if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
+            if (offers.TryGetValue(v.Id, out var offer) && offer.EffectivePrice < v.SellingPrice)
+            {
+                var regular = offer.RegularPrice > v.SellingPrice ? offer.RegularPrice : v.SellingPrice;
+                item.SetElementValue(G + "price", $"{regular:0.00} BDT");
+                item.Add(new XElement(G + "sale_price", $"{offer.EffectivePrice:0.00} BDT"));
+            }
+            else if (v.CompareAtPrice.HasValue && v.CompareAtPrice.Value > v.SellingPrice)
             {
                 item.Add(new XElement(G + "sale_price", $"{v.SellingPrice:0.00} BDT"));
                 item.SetElementValue(G + "price", $"{v.CompareAtPrice.Value:0.00} BDT");

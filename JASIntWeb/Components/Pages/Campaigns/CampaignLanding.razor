@@ -1,4 +1,5 @@
 @page "/campaigns/{Slug}"
+@page "/offers/{Slug}"
 @rendermode InteractiveServer
 @inject CampaignService CampaignSvc
 @inject NavigationManager Nav
@@ -55,12 +56,26 @@ else
 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
                     <div class="lg:col-span-7 space-y-4">
-                        @if (!string.IsNullOrWhiteSpace(campaign.Eyebrow))
-                        {
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/15 backdrop-blur-xs text-white border border-white/20">
-                                ⚡ @campaign.Eyebrow
-                            </span>
-                        }
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if (!string.IsNullOrWhiteSpace(campaign.Eyebrow))
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/15 backdrop-blur-xs text-white border border-white/20">
+                                    ⚡ @campaign.Eyebrow
+                                </span>
+                            }
+                            @if (isUpcoming)
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-500/80 text-white border border-white/20">
+                                    🕒 Coming Soon · Teaser Preview
+                                </span>
+                            }
+                            else if (campaign.DiscountScenario != CampaignDiscountScenario.MarketingOnly)
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/90 text-white border border-white/20">
+                                    @GetHeroScenarioPill(campaign)
+                                </span>
+                            }
+                        </div>
 
                         <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight font-display text-white leading-tight">
                             @campaign.Name
@@ -80,12 +95,12 @@ else
                             </p>
                         }
 
-                        <!-- Live Countdown Timer -->
-                        @if (campaign.ShowCountdown && campaign.EndDate.HasValue && !hasExpired)
+                        <!-- Live Countdown Timer (Upcoming Start OR Live Expiration) -->
+                        @if (campaign.ShowCountdown && !hasExpired && ((isUpcoming && campaign.StartDate.HasValue) || campaign.EndDate.HasValue))
                         {
                             <div class="pt-2">
                                 <span class="block text-xs font-bold uppercase tracking-wider text-white/80 mb-2">
-                                    ⏳ Deals Expire In
+                                    @(isUpcoming ? "🚀 Campaign Starts In" : "⏳ Deals Expire In")
                                 </span>
                                 <div class="flex items-center gap-2 sm:gap-3 text-center">
                                     <div class="px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 min-w-[56px] sm:min-w-[64px]">
@@ -293,6 +308,7 @@ else
     private int hoursRemaining;
     private int minsRemaining;
     private int secsRemaining;
+    private bool isUpcoming;
     private bool hasExpired;
 
     private PeriodicTimer? timer;
@@ -304,7 +320,7 @@ else
         campaign = await CampaignSvc.GetCampaignBySlugAsync(Slug);
         loading = false;
 
-        if (campaign?.EndDate.HasValue == true)
+        if (campaign?.StartDate.HasValue == true || campaign?.EndDate.HasValue == true)
         {
             UpdateCountdown();
             StartTimer();
@@ -313,25 +329,74 @@ else
 
     private void UpdateCountdown()
     {
-        if (campaign?.EndDate == null) return;
-        var diff = campaign.EndDate.Value - DateTimeOffset.UtcNow;
-        if (diff <= TimeSpan.Zero)
+        if (campaign == null) return;
+        var now = DateTimeOffset.UtcNow;
+
+        DateTimeOffset? targetDate = null;
+        if (campaign.StartDate.HasValue && campaign.StartDate.Value > now)
         {
-            hasExpired = true;
-            daysRemaining = 0;
-            hoursRemaining = 0;
-            minsRemaining = 0;
-            secsRemaining = 0;
+            isUpcoming = true;
+            hasExpired = false;
+            targetDate = campaign.StartDate.Value;
+        }
+        else if (campaign.EndDate.HasValue)
+        {
+            isUpcoming = false;
+            targetDate = campaign.EndDate.Value;
         }
         else
         {
+            isUpcoming = false;
             hasExpired = false;
-            daysRemaining = (int)diff.TotalDays;
-            hoursRemaining = diff.Hours;
-            minsRemaining = diff.Minutes;
-            secsRemaining = diff.Seconds;
+            return;
         }
+
+        var diff = targetDate.Value - now;
+        if (diff <= TimeSpan.Zero)
+        {
+            if (isUpcoming)
+            {
+                // Window just started; re-evaluate toward EndDate if present
+                isUpcoming = false;
+                if (campaign.EndDate.HasValue && campaign.EndDate.Value > now)
+                {
+                    diff = campaign.EndDate.Value - now;
+                    hasExpired = false;
+                }
+                else
+                {
+                    hasExpired = campaign.EndDate.HasValue;
+                    daysRemaining = hoursRemaining = minsRemaining = secsRemaining = 0;
+                    return;
+                }
+            }
+            else
+            {
+                hasExpired = true;
+                daysRemaining = 0;
+                hoursRemaining = 0;
+                minsRemaining = 0;
+                secsRemaining = 0;
+                return;
+            }
+        }
+
+        hasExpired = false;
+        daysRemaining = (int)diff.TotalDays;
+        hoursRemaining = diff.Hours;
+        minsRemaining = diff.Minutes;
+        secsRemaining = diff.Seconds;
     }
+
+    private static string GetHeroScenarioPill(CampaignDetailsDto c) => c.DiscountScenario switch
+    {
+        CampaignDiscountScenario.DirectDiscount when c.DefaultDiscountType == CampaignProductDiscountType.Percentage && c.DefaultDiscountValue > 0
+            => $"🔥 Up to {c.DefaultDiscountValue:0.##}% Off Sitewide Deals",
+        CampaignDiscountScenario.DirectDiscount => "🔥 Scheduled Direct Discounts Live",
+        CampaignDiscountScenario.CouponOnly => "🎟️ Coupon Voucher Exclusive",
+        CampaignDiscountScenario.DirectAndCoupon => "⚡ Direct Markdowns + Coupon Stackable",
+        _ => "✨ Special Showcase Event"
+    };
 
     private void StartTimer()
     {

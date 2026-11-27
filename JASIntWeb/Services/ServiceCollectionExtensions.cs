@@ -234,6 +234,7 @@ internal static class ServiceCollectionExtensions
         builder.Services.AddScoped<IVisitorAnalyticsService, VisitorAnalyticsService>();
         builder.Services.AddScoped<CatalogService>();
         builder.Services.AddScoped<CollectionService>();
+        builder.Services.AddScoped<CampaignPricingService>();
         builder.Services.AddScoped<CampaignService>();
         builder.Services.AddScoped<ShoppingService>();
         builder.Services.AddScoped<AdminService>();
