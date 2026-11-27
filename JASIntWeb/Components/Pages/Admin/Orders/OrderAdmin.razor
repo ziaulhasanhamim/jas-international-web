@@ -52,7 +52,7 @@
                     <Icon Name="receipt" Class="size-4 text-slate-600" />
                     <span>Print Packing Slip / Invoice</span>
                 </summary>
-                <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs" onclick="if (event.target === this) this.closest('details').removeAttribute('open')">
+                <div data-details-backdrop class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
                     <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-left">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div class="flex items-center gap-2">
@@ -63,8 +63,8 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button type="button" onclick="window.print()" class="btn-primary px-3! py-1! text-xs cursor-pointer">🖨️ Print Now</button>
-                                <button type="button" onclick="this.closest('details').removeAttribute('open')" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer" aria-label="Close">✕</button>
+                                <button type="button" data-print-page class="btn-primary px-3! py-1! text-xs cursor-pointer">🖨️ Print Now</button>
+                                <button type="button" data-close-details class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer" aria-label="Close">✕</button>
                             </div>
                         </div>
 
@@ -167,7 +167,7 @@ else
                 <Icon Name="close" Class="size-4 text-rose-600 shrink-0" />
                 <span>@error</span>
             </div>
-            <button type="button" onclick="this.closest('div').remove()" class="text-rose-500 hover:text-rose-700 font-bold cursor-pointer">✕</button>
+            <button type="button" data-dismiss-target="div" class="text-rose-500 hover:text-rose-700 font-bold cursor-pointer" aria-label="Dismiss">✕</button>
         </div>
     }
 
@@ -189,7 +189,7 @@ else
                 }
                 <span>@alertMessage</span>
             </div>
-            <button type="button" onclick="this.closest('div').remove()" class="text-slate-400 hover:text-slate-600 font-bold ml-2 cursor-pointer">✕</button>
+            <button type="button" data-dismiss-target="div" class="text-slate-400 hover:text-slate-600 font-bold ml-2 cursor-pointer" aria-label="Dismiss">✕</button>
         </div>
     }
 
@@ -538,7 +538,7 @@ else
                                 order.CourierTrackingId,
                                 order.CourierTrackingUrl
                             );
-                            <button type="button" onclick="navigator.clipboard.writeText('@(smsSnippet.Replace("'", "\\'"))'); alert('Copied to clipboard!');" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
+                            <button type="button" data-copy-value="@smsSnippet" data-copy-message="Copied to clipboard!" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
                                 <span>📋 Copy Customer SMS</span>
                             </button>
                         }

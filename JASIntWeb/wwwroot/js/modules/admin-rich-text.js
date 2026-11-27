@@ -1,23 +1,21 @@
+import { request } from '../core/api.js';
+
 let loading;
 async function uploadImageBlob(blob, filename) {
-    const tokenRes = await fetch('/api/admin/uploads/security', { cache: 'no-store' });
-    if (!tokenRes.ok) throw new Error('Please sign in as an administrator to upload images.');
-    const { token } = await tokenRes.json();
     const formData = new FormData();
     formData.append('file', blob, filename || 'image.png');
-    const res = await fetch('/api/admin/uploads/image', {
+    const res = await request('/api/admin/uploads/image', {
         method: 'POST',
-        headers: { 'X-CSRF-TOKEN': token },
         body: formData,
+        includeCsrf: true,
+        csrfUrl: '/api/admin/uploads/security',
         signal: AbortSignal.timeout(60000)
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.message || `Upload failed (HTTP ${res.status})`);
+        throw new Error(res.error || `Upload failed (HTTP ${res.status})`);
     }
-    const data = await res.json();
-    if (!data?.url) throw new Error('No image URL returned from storage');
-    return data.url;
+    if (!res.data?.url) throw new Error('No image URL returned from storage');
+    return res.data.url;
 }
 async function loadEditor() {
     if (window.tinymce) return;

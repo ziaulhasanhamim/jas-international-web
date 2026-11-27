@@ -37,7 +37,7 @@
         <!-- Search Form -->
         <form method="get" data-enhance class="relative max-w-xs w-full">
             <input type="hidden" name="status" value="@Filter" />
-            <input name="q" value="@Query" placeholder="Search guides…" oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition" />
+            <input name="q" value="@Query" placeholder="Search guides…" data-debounce-submit="350" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition" />
             <span class="absolute left-3 top-2.5 text-slate-400">
                 <Icon Name="search" Class="size-3.5" />
             </span>
@@ -121,7 +121,7 @@
                             <form method="post" @formname="@($"delete-guide-{context.Id}")" data-enhance class="inline">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="deleteId" value="@context.Id" />
-                                <button type="submit" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" onclick="return confirm('Delete this guide?');" title="Delete guide">
+                                <button type="submit" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" data-confirm="Delete this guide?" title="Delete guide">
                                     <Icon Name="close" Class="size-3.5" />
                                 </button>
                             </form>

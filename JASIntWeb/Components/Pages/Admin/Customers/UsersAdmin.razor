@@ -103,7 +103,7 @@
             <input type="hidden" name="filter" value="@Filter" />
         }
         <div class="relative flex-1 min-w-[240px]">
-            <input name="q" value="@Query" class="field pr-9" placeholder="Search by email, name, or phone number..." oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" />
+            <input name="q" value="@Query" class="field pr-9" placeholder="Search by email, name, or phone number..." data-debounce-submit="350" />
             <span class="absolute right-3 top-3 text-slate-400">
                 <Icon Name="search" Class="size-4" />
             </span>
