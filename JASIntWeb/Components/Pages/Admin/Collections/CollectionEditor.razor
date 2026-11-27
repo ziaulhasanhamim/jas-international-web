@@ -130,7 +130,7 @@ else
                         </div>
 
                         <div class="flex items-center gap-2">
-                            <select @bind="pickerCategoryId" @bind:after="SearchPickerProductsAsync" class="shop-input !py-1.5 text-xs flex-1 cursor-pointer">
+                            <select @bind="pickerCategoryId" @bind:after="ResetAndSearchPickerAsync" class="shop-input !py-1.5 text-xs flex-1 cursor-pointer">
                                 <option value="">All Categories</option>
                                 @foreach (var c in categoryLookups)
                                 {
@@ -138,9 +138,17 @@ else
                                 }
                             </select>
                             <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap cursor-pointer">
-                                <input type="checkbox" @bind="pickerInStockOnly" @bind:after="SearchPickerProductsAsync" class="size-3.5 rounded text-blue-600" />
+                                <input type="checkbox" @bind="pickerInStockOnly" @bind:after="ResetAndSearchPickerAsync" class="size-3.5 rounded text-blue-600" />
                                 <span>In stock</span>
                             </label>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] text-slate-500 px-0.5">
+                            <span>Showing <strong>@pickerResults.Count</strong> of <strong>@pickerTotalMatches</strong> product@(pickerTotalMatches == 1 ? "" : "s")</span>
+                            @if (pickerTotalMatches > pickerResults.Count)
+                            {
+                                <span class="text-slate-400">Type to narrow search</span>
+                            }
                         </div>
                     </div>
 
@@ -188,6 +196,16 @@ else
                                             + Add
                                         </button>
                                     }
+                                </div>
+                            }
+
+                            @if (pickerTotalMatches > pickerResults.Count)
+                            {
+                                <div class="p-2.5 text-center bg-slate-50/80">
+                                    <button type="button" @onclick="LoadMorePickerProductsAsync"
+                                            class="btn-secondary !py-1.5 !px-3 text-xs font-bold cursor-pointer">
+                                        Load @Math.Min(PickerBatchSize, pickerTotalMatches - pickerResults.Count) more (@(pickerTotalMatches - pickerResults.Count) remaining)
+                                    </button>
                                 </div>
                             }
                         }
@@ -459,6 +477,9 @@ else
     private List<PickerProduct> pickerResults = [];
     private List<ExistingPageLink> existingPages = [];
 
+    private const int PickerBatchSize = 15;
+    private int pickerLimit = PickerBatchSize;
+    private int pickerTotalMatches;
     private string productSearch = "";
     private string pickerCategoryId = "";
     private bool pickerInStockOnly;
@@ -581,7 +602,7 @@ else
         {
             InvokeAsync(async () =>
             {
-                await SearchPickerProductsAsync();
+                await ResetAndSearchPickerAsync();
                 StateHasChanged();
             });
         }, null, 250, Timeout.Infinite);
@@ -590,6 +611,18 @@ else
     private async Task ClearProductSearchAsync()
     {
         productSearch = "";
+        await ResetAndSearchPickerAsync();
+    }
+
+    private async Task ResetAndSearchPickerAsync()
+    {
+        pickerLimit = PickerBatchSize;
+        await SearchPickerProductsAsync();
+    }
+
+    private async Task LoadMorePickerProductsAsync()
+    {
+        pickerLimit += PickerBatchSize;
         await SearchPickerProductsAsync();
     }
 
@@ -603,6 +636,15 @@ else
             q = q.Where(p => p.CategoryId == catId);
         }
 
+        if (pickerInStockOnly)
+        {
+            q = q.Where(p => Db.InventoryItems.Any(i =>
+                i.ProductVariant!.ProductId == p.Id &&
+                i.ProductVariant.IsActive &&
+                !i.ProductVariant.IsDeleted &&
+                (i.QuantityOnHand - i.QuantityReserved) > 0));
+        }
+
         if (!string.IsNullOrWhiteSpace(productSearch))
         {
             var term = productSearch.Trim().ToLower();
@@ -613,8 +655,10 @@ else
                 || p.ProductVariants.Any(v => !v.IsDeleted && v.SKU.ToLower().Contains(term)));
         }
 
-        var items = await q.OrderByDescending(p => p.CreatedAt)
-            .Take(40)
+        pickerTotalMatches = await q.CountAsync();
+
+        pickerResults = await q.OrderByDescending(p => p.CreatedAt)
+            .Take(pickerLimit)
             .Select(p => new PickerProduct(
                 p.Id,
                 p.Name,
@@ -625,8 +669,6 @@ else
                 p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SKU).FirstOrDefault()
             ))
             .ToListAsync();
-
-        pickerResults = pickerInStockOnly ? items.Where(i => i.Stock > 0).ToList() : items;
     }
 
     private void AddManualProduct(PickerProduct prod)

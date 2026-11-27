@@ -128,18 +128,31 @@
                         }
                         else if (rule.Field is CollectionRuleField.HasDiscount or CollectionRuleField.IsFeatured or CollectionRuleField.IsNewArrival)
                         {
-                            <div class="text-xs text-slate-500 font-medium px-2">
-                                @(rule.Operator == CollectionRuleOperator.IsFalse ? "Condition: False / No" : "Condition: True / Yes")
+                            <div class="text-[11px] text-slate-600 font-medium px-2">
+                                @if (rule.Field == CollectionRuleField.HasDiscount)
+                                {
+                                    <span>@(rule.Operator == CollectionRuleOperator.IsFalse ? "No discount (Compare-At ≤ Selling)" : "On sale (Compare-At Price > Selling Price)")</span>
+                                }
+                                else
+                                {
+                                    <span>@(rule.Operator == CollectionRuleOperator.IsFalse ? "Condition: False / No" : "Condition: True / Yes")</span>
+                                }
                             </div>
                         }
                         else if (rule.Field is CollectionRuleField.Price or CollectionRuleField.Stock or CollectionRuleField.DiscountPercent)
                         {
-                            <input type="number"
-                                   step="@(rule.Field == CollectionRuleField.Stock ? "1" : "any")"
-                                   value="@rule.Value"
-                                   @oninput="e => OnValueInputAsync(rule, e)"
-                                   placeholder="@(rule.Field == CollectionRuleField.Price ? "e.g. 3000" : (rule.Field == CollectionRuleField.Stock ? "e.g. 0" : "e.g. 15"))"
-                                   class="shop-input !py-1.5 text-xs font-mono" />
+                            <div class="space-y-0.5">
+                                <input type="number"
+                                       step="@(rule.Field == CollectionRuleField.Stock ? "1" : "any")"
+                                       value="@rule.Value"
+                                       @oninput="e => OnValueInputAsync(rule, e)"
+                                       placeholder="@(rule.Field == CollectionRuleField.Price ? "e.g. 3000" : (rule.Field == CollectionRuleField.Stock ? "e.g. 0" : "e.g. 15"))"
+                                       class="shop-input !py-1.5 text-xs font-mono" />
+                                @if (rule.Field == CollectionRuleField.DiscountPercent)
+                                {
+                                    <span class="block text-[10px] text-slate-400 px-0.5">% off = (CompareAt − Selling) ÷ CompareAt × 100</span>
+                                }
+                            </div>
                         }
                         else
                         {

@@ -191,6 +191,12 @@
             </div>
         </div>
 
+        <div>
+            <label class="shop-label mb-1">"Show All" Link URL (optional)</label>
+            <input name="FormViewAllHref" value="@(editSection?.ViewAllHref ?? "")" class="shop-input font-mono text-xs" placeholder="Leave blank for auto (/collections/slug, /category/slug, or /products), or enter e.g. /offers" />
+            <small class="text-slate-400 text-[11px]">Destination URL when shoppers click the <strong>Show All →</strong> link in this section's header.</small>
+        </div>
+
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
             @if (EditId > 0)
             {
@@ -230,6 +236,9 @@
 
     [SupplyParameterFromForm(FormName = "save-section")]
     public int? FormCollectionId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "save-section")]
+    public string? FormViewAllHref { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
     public int? FormItemLimit { get; set; }
@@ -299,8 +308,12 @@
         {
             int? collectionId = (FormCollectionId.HasValue && FormCollectionId.Value > 0) ? FormCollectionId.Value : null;
             string? categorySlug = collectionId.HasValue ? null : FormCategorySlug;
-            string viewHref = "/products";
-            if (collectionId.HasValue)
+            string viewHref;
+            if (!string.IsNullOrWhiteSpace(FormViewAllHref))
+            {
+                viewHref = FormViewAllHref.Trim();
+            }
+            else if (collectionId.HasValue)
             {
                 var publishedPageSlug = await Db.CollectionPages.AsNoTracking()
                     .Where(p => p.CollectionId == collectionId.Value && p.IsPublished)
@@ -312,6 +325,10 @@
             else if (!string.IsNullOrWhiteSpace(categorySlug))
             {
                 viewHref = $"/category/{categorySlug}";
+            }
+            else
+            {
+                viewHref = "/products";
             }
 
             string noticeText;
