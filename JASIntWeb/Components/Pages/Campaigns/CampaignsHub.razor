@@ -84,9 +84,15 @@
                     @if (!string.IsNullOrWhiteSpace(primaryBanner))
                     {
                         <a href="/campaigns/@primary.Slug" class="block w-full overflow-hidden bg-slate-100 group">
-                            <img src="@primaryBanner"
-                                 alt="@primary.Name"
-                                 class="w-full h-auto block transition-transform duration-500 group-hover:scale-[1.01]" />
+                            <picture class="block w-full">
+                                @if (!string.IsNullOrWhiteSpace(primary.MobileBannerImageUrl))
+                                {
+                                    <source media="(max-width: 640px)" srcset="@primary.MobileBannerImageUrl" />
+                                }
+                                <img src="@primaryBanner"
+                                     alt="@primary.Name"
+                                     class="w-full h-auto block transition-transform duration-500 group-hover:scale-[1.01]" />
+                            </picture>
                         </a>
                     }
                     <div class="p-6 sm:p-8 space-y-4">
@@ -158,7 +164,13 @@
                                     @if (!string.IsNullOrWhiteSpace(cardBanner))
                                     {
                                         <a href="/campaigns/@c.Slug" class="block w-full bg-slate-100 overflow-hidden">
-                                            <img src="@cardBanner" alt="@c.Name" class="w-full h-auto block hover:scale-[1.02] transition-transform duration-300" />
+                                            <picture class="block w-full">
+                                                @if (!string.IsNullOrWhiteSpace(c.MobileBannerImageUrl))
+                                                {
+                                                    <source media="(max-width: 640px)" srcset="@c.MobileBannerImageUrl" />
+                                                }
+                                                <img src="@cardBanner" alt="@c.Name" class="w-full h-auto block hover:scale-[1.02] transition-transform duration-300" />
+                                            </picture>
                                         </a>
                                     }
                                     <div class="p-5 flex-1 flex flex-col justify-between space-y-3">

@@ -83,16 +83,19 @@ else
                     <span class="text-white font-semibold truncate">@pageData.Title</span>
                 </nav>
 
-                @{
-                    var colBannerUrl = !string.IsNullOrWhiteSpace(pageData.BannerImageUrl)
-                        ? pageData.BannerImageUrl
-                        : pageData.MobileBannerImageUrl;
-                }
-
-                @if (!string.IsNullOrWhiteSpace(colBannerUrl))
+                @if (!string.IsNullOrWhiteSpace(pageData.BannerImageUrl) || !string.IsNullOrWhiteSpace(pageData.MobileBannerImageUrl))
                 {
+                    var desktopColSrc = !string.IsNullOrWhiteSpace(pageData.BannerImageUrl)
+                        ? pageData.BannerImageUrl
+                        : pageData.MobileBannerImageUrl!;
                     <div class="mb-6 sm:mb-8 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-white/15 bg-black/20">
-                        <img src="@colBannerUrl" alt="@pageData.Title" class="w-full h-auto block" />
+                        <picture class="block w-full">
+                            @if (!string.IsNullOrWhiteSpace(pageData.MobileBannerImageUrl))
+                            {
+                                <source media="(max-width: 640px)" srcset="@pageData.MobileBannerImageUrl" />
+                            }
+                            <img src="@desktopColSrc" alt="@pageData.Title" class="w-full h-auto block" />
+                        </picture>
                     </div>
                 }
 

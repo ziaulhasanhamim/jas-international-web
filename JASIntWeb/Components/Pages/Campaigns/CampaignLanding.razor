@@ -54,18 +54,21 @@ else
                     <span class="text-white font-semibold truncate max-w-[200px] sm:max-w-none">@campaign.Name</span>
                 </nav>
 
-                @{
-                    var heroBannerUrl = !string.IsNullOrWhiteSpace(campaign.BannerImageUrl)
-                        ? campaign.BannerImageUrl
-                        : campaign.MobileBannerImageUrl;
-                }
-
-                @if (!string.IsNullOrWhiteSpace(heroBannerUrl))
+                @if (!string.IsNullOrWhiteSpace(campaign.BannerImageUrl) || !string.IsNullOrWhiteSpace(campaign.MobileBannerImageUrl))
                 {
+                    var desktopSrc = !string.IsNullOrWhiteSpace(campaign.BannerImageUrl)
+                        ? campaign.BannerImageUrl
+                        : campaign.MobileBannerImageUrl!;
                     <div class="mb-6 sm:mb-8 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-white/15 bg-black/20">
-                        <img src="@heroBannerUrl"
-                             alt="@campaign.Name"
-                             class="w-full h-auto block" />
+                        <picture class="block w-full">
+                            @if (!string.IsNullOrWhiteSpace(campaign.MobileBannerImageUrl))
+                            {
+                                <source media="(max-width: 640px)" srcset="@campaign.MobileBannerImageUrl" />
+                            }
+                            <img src="@desktopSrc"
+                                 alt="@campaign.Name"
+                                 class="w-full h-auto block" />
+                        </picture>
                     </div>
                 }
 

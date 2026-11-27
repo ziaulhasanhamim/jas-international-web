@@ -98,15 +98,23 @@ else
             <InputTextArea @bind-Value="Input.Description" class="shop-input" rows="4" placeholder="Describe this curated collection for shoppers and search engines..." />
         </label>
 
-        <!-- Uploadable Hero Banner -->
+        <!-- Uploadable Hero Banners -->
         <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
-            <h3 class="font-display text-base font-bold text-slate-900">🖼️ Collection Hero Banner</h3>
+            <h3 class="font-display text-base font-bold text-slate-900">🖼️ Collection Banners</h3>
 
-            <AdminBannerDropZone Title="Hero Banner Image"
-                                 SizeHint="Recommended: 1920 × 600 px (Wide Full-Width · Used on Desktop & Mobile)"
-                                 EmptyHint="No hero banner uploaded"
-                                 UrlLabel="Direct Banner URL / Path:"
-                                 @bind-Value="Input.BannerImageUrl" />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AdminBannerDropZone Title="Desktop Hero Banner"
+                                     SizeHint="1920 × 600 px"
+                                     EmptyHint="No desktop banner uploaded"
+                                     UrlLabel="Direct Image URL / Path:"
+                                     @bind-Value="Input.BannerImageUrl" />
+
+                <AdminBannerDropZone Title="Mobile Hero Banner (Optional)"
+                                     SizeHint="1080 × 1080 px"
+                                     EmptyHint="Uses desktop banner on mobile"
+                                     UrlLabel="Direct Mobile URL / Path:"
+                                     @bind-Value="Input.MobileBannerImageUrl" />
+            </div>
         </div>
 
         <!-- Settings & SEO -->
@@ -231,8 +239,8 @@ else
                 Slug = existing.Slug,
                 Eyebrow = existing.Eyebrow,
                 Description = existing.Description,
-                BannerImageUrl = !string.IsNullOrWhiteSpace(existing.BannerImageUrl) ? existing.BannerImageUrl : existing.MobileBannerImageUrl,
-                MobileBannerImageUrl = null,
+                BannerImageUrl = existing.BannerImageUrl,
+                MobileBannerImageUrl = existing.MobileBannerImageUrl,
                 ThemeColor = existing.ThemeColor,
                 ShowFilters = existing.ShowFilters,
                 IsPublished = existing.IsPublished,
@@ -285,7 +293,7 @@ else
                     Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim(),
                     Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
                     BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim(),
-                    MobileBannerImageUrl = null,
+                    MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim(),
                     ThemeColor = Input.ThemeColor,
                     ShowFilters = Input.ShowFilters,
                     IsPublished = Input.IsPublished,
@@ -305,7 +313,7 @@ else
                     existing.Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim();
                     existing.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
                     existing.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
-                    existing.MobileBannerImageUrl = null;
+                    existing.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
                     existing.ThemeColor = Input.ThemeColor;
                     existing.ShowFilters = Input.ShowFilters;
                     existing.IsPublished = Input.IsPublished;
