@@ -12,6 +12,7 @@
 @inject CampaignService CampaignSvc
 @inject CampaignPricingService PricingSvc
 @inject CatalogService CatalogSvc
+@inject CollectionService CollectionSvc
 @inject IStorageService Storage
 
 <PageTitle>@(Id == 0 ? "Create Campaign" : "Edit Campaign") · JAS Admin</PageTitle>
@@ -375,9 +376,9 @@ else
             </div>
 
             <label class="shop-label">
-                Campaign Collection
-                <InputSelect @bind-Value="Input.CollectionId" class="shop-input font-semibold cursor-pointer">
-                    <option value="">-- No Collection Selected --</option>
+                Campaign Collection <span class="admin-required">Required</span>
+                <InputSelect @bind-Value="Input.CollectionId" @bind-Value:after="OnCollectionChanged" class="shop-input font-semibold cursor-pointer">
+                    <option value="">-- Select a Collection (Required) --</option>
                     @foreach (var col in availableCollections)
                     {
                         <option value="@col.Id">
@@ -385,6 +386,7 @@ else
                         </option>
                     }
                 </InputSelect>
+                <ValidationMessage For="@(() => Input.CollectionId)" class="text-xs text-rose-600 mt-1" />
                 <small>All products in the selected collection will display on this campaign page in your configured order. Manage collections in <a href="/admin/collections" target="_blank" class="text-blue-600 font-semibold underline">Catalog &gt; Collections</a>.</small>
             </label>
         </div>
@@ -399,67 +401,97 @@ else
                     <p class="text-xs text-slate-500 mt-1">
                         @(UsesDirectPricing
                             ? "Set custom %, fixed ৳ discount, or exact deal prices (e.g. ৳1,111) per product or variant. Overrides the Collection default above."
-                            : "Curate spotlight products for this campaign page (switch Scenario to Direct Discount above to apply automatic price cuts).")
+                            : "Curate spotlight products from the selected collection (switch Scenario to Direct Discount above to apply automatic price cuts).")
                     </p>
                 </div>
             </div>
 
-            <!-- Batched Product Picker (max 15 rows per search) -->
-            <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <div class="relative flex-1">
-                        <input value="@productSearchQuery"
-                               @oninput="OnProductSearchChanged"
-                               placeholder="Search products by name or SKU to add offer deal..."
-                               class="shop-input !mt-0 text-xs pl-9 pr-9" />
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                            <Icon Name="search" Class="size-3.5" />
-                        </span>
-                        @if (!string.IsNullOrWhiteSpace(productSearchQuery))
-                        {
-                            <button type="button" @onclick="ClearProductSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer">✕</button>
-                        }
-                    </div>
-                    <span class="text-[11px] text-slate-400 shrink-0">Showing @(searchResults.Count) of @(searchTotalCount)</span>
+            @if (!Input.CollectionId.HasValue || Input.CollectionId.Value <= 0)
+            {
+                <div class="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+                    <span class="text-lg block mb-1">📦</span>
+                    Please select a <strong class="text-slate-700">Campaign Collection</strong> above first. Products from that collection will appear here so you can customize per-product or variant offer prices.
                 </div>
+            }
+            else if (collectionProductIds.Count == 0)
+            {
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-center text-xs text-amber-800">
+                    This collection currently has <strong>0 active products</strong>. Add products to the selected collection first, or choose another collection above.
+                </div>
+            }
+            else
+            {
+                <!-- Batched Product Picker (scoped to selected Collection, max 15 rows per search) -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div class="relative flex-1">
+                            <input value="@productSearchQuery"
+                                   @oninput="OnProductSearchChanged"
+                                   placeholder="Search products in this collection by name or SKU..."
+                                   class="shop-input !mt-0 text-xs pl-9 pr-9" />
+                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                <Icon Name="search" Class="size-3.5" />
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(productSearchQuery))
+                            {
+                                <button type="button" @onclick="ClearProductSearch" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer">✕</button>
+                            }
+                        </div>
+                        <span class="text-[11px] text-slate-400 shrink-0">Showing @(searchResults.Count) of @(searchTotalCount) in collection</span>
+                    </div>
 
-                @if (searchResults.Count > 0)
-                {
-                    <div class="max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl">
-                        @foreach (var p in searchResults)
-                        {
-                            <div class="p-2.5 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 text-xs">
-                                <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <img src="@p.ImageUrl" alt="@p.Name" class="size-9 rounded-lg object-contain bg-slate-50 border p-0.5 shrink-0" />
-                                    <div class="min-w-0">
-                                        <span class="font-bold text-slate-900 block truncate">@p.Name</span>
-                                        <span class="text-[11px] text-slate-500">Default Price: ৳@p.DefaultPrice.ToString("N0") · @p.Variants.Count variant(s)</span>
+                    @if (searchResults.Count > 0)
+                    {
+                        <div class="max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl">
+                            @foreach (var p in searchResults)
+                            {
+                                var allVariantsAdded = offerRows.Any(r => r.ProductId == p.Id && r.ProductVariantId == null);
+                                <div class="p-2.5 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 text-xs">
+                                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                        <img src="@p.ImageUrl" alt="@p.Name" class="size-9 rounded-lg object-contain bg-slate-50 border p-0.5 shrink-0" />
+                                        <div class="min-w-0">
+                                            <span class="font-bold text-slate-900 block truncate">@p.Name</span>
+                                            <span class="text-[11px] text-slate-500">Default Price: ৳@p.DefaultPrice.ToString("N0") · @p.Variants.Count variant(s)</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center gap-1.5 shrink-0">
-                                    <button type="button"
-                                            @onclick="() => AddOfferProduct(p, null)"
-                                            class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 cursor-pointer">
-                                        + All Variants
-                                    </button>
-                                    @if (p.Variants.Count > 1)
-                                    {
-                                        @foreach (var v in p.Variants.Take(3))
+                                    <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
+                                        @if (allVariantsAdded)
+                                        {
+                                            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">✓ Added</span>
+                                        }
+                                        else
                                         {
                                             <button type="button"
-                                                    @onclick="() => AddOfferProduct(p, v)"
-                                                    class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold cursor-pointer"
-                                                    title="Override just @v.Label (৳@v.Price:N0)">
-                                                + @v.Label
+                                                    @onclick="() => AddOfferProduct(p, null)"
+                                                    class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 cursor-pointer">
+                                                + All Variants
                                             </button>
                                         }
-                                    }
+                                        @if (p.Variants.Count > 1)
+                                        {
+                                            @foreach (var v in p.Variants.Take(3))
+                                            {
+                                                var varAdded = offerRows.Any(r => r.ProductId == p.Id && r.ProductVariantId == v.Id);
+                                                <button type="button"
+                                                        @onclick="() => AddOfferProduct(p, v)"
+                                                        disabled="@varAdded"
+                                                        class="px-2 py-1 rounded-lg text-[11px] font-semibold @(varAdded ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default" : "bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer")"
+                                                        title="Override just @v.Label (৳@v.Price:N0)">
+                                                    @(varAdded ? $"✓ {v.Label}" : $"+ {v.Label}")
+                                                </button>
+                                            }
+                                        }
+                                    </div>
                                 </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-xs text-slate-400 text-center py-3">No products in this collection match “@productSearchQuery”.</p>
+                    }
+                </div>
+            }
 
             @if (offerRows.Count > 0)
             {
@@ -682,6 +714,7 @@ else
 
     private List<CouponItem> activeCoupons = [];
     private List<CollectionItem> availableCollections = [];
+    private HashSet<int> collectionProductIds = [];
     private List<CampaignProductEditorRow> offerRows = [];
     private List<ProductSearchHit> searchResults = [];
     private int searchTotalCount;
@@ -891,8 +924,50 @@ else
                 Input = new CampaignFormModel();
             }
         }
-        await LoadProductSearchBatchAsync();
+
+        if (Input.CollectionId is > 0)
+        {
+            await LoadCollectionScopeAndProductsAsync();
+        }
+
         loading = false;
+    }
+
+    private async Task OnCollectionChanged()
+    {
+        productSearchQuery = "";
+        if (Input?.CollectionId is > 0)
+        {
+            await LoadCollectionScopeAndProductsAsync(pruneOutOfCollectionRows: true);
+        }
+        else
+        {
+            collectionProductIds.Clear();
+            searchResults = [];
+            searchTotalCount = 0;
+            offerRows.Clear();
+        }
+    }
+
+    private async Task LoadCollectionScopeAndProductsAsync(bool pruneOutOfCollectionRows = false)
+    {
+        if (Input?.CollectionId is not > 0)
+        {
+            collectionProductIds.Clear();
+            searchResults = [];
+            searchTotalCount = 0;
+            return;
+        }
+
+        var ids = await CollectionSvc.GetCollectionProductIdsAsync(Input.CollectionId.Value);
+        collectionProductIds = [.. ids];
+
+        if (pruneOutOfCollectionRows && offerRows.Count > 0)
+        {
+            offerRows.RemoveAll(r => !collectionProductIds.Contains(r.ProductId));
+        }
+
+        await LoadProductSearchBatchAsync();
     }
 
     private async Task OnProductSearchChanged(ChangeEventArgs e)
@@ -909,8 +984,17 @@ else
 
     private async Task LoadProductSearchBatchAsync()
     {
+        if (Input?.CollectionId is not > 0 || collectionProductIds.Count == 0)
+        {
+            searchResults = [];
+            searchTotalCount = 0;
+            return;
+        }
+
         var q = Db.Products.AsNoTracking()
-            .Where(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted));
+            .Where(p => !p.IsDeleted
+                && collectionProductIds.Contains(p.Id)
+                && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted));
 
         if (!string.IsNullOrWhiteSpace(productSearchQuery))
         {
@@ -972,6 +1056,12 @@ else
         if (string.IsNullOrWhiteSpace(cleanName))
         {
             errorMessage = "Campaign name is required.";
+            return;
+        }
+
+        if (!Input.CollectionId.HasValue || Input.CollectionId.Value <= 0)
+        {
+            errorMessage = "Please select a Campaign Collection.";
             return;
         }
 

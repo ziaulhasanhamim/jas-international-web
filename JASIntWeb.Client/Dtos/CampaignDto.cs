@@ -115,6 +115,8 @@ public sealed class CampaignFormModel
     [StringLength(50)]
     public string? HighlightCouponCode { get; set; }
 
+    [Required(ErrorMessage = "Campaign Collection is required.")]
+    [Range(1, int.MaxValue, ErrorMessage = "Please select a Campaign Collection.")]
     public int? CollectionId { get; set; }
 
     public int? TagId { get; set; }
