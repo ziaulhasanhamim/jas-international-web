@@ -4,7 +4,7 @@
 <section class="my-5 space-y-3 rounded-xl border border-slate-200 p-4" aria-label="Product images">
     <h3 class="font-semibold">Product images</h3>
     <p class="admin-help">The first image is the cover. Drag thumbnails to reorder, or use the arrow buttons.</p>
-    <AdminImageDropZone Label="Product images" Multiple="true" Disabled="uploading" Selected="Upload" />
+    <AdminImageDropZone Label="Product images" Multiple="true" Disabled="@(uploading && !readingStreams)" Selected="Upload" />
     <div class="flex gap-2"><input class="shop-input" @bind="url" placeholder="Image URL or local path" aria-label="Add product image URL" /><button type="button" class="btn-secondary" @onclick="AddUrl" disabled="@uploading">Add URL</button></div>
     @if (error is not null) { <p class="form-error" role="alert">@error</p> }
     @if (uploading) { <p role="status">Uploading images…</p> }
@@ -52,6 +52,7 @@
     private string url = "";
     private string? error;
     private bool uploading;
+    private bool readingStreams;
     protected override void OnParametersSet()
     {
         if (Value == previous) return;
@@ -74,13 +75,31 @@
     private async Task Remove(int index) { if (uploading || index < 0 || index >= images.Count) return; images.RemoveAt(index); await Changed(); }
     private async Task Upload(InputFileChangeEventArgs args)
     {
-        uploading = true; error = null; await BusyChanged.InvokeAsync(true);
+        if (uploading) return;
+        uploading = true;
+        readingStreams = true;
+        error = null;
+
+        List<(string Name, string ContentType, MemoryStream Buffer)> buffered = [];
         try
         {
+            // Buffer all selected streams before disabling the <InputFile> DOM element so multi-file drops/picks never lose later files.
             foreach (var file in args.GetMultipleFiles(10))
             {
+                var ms = new MemoryStream();
                 await using var stream = file.OpenReadStream(10 * 1024 * 1024);
-                var uploadRes = await Backend.UploadAsync(stream, file.Name, file.ContentType, false);
+                await stream.CopyToAsync(ms);
+                ms.Position = 0;
+                buffered.Add((file.Name, file.ContentType, ms));
+            }
+
+            readingStreams = false;
+            await BusyChanged.InvokeAsync(true);
+            await InvokeAsync(StateHasChanged);
+
+            foreach (var item in buffered)
+            {
+                var uploadRes = await Backend.UploadAsync(item.Buffer, item.Name, item.ContentType, false);
                 switch (uploadRes)
                 {
                     case string uploaded:
@@ -95,7 +114,15 @@
             }
         }
         catch (Exception failure) when (failure is IOException or HttpRequestException or InvalidOperationException)
-        { error = "One or more images could not be uploaded. Check the file count, size and connection."; }
-        finally { uploading = false; await BusyChanged.InvokeAsync(false); }
+        {
+            error = "One or more images could not be uploaded. Check the file count, size and connection.";
+        }
+        finally
+        {
+            foreach (var item in buffered) await item.Buffer.DisposeAsync();
+            readingStreams = false;
+            uploading = false;
+            await BusyChanged.InvokeAsync(false);
+        }
     }
 }

@@ -1,0 +1,172 @@
+@using JASIntWeb.Client.Services
+@using JASIntWeb.Helpers
+@using JASIntWeb.Services
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IStorageService Storage
+
+<div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+    <div class="flex items-center justify-between">
+        <label class="font-bold text-slate-900 text-xs sm:text-sm">@Title</label>
+        @if (!string.IsNullOrWhiteSpace(SizeHint))
+        {
+            <span class="text-[11px] text-slate-400">@SizeHint</span>
+        }
+    </div>
+
+    <div @ref="dropZoneRef"
+         class="border-2 border-dashed border-slate-200 hover:border-blue-400 [&.is-dragging]:border-blue-500 [&.is-dragging]:bg-blue-50/70 rounded-xl p-3.5 text-center bg-slate-50/50 transition @(uploading ? "is-disabled opacity-75" : "")">
+        <div class="aspect-21/9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3">
+            @if (!string.IsNullOrWhiteSpace(Value))
+            {
+                <img src="@Value" alt="@Title Preview" class="w-full h-full object-cover" />
+            }
+            else
+            {
+                <div class="text-center p-3 text-slate-400">
+                    <Icon Name="camera" Class="size-6 mx-auto mb-1 opacity-50" />
+                    <span class="text-[11px] font-medium block">@EmptyHint</span>
+                    <span class="text-[10px] text-slate-400 block mt-0.5">Drag &amp; drop an image here</span>
+                </div>
+            }
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-2">
+            <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5 select-none shadow-2xs @(uploading ? "pointer-events-none opacity-60" : "")">
+                <Icon Name="camera" Class="size-3.5" />
+                <span>@(uploading ? "Uploading..." : "Browse & Upload")</span>
+                <InputFile OnChange="OnFileSelected" accept=".jpg,.jpeg,.png,.webp,.avif,.svg" class="sr-only" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(Value))
+            {
+                <button type="button"
+                        @onclick="ClearImage"
+                        disabled="@uploading"
+                        class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 hover:bg-rose-50 border-rose-200 cursor-pointer">
+                    Remove
+                </button>
+            }
+        </div>
+
+        @if (uploading)
+        {
+            <div class="mt-2 text-xs text-blue-600 font-semibold flex items-center justify-center gap-1.5 animate-pulse">
+                <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+                <span>Uploading @Title.ToLowerInvariant()...</span>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(uploadError))
+        {
+            <div class="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 flex items-center justify-between gap-2">
+                <span>⚠️ @uploadError</span>
+                <button type="button" @onclick="() => uploadError = null" class="cursor-pointer font-bold shrink-0">✕</button>
+            </div>
+        }
+    </div>
+
+    <div>
+        <label class="block text-[11px] font-semibold text-slate-500 mb-1">@UrlLabel</label>
+        <input type="text"
+               value="@Value"
+               @oninput="OnUrlInput"
+               class="shop-input !mt-0 font-mono text-xs"
+               placeholder="https://... or /images/..." />
+    </div>
+</div>
+
+@code {
+    // Serialize only the SignalR stream copy so concurrent banner uploads don't collide on the circuit,
+    // while allowing S3 optimization/uploads to run in parallel afterward.
+    private static readonly SemaphoreSlim SignalRReadLock = new(1, 1);
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "Banner Image";
+    [Parameter] public string? SizeHint { get; set; }
+    [Parameter] public string EmptyHint { get; set; } = "No image set";
+    [Parameter] public string UrlLabel { get; set; } = "Direct Image URL / Path:";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private ElementReference dropZoneRef;
+    private AdminEditorInterop? dropZoneInterop;
+    private bool dropZoneBound;
+    private bool uploading;
+    private string? uploadError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (dropZoneBound) return;
+        dropZoneBound = true;
+        try
+        {
+            dropZoneInterop = new AdminEditorInterop(JS);
+            await dropZoneInterop.DropZoneAsync(dropZoneRef);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+    }
+
+    private async Task OnUrlInput(ChangeEventArgs e)
+    {
+        var next = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(string.IsNullOrWhiteSpace(next) ? null : next);
+    }
+
+    private async Task ClearImage()
+    {
+        uploadError = null;
+        await ValueChanged.InvokeAsync(null);
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null || uploading) return;
+
+        uploadError = null;
+        uploading = true;
+        await InvokeAsync(StateHasChanged);
+
+        MemoryStream? buffer = null;
+        try
+        {
+            buffer = new MemoryStream();
+            await SignalRReadLock.WaitAsync();
+            try
+            {
+                await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                await stream.CopyToAsync(buffer);
+            }
+            finally
+            {
+                SignalRReadLock.Release();
+            }
+
+            buffer.Position = 0;
+            var result = await ImageUploadValidator.TryUploadAsync(Storage, buffer, file.Name, file.ContentType, CancellationToken.None);
+            switch (result)
+            {
+                case string url:
+                    await ValueChanged.InvokeAsync(url);
+                    break;
+                case Error err:
+                    uploadError = err.Message;
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            if (buffer is not null) await buffer.DisposeAsync();
+            uploading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dropZoneInterop is not null) await dropZoneInterop.DisposeAsync();
+    }
+}

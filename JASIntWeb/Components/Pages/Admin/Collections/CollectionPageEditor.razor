@@ -9,7 +9,6 @@
 @inject AppDbContext Db
 @inject CollectionService CollectionSvc
 @inject CatalogService Catalog
-@inject IStorageService Storage
 @inject NavigationManager Nav
 
 <PageTitle>@(Id == 0 ? "Create Collection Page" : "Edit Collection Page") · JAS Admin</PageTitle>
@@ -103,84 +102,18 @@ else
         <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
             <h3 class="font-display text-base font-bold text-slate-900">🖼️ Collection Banners</h3>
 
-            @if (!string.IsNullOrWhiteSpace(uploadError))
-            {
-                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 flex items-center justify-between">
-                    <span>⚠️ @uploadError</span>
-                    <button type="button" @onclick="() => uploadError = null" class="cursor-pointer font-bold">✕</button>
-                </div>
-            }
-
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90">
-                    <div class="flex items-center justify-between">
-                        <label class="font-bold text-slate-900 text-xs sm:text-sm">Desktop Hero Banner</label>
-                        <span class="text-[11px] text-slate-400">1920×600 / 16:9</span>
-                    </div>
+                <AdminBannerDropZone Title="Desktop Hero Banner"
+                                     SizeHint="1920×600 / 16:9"
+                                     EmptyHint="No desktop banner uploaded"
+                                     UrlLabel="Direct Image URL / Path:"
+                                     @bind-Value="Input.BannerImageUrl" />
 
-                    <div class="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3 text-center bg-slate-50/50 transition">
-                        <div class="aspect-21/9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3">
-                            @if (!string.IsNullOrWhiteSpace(Input.BannerImageUrl))
-                            {
-                                <img src="@Input.BannerImageUrl" alt="Desktop Banner" class="w-full h-full object-cover" />
-                            }
-                            else
-                            {
-                                <span class="text-xs text-slate-400">No desktop banner uploaded</span>
-                            }
-                        </div>
-
-                        <div class="flex justify-center gap-2">
-                            <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-                                <Icon Name="camera" Class="size-3.5" />
-                                <span>@(uploadingDesktop ? "Uploading..." : "Upload Banner")</span>
-                                <InputFile OnChange="OnDesktopBannerUpload" accept=".jpg,.jpeg,.png,.webp,.avif,.svg" class="sr-only" />
-                            </label>
-                            @if (!string.IsNullOrWhiteSpace(Input.BannerImageUrl))
-                            {
-                                <button type="button" @onclick="() => Input.BannerImageUrl = string.Empty" class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 cursor-pointer">
-                                    Remove
-                                </button>
-                            }
-                        </div>
-                    </div>
-                    <InputText @bind-Value="Input.BannerImageUrl" class="shop-input font-mono text-xs" placeholder="Or paste image URL..." />
-                </div>
-
-                <div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90">
-                    <div class="flex items-center justify-between">
-                        <label class="font-bold text-slate-900 text-xs sm:text-sm">Mobile Hero Banner (Optional)</label>
-                        <span class="text-[11px] text-slate-400">750×500</span>
-                    </div>
-
-                    <div class="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3 text-center bg-slate-50/50 transition">
-                        <div class="aspect-21/9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3">
-                            @if (!string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl))
-                            {
-                                <img src="@Input.MobileBannerImageUrl" alt="Mobile Banner" class="w-full h-full object-cover" />
-                            }
-                            else
-                            {
-                                <span class="text-xs text-slate-400">Uses desktop banner on mobile</span>
-                            }
-                        </div>
-
-                        <div class="flex justify-center gap-2">
-                            <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-                                <Icon Name="camera" Class="size-3.5" />
-                                <span>@(uploadingMobile ? "Uploading..." : "Upload Mobile")</span>
-                                <InputFile OnChange="OnMobileBannerUpload" accept=".jpg,.jpeg,.png,.webp,.avif,.svg" class="sr-only" />
-                            </label>
-                            @if (!string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl))
-                            {
-                                <button type="button" @onclick="() => Input.MobileBannerImageUrl = string.Empty" class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 cursor-pointer">
-                                    Remove
-                                </button>
-                            }
-                        </div>
-                    </div>
-                    <InputText @bind-Value="Input.MobileBannerImageUrl" class="shop-input font-mono text-xs" placeholder="Or paste mobile URL..." />
-                </div>
+                <AdminBannerDropZone Title="Mobile Hero Banner (Optional)"
+                                     SizeHint="750×500"
+                                     EmptyHint="Uses desktop banner on mobile"
+                                     UrlLabel="Direct Mobile URL / Path:"
+                                     @bind-Value="Input.MobileBannerImageUrl" />
             </div>
         </div>
 
@@ -280,10 +213,7 @@ else
     private List<CollectionPickItem> availableCollections = [];
     private bool loading = true;
     private bool saving;
-    private bool uploadingDesktop;
-    private bool uploadingMobile;
     private string? errorMessage;
-    private string? uploadError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -334,44 +264,6 @@ else
         }
 
         loading = false;
-    }
-
-    private async Task OnDesktopBannerUpload(InputFileChangeEventArgs e)
-    {
-        if (Input is null || e.File is null) return;
-        uploadError = null;
-        uploadingDesktop = true;
-        try
-        {
-            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
-            var res = await ImageUploadValidator.TryUploadAsync(Storage, stream, e.File.Name, e.File.ContentType, CancellationToken.None);
-            switch (res)
-            {
-                case string url: Input.BannerImageUrl = url; break;
-                case Error err: uploadError = err.Message; break;
-            }
-        }
-        catch (Exception ex) { uploadError = ex.Message; }
-        finally { uploadingDesktop = false; }
-    }
-
-    private async Task OnMobileBannerUpload(InputFileChangeEventArgs e)
-    {
-        if (Input is null || e.File is null) return;
-        uploadError = null;
-        uploadingMobile = true;
-        try
-        {
-            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
-            var res = await ImageUploadValidator.TryUploadAsync(Storage, stream, e.File.Name, e.File.ContentType, CancellationToken.None);
-            switch (res)
-            {
-                case string url: Input.MobileBannerImageUrl = url; break;
-                case Error err: uploadError = err.Message; break;
-            }
-        }
-        catch (Exception ex) { uploadError = ex.Message; }
-        finally { uploadingMobile = false; }
     }
 
     private async Task SaveAsync()

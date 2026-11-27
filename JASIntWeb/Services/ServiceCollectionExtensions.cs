@@ -126,6 +126,7 @@ internal static class ServiceCollectionExtensions
             .AddHubOptions(options =>
             {
                 options.MaximumReceiveMessageSize = 1024 * 1024;
+                options.MaximumParallelInvocationsPerClient = 6;
                 options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
                 options.HandshakeTimeout = TimeSpan.FromSeconds(30);
                 options.EnableDetailedErrors = builder.Environment.IsDevelopment();

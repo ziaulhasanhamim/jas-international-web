@@ -7,23 +7,55 @@ function cleanupOnRemoval(root, cleanup) {
 }
 function hasFiles(event) { return [...(event.dataTransfer?.types ?? [])].includes('Files'); }
 export function dropZone(root) {
-    const input = root.querySelector('input[type=file]');
+    if (!root) return { dispose() {} };
+    const isBlocked = input => root.classList.contains('is-disabled') || (input?.disabled ?? false);
+    const enter = event => {
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const input = root.querySelector('input[type=file]');
+        if (!isBlocked(input)) root.classList.add('is-dragging');
+    };
     const over = event => {
         event.preventDefault();
-        if (!hasFiles(event) || input.matches(':disabled')) { event.dataTransfer.dropEffect = 'none'; return; }
+        event.stopPropagation();
+        const input = root.querySelector('input[type=file]');
+        if (!hasFiles(event) || isBlocked(input)) {
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+            return;
+        }
         root.classList.add('is-dragging');
-        event.dataTransfer.dropEffect = 'copy';
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
     };
     const leave = event => { if (!root.contains(event.relatedTarget)) root.classList.remove('is-dragging'); };
     const drop = event => {
         root.classList.remove('is-dragging');
-        event.preventDefault(); event.stopPropagation();
-        if (!hasFiles(event) || input.matches(':disabled')) return;
-        input.files = event.dataTransfer.files;
+        event.preventDefault();
+        event.stopPropagation();
+        const input = root.querySelector('input[type=file]');
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0 || !input || isBlocked(input)) return;
+        try {
+            const dt = new DataTransfer();
+            for (const f of files) dt.items.add(f);
+            input.files = dt.files;
+        } catch {
+            input.files = files;
+        }
         input.dispatchEvent(new Event('change', { bubbles: true }));
     };
-    root.addEventListener('dragover', over); root.addEventListener('dragleave', leave); root.addEventListener('drop', drop);
-    return { dispose: cleanupOnRemoval(root, () => { root.removeEventListener('dragover', over); root.removeEventListener('dragleave', leave); root.removeEventListener('drop', drop); }) };
+    root.addEventListener('dragenter', enter);
+    root.addEventListener('dragover', over);
+    root.addEventListener('dragleave', leave);
+    root.addEventListener('drop', drop);
+    return {
+        dispose: cleanupOnRemoval(root, () => {
+            root.removeEventListener('dragenter', enter);
+            root.removeEventListener('dragover', over);
+            root.removeEventListener('dragleave', leave);
+            root.removeEventListener('drop', drop);
+        })
+    };
 }
 export function gallery(root, receiver) {
     let dragged = null;
