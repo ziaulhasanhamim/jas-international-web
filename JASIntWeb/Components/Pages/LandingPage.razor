@@ -30,10 +30,9 @@ else if (product is null)
 }
 else
 {
-    var defaultVariant = product.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                        ?? product.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+    var defaultVariant = product.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).ThenBy(v => v.Id).FirstOrDefault();
     var price = defaultVariant?.SellingPrice ?? 0m;
-    var comparePrice = product.CompareAtPrice;
+    var comparePrice = defaultVariant?.CompareAtPrice;
     var discountPercent = comparePrice.HasValue && comparePrice.Value > price
         ? (int)Math.Round((comparePrice.Value - price) / comparePrice.Value * 100)
         : 0;

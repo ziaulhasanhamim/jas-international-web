@@ -190,8 +190,11 @@ else
 
         products = prods.Select(p =>
         {
-            var defaultVariant = p.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                                ?? p.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+            var defaultVariant = p.ProductVariants
+                                .Where(v => v.IsActive && !v.IsDeleted)
+                                .OrderByDescending(v => v.IsDefault)
+                                .ThenBy(v => v.Id)
+                                .FirstOrDefault();
             return new ProductSummaryDto
             {
                 Id = p.Id,
@@ -199,7 +202,7 @@ else
                 Slug = p.Slug,
                 MainImage = p.MainImageUrl,
                 Price = defaultVariant?.SellingPrice ?? 0m,
-                ComparePrice = p.CompareAtPrice,
+                ComparePrice = defaultVariant?.CompareAtPrice,
                 Stock = defaultVariant != null ? 10 : 0
             };
         }).ToList();

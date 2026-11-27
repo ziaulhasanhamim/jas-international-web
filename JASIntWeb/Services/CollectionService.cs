@@ -320,7 +320,6 @@ public sealed class CollectionService(
                     .ThenBy(v => v.Id)
                     .Select(v => new { v.Id, v.SellingPrice, v.CompareAtPrice })
                     .FirstOrDefault(),
-                p.CompareAtPrice,
                 p.IsFeatured,
                 p.IsNewArrival,
                 p.Rating,
@@ -349,7 +348,7 @@ public sealed class CollectionService(
                 p.BrandSlug,
                 p.TagIds,
                 p.DefaultVariant.SellingPrice,
-                p.DefaultVariant.CompareAtPrice ?? p.CompareAtPrice,
+                p.DefaultVariant.CompareAtPrice,
                 stock,
                 p.IsFeatured,
                 p.IsNewArrival,
@@ -437,11 +436,9 @@ public sealed class CollectionService(
                 CategoryName = p.Category != null ? p.Category.Name : "",
                 p.MainImageUrl,
                 DefaultVariantId = p.ProductVariants
-                    .Where(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                    .Select(v => (int?)v.Id)
-                    .FirstOrDefault() ?? p.ProductVariants
                     .Where(v => v.IsActive && !v.IsDeleted)
-                    .OrderBy(v => v.Id)
+                    .OrderByDescending(v => v.IsDefault)
+                    .ThenBy(v => v.Id)
                     .Select(v => (int?)v.Id)
                     .FirstOrDefault(),
                 AvailableStock = db.InventoryItems
@@ -451,9 +448,11 @@ public sealed class CollectionService(
                 BrandName = p.Brand != null ? p.Brand.Name : null,
                 BrandSlug = p.Brand != null ? p.Brand.Slug : null,
                 CompareAtPrice = p.ProductVariants
-                    .Where(v => v.IsDefault && v.IsActive && !v.IsDeleted)
+                    .Where(v => v.IsActive && !v.IsDeleted)
+                    .OrderByDescending(v => v.IsDefault)
+                    .ThenBy(v => v.Id)
                     .Select(v => v.CompareAtPrice)
-                    .FirstOrDefault() ?? p.CompareAtPrice,
+                    .FirstOrDefault(),
                 Rating = db.ProductReviews.Where(r => r.ProductId == p.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? p.Rating,
                 ReviewCount = db.ProductReviews.Count(r => r.ProductId == p.Id && r.IsApproved),
                 p.IsNewArrival,

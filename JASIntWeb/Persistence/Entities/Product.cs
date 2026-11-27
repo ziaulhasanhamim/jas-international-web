@@ -14,6 +14,7 @@ public sealed class Product : SoftDeletableEntity
     public bool IsFeatured { get; set; }
     public bool IsNewArrival { get; set; } = true;
     public long CatalogRevision { get; set; }
+    // Legacy column retained only for historical seed/migration fixtures; runtime pricing reads ProductVariant.
     public decimal? CompareAtPrice { get; set; }
     public decimal Rating { get; set; } = 5.0m;
     public int ReviewCount { get; set; } = 12;

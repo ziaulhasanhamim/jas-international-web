@@ -177,7 +177,7 @@ public sealed class ServerAdminCatalogBackend(AdminSession session, IServiceScop
             Hidden = p.IsDeleted,
             IsFeatured = p.IsFeatured,
             IsNewArrival = p.IsNewArrival,
-            CompareAtPrice = p.CompareAtPrice,
+            CompareAtPrice = defVariant?.CompareAtPrice,
             MetaTitle = p.MetaTitle,
             MetaDescription = p.MetaDescription,
             OgImageUrl = p.OgImageUrl,

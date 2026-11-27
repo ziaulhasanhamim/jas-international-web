@@ -288,8 +288,11 @@
 
         var list = raw.Select(p =>
         {
-            var defaultVar = p.ProductVariants.FirstOrDefault(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                ?? p.ProductVariants.FirstOrDefault(v => v.IsActive && !v.IsDeleted);
+            var defaultVar = p.ProductVariants
+                .Where(v => v.IsActive && !v.IsDeleted)
+                .OrderByDescending(v => v.IsDefault)
+                .ThenBy(v => v.Id)
+                .FirstOrDefault();
             var price = defaultVar?.SellingPrice ?? 0m;
             return new FeaturedProductItem(
                 p.Id,
@@ -299,7 +302,7 @@
                 p.Category?.Name ?? "Uncategorized",
                 p.Brand?.Name,
                 price,
-                p.CompareAtPrice,
+                defaultVar?.CompareAtPrice,
                 p.IsFeatured,
                 p.IsNewArrival
             );
