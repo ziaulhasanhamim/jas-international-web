@@ -76,6 +76,8 @@ public sealed class CampaignFormModel
     [StringLength(50)]
     public string? HighlightCouponCode { get; set; }
 
+    public int? CollectionId { get; set; }
+
     public int? TagId { get; set; }
 
     public List<int> CuratedProductIds { get; set; } = [];

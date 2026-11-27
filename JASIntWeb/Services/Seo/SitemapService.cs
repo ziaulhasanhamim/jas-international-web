@@ -16,6 +16,7 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
         var categoriesLastMod = await db.Categories.AsNoTracking().MaxAsync(c => (DateTimeOffset?)(c.UpdatedAt ?? c.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
         var brandsLastMod = await db.Brands.AsNoTracking().MaxAsync(b => (DateTimeOffset?)(b.UpdatedAt ?? b.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
         var guidesLastMod = await db.Guides.AsNoTracking().MaxAsync(g => (DateTimeOffset?)(g.UpdatedAt ?? g.PublishedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
+        var collectionsLastMod = await db.CollectionPages.AsNoTracking().MaxAsync(c => (DateTimeOffset?)(c.UpdatedAt ?? c.CreatedAt)) ?? new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero);
 
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", "yes"),
@@ -23,6 +24,7 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
                 CreateSitemapEntry("sitemap-pages.xml", productsLastMod),
                 CreateSitemapEntry("sitemap-categories.xml", categoriesLastMod),
                 CreateSitemapEntry("sitemap-brands.xml", brandsLastMod),
+                CreateSitemapEntry("sitemap-collections.xml", collectionsLastMod),
                 CreateSitemapEntry("sitemap-products.xml", productsLastMod),
                 CreateSitemapEntry("sitemap-guides.xml", guidesLastMod)
             )
@@ -201,6 +203,46 @@ public sealed class SitemapService(AppDbContext db, ISeoService seo)
                 new XElement(S + "priority", "0.8"),
                 new XElement(S + "lastmod", b.LastMod.ToString("yyyy-MM-dd"))
             ));
+        }
+
+        var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);
+        return doc.Declaration + Environment.NewLine + doc.ToString();
+    }
+
+    public async Task<string> GenerateCollectionsSitemapAsync()
+    {
+        var pages = await db.CollectionPages.AsNoTracking()
+            .Where(p => p.IsPublished && !p.Collection!.IsDeleted && p.Collection.IsActive)
+            .OrderBy(p => p.Title)
+            .Select(p => new
+            {
+                p.Slug,
+                p.Title,
+                p.BannerImageUrl,
+                LastMod = p.UpdatedAt ?? p.CreatedAt
+            })
+            .ToListAsync();
+
+        var root = new XElement(S + "urlset", new XAttribute(XNamespace.Xmlns + "image", ImageNs.NamespaceName));
+
+        foreach (var p in pages)
+        {
+            var urlElement = new XElement(S + "url",
+                new XElement(S + "loc", seo.BuildAbsoluteUrl($"/collections/{p.Slug}")),
+                new XElement(S + "changefreq", "daily"),
+                new XElement(S + "priority", "0.85"),
+                new XElement(S + "lastmod", p.LastMod.ToString("yyyy-MM-dd"))
+            );
+
+            if (!string.IsNullOrWhiteSpace(p.BannerImageUrl))
+            {
+                urlElement.Add(new XElement(ImageNs + "image",
+                    new XElement(ImageNs + "loc", seo.BuildAbsoluteUrl(p.BannerImageUrl)),
+                    new XElement(ImageNs + "title", p.Title)
+                ));
+            }
+
+            root.Add(urlElement);
         }
 
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);

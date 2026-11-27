@@ -23,6 +23,7 @@ internal static class DatabaseInitialization
             }
             await app.Services.SeedAdminAsync(app.Configuration);
             await app.Services.PatchCatalogDataAsync();
+            await app.Services.MigrateLegacyPromotionsToCollectionsAsync();
         }
     }
 }

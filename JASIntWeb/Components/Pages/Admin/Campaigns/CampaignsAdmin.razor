@@ -84,6 +84,12 @@
                             }
                         </div>
                         <span class="text-xs text-slate-400 font-mono block mt-0.5">/campaigns/@context.Slug</span>
+                        @if (context.Collection != null)
+                        {
+                            <a href="/admin/collections/@context.Collection.Id/edit" class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-bold hover:bg-indigo-100">
+                                📦 @context.Collection.Name
+                            </a>
+                        }
                     </div>
                 </div>
             </TemplateColumn>
@@ -177,7 +183,7 @@
     {
         get
         {
-            var q = Db.Campaigns.AsNoTracking();
+            var q = Db.Campaigns.AsNoTracking().Include(c => c.Collection).AsQueryable();
             if (!string.IsNullOrWhiteSpace(searchQuery))
             {
                 var term = searchQuery.Trim().ToLower();

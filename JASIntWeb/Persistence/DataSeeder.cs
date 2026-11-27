@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JASIntWeb.Client.Dtos;
+using JASIntWeb.Services;
 using Microsoft.AspNetCore.Identity;
 namespace JASIntWeb.Persistence;
 
@@ -652,8 +654,139 @@ public static class JsonTestDataSeeder
             }
         }
 
+        if (!await db.Collections.AnyAsync(ct))
+        {
+            var featuredProds = await db.Products.AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .OrderByDescending(p => p.IsFeatured)
+                .ThenByDescending(p => p.CreatedAt)
+                .Take(8)
+                .Select(p => p.Id)
+                .ToListAsync(ct);
+
+            var featuredCollection = new Collection
+            {
+                Name = "Homepage Featured",
+                Slug = "homepage-featured",
+                InternalNotes = "Curated ordered products shown in the Featured Products section on the landing page.",
+                Type = CollectionType.Manual,
+                SortMode = CollectionSortOrder.ManualOrder,
+                IsActive = true
+            };
+            db.Collections.Add(featuredCollection);
+            await db.SaveChangesAsync(ct);
+
+            for (int i = 0; i < featuredProds.Count; i++)
+            {
+                db.CollectionProducts.Add(new CollectionProduct
+                {
+                    CollectionId = featuredCollection.Id,
+                    ProductId = featuredProds[i],
+                    SortOrder = i
+                });
+            }
+
+            if (!await db.HomepageSections.AnyAsync(s => s.CollectionId == featuredCollection.Id || s.Title == "Featured Products", ct))
+            {
+                db.HomepageSections.Add(new HomepageSection
+                {
+                    Title = "Featured Products",
+                    Eyebrow = "HANDPICKED SPOTLIGHT",
+                    CollectionId = featuredCollection.Id,
+                    ViewAllHref = "/products",
+                    SortOrder = 0,
+                    IsActive = true,
+                    ItemLimit = 8
+                });
+            }
+
+            var summerTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "summer-sale" && !t.IsDeleted, ct);
+            var creatorCat = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "creator-essentials" && !c.IsDeleted, ct);
+            var audioCat = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "audio" && !c.IsDeleted, ct);
+
+            // Coupon/Internal rule-based collection (NO storefront page created)
+            var ruleGroup1 = new CollectionRuleGroup
+            {
+                MatchOperator = CollectionRuleLogicalOp.And,
+                Groups =
+                [
+                    new CollectionRuleGroup
+                    {
+                        MatchOperator = CollectionRuleLogicalOp.Or,
+                        Rules =
+                        [
+                            new CollectionRuleCondition { Field = CollectionRuleField.Tag, Operator = CollectionRuleOperator.Equals, Value = summerTag?.Id.ToString() ?? "summer-sale" },
+                            new CollectionRuleCondition { Field = CollectionRuleField.Category, Operator = CollectionRuleOperator.Equals, Value = creatorCat?.Id.ToString() ?? "creator-essentials" }
+                        ]
+                    }
+                ],
+                Rules =
+                [
+                    new CollectionRuleCondition { Field = CollectionRuleField.Stock, Operator = CollectionRuleOperator.GreaterThan, Value = "0" },
+                    new CollectionRuleCondition { Field = CollectionRuleField.Price, Operator = CollectionRuleOperator.LessThan, Value = "3000" }
+                ]
+            };
+
+            var creatorCouponCol = new Collection
+            {
+                Name = "Creator & Summer Picks Under ৳3,000",
+                Slug = "creator-summer-under-3000",
+                InternalNotes = "Dynamic rule-based group for coupons and internal promos (no storefront page).",
+                Type = CollectionType.RuleBased,
+                SortMode = CollectionSortOrder.PriceLowToHigh,
+                RulesJson = CollectionRuleEvaluator.SerializeRules(ruleGroup1),
+                IsActive = true
+            };
+            db.Collections.Add(creatorCouponCol);
+
+            // Showcase collection WITH an optional Collection Page
+            var audioRules = new CollectionRuleGroup
+            {
+                MatchOperator = CollectionRuleLogicalOp.And,
+                Rules =
+                [
+                    new CollectionRuleCondition { Field = CollectionRuleField.Category, Operator = CollectionRuleOperator.Equals, Value = audioCat?.Id.ToString() ?? "audio" },
+                    new CollectionRuleCondition { Field = CollectionRuleField.Stock, Operator = CollectionRuleOperator.GreaterThan, Value = "0" }
+                ]
+            };
+
+            var audioCol = new Collection
+            {
+                Name = "In-Stock Studio Audio",
+                Slug = "in-stock-studio-audio",
+                InternalNotes = "Automated live collection paired with a public Collection Page.",
+                Type = CollectionType.RuleBased,
+                SortMode = CollectionSortOrder.FeaturedFirst,
+                RulesJson = CollectionRuleEvaluator.SerializeRules(audioRules),
+                IsActive = true
+            };
+            db.Collections.Add(audioCol);
+            await db.SaveChangesAsync(ct);
+
+            db.CollectionPages.Add(new CollectionPage
+            {
+                CollectionId = audioCol.Id,
+                Title = "Studio Wireless Audio Showcase",
+                Slug = "wireless-audio-showcase",
+                Eyebrow = "IN STOCK · VERIFIED SOUND",
+                Description = "Explore ANC wireless earbuds, neckbands, and studio headphones ready for fast dispatch across Bangladesh.",
+                BannerImageUrl = "/jas-og-card.webp",
+                ThemeColor = "indigo",
+                IsPublished = true,
+                ShowFilters = true,
+                MetaTitle = "Studio Wireless Audio Showcase | JAS International",
+                MetaDescription = "Shop in-stock studio audio gear, ANC TWS earbuds, and wireless headphones with official warranty."
+            });
+
+            await db.SaveChangesAsync(ct);
+        }
+
         if (!await db.Campaigns.AnyAsync(ct))
         {
+            var featuredCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == "homepage-featured" && !c.IsDeleted, ct);
+            var audioCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == "in-stock-studio-audio" && !c.IsDeleted, ct);
+            var under3kCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == "creator-summer-under-3000" && !c.IsDeleted, ct);
+
             var summerTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "summer-sale", ct);
             var creatorTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "creator-essentials", ct);
             var flashTag = await db.Tags.FirstOrDefaultAsync(t => t.Slug == "flash-deal", ct);
@@ -675,6 +808,7 @@ public static class JsonTestDataSeeder
                     ShowCountdown = true,
                     ThemeColor = "amber",
                     HighlightCouponCode = "WELCOME200",
+                    CollectionId = featuredCol?.Id,
                     TagId = summerTag?.Id,
                     CuratedProductIds = sampleProducts.Take(6).ToList(),
                     IsActive = true,
@@ -696,6 +830,7 @@ public static class JsonTestDataSeeder
                     ShowCountdown = true,
                     ThemeColor = "indigo",
                     HighlightCouponCode = "SAVE10",
+                    CollectionId = audioCol?.Id,
                     TagId = creatorTag?.Id,
                     CuratedProductIds = sampleProducts.Skip(2).Take(6).ToList(),
                     IsActive = true,
@@ -717,6 +852,7 @@ public static class JsonTestDataSeeder
                     ShowCountdown = true,
                     ThemeColor = "crimson",
                     HighlightCouponCode = "FREESHIP",
+                    CollectionId = under3kCol?.Id,
                     TagId = flashTag?.Id,
                     CuratedProductIds = sampleProducts.Skip(4).Take(4).ToList(),
                     IsActive = true,
@@ -799,6 +935,189 @@ public static class JsonTestDataSeeder
             }
         }
     }
+
+        public async Task MigrateLegacyPromotionsToCollectionsAsync(CancellationToken ct = default)
+        {
+            await using var scope = services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var changed = false;
+
+            if (await db.Products.AnyAsync(p => !p.IsDeleted, ct)
+                && !await db.Collections.AnyAsync(c => c.Slug == "homepage-featured" && !c.IsDeleted, ct))
+            {
+                var featuredIds = await db.Products.AsNoTracking()
+                    .Where(p => !p.IsDeleted)
+                    .OrderByDescending(p => p.IsFeatured)
+                    .ThenByDescending(p => p.CreatedAt)
+                    .Take(8)
+                    .Select(p => p.Id)
+                    .ToListAsync(ct);
+
+                var featuredCol = new Collection
+                {
+                    Name = "Homepage Featured",
+                    Slug = "homepage-featured",
+                    InternalNotes = "Curated ordered products shown on the landing page Featured Products section.",
+                    Type = CollectionType.Manual,
+                    SortMode = CollectionSortOrder.ManualOrder,
+                    IsActive = true
+                };
+                db.Collections.Add(featuredCol);
+                await db.SaveChangesAsync(ct);
+
+                for (int i = 0; i < featuredIds.Count; i++)
+                {
+                    db.CollectionProducts.Add(new CollectionProduct
+                    {
+                        CollectionId = featuredCol.Id,
+                        ProductId = featuredIds[i],
+                        SortOrder = i
+                    });
+                }
+
+                if (!await db.HomepageSections.AnyAsync(s => s.CollectionId == featuredCol.Id || s.Title == "Featured Products", ct))
+                {
+                    db.HomepageSections.Add(new HomepageSection
+                    {
+                        Title = "Featured Products",
+                        Eyebrow = "HANDPICKED SPOTLIGHT",
+                        CollectionId = featuredCol.Id,
+                        ViewAllHref = "/products",
+                        SortOrder = 0,
+                        IsActive = true,
+                        ItemLimit = 8
+                    });
+                }
+                changed = true;
+            }
+
+            var legacyCoupons = await db.Coupons
+                .Where(c => c.CollectionId == null)
+                .ToListAsync(ct);
+
+            foreach (var coupon in legacyCoupons)
+            {
+                bool hasLegacy = coupon.IncludedCategoryIds.Count > 0 ||
+                                 coupon.ExcludedCategoryIds.Count > 0 ||
+                                 coupon.IncludedBrandIds.Count > 0 ||
+                                 coupon.ExcludedBrandIds.Count > 0 ||
+                                 coupon.IncludedTagIds.Count > 0 ||
+                                 coupon.ExcludedTagIds.Count > 0;
+                if (!hasLegacy) continue;
+
+                var root = new CollectionRuleGroup { MatchOperator = CollectionRuleLogicalOp.And };
+                var incGroup = new CollectionRuleGroup { MatchOperator = CollectionRuleLogicalOp.Or };
+
+                foreach (var id in coupon.IncludedCategoryIds)
+                    incGroup.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Category, Operator = CollectionRuleOperator.Equals, Value = id.ToString() });
+                foreach (var id in coupon.IncludedBrandIds)
+                    incGroup.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Brand, Operator = CollectionRuleOperator.Equals, Value = id.ToString() });
+                foreach (var id in coupon.IncludedTagIds)
+                    incGroup.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Tag, Operator = CollectionRuleOperator.Equals, Value = id.ToString() });
+
+                if (incGroup.Rules.Count > 0) root.Groups.Add(incGroup);
+
+                foreach (var id in coupon.ExcludedCategoryIds)
+                    root.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Category, Operator = CollectionRuleOperator.NotEquals, Value = id.ToString() });
+                foreach (var id in coupon.ExcludedBrandIds)
+                    root.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Brand, Operator = CollectionRuleOperator.NotEquals, Value = id.ToString() });
+                foreach (var id in coupon.ExcludedTagIds)
+                    root.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Tag, Operator = CollectionRuleOperator.NotEquals, Value = id.ToString() });
+
+                var colSlug = SlugAndSkuGenerator.GenerateSlug($"coupon-{coupon.Code}");
+                var existingCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == colSlug && !c.IsDeleted, ct);
+                if (existingCol == null)
+                {
+                    existingCol = new Collection
+                    {
+                        Name = $"Coupon Target: {coupon.Code}",
+                        Slug = colSlug,
+                        InternalNotes = "Auto-migrated from legacy coupon rules.",
+                        Type = CollectionType.RuleBased,
+                        SortMode = CollectionSortOrder.Newest,
+                        RulesJson = CollectionRuleEvaluator.SerializeRules(root),
+                        IsActive = true
+                    };
+                    db.Collections.Add(existingCol);
+                    await db.SaveChangesAsync(ct);
+                }
+
+                coupon.CollectionId = existingCol.Id;
+                changed = true;
+            }
+
+            var legacyCampaigns = await db.Campaigns
+                .Where(c => c.CollectionId == null)
+                .ToListAsync(ct);
+
+            foreach (var campaign in legacyCampaigns)
+            {
+                if (!campaign.TagId.HasValue && campaign.CuratedProductIds.Count == 0) continue;
+
+                var colSlug = SlugAndSkuGenerator.GenerateSlug($"campaign-{campaign.Slug}");
+                var existingCol = await db.Collections.FirstOrDefaultAsync(c => c.Slug == colSlug && !c.IsDeleted, ct);
+                if (existingCol == null)
+                {
+                    if (campaign.TagId.HasValue && campaign.CuratedProductIds.Count == 0)
+                    {
+                        var rules = new CollectionRuleGroup
+                        {
+                            MatchOperator = CollectionRuleLogicalOp.And,
+                            Rules = [new CollectionRuleCondition { Field = CollectionRuleField.Tag, Operator = CollectionRuleOperator.Equals, Value = campaign.TagId.Value.ToString() }]
+                        };
+                        existingCol = new Collection
+                        {
+                            Name = $"Campaign: {campaign.Name}",
+                            Slug = colSlug,
+                            Type = CollectionType.RuleBased,
+                            SortMode = CollectionSortOrder.FeaturedFirst,
+                            RulesJson = CollectionRuleEvaluator.SerializeRules(rules),
+                            IsActive = true
+                        };
+                        db.Collections.Add(existingCol);
+                        await db.SaveChangesAsync(ct);
+                    }
+                    else
+                    {
+                        var ids = campaign.CuratedProductIds.Distinct().ToList();
+                        if (campaign.TagId.HasValue)
+                        {
+                            var tagged = await db.ProductTags.Where(pt => pt.TagId == campaign.TagId.Value).Select(pt => pt.ProductId).ToListAsync(ct);
+                            ids = ids.Concat(tagged).Distinct().ToList();
+                        }
+
+                        existingCol = new Collection
+                        {
+                            Name = $"Campaign: {campaign.Name}",
+                            Slug = colSlug,
+                            Type = CollectionType.Manual,
+                            SortMode = CollectionSortOrder.ManualOrder,
+                            IsActive = true
+                        };
+                        db.Collections.Add(existingCol);
+                        await db.SaveChangesAsync(ct);
+
+                        for (int i = 0; i < ids.Count; i++)
+                        {
+                            db.CollectionProducts.Add(new CollectionProduct
+                            {
+                                CollectionId = existingCol.Id,
+                                ProductId = ids[i],
+                                SortOrder = i
+                            });
+                        }
+                    }
+                }
+
+                campaign.CollectionId = existingCol.Id;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await db.SaveChangesAsync(ct);
+            }
+        }
     }
 
     private sealed class SeedData

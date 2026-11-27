@@ -1,0 +1,241 @@
+@page "/admin/collection-pages"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@inject AppDbContext Db
+@inject CollectionService CollectionSvc
+@inject NavigationManager Nav
+
+<PageTitle>Collection Pages · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">STOREFRONT CONTENT</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Storefront Collection Pages</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Optional landing pages (<code class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">/collections/slug</code>) with custom title, banner, description, and SEO linked to a Collection. Collections without a page remain private/internal.
+        </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/collections" class="btn-secondary text-xs shadow-xs">
+            <span>Manage Collections</span>
+        </a>
+        <a href="/admin/collection-pages/new" class="btn-primary shadow-xs flex items-center gap-1.5">
+            <Icon Name="plus" Class="size-4" />
+            <span>Create Collection Page</span>
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 cursor-pointer">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div class="relative w-full max-w-xs">
+        <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
+               placeholder="Search pages by title, slug, collection..."
+               class="shop-input text-xs pl-8 pr-8" />
+        <span class="absolute left-2.5 top-2.5 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+        @if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+        }
+    </div>
+</div>
+
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <QuickGrid Items="@pagesQuery" class="data-table">
+            <PropertyColumn Property="@(p => p.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
+
+            <TemplateColumn Title="Collection Page" Class="min-w-[240px]">
+                <div class="flex items-center gap-3">
+                    @if (!string.IsNullOrWhiteSpace(context.BannerImageUrl))
+                    {
+                        <img src="@context.BannerImageUrl" alt="@context.Title" class="size-12 rounded-lg object-cover border border-slate-200 shrink-0" />
+                    }
+                    else
+                    {
+                        <div class="size-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 text-lg shrink-0">📄</div>
+                    }
+                    <div>
+                        <a href="/admin/collection-pages/@context.Id/edit" class="font-bold text-slate-900 hover:text-blue-600 text-sm transition block">
+                            @context.Title
+                        </a>
+                        <a href="/collections/@context.Slug" target="_blank" class="text-xs text-blue-600 font-mono hover:underline block">
+                            /collections/@context.Slug ↗
+                        </a>
+                    </div>
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Source Collection" Class="min-w-[180px]">
+                <a href="/admin/collections/@context.CollectionId/edit" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-800 transition">
+                    <span>@(context.CollectionType == CollectionType.Manual ? "✋" : "⚡")</span>
+                    <span>@context.CollectionName</span>
+                </a>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Filters" Class="text-center w-24" Align="Align.Center">
+                <span class="text-xs font-semibold @(context.ShowFilters ? "text-emerald-700" : "text-slate-400")">
+                    @(context.ShowFilters ? "Enabled" : "Hidden")
+                </span>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Status" Class="text-center w-28" Align="Align.Center">
+                <button type="button" @onclick="() => TogglePublishAsync(context.Id)"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100")">
+                    <span class="size-1.5 rounded-full @(context.IsPublished ? "bg-emerald-500" : "bg-amber-500")"></span>
+                    <span>@(context.IsPublished ? "Published" : "Draft")</span>
+                </button>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Actions" Class="text-right w-36" Align="Align.End">
+                <div class="flex items-center justify-end gap-1.5">
+                    <a href="/admin/collection-pages/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Edit
+                    </a>
+                    <button type="button" @onclick="() => DeletePageAsync(context.Id)"
+                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer">
+                        Delete
+                    </button>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+
+    @if (rowCount == 0)
+    {
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No collection pages created yet. Collections only get public URLs when you create a page for them.</p>
+        </div>
+    }
+</div>
+
+@code {
+    public sealed record AdminCollectionPageRow(
+        int Id,
+        int CollectionId,
+        string CollectionName,
+        CollectionType CollectionType,
+        string Title,
+        string Slug,
+        string? BannerImageUrl,
+        bool ShowFilters,
+        bool IsPublished
+    );
+
+    private IQueryable<AdminCollectionPageRow> pagesQuery = Array.Empty<AdminCollectionPageRow>().AsQueryable();
+    private int rowCount;
+    private string searchQuery = "";
+    private string? _toast;
+    private System.Threading.Timer? _debounceTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).ContainsKey("saved"))
+        {
+            _toast = "Collection page saved successfully!";
+        }
+
+        await LoadPagesAsync();
+    }
+
+    private void OnSearchInput()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(async () =>
+            {
+                await LoadPagesAsync();
+                StateHasChanged();
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task ClearSearch()
+    {
+        searchQuery = "";
+        await LoadPagesAsync();
+    }
+
+    private async Task LoadPagesAsync()
+    {
+        var q = Db.CollectionPages.AsNoTracking()
+            .Where(p => !p.Collection!.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            var term = searchQuery.Trim().ToLower();
+            q = q.Where(p => p.Title.ToLower().Contains(term)
+                || p.Slug.ToLower().Contains(term)
+                || p.Collection!.Name.ToLower().Contains(term));
+        }
+
+        var list = await q.OrderByDescending(p => p.CreatedAt)
+            .Select(p => new AdminCollectionPageRow(
+                p.Id,
+                p.CollectionId,
+                p.Collection!.Name,
+                p.Collection.Type,
+                p.Title,
+                p.Slug,
+                p.BannerImageUrl,
+                p.ShowFilters,
+                p.IsPublished
+            ))
+            .ToListAsync();
+
+        rowCount = list.Count;
+        pagesQuery = list.AsQueryable();
+    }
+
+    private async Task TogglePublishAsync(int id)
+    {
+        var page = await Db.CollectionPages.FindAsync(id);
+        if (page != null)
+        {
+            page.IsPublished = !page.IsPublished;
+            page.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync(page.CollectionId);
+            _toast = $"Page '{page.Title}' is now {(page.IsPublished ? "Published" : "Draft")}.";
+            await LoadPagesAsync();
+        }
+    }
+
+    private async Task DeletePageAsync(int id)
+    {
+        var page = await Db.CollectionPages.FindAsync(id);
+        if (page != null)
+        {
+            var colId = page.CollectionId;
+            Db.CollectionPages.Remove(page);
+            await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync(colId);
+            _toast = $"Collection page '{page.Title}' deleted (underlying collection preserved).";
+            await LoadPagesAsync();
+        }
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
+}

@@ -86,5 +86,47 @@ internal static class CommerceModel
         b.Entity<Campaign>().HasIndex(x => x.Slug).IsUnique();
         b.Entity<Campaign>().HasIndex(x => new { x.IsActive, x.SortOrder });
         b.Entity<Campaign>().Property(x => x.CuratedProductIds).HasDefaultValueSql("'{}'");
+        b.Entity<Campaign>()
+            .HasOne(x => x.Collection)
+            .WithMany()
+            .HasForeignKey(x => x.CollectionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<Coupon>()
+            .HasOne(x => x.Collection)
+            .WithMany()
+            .HasForeignKey(x => x.CollectionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<HomepageSection>()
+            .HasOne(x => x.Collection)
+            .WithMany()
+            .HasForeignKey(x => x.CollectionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<Collection>().HasIndex(x => x.Slug).IsUnique().HasFilter("NOT \"IsDeleted\"");
+        b.Entity<Collection>().HasIndex(x => new { x.IsDeleted, x.IsActive, x.Type });
+        b.Entity<Collection>().Property(x => x.RulesJson).HasColumnType("jsonb");
+
+        b.Entity<CollectionProduct>().HasKey(x => new { x.CollectionId, x.ProductId });
+        b.Entity<CollectionProduct>().HasIndex(x => new { x.CollectionId, x.SortOrder });
+        b.Entity<CollectionProduct>()
+            .HasOne(x => x.Collection)
+            .WithMany(c => c.Items)
+            .HasForeignKey(x => x.CollectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<CollectionProduct>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<CollectionPage>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<CollectionPage>().HasIndex(x => new { x.IsPublished, x.CollectionId });
+        b.Entity<CollectionPage>()
+            .HasOne(x => x.Collection)
+            .WithMany(c => c.Pages)
+            .HasForeignKey(x => x.CollectionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

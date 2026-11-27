@@ -16,11 +16,11 @@
     private sealed record Group(string Title, string Icon, Link[] Links);
     private static readonly Group[] Groups = [
         new("Dashboard", "dashboard", [new("/admin", "Overview"), new("/admin/analytics", "Sales & analytics"), new("/admin/visitors", "Live traffic")]),
-        new("Catalog", "box", [new("/admin/products", "Products"), new("/admin/products/new", "Add product"), new("/admin/categories", "Categories"), new("/admin/brands", "Brands"), new("/admin/tags", "Product tags"), new("/admin/attributes", "Attribute definitions & suggestions"), new("/admin/inventory", "Inventory"), new("/admin/stock-notifications", "Back-in-stock subscriptions")]),
+        new("Catalog", "box", [new("/admin/products", "Products"), new("/admin/products/new", "Add product"), new("/admin/categories", "Categories"), new("/admin/brands", "Brands"), new("/admin/tags", "Product tags"), new("/admin/collections", "Collections"), new("/admin/attributes", "Attribute definitions & suggestions"), new("/admin/inventory", "Inventory"), new("/admin/stock-notifications", "Back-in-stock subscriptions")]),
         new("Orders", "cart", [new("/admin/orders", "Orders & payments")]),
         new("Customers", "users", [new("/admin/users", "Customer accounts"), new("/admin/users/create", "Add account"), new("/admin/reviews", "Review moderation")]),
         new("Marketing", "chart", [new("/admin/marketing", "Meta Ads & ROAS"), new("/admin/marketing/abandoned-carts", "Abandoned carts"), new("/admin/marketing/audiences", "Audiences"), new("/admin/coupons", "Coupons"), new("/admin/campaigns", "Campaigns & Offers"), new("/admin/feeds", "Catalog feeds")]),
-        new("Storefront Content", "camera", [new("/admin/guides", "Buying guides"), new("/admin/guides/new", "Write guide"), new("/admin/carousel", "Hero carousel"), new("/admin/promo-cards", "Promo cards"), new("/admin/homepage-sections", "Homepage sections"), new("/admin/featured-products", "Featured products"), new("/admin/seo", "SEO & sitemaps")]),
+        new("Storefront Content", "camera", [new("/admin/collection-pages", "Collection pages"), new("/admin/guides", "Buying guides"), new("/admin/guides/new", "Write guide"), new("/admin/carousel", "Hero carousel"), new("/admin/promo-cards", "Promo cards"), new("/admin/homepage-sections", "Homepage sections"), new("/admin/featured-products", "Featured products"), new("/admin/seo", "SEO & sitemaps")]),
         new("Settings", "settings", [new("/admin/settings/delivery", "Delivery & payment configuration"), new("/admin/settings/meta-ads", "Pixel & Meta configuration")])
     ];
 }

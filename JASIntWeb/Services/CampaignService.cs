@@ -8,8 +8,10 @@ namespace JASIntWeb.Services;
 
 public sealed class CampaignService(
     IDbContextFactory<AppDbContext> dbFactory,
-    HybridCache cache)
+    HybridCache cache,
+    CollectionService collectionService)
 {
+    public const string TagCampaigns = "campaigns";
     private const string ActiveCampaignsCacheKey = "campaigns:active";
     private static readonly HybridCacheEntryOptions StandardOptions = new()
     {
@@ -35,15 +37,23 @@ public sealed class CampaignService(
                 foreach (var c in campaigns)
                 {
                     int productCount = 0;
-                    if (c.TagId.HasValue)
+                    if (c.CollectionId.HasValue)
                     {
-                        productCount += await db.ProductTags
-                            .CountAsync(pt => pt.TagId == c.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted), token);
+                        var ids = await collectionService.GetCollectionProductIdsAsync(c.CollectionId.Value, token);
+                        productCount = ids.Count;
                     }
-                    if (c.CuratedProductIds.Count > 0)
+                    else
                     {
-                        var curatedDistinct = c.CuratedProductIds.Distinct().Count();
-                        productCount = Math.Max(productCount, curatedDistinct);
+                        if (c.TagId.HasValue)
+                        {
+                            productCount += await db.ProductTags
+                                .CountAsync(pt => pt.TagId == c.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted), token);
+                        }
+                        if (c.CuratedProductIds.Count > 0)
+                        {
+                            var curatedDistinct = c.CuratedProductIds.Distinct().Count();
+                            productCount = Math.Max(productCount, curatedDistinct);
+                        }
                     }
 
                     summaries.Add(new CampaignSummaryDto(
@@ -68,6 +78,7 @@ public sealed class CampaignService(
                 return summaries;
             },
             StandardOptions,
+            tags: [TagCampaigns, CollectionService.TagCollections, CatalogService.TagCatalog],
             cancellationToken: ct);
     }
 
@@ -87,87 +98,33 @@ public sealed class CampaignService(
 
                 if (campaign == null) return null;
 
-                // Collect product IDs: Curated first, then tagged
-                var productIds = new List<int>();
-                if (campaign.CuratedProductIds.Count > 0)
+                List<ProductSummaryDto> products;
+                if (campaign.CollectionId.HasValue)
                 {
-                    productIds.AddRange(campaign.CuratedProductIds);
+                    products = await collectionService.GetCollectionProductsAsync(campaign.CollectionId.Value, ct: token);
                 }
-
-                if (campaign.TagId.HasValue)
+                else
                 {
-                    var taggedProductIds = await db.ProductTags.AsNoTracking()
-                        .Where(pt => pt.TagId == campaign.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
-                        .Select(pt => pt.ProductId)
-                        .ToListAsync(token);
-
-                    productIds.AddRange(taggedProductIds);
-                }
-
-                var distinctProductIds = productIds.Distinct().ToList();
-
-                var products = new List<ProductSummaryDto>();
-                if (distinctProductIds.Count > 0)
-                {
-                    var query = db.Products.AsNoTracking()
-                        .Where(p => distinctProductIds.Contains(p.Id) && !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
-                        .Select(p => new
-                        {
-                            p.Id,
-                            p.Name,
-                            p.Slug,
-                            Price = p.ProductVariants
-                                .Where(v => v.IsActive && !v.IsDeleted)
-                                .OrderByDescending(v => v.IsDefault)
-                                .ThenBy(v => v.Id)
-                                .Select(v => v.SellingPrice)
-                                .FirstOrDefault(),
-                            CategoryName = p.Category != null ? p.Category.Name : "",
-                            p.MainImageUrl,
-                            DefaultVariantId = p.ProductVariants
-                                .Where(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                                .Select(v => (int?)v.Id)
-                                .FirstOrDefault(),
-                            AvailableStock = db.InventoryItems
-                                .Where(i => i.ProductVariant!.ProductId == p.Id && i.ProductVariant.IsDefault && i.ProductVariant.IsActive && !i.ProductVariant.IsDeleted)
-                                .Select(i => i.QuantityOnHand - i.QuantityReserved)
-                                .FirstOrDefault(),
-                            BrandName = p.Brand != null ? p.Brand.Name : null,
-                            BrandSlug = p.Brand != null ? p.Brand.Slug : null,
-                            CompareAtPrice = p.ProductVariants
-                                .Where(v => v.IsDefault && v.IsActive && !v.IsDeleted)
-                                .Select(v => v.CompareAtPrice)
-                                .FirstOrDefault(),
-                            Rating = db.ProductReviews.Where(r => r.ProductId == p.Id && r.IsApproved).Average(r => (decimal?)r.Rating) ?? 5.0m,
-                            ReviewCount = db.ProductReviews.Count(r => r.ProductId == p.Id && r.IsApproved),
-                            p.IsNewArrival,
-                            p.IsFeatured,
-                            HasVariants = p.Attributes.Any(),
-                            TopTag = p.ProductTags
-                                .Where(pt => !pt.Tag.IsDeleted && !pt.Tag.IsHidden)
-                                .OrderBy(pt => pt.Tag.SortOrder)
-                                .Select(pt => new TagDto(pt.Tag.Id, pt.Tag.Name, pt.Tag.Slug, pt.Tag.IsHidden, pt.Tag.BadgeColor, pt.Tag.SortOrder, 0))
-                                .FirstOrDefault()
-                        });
-
-                    var rawProducts = await query.ToListAsync(token);
-                    var productMap = rawProducts.ToDictionary(p => p.Id);
-
-                    // Preserve curated ordering first
-                    foreach (var id in distinctProductIds)
+                    var productIds = new List<int>();
+                    if (campaign.CuratedProductIds.Count > 0)
                     {
-                        if (productMap.TryGetValue(id, out var p))
-                        {
-                            products.Add(new ProductSummaryDto(
-                                p.Id, p.Name, p.Slug, p.Price, p.CategoryName, p.MainImageUrl,
-                                p.DefaultVariantId, p.AvailableStock, p.BrandName, p.BrandSlug,
-                                p.CompareAtPrice, p.Rating, p.ReviewCount, p.IsNewArrival,
-                                p.IsFeatured, p.HasVariants)
-                            {
-                                TopTag = p.TopTag
-                            });
-                        }
+                        productIds.AddRange(campaign.CuratedProductIds);
                     }
+
+                    if (campaign.TagId.HasValue)
+                    {
+                        var taggedProductIds = await db.ProductTags.AsNoTracking()
+                            .Where(pt => pt.TagId == campaign.TagId.Value && !pt.Product.IsDeleted && pt.Product.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
+                            .Select(pt => pt.ProductId)
+                            .ToListAsync(token);
+
+                        productIds.AddRange(taggedProductIds);
+                    }
+
+                    var distinctProductIds = productIds.Distinct().ToList();
+                    products = distinctProductIds.Count > 0
+                        ? await CollectionService.LoadOrderedProductSummariesAsync(db, distinctProductIds, token)
+                        : [];
                 }
 
                 return new CampaignDetailsDto(
@@ -190,12 +147,14 @@ public sealed class CampaignService(
                     products);
             },
             StandardOptions,
+            tags: [TagCampaigns, CollectionService.TagCollections, CatalogService.TagCatalog],
             cancellationToken: ct);
     }
 
     public async ValueTask InvalidateCacheAsync(string? slug = null)
     {
         await cache.RemoveAsync(ActiveCampaignsCacheKey);
+        await cache.RemoveByTagAsync(TagCampaigns);
         if (!string.IsNullOrWhiteSpace(slug))
         {
             await cache.RemoveAsync($"campaign:{slug.Trim().ToLowerInvariant()}");

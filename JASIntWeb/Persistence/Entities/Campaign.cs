@@ -14,6 +14,8 @@ public sealed class Campaign : AuditableEntity
     public bool ShowCountdown { get; set; } = true;
     public string ThemeColor { get; set; } = "indigo"; // indigo, crimson, amber, emerald, navy
     public string? HighlightCouponCode { get; set; }
+    public int? CollectionId { get; set; }
+    public Collection? Collection { get; set; }
     public int? TagId { get; set; }
     public Tag? Tag { get; set; }
     public List<int> CuratedProductIds { get; set; } = [];

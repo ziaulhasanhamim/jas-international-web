@@ -16,7 +16,8 @@ public sealed record HomepageSectionDto(
     int SortOrder,
     bool IsActive,
     int ItemLimit,
-    List<ProductSummaryDto> Products);
+    List<ProductSummaryDto> Products,
+    int? CollectionId = null);
 
 public sealed record ProductDetailsDto(int Id, string Name, string Slug, string Category, string CategorySlug,
     string? Description, string Details, string MainImage, List<string> Images,

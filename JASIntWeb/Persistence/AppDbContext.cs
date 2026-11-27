@@ -46,6 +46,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<ProductTag> ProductTags => Set<ProductTag>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<Collection> Collections => Set<Collection>();
+    public DbSet<CollectionProduct> CollectionProducts => Set<CollectionProduct>();
+    public DbSet<CollectionPage> CollectionPages => Set<CollectionPage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

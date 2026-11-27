@@ -20,6 +20,9 @@ public class Coupon : AuditableEntity
     public bool IsActive { get; set; } = true;
     public string? Description { get; set; }
 
+    public int? CollectionId { get; set; }
+    public Collection? Collection { get; set; }
+
     public List<int> IncludedCategoryIds { get; set; } = [];
     public List<int> ExcludedCategoryIds { get; set; } = [];
     public List<int> IncludedBrandIds { get; set; } = [];
@@ -28,6 +31,7 @@ public class Coupon : AuditableEntity
     public List<int> ExcludedTagIds { get; set; } = [];
 
     public bool HasTargetingRules =>
+        CollectionId.HasValue ||
         IncludedCategoryIds.Count > 0 ||
         ExcludedCategoryIds.Count > 0 ||
         IncludedBrandIds.Count > 0 ||

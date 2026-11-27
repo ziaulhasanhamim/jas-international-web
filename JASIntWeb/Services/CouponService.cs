@@ -21,7 +21,7 @@ public record CouponValidationResult(
     CouponDiscountType? DiscountType = null
 );
 
-public sealed class CouponService(AppDbContext db)
+public sealed class CouponService(AppDbContext db, CollectionService collectionService)
 {
     public async Task<Result<AppliedCoupon>> ApplyCouponAsync(
         string code,
@@ -54,6 +54,7 @@ public sealed class CouponService(AppDbContext db)
         }
 
         decimal eligibleSubtotal = subtotal;
+        string? collectionLabel = null;
 
         if (coupon.HasTargetingRules)
         {
@@ -80,47 +81,64 @@ public sealed class CouponService(AppDbContext db)
             decimal targetEligibleSubtotal = 0m;
             bool hasEligibleItem = false;
 
-            bool hasInclusions = coupon.IncludedBrandIds.Count > 0 ||
-                                 coupon.IncludedCategoryIds.Count > 0 ||
-                                 coupon.IncludedTagIds.Count > 0;
-
-            foreach (var item in items)
+            if (coupon.CollectionId.HasValue)
             {
-                if (!variantMap.TryGetValue(item.VariantId, out var v))
+                var meta = await collectionService.GetCollectionMetaAsync(coupon.CollectionId.Value);
+                if (meta == null || !meta.IsActive)
                 {
-                    continue;
+                    return Error.Validation("This coupon's promotional collection is currently inactive.");
                 }
 
-                // 1. Check exclusions (Exclusions always take precedence)
-                bool isExcluded = (v.BrandId.HasValue && coupon.ExcludedBrandIds.Contains(v.BrandId.Value))
-                    || coupon.ExcludedCategoryIds.Contains(v.CategoryId)
-                    || v.TagIds.Any(tid => coupon.ExcludedTagIds.Contains(tid));
+                collectionLabel = meta.Name;
+                var allowedProductIds = (await collectionService.GetCollectionProductIdsAsync(coupon.CollectionId.Value)).ToHashSet();
 
-                if (isExcluded)
+                foreach (var item in items)
                 {
-                    continue;
+                    if (!variantMap.TryGetValue(item.VariantId, out var v)) continue;
+                    if (!allowedProductIds.Contains(v.ProductId)) continue;
+
+                    hasEligibleItem = true;
+                    targetEligibleSubtotal += v.SellingPrice * item.Quantity;
                 }
 
-                // 2. Check inclusions
-                if (hasInclusions)
+                if (!hasEligibleItem || targetEligibleSubtotal <= 0)
                 {
-                    bool isIncluded = (v.BrandId.HasValue && coupon.IncludedBrandIds.Contains(v.BrandId.Value))
-                        || coupon.IncludedCategoryIds.Contains(v.CategoryId)
-                        || v.TagIds.Any(tid => coupon.IncludedTagIds.Contains(tid));
-
-                    if (!isIncluded)
-                    {
-                        continue;
-                    }
+                    return Error.Validation($"This coupon only applies to products in the '{collectionLabel}' collection.");
                 }
-
-                hasEligibleItem = true;
-                targetEligibleSubtotal += v.SellingPrice * item.Quantity;
             }
-
-            if (!hasEligibleItem || targetEligibleSubtotal <= 0)
+            else
             {
-                return Error.Validation("This coupon is not valid for any items in your cart.");
+                bool hasInclusions = coupon.IncludedBrandIds.Count > 0 ||
+                                     coupon.IncludedCategoryIds.Count > 0 ||
+                                     coupon.IncludedTagIds.Count > 0;
+
+                foreach (var item in items)
+                {
+                    if (!variantMap.TryGetValue(item.VariantId, out var v)) continue;
+
+                    bool isExcluded = (v.BrandId.HasValue && coupon.ExcludedBrandIds.Contains(v.BrandId.Value))
+                        || coupon.ExcludedCategoryIds.Contains(v.CategoryId)
+                        || v.TagIds.Any(tid => coupon.ExcludedTagIds.Contains(tid));
+
+                    if (isExcluded) continue;
+
+                    if (hasInclusions)
+                    {
+                        bool isIncluded = (v.BrandId.HasValue && coupon.IncludedBrandIds.Contains(v.BrandId.Value))
+                            || coupon.IncludedCategoryIds.Contains(v.CategoryId)
+                            || v.TagIds.Any(tid => coupon.IncludedTagIds.Contains(tid));
+
+                        if (!isIncluded) continue;
+                    }
+
+                    hasEligibleItem = true;
+                    targetEligibleSubtotal += v.SellingPrice * item.Quantity;
+                }
+
+                if (!hasEligibleItem || targetEligibleSubtotal <= 0)
+                {
+                    return Error.Validation("This coupon is not valid for any items in your cart.");
+                }
             }
 
             eligibleSubtotal = targetEligibleSubtotal;
@@ -143,9 +161,11 @@ public sealed class CouponService(AppDbContext db)
             _ => 0m
         };
 
-        string successMessage = coupon.HasTargetingRules
-            ? $"Coupon '{coupon.Code}' applied to eligible products!"
-            : $"Coupon '{coupon.Code}' applied successfully!";
+        string successMessage = !string.IsNullOrWhiteSpace(collectionLabel)
+            ? $"Coupon '{coupon.Code}' applied to '{collectionLabel}' items!"
+            : (coupon.HasTargetingRules
+                ? $"Coupon '{coupon.Code}' applied to eligible products!"
+                : $"Coupon '{coupon.Code}' applied successfully!");
 
         return new AppliedCoupon(coupon.Code, discount, coupon.DiscountType, successMessage);
     }

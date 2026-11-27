@@ -1,0 +1,449 @@
+@page "/admin/collection-pages/new"
+@page "/admin/collection-pages/{Id:int}/edit"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Services
+@inject AppDbContext Db
+@inject CollectionService CollectionSvc
+@inject CatalogService Catalog
+@inject IStorageService Storage
+@inject NavigationManager Nav
+
+<PageTitle>@(Id == 0 ? "Create Collection Page" : "Edit Collection Page") · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Create Collection Page" : "Edit Collection Page")"
+    Description="Optionally publish a storefront landing page (/collections/slug) with custom title, banner, description, and SEO backed by a Collection."
+    ActionHref="/admin/collection-pages"
+    ActionText="Back to collection pages"
+/>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 flex items-center justify-between">
+        <span>⚠️ @errorMessage</span>
+        <button type="button" @onclick="() => errorMessage = null" class="font-bold cursor-pointer">✕</button>
+    </div>
+}
+
+@if (loading || Input is null)
+{
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-500">Loading collection page editor…</p>
+    </div>
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="SaveAsync" class="shop-panel admin-form space-y-6">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 space-y-1" />
+
+        <!-- Source Collection -->
+        <div class="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/40 space-y-2">
+            <div class="flex items-center justify-between">
+                <label class="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Source Collection <span class="admin-required">Required</span>
+                </label>
+                <a href="/admin/collections" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline">Manage Collections ↗</a>
+            </div>
+            <InputSelect @bind-Value="Input.CollectionId" class="shop-input font-semibold cursor-pointer">
+                <option value="0">-- Select which Collection's products to display --</option>
+                @foreach (var col in availableCollections)
+                {
+                    <option value="@col.Id">
+                        @col.Name (@(col.Type == CollectionType.Manual ? "Manual" : "Rule-Based"))
+                    </option>
+                }
+            </InputSelect>
+            <small class="text-slate-500">The products displayed on this page automatically pull from this collection in its configured order.</small>
+        </div>
+
+        <!-- Identity & Content -->
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Page Title (H1) <span class="admin-required">Required</span>
+                <InputText @bind-Value="Input.Title" class="shop-input font-bold" placeholder="e.g. Studio Microphones & Creator Gear" />
+            </label>
+
+            <label class="shop-label">
+                URL Slug
+                <InputText @bind-Value="Input.Slug" class="shop-input font-mono text-xs" placeholder="Auto-generated if empty" />
+                <small>Public storefront URL: <strong>/collections/@(string.IsNullOrWhiteSpace(Input.Slug) ? "your-slug" : SlugAndSkuGenerator.GenerateSlug(Input.Slug))</strong></small>
+            </label>
+        </div>
+
+        <div class="admin-form-grid">
+            <label class="shop-label">
+                Eyebrow Label (optional)
+                <InputText @bind-Value="Input.Eyebrow" class="shop-input uppercase text-xs font-semibold tracking-wider" placeholder="e.g. CURATED COLLECTION · OFFICIAL WARRANTY" />
+            </label>
+
+            <label class="shop-label">
+                Hero Theme Color
+                <InputSelect @bind-Value="Input.ThemeColor" class="shop-input cursor-pointer">
+                    <option value="slate">Slate / Clean Studio Dark</option>
+                    <option value="indigo">Indigo / Modern Tech</option>
+                    <option value="navy">Navy / Flagship Dark</option>
+                    <option value="emerald">Emerald / Fresh Mint</option>
+                    <option value="amber">Amber / Gold Spotlight</option>
+                    <option value="crimson">Crimson / Hot Deals</option>
+                </InputSelect>
+            </label>
+        </div>
+
+        <label class="shop-label">
+            Page Description / Merchandising Copy
+            <InputTextArea @bind-Value="Input.Description" class="shop-input" rows="4" placeholder="Describe this curated collection for shoppers and search engines..." />
+        </label>
+
+        <!-- Uploadable Hero Banners -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+            <h3 class="font-display text-base font-bold text-slate-900">🖼️ Collection Banners</h3>
+
+            @if (!string.IsNullOrWhiteSpace(uploadError))
+            {
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 flex items-center justify-between">
+                    <span>⚠️ @uploadError</span>
+                    <button type="button" @onclick="() => uploadError = null" class="cursor-pointer font-bold">✕</button>
+                </div>
+            }
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-slate-900 text-xs sm:text-sm">Desktop Hero Banner</label>
+                        <span class="text-[11px] text-slate-400">1920×600 / 16:9</span>
+                    </div>
+
+                    <div class="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3 text-center bg-slate-50/50 transition">
+                        <div class="aspect-21/9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3">
+                            @if (!string.IsNullOrWhiteSpace(Input.BannerImageUrl))
+                            {
+                                <img src="@Input.BannerImageUrl" alt="Desktop Banner" class="w-full h-full object-cover" />
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">No desktop banner uploaded</span>
+                            }
+                        </div>
+
+                        <div class="flex justify-center gap-2">
+                            <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                                <Icon Name="camera" Class="size-3.5" />
+                                <span>@(uploadingDesktop ? "Uploading..." : "Upload Banner")</span>
+                                <InputFile OnChange="OnDesktopBannerUpload" accept=".jpg,.jpeg,.png,.webp,.avif,.svg" class="sr-only" />
+                            </label>
+                            @if (!string.IsNullOrWhiteSpace(Input.BannerImageUrl))
+                            {
+                                <button type="button" @onclick="() => Input.BannerImageUrl = string.Empty" class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 cursor-pointer">
+                                    Remove
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <InputText @bind-Value="Input.BannerImageUrl" class="shop-input font-mono text-xs" placeholder="Or paste image URL..." />
+                </div>
+
+                <div class="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-slate-900 text-xs sm:text-sm">Mobile Hero Banner (Optional)</label>
+                        <span class="text-[11px] text-slate-400">750×500</span>
+                    </div>
+
+                    <div class="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3 text-center bg-slate-50/50 transition">
+                        <div class="aspect-21/9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center mb-3">
+                            @if (!string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl))
+                            {
+                                <img src="@Input.MobileBannerImageUrl" alt="Mobile Banner" class="w-full h-full object-cover" />
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">Uses desktop banner on mobile</span>
+                            }
+                        </div>
+
+                        <div class="flex justify-center gap-2">
+                            <label class="btn-primary cursor-pointer text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                                <Icon Name="camera" Class="size-3.5" />
+                                <span>@(uploadingMobile ? "Uploading..." : "Upload Mobile")</span>
+                                <InputFile OnChange="OnMobileBannerUpload" accept=".jpg,.jpeg,.png,.webp,.avif,.svg" class="sr-only" />
+                            </label>
+                            @if (!string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl))
+                            {
+                                <button type="button" @onclick="() => Input.MobileBannerImageUrl = string.Empty" class="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 cursor-pointer">
+                                    Remove
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <InputText @bind-Value="Input.MobileBannerImageUrl" class="shop-input font-mono text-xs" placeholder="Or paste mobile URL..." />
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings & SEO -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex items-center gap-2.5 p-3.5 rounded-xl border border-slate-200 cursor-pointer select-none">
+                <InputCheckbox @bind-Value="Input.ShowFilters" class="size-4 rounded text-blue-600 cursor-pointer" />
+                <div>
+                    <span class="text-sm font-bold text-slate-900 block">Show On-Page Filters</span>
+                    <span class="text-[11px] text-slate-500">Allow shoppers to filter by Brand, Price, In-Stock, and Sort.</span>
+                </div>
+            </label>
+
+            <label class="flex items-center gap-2.5 p-3.5 rounded-xl border border-slate-200 cursor-pointer select-none">
+                <InputCheckbox @bind-Value="Input.IsPublished" class="size-4 rounded text-blue-600 cursor-pointer" />
+                <div>
+                    <span class="text-sm font-bold text-slate-900 block">Published / Live</span>
+                    <span class="text-[11px] text-slate-500">Uncheck to keep as a draft (returns 404 publicly).</span>
+                </div>
+            </label>
+        </div>
+
+        <details class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+            <summary class="font-bold text-xs uppercase tracking-wider text-slate-700 cursor-pointer">
+                🔍 SEO &amp; OpenGraph Metadata (Optional)
+            </summary>
+            <div class="space-y-4 pt-4">
+                <label class="shop-label">
+                    SEO Meta Title
+                    <InputText @bind-Value="Input.MetaTitle" class="shop-input" />
+                </label>
+                <label class="shop-label">
+                    SEO Meta Description
+                    <InputTextArea @bind-Value="Input.MetaDescription" class="shop-input" rows="2" />
+                </label>
+                <label class="shop-label">
+                    OpenGraph Image URL
+                    <InputText @bind-Value="Input.OgImageUrl" class="shop-input font-mono text-xs" />
+                </label>
+            </div>
+        </details>
+
+        <div class="form-actions pt-4 border-t border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <button type="submit" disabled="@saving" class="shop-button">
+                    @(saving ? "Saving…" : (Id == 0 ? "Create Collection Page" : "Save Changes"))
+                </button>
+                <a href="/admin/collection-pages" class="shop-button-secondary">Cancel</a>
+            </div>
+            @if (Id > 0)
+            {
+                <span class="text-xs text-slate-400">Page ID: #@Id</span>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery(Name = "collectionId")] public int? QueryCollectionId { get; set; }
+
+    public sealed class CollectionPageFormModel
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "Please select a source Collection.")]
+        public int CollectionId { get; set; }
+
+        [Required(ErrorMessage = "Page title is required.")]
+        [StringLength(150)]
+        public string Title { get; set; } = "";
+
+        [StringLength(150)]
+        public string? Slug { get; set; }
+
+        [StringLength(100)]
+        public string? Eyebrow { get; set; }
+
+        [StringLength(2000)]
+        public string? Description { get; set; }
+
+        [StringLength(500)]
+        public string? BannerImageUrl { get; set; }
+
+        [StringLength(500)]
+        public string? MobileBannerImageUrl { get; set; }
+
+        public string ThemeColor { get; set; } = "slate";
+        public bool ShowFilters { get; set; } = true;
+        public bool IsPublished { get; set; } = true;
+        public string? MetaTitle { get; set; }
+        public string? MetaDescription { get; set; }
+        public string? OgImageUrl { get; set; }
+    }
+
+    private sealed record CollectionPickItem(int Id, string Name, string Slug, CollectionType Type);
+
+    private CollectionPageFormModel? Input;
+    private List<CollectionPickItem> availableCollections = [];
+    private bool loading = true;
+    private bool saving;
+    private bool uploadingDesktop;
+    private bool uploadingMobile;
+    private string? errorMessage;
+    private string? uploadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        availableCollections = await Db.Collections.AsNoTracking()
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .Select(c => new CollectionPickItem(c.Id, c.Name, c.Slug, c.Type))
+            .ToListAsync();
+
+        if (Id != 0)
+        {
+            var existing = await Db.CollectionPages.FindAsync(Id);
+            if (existing is null)
+            {
+                Nav.NavigateTo("/admin/collection-pages");
+                return;
+            }
+
+            Input = new CollectionPageFormModel
+            {
+                CollectionId = existing.CollectionId,
+                Title = existing.Title,
+                Slug = existing.Slug,
+                Eyebrow = existing.Eyebrow,
+                Description = existing.Description,
+                BannerImageUrl = existing.BannerImageUrl,
+                MobileBannerImageUrl = existing.MobileBannerImageUrl,
+                ThemeColor = existing.ThemeColor,
+                ShowFilters = existing.ShowFilters,
+                IsPublished = existing.IsPublished,
+                MetaTitle = existing.MetaTitle,
+                MetaDescription = existing.MetaDescription,
+                OgImageUrl = existing.OgImageUrl
+            };
+        }
+        else
+        {
+            var preselected = QueryCollectionId.HasValue
+                ? availableCollections.FirstOrDefault(c => c.Id == QueryCollectionId.Value)
+                : null;
+
+            Input = new CollectionPageFormModel
+            {
+                CollectionId = preselected?.Id ?? 0,
+                Title = preselected?.Name ?? "",
+                Slug = preselected?.Slug
+            };
+        }
+
+        loading = false;
+    }
+
+    private async Task OnDesktopBannerUpload(InputFileChangeEventArgs e)
+    {
+        if (Input is null || e.File is null) return;
+        uploadError = null;
+        uploadingDesktop = true;
+        try
+        {
+            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            var res = await ImageUploadValidator.TryUploadAsync(Storage, stream, e.File.Name, e.File.ContentType, CancellationToken.None);
+            switch (res)
+            {
+                case string url: Input.BannerImageUrl = url; break;
+                case Error err: uploadError = err.Message; break;
+            }
+        }
+        catch (Exception ex) { uploadError = ex.Message; }
+        finally { uploadingDesktop = false; }
+    }
+
+    private async Task OnMobileBannerUpload(InputFileChangeEventArgs e)
+    {
+        if (Input is null || e.File is null) return;
+        uploadError = null;
+        uploadingMobile = true;
+        try
+        {
+            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            var res = await ImageUploadValidator.TryUploadAsync(Storage, stream, e.File.Name, e.File.ContentType, CancellationToken.None);
+            switch (res)
+            {
+                case string url: Input.MobileBannerImageUrl = url; break;
+                case Error err: uploadError = err.Message; break;
+            }
+        }
+        catch (Exception ex) { uploadError = ex.Message; }
+        finally { uploadingMobile = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving || Input is null) return;
+        errorMessage = null;
+
+        var cleanTitle = Input.Title.Trim();
+        var cleanSlug = SlugAndSkuGenerator.GenerateSlug(string.IsNullOrWhiteSpace(Input.Slug) ? cleanTitle : Input.Slug);
+
+        if (await Db.CollectionPages.AnyAsync(p => p.Slug == cleanSlug && p.Id != Id))
+        {
+            errorMessage = $"A collection page with slug '{cleanSlug}' already exists.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            if (Id == 0)
+            {
+                Db.CollectionPages.Add(new CollectionPage
+                {
+                    CollectionId = Input.CollectionId,
+                    Title = cleanTitle,
+                    Slug = cleanSlug,
+                    Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim(),
+                    Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
+                    BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim(),
+                    MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim(),
+                    ThemeColor = Input.ThemeColor,
+                    ShowFilters = Input.ShowFilters,
+                    IsPublished = Input.IsPublished,
+                    MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim(),
+                    MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim(),
+                    OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim()
+                });
+            }
+            else
+            {
+                var existing = await Db.CollectionPages.FindAsync(Id);
+                if (existing is not null)
+                {
+                    existing.CollectionId = Input.CollectionId;
+                    existing.Title = cleanTitle;
+                    existing.Slug = cleanSlug;
+                    existing.Eyebrow = string.IsNullOrWhiteSpace(Input.Eyebrow) ? null : Input.Eyebrow.Trim();
+                    existing.Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim();
+                    existing.BannerImageUrl = string.IsNullOrWhiteSpace(Input.BannerImageUrl) ? null : Input.BannerImageUrl.Trim();
+                    existing.MobileBannerImageUrl = string.IsNullOrWhiteSpace(Input.MobileBannerImageUrl) ? null : Input.MobileBannerImageUrl.Trim();
+                    existing.ThemeColor = Input.ThemeColor;
+                    existing.ShowFilters = Input.ShowFilters;
+                    existing.IsPublished = Input.IsPublished;
+                    existing.MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim();
+                    existing.MetaDescription = string.IsNullOrWhiteSpace(Input.MetaDescription) ? null : Input.MetaDescription.Trim();
+                    existing.OgImageUrl = string.IsNullOrWhiteSpace(Input.OgImageUrl) ? null : Input.OgImageUrl.Trim();
+                    existing.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync(Input.CollectionId);
+            await Catalog.InvalidateHomepageSectionsCacheAsync();
+            Nav.NavigateTo("/admin/collection-pages?saved=true");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save page: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

@@ -8,6 +8,7 @@
 @using JASIntWeb.Client.Dtos
 @inject AppDbContext Db
 @inject NavigationManager Nav
+@inject CollectionService CollectionSvc
 
 <PageTitle>Product Tags &amp; Labels · JAS Admin</PageTitle>
 
@@ -338,6 +339,7 @@
             }
 
             await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync();
             CloseEditor();
             await LoadTagsAsync();
         }
@@ -359,6 +361,7 @@
             tag.IsDeleted = true;
             tag.DeletedAt = DateTimeOffset.UtcNow;
             await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync();
             _toast = $"Tag '{tag.Name}' deleted.";
             await LoadTagsAsync();
         }

@@ -1,0 +1,282 @@
+@page "/collections/{Slug}"
+@using Microsoft.AspNetCore.WebUtilities
+@using JASIntWeb.Client.Dtos
+@using JASIntWeb.Services
+@using JASIntWeb.Services.Seo
+@inject CollectionService CollectionSvc
+@inject CatalogContentRenderer ContentRenderer
+@inject ISeoService Seo
+@inject NavigationManager Nav
+
+@if (loading)
+{
+    <PageTitle>Loading Collection… · JAS International</PageTitle>
+    <div class="shop-container py-12 animate-pulse space-y-6">
+        <div class="h-44 bg-slate-200 rounded-3xl w-full"></div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            @for (int i = 0; i < 8; i++)
+            {
+                <div class="aspect-square bg-slate-200 rounded-2xl"></div>
+            }
+        </div>
+    </div>
+}
+else if (pageData is null)
+{
+    <SeoHead Title="Collection Not Found | JAS International" Robots="noindex,nofollow" />
+    <div class="max-w-3xl mx-auto px-4 py-20 text-center">
+        <span class="text-5xl block mb-4">🔍</span>
+        <h1 class="text-2xl font-bold text-slate-900">Collection Not Found</h1>
+        <p class="text-sm text-slate-500 mt-2">This collection page does not exist or is no longer published.</p>
+        <div class="mt-6 flex justify-center gap-3">
+            <a href="/products" class="shop-button">Browse All Products</a>
+            <a href="/offers" class="shop-button-secondary">View Offers</a>
+        </div>
+    </div>
+}
+else
+{
+    var canonicalPath = $"/collections/{pageData.Slug}";
+    var seoTitle = string.IsNullOrWhiteSpace(pageData.MetaTitle) ? $"{pageData.Title} | JAS International" : pageData.MetaTitle;
+    var seoDesc = string.IsNullOrWhiteSpace(pageData.MetaDescription) ? (pageData.Description ?? $"Shop curated products in {pageData.Title} at JAS International Bangladesh.") : pageData.MetaDescription;
+    var ogImage = string.IsNullOrWhiteSpace(pageData.OgImageUrl) ? pageData.BannerImageUrl : pageData.OgImageUrl;
+
+    var crumbs = new List<(string Name, string Url)>
+    {
+        ("Home", Seo.PublicBaseUrl),
+        (pageData.Title, Seo.BuildAbsoluteUrl(canonicalPath))
+    };
+
+    var schemaItems = pageData.Products.Select(p => (
+        Name: p.Name,
+        Url: Seo.BuildAbsoluteUrl($"/product/{p.Slug}"),
+        Price: p.Price,
+        Image: (string?)Seo.BuildAbsoluteUrl(p.Image)
+    ));
+
+    var jsonLd = new[]
+    {
+        JsonLdBuilder.BuildBreadcrumbs(crumbs),
+        JsonLdBuilder.BuildCollection(seoTitle, seoDesc, Seo.BuildAbsoluteUrl(canonicalPath), schemaItems)
+    };
+
+    <SeoHead Title="@seoTitle"
+             Description="@seoDesc"
+             CanonicalPath="@canonicalPath"
+             OgImage="@ogImage"
+             OgType="website"
+             PrevUrl="@(Page > 1 ? (Page == 2 ? canonicalPath : $"{canonicalPath}?page={Page - 1}") : null)"
+             NextUrl="@((Page * PageSize < pageData.TotalCount) ? $"{canonicalPath}?page={Page + 1}" : null)"
+             JsonLd="jsonLd" />
+
+    <div data-meta-event="ViewCategory" data-content-category="@pageData.Title" hidden></div>
+
+    <main class="min-h-screen bg-slate-50/70 pb-16">
+        <!-- Hero Banner -->
+        <section class="@GetThemeHeroClasses(pageData.ThemeColor) relative overflow-hidden py-10 sm:py-14 text-white shadow-inner">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_60%)] pointer-events-none"></div>
+
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav class="flex items-center gap-2 text-xs text-white/70 mb-5 font-medium" aria-label="Breadcrumb">
+                    <a href="/" class="hover:text-white transition">Home</a>
+                    <span>/</span>
+                    <span class="text-white font-semibold truncate">@pageData.Title</span>
+                </nav>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    <div class="@(string.IsNullOrWhiteSpace(pageData.BannerImageUrl) ? "lg:col-span-10" : "lg:col-span-7") space-y-4">
+                        @if (!string.IsNullOrWhiteSpace(pageData.Eyebrow))
+                        {
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/15 backdrop-blur-xs text-white border border-white/20">
+                                @pageData.Eyebrow
+                            </span>
+                        }
+
+                        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight font-display text-white leading-tight">
+                            @pageData.Title
+                        </h1>
+
+                        @if (!string.IsNullOrWhiteSpace(pageData.Description))
+                        {
+                            <div class="text-sm sm:text-base text-white/85 max-w-2xl leading-relaxed">
+                                @((MarkupString)ContentRenderer.Render(pageData.Description))
+                            </div>
+                        }
+
+                        <div class="pt-1 flex items-center gap-3">
+                            <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-3.5 py-1 text-xs font-bold text-white">
+                                @pageData.TotalCount Product@(pageData.TotalCount == 1 ? "" : "s")
+                            </span>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(pageData.BannerImageUrl))
+                    {
+                        <div class="lg:col-span-5">
+                            <div class="aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black/20">
+                                <picture>
+                                    @if (!string.IsNullOrWhiteSpace(pageData.MobileBannerImageUrl))
+                                    {
+                                        <source media="(max-width: 640px)" srcset="@pageData.MobileBannerImageUrl" />
+                                    }
+                                    <img src="@pageData.BannerImageUrl" alt="@pageData.Title" class="w-full h-full object-cover" />
+                                </picture>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-6">
+            @if (pageData.ShowFilters)
+            {
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs">
+                    <form method="get" class="flex flex-wrap items-center gap-3">
+                        <div class="relative flex-1 min-w-[200px]">
+                            <input name="q" value="@Query" class="field pr-9" placeholder="Filter within @pageData.Title..." />
+                            <span class="absolute right-3 top-3 text-slate-400">
+                                <Icon Name="search" Class="size-4" />
+                            </span>
+                        </div>
+
+                        @if (pageData.AvailableBrands.Count > 1)
+                        {
+                            <select name="brand" class="field w-auto text-xs">
+                                <option value="">All Brands</option>
+                                @foreach (var b in pageData.AvailableBrands)
+                                {
+                                    <option value="@b.Slug" selected="@(string.Equals(BrandSlug, b.Slug, StringComparison.OrdinalIgnoreCase))">@b.Name</option>
+                                }
+                            </select>
+                        }
+
+                        <div class="flex items-center gap-2">
+                            <input name="min-price" type="number" min="0" placeholder="Min ৳" value="@MinPrice" class="field w-24 text-xs" />
+                            <span class="text-slate-400">-</span>
+                            <input name="max-price" type="number" min="0" placeholder="Max ৳" value="@MaxPrice" class="field w-24 text-xs" />
+                        </div>
+
+                        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 px-2 cursor-pointer">
+                            <input type="checkbox" name="in-stock" value="true" checked="@InStockOnly" class="size-4 rounded text-blue-600" />
+                            <span>In stock only</span>
+                        </label>
+
+                        <select name="sort" class="field w-auto text-xs">
+                            <option value="collection" selected="@(string.IsNullOrWhiteSpace(Sort) || Sort == "collection")">Sort: Featured Order</option>
+                            <option value="price-low" selected="@(Sort == "price-low")">Price: Low to High</option>
+                            <option value="price-high" selected="@(Sort == "price-high")">Price: High to Low</option>
+                            <option value="newest" selected="@(Sort == "newest")">Newest Arrivals</option>
+                            <option value="name" selected="@(Sort == "name")">Name A–Z</option>
+                        </select>
+
+                        <button type="submit" class="btn-primary !px-4 !py-2.5 text-xs">Apply</button>
+
+                        @if (HasActiveFilters)
+                        {
+                            <a href="@canonicalPath" class="btn-secondary !px-3 !py-2.5 text-xs">Reset</a>
+                        }
+                    </form>
+                </div>
+            }
+
+            @if (pageData.Products.Count == 0)
+            {
+                <div class="rounded-3xl border border-slate-200/90 bg-white p-12 text-center shadow-xs">
+                    <Icon Name="box" Class="size-12 text-slate-300 mx-auto mb-3" />
+                    <h2 class="font-bold text-slate-900 text-lg mb-1">No Matching Products</h2>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mb-5">
+                        @(HasActiveFilters ? "Try clearing or relaxing your filter criteria." : "Products in this collection are currently being updated.")
+                    </p>
+                    @if (HasActiveFilters)
+                    {
+                        <a href="@canonicalPath" class="btn-secondary text-xs">Clear Filters</a>
+                    }
+                    else
+                    {
+                        <a href="/products" class="btn-secondary text-xs">Browse All Products</a>
+                    }
+                </div>
+            }
+            else
+            {
+                <ProductGrid Products="pageData.Products" />
+            }
+
+            @if (pageData.TotalCount > PageSize)
+            {
+                <div class="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+                    <div>
+                        @if (Page > 1)
+                        {
+                            <a href="@Nav.GetUriWithQueryParameter("page", Page - 1)" class="btn-secondary text-xs">← Previous Page</a>
+                        }
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500">
+                        Page @Page of @Math.Max(1, (int)Math.Ceiling(pageData.TotalCount / (double)PageSize))
+                    </span>
+                    <div>
+                        @if (Page * PageSize < pageData.TotalCount)
+                        {
+                            <a href="@Nav.GetUriWithQueryParameter("page", Page + 1)" class="btn-secondary text-xs">Next Page →</a>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </main>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "brand")] public string? BrandSlug { get; set; }
+    [SupplyParameterFromQuery(Name = "min-price")] public decimal? MinPrice { get; set; }
+    [SupplyParameterFromQuery(Name = "max-price")] public decimal? MaxPrice { get; set; }
+    [SupplyParameterFromQuery(Name = "in-stock")] public bool InStockOnly { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private const int PageSize = 18;
+    private bool loading = true;
+    private CollectionPageDetailsDto? pageData;
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(Query) ||
+        !string.IsNullOrWhiteSpace(BrandSlug) ||
+        MinPrice.HasValue ||
+        MaxPrice.HasValue ||
+        InStockOnly ||
+        (!string.IsNullOrWhiteSpace(Sort) && Sort != "collection");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            Page = Math.Clamp(Page, 1, 10000);
+            pageData = await CollectionSvc.GetPublishedCollectionPageAsync(
+                Slug, Query, BrandSlug, MinPrice, MaxPrice, InStockOnly, Sort, Page, PageSize);
+
+            if (pageData is null && HttpContext is not null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            }
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static string GetThemeHeroClasses(string? theme) => theme?.ToLowerInvariant() switch
+    {
+        "crimson" or "red" => "bg-gradient-to-br from-rose-950 via-red-950 to-slate-950",
+        "emerald" or "green" => "bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950",
+        "amber" or "orange" => "bg-gradient-to-br from-amber-950 via-orange-950 to-slate-950",
+        "navy" => "bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900",
+        "indigo" => "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950",
+        _ => "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950"
+    };
+}

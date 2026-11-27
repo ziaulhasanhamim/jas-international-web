@@ -1,0 +1,797 @@
+@page "/admin/collections/new"
+@page "/admin/collections/{Id:int}/edit"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@using JASIntWeb.Client.Dtos
+@using JASIntWeb.Services
+@inject AppDbContext Db
+@inject CollectionService CollectionSvc
+@inject CampaignService CampaignSvc
+@inject CatalogService Catalog
+@inject NavigationManager Nav
+
+<PageTitle>@(Id == 0 ? "Create Collection" : "Edit Collection") · JAS Admin</PageTitle>
+
+<AdminPageHeader
+    Title="@(Id == 0 ? "Create Collection" : "Edit Collection")"
+    Description="Curate manual ordered product groups or build automated rule-based collections for Landing Pages, Coupons, and Offers."
+    ActionHref="/admin/collections"
+    ActionText="Back to collections"
+/>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 flex items-center justify-between">
+        <span>⚠️ @errorMessage</span>
+        <button type="button" @onclick="() => errorMessage = null" class="font-bold cursor-pointer">✕</button>
+    </div>
+}
+
+@if (loading || Input is null)
+{
+    <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+        <p class="text-sm font-semibold text-slate-500">Loading collection editor…</p>
+    </div>
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="SaveAsync" class="space-y-6">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 space-y-1" />
+
+        <!-- Section 1: Identity & Type -->
+        <div class="shop-panel space-y-5">
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Collection Name <span class="admin-required">Required</span>
+                    <InputText @bind-Value="Input.Name" class="shop-input font-bold" placeholder="e.g. Eid Creator Mics Under ৳3,000 or Homepage Featured" />
+                    <small>Descriptive name shown in Admin selectors (Coupons, Campaigns, Homepage Sections).</small>
+                </label>
+
+                <label class="shop-label">
+                    Internal Slug Identifier
+                    <InputText @bind-Value="Input.Slug" class="shop-input font-mono text-xs" placeholder="Auto-generated if empty" />
+                    <small>Collections are private product groups by default (no storefront URL unless you create a Collection Page).</small>
+                </label>
+            </div>
+
+            <div class="admin-form-grid">
+                <label class="shop-label">
+                    Internal Notes (optional)
+                    <InputText @bind-Value="Input.InternalNotes" class="shop-input text-xs" placeholder="e.g. Used by EID20 coupon and Mega Eid campaign banner" />
+                </label>
+
+                <div class="flex items-center pt-5">
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                        <InputCheckbox @bind-Value="Input.IsActive" class="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span class="text-sm font-bold text-slate-800">Collection is Active</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Type Selection Cards -->
+            <div>
+                <span class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Collection Type</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button type="button" @onclick="() => SelectTypeAsync(CollectionType.Manual)"
+                            class="text-left p-4 rounded-2xl border-2 transition cursor-pointer @(Input.Type == CollectionType.Manual ? "border-blue-600 bg-blue-50/50 shadow-xs" : "border-slate-200 bg-white hover:border-slate-300")">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-bold text-sm text-slate-900">✋ Manual Curated</span>
+                            @if (Input.Type == CollectionType.Manual)
+                            {
+                                <span class="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Selected</span>
+                            }
+                        </div>
+                        <p class="text-xs text-slate-500">Search products individually, add them, and set their exact display order (#1, #2, #3...).</p>
+                    </button>
+
+                    <button type="button" @onclick="() => SelectTypeAsync(CollectionType.RuleBased)"
+                            class="text-left p-4 rounded-2xl border-2 transition cursor-pointer @(Input.Type == CollectionType.RuleBased ? "border-indigo-600 bg-indigo-50/50 shadow-xs" : "border-slate-200 bg-white hover:border-slate-300")">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-bold text-sm text-slate-900">⚡ Automated (Rule-Based)</span>
+                            @if (Input.Type == CollectionType.RuleBased)
+                            {
+                                <span class="text-[11px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">Selected</span>
+                            }
+                        </div>
+                        <p class="text-xs text-slate-500">Automatically updates as products change based on rules (Tag, Category, Brand, Price, Stock).</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2A: Manual Product Search + Ordering -->
+        @if (Input.Type == CollectionType.Manual)
+        {
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <!-- Left: Search & Pick Products -->
+                <div class="lg:col-span-5 shop-panel space-y-4">
+                    <div>
+                        <h3 class="font-display text-base font-bold text-slate-900">Search &amp; Add Products</h3>
+                        <p class="text-xs text-slate-500">Search by product name, SKU, brand, or category and click Add.</p>
+                    </div>
+
+                    <div class="space-y-2.5">
+                        <div class="relative">
+                            <input @bind="productSearch" @bind:event="oninput" @bind:after="OnProductSearchInput"
+                                   placeholder="Search products by name, SKU, brand..."
+                                   class="shop-input text-xs pl-8 pr-8" />
+                            <span class="absolute left-2.5 top-2.5 text-slate-400">
+                                <Icon Name="search" Class="size-3.5" />
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(productSearch))
+                            {
+                                <button type="button" @onclick="ClearProductSearchAsync" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+                            }
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <select @bind="pickerCategoryId" @bind:after="SearchPickerProductsAsync" class="shop-input !py-1.5 text-xs flex-1 cursor-pointer">
+                                <option value="">All Categories</option>
+                                @foreach (var c in categoryLookups)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </select>
+                            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap cursor-pointer">
+                                <input type="checkbox" @bind="pickerInStockOnly" @bind:after="SearchPickerProductsAsync" class="size-3.5 rounded text-blue-600" />
+                                <span>In stock</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="max-h-[420px] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white">
+                        @if (pickerResults.Count == 0)
+                        {
+                            <div class="p-8 text-center text-xs text-slate-400">
+                                No matching products found.
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var p in pickerResults)
+                            {
+                                var alreadyAdded = selectedManualIds.Contains(p.Id);
+                                <div class="flex items-center justify-between gap-2.5 p-2.5 hover:bg-slate-50 transition">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <img src="@(string.IsNullOrWhiteSpace(p.ImageUrl) ? "/jas-logo.png" : p.ImageUrl)" alt="@p.Name"
+                                             class="size-10 rounded-lg border border-slate-100 object-contain bg-white p-0.5 shrink-0" />
+                                        <div class="min-w-0">
+                                            <strong class="block text-xs font-bold text-slate-900 truncate">@p.Name</strong>
+                                            <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                                                <span class="font-mono font-semibold text-slate-700">৳@p.Price.ToString("N0")</span>
+                                                @if (!string.IsNullOrWhiteSpace(p.Sku))
+                                                {
+                                                    <span class="font-mono text-slate-400">@p.Sku</span>
+                                                }
+                                                <span class="@(p.Stock > 0 ? "text-emerald-700 font-semibold" : "text-rose-600")">
+                                                    @(p.Stock > 0 ? $"{p.Stock} left" : "Out")
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (alreadyAdded)
+                                    {
+                                        <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold shrink-0">
+                                            ✓ Added
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" @onclick="() => AddManualProduct(p)"
+                                                class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition shrink-0 cursor-pointer">
+                                            + Add
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <!-- Right: Ordered Selected Products -->
+                <div class="lg:col-span-7 shop-panel space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 class="font-display text-base font-bold text-slate-900">
+                                Selected Products &amp; Display Order (@manualItems.Count)
+                            </h3>
+                            <p class="text-xs text-slate-500">Top items (#1, #2...) appear first on Landing Pages, Campaigns, and Collection Pages.</p>
+                        </div>
+
+                        @if (manualItems.Count > 1)
+                        {
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button type="button" @onclick="SortManualByPriceAsc" class="btn-secondary !px-2 !py-1 text-[11px]">Price ↑</button>
+                                <button type="button" @onclick="SortManualByPriceDesc" class="btn-secondary !px-2 !py-1 text-[11px]">Price ↓</button>
+                                <button type="button" @onclick="SortManualByName" class="btn-secondary !px-2 !py-1 text-[11px]">Name A–Z</button>
+                                <button type="button" @onclick="ClearManualItems" class="btn-secondary !px-2 !py-1 text-[11px] text-rose-600 hover:bg-rose-50">Clear All</button>
+                            </div>
+                        }
+                    </div>
+
+                    @if (manualItems.Count == 0)
+                    {
+                        <div class="rounded-xl border-2 border-dashed border-slate-200 p-10 text-center text-xs text-slate-500">
+                            Search products on the left and click <strong>+ Add</strong> to build your ordered collection.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white max-h-[460px] overflow-y-auto">
+                            @for (int i = 0; i < manualItems.Count; i++)
+                            {
+                                var item = manualItems[i];
+                                var idx = i;
+                                <div class="flex items-center justify-between gap-3 p-3 hover:bg-slate-50/80 transition">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <span class="font-mono text-xs font-extrabold text-slate-500 w-7 text-center shrink-0">
+                                            #@(idx + 1)
+                                        </span>
+                                        <img src="@(string.IsNullOrWhiteSpace(item.ImageUrl) ? "/jas-logo.png" : item.ImageUrl)" alt="@item.Name"
+                                             class="size-10 rounded-lg border border-slate-100 object-contain bg-white p-0.5 shrink-0" />
+                                        <div class="min-w-0">
+                                            <strong class="block text-xs font-bold text-slate-900 truncate">@item.Name</strong>
+                                            <span class="text-[11px] text-slate-500 font-mono">৳@item.Price.ToString("N0") · @item.CategoryName</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <button type="button" disabled="@(idx == 0)" @onclick="() => MoveItemToTop(idx)"
+                                                class="px-2 py-1 rounded-md border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer" title="Move to #1">
+                                            ⤒
+                                        </button>
+                                        <button type="button" disabled="@(idx == 0)" @onclick="() => MoveItem(idx, idx - 1)"
+                                                class="px-2 py-1 rounded-md border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer" title="Move Up">
+                                            ↑
+                                        </button>
+                                        <button type="button" disabled="@(idx == manualItems.Count - 1)" @onclick="() => MoveItem(idx, idx + 1)"
+                                                class="px-2 py-1 rounded-md border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer" title="Move Down">
+                                            ↓
+                                        </button>
+                                        <button type="button" @onclick="() => RemoveManualItem(idx)"
+                                                class="px-2 py-1 rounded-md text-rose-600 hover:bg-rose-50 text-xs font-bold cursor-pointer ml-1" title="Remove">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Section 2B: Automated Rule-Based Builder + Live Preview -->
+            <div class="space-y-6">
+                <div class="shop-panel space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h3 class="font-display text-base font-bold text-slate-900">Automated Conditions &amp; Rules</h3>
+                            <p class="text-xs text-slate-500">
+                                Build rules such as <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px]">(Tag = eid-sale OR Category = Microphone) AND Stock &gt; 0 AND Price &lt; 3000</code>.
+                            </p>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-700">
+                            <span>Product Order:</span>
+                            <InputSelect @bind-Value="Input.SortMode" @bind-Value:after="RefreshRulePreviewAsync" class="shop-input !py-1.5 !w-auto text-xs cursor-pointer">
+                                <option value="@CollectionSortOrder.Newest">Newest First</option>
+                                <option value="@CollectionSortOrder.PriceLowToHigh">Price: Low to High</option>
+                                <option value="@CollectionSortOrder.PriceHighToLow">Price: High to Low</option>
+                                <option value="@CollectionSortOrder.FeaturedFirst">Featured First</option>
+                                <option value="@CollectionSortOrder.BiggestDiscount">Biggest Discount %</option>
+                                <option value="@CollectionSortOrder.BestRated">Best Rated</option>
+                                <option value="@CollectionSortOrder.NameAsc">Name A–Z</option>
+                            </InputSelect>
+                        </label>
+                    </div>
+
+                    <!-- Quick Rule Helpers -->
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <span class="text-[11px] font-bold text-slate-500">Quick add:</span>
+                        <button type="button" @onclick="ApplyPresetInStockAsync" class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold hover:bg-emerald-100 transition cursor-pointer">
+                            + Stock &gt; 0
+                        </button>
+                        <button type="button" @onclick="ApplyPresetPriceCapAsync" class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold hover:bg-blue-100 transition cursor-pointer">
+                            + Price &lt; 3000
+                        </button>
+                        <button type="button" @onclick="ApplyPresetDiscountAsync" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold hover:bg-amber-100 transition cursor-pointer">
+                            + On Sale Only
+                        </button>
+                    </div>
+
+                    <CollectionRuleGroupEditor
+                        Group="rootRules"
+                        Depth="0"
+                        Tags="tagLookups"
+                        Categories="categoryLookups"
+                        Brands="brandLookups"
+                        OnChanged="RefreshRulePreviewAsync" />
+                </div>
+
+                <!-- Live Matching Preview Panel -->
+                <div class="shop-panel space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                                <span>Live Matching Preview</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold @(totalRuleMatches > 0 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600")">
+                                    @totalRuleMatches product@(totalRuleMatches == 1 ? "" : "s") match
+                                </span>
+                            </h3>
+                            <p class="text-xs text-slate-500">Automatically updates in real time when products, tags, prices, or inventory change.</p>
+                        </div>
+                        <button type="button" @onclick="RefreshRulePreviewAsync" class="btn-secondary text-xs cursor-pointer">
+                            🔄 Refresh Preview
+                        </button>
+                    </div>
+
+                    @if (previewLoading)
+                    {
+                        <p class="text-xs text-slate-400 py-4 text-center">Evaluating rules against catalog…</p>
+                    }
+                    else if (rulePreviewItems.Count == 0)
+                    {
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-xs text-slate-500">
+                            No active products currently match these rules. Try adjusting your conditions.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                            @foreach (var item in rulePreviewItems)
+                            {
+                                <div class="rounded-xl border border-slate-200 bg-white p-3 flex flex-col justify-between gap-2 text-xs">
+                                    <div class="flex items-center gap-2.5">
+                                        <img src="@item.Image" alt="@item.Name" class="size-11 rounded-lg object-contain border border-slate-100 bg-white shrink-0" />
+                                        <div class="min-w-0">
+                                            <strong class="block font-bold text-slate-900 line-clamp-2 leading-tight">@item.Name</strong>
+                                            <span class="text-[10px] text-slate-400 block mt-0.5">@item.Category</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                        <span class="font-mono font-bold text-slate-900">৳@item.Price.ToString("N0")</span>
+                                        <span class="text-[10px] font-bold @(item.DefaultVariantStock > 0 ? "text-emerald-700" : "text-rose-600")">
+                                            @(item.DefaultVariantStock > 0 ? $"Stock: {item.DefaultVariantStock}" : "Out of Stock")
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        @if (totalRuleMatches > rulePreviewItems.Count)
+                        {
+                            <p class="text-xs text-slate-500 text-center">
+                                Showing top @rulePreviewItems.Count of @totalRuleMatches matching products.
+                            </p>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Section 3: Optional Storefront Collection Page Status -->
+        @if (Id > 0)
+        {
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h4 class="text-sm font-bold text-slate-900">Optional Storefront Collection Page</h4>
+                    @if (existingPages.Count == 0)
+                    {
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            This collection is internal only and does not have a public storefront URL. Want to display it on the store?
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="flex flex-wrap gap-2 mt-1.5">
+                            @foreach (var pg in existingPages)
+                            {
+                                <a href="/admin/collection-pages/@pg.Id/edit" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-blue-700 hover:border-blue-400">
+                                    <span>📄 @pg.Title</span>
+                                    <span class="font-mono text-slate-400">/collections/@pg.Slug</span>
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <a href="/admin/collection-pages/new?collectionId=@Id" class="btn-secondary text-xs shrink-0">
+                    + Create Collection Page
+                </a>
+            </div>
+        }
+
+        <!-- Footer Actions -->
+        <div class="form-actions pt-3 border-t border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <button type="submit" disabled="@saving" class="shop-button flex items-center gap-2">
+                    @(saving ? "Saving collection…" : (Id == 0 ? "Create Collection" : "Save Collection"))
+                </button>
+                <a href="/admin/collections" class="shop-button-secondary">Cancel</a>
+            </div>
+
+            @if (Id > 0)
+            {
+                <span class="text-xs text-slate-400">Collection ID: #@Id</span>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    public sealed class CollectionFormModel
+    {
+        [Required(ErrorMessage = "Collection name is required.")]
+        [StringLength(150)]
+        public string Name { get; set; } = "";
+
+        [StringLength(150)]
+        public string? Slug { get; set; }
+
+        [StringLength(500)]
+        public string? InternalNotes { get; set; }
+
+        public CollectionType Type { get; set; } = CollectionType.Manual;
+        public CollectionSortOrder SortMode { get; set; } = CollectionSortOrder.ManualOrder;
+        public bool IsActive { get; set; } = true;
+    }
+
+    public sealed record PickerProduct(int Id, string Name, decimal Price, int Stock, string ImageUrl, string CategoryName, string? Sku);
+    private sealed record ExistingPageLink(int Id, string Title, string Slug);
+
+    private CollectionFormModel? Input;
+    private CollectionRuleGroup rootRules = new();
+    private List<PickerProduct> manualItems = [];
+    private HashSet<int> selectedManualIds = [];
+
+    private List<CollectionRuleGroupEditor.RuleLookupItem> tagLookups = [];
+    private List<CollectionRuleGroupEditor.RuleLookupItem> categoryLookups = [];
+    private List<CollectionRuleGroupEditor.RuleLookupItem> brandLookups = [];
+    private List<PickerProduct> pickerResults = [];
+    private List<ExistingPageLink> existingPages = [];
+
+    private string productSearch = "";
+    private string pickerCategoryId = "";
+    private bool pickerInStockOnly;
+    private System.Threading.Timer? _pickerDebounce;
+
+    private int totalRuleMatches;
+    private List<ProductSummaryDto> rulePreviewItems = [];
+    private bool previewLoading;
+
+    private bool loading = true;
+    private bool saving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tagLookups = await Db.Tags.AsNoTracking()
+            .Where(t => !t.IsDeleted)
+            .OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
+            .Select(t => new CollectionRuleGroupEditor.RuleLookupItem(t.Id, t.Name, t.Slug, t.IsHidden))
+            .ToListAsync();
+
+        categoryLookups = await Db.Categories.AsNoTracking()
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .Select(c => new CollectionRuleGroupEditor.RuleLookupItem(c.Id, c.Name, c.Slug, false))
+            .ToListAsync();
+
+        brandLookups = await Db.Brands.AsNoTracking()
+            .Where(b => !b.IsDeleted)
+            .OrderBy(b => b.Name)
+            .Select(b => new CollectionRuleGroupEditor.RuleLookupItem(b.Id, b.Name, b.Slug, false))
+            .ToListAsync();
+
+        if (Id != 0)
+        {
+            var existing = await Db.Collections
+                .AsNoTracking()
+                .Include(c => c.Pages)
+                .FirstOrDefaultAsync(c => c.Id == Id && !c.IsDeleted);
+
+            if (existing is null)
+            {
+                Nav.NavigateTo("/admin/collections");
+                return;
+            }
+
+            Input = new CollectionFormModel
+            {
+                Name = existing.Name,
+                Slug = existing.Slug,
+                InternalNotes = existing.InternalNotes,
+                Type = existing.Type,
+                SortMode = existing.SortMode,
+                IsActive = existing.IsActive
+            };
+
+            rootRules = CollectionRuleEvaluator.DeserializeRules(existing.RulesJson);
+            existingPages = existing.Pages.Select(p => new ExistingPageLink(p.Id, p.Title, p.Slug)).ToList();
+
+            var orderedProducts = await Db.CollectionProducts.AsNoTracking()
+                .Where(cp => cp.CollectionId == Id && !cp.Product!.IsDeleted)
+                .OrderBy(cp => cp.SortOrder)
+                .ThenBy(cp => cp.ProductId)
+                .Select(cp => new PickerProduct(
+                    cp.ProductId,
+                    cp.Product!.Name,
+                    cp.Product.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SellingPrice).FirstOrDefault(),
+                    Db.InventoryItems.Where(i => i.ProductVariant!.ProductId == cp.ProductId && i.ProductVariant.IsDefault && i.ProductVariant.IsActive && !i.ProductVariant.IsDeleted).Select(i => i.QuantityOnHand - i.QuantityReserved).FirstOrDefault(),
+                    cp.Product.MainImageUrl,
+                    cp.Product.Category != null ? cp.Product.Category.Name : "",
+                    cp.Product.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SKU).FirstOrDefault()
+                ))
+                .ToListAsync();
+
+            manualItems = orderedProducts;
+            selectedManualIds = manualItems.Select(m => m.Id).ToHashSet();
+        }
+        else
+        {
+            Input = new CollectionFormModel();
+            rootRules = new CollectionRuleGroup
+            {
+                MatchOperator = CollectionRuleLogicalOp.And,
+                Rules = []
+            };
+        }
+
+        await SearchPickerProductsAsync();
+
+        if (Input.Type == CollectionType.RuleBased)
+        {
+            await RefreshRulePreviewAsync();
+        }
+
+        loading = false;
+    }
+
+    private async Task SelectTypeAsync(CollectionType type)
+    {
+        if (Input is null || Input.Type == type) return;
+        Input.Type = type;
+        if (type == CollectionType.RuleBased)
+        {
+            if (Input.SortMode == CollectionSortOrder.ManualOrder)
+            {
+                Input.SortMode = CollectionSortOrder.Newest;
+            }
+            await RefreshRulePreviewAsync();
+        }
+        else
+        {
+            Input.SortMode = CollectionSortOrder.ManualOrder;
+        }
+    }
+
+    private void OnProductSearchInput()
+    {
+        _pickerDebounce?.Dispose();
+        _pickerDebounce = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(async () =>
+            {
+                await SearchPickerProductsAsync();
+                StateHasChanged();
+            });
+        }, null, 250, Timeout.Infinite);
+    }
+
+    private async Task ClearProductSearchAsync()
+    {
+        productSearch = "";
+        await SearchPickerProductsAsync();
+    }
+
+    private async Task SearchPickerProductsAsync()
+    {
+        var q = Db.Products.AsNoTracking()
+            .Where(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted));
+
+        if (int.TryParse(pickerCategoryId, out var catId) && catId > 0)
+        {
+            q = q.Where(p => p.CategoryId == catId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(productSearch))
+        {
+            var term = productSearch.Trim().ToLower();
+            q = q.Where(p => p.Name.ToLower().Contains(term)
+                || p.Slug.ToLower().Contains(term)
+                || (p.Brand != null && p.Brand.Name.ToLower().Contains(term))
+                || p.Category!.Name.ToLower().Contains(term)
+                || p.ProductVariants.Any(v => !v.IsDeleted && v.SKU.ToLower().Contains(term)));
+        }
+
+        var items = await q.OrderByDescending(p => p.CreatedAt)
+            .Take(40)
+            .Select(p => new PickerProduct(
+                p.Id,
+                p.Name,
+                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SellingPrice).FirstOrDefault(),
+                Db.InventoryItems.Where(i => i.ProductVariant!.ProductId == p.Id && i.ProductVariant.IsDefault && i.ProductVariant.IsActive && !i.ProductVariant.IsDeleted).Select(i => i.QuantityOnHand - i.QuantityReserved).FirstOrDefault(),
+                p.MainImageUrl,
+                p.Category != null ? p.Category.Name : "",
+                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SKU).FirstOrDefault()
+            ))
+            .ToListAsync();
+
+        pickerResults = pickerInStockOnly ? items.Where(i => i.Stock > 0).ToList() : items;
+    }
+
+    private void AddManualProduct(PickerProduct prod)
+    {
+        if (selectedManualIds.Add(prod.Id))
+        {
+            manualItems.Add(prod);
+        }
+    }
+
+    private void RemoveManualItem(int index)
+    {
+        if (index >= 0 && index < manualItems.Count)
+        {
+            selectedManualIds.Remove(manualItems[index].Id);
+            manualItems.RemoveAt(index);
+        }
+    }
+
+    private void MoveItem(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= manualItems.Count || toIndex < 0 || toIndex >= manualItems.Count) return;
+        var item = manualItems[fromIndex];
+        manualItems.RemoveAt(fromIndex);
+        manualItems.Insert(toIndex, item);
+    }
+
+    private void MoveItemToTop(int index) => MoveItem(index, 0);
+
+    private void SortManualByPriceAsc() => manualItems = manualItems.OrderBy(m => m.Price).ThenBy(m => m.Name).ToList();
+    private void SortManualByPriceDesc() => manualItems = manualItems.OrderByDescending(m => m.Price).ThenBy(m => m.Name).ToList();
+    private void SortManualByName() => manualItems = manualItems.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    private void ClearManualItems()
+    {
+        manualItems.Clear();
+        selectedManualIds.Clear();
+    }
+
+    private async Task ApplyPresetInStockAsync()
+    {
+        rootRules.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Stock, Operator = CollectionRuleOperator.GreaterThan, Value = "0" });
+        await RefreshRulePreviewAsync();
+    }
+
+    private async Task ApplyPresetPriceCapAsync()
+    {
+        rootRules.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.Price, Operator = CollectionRuleOperator.LessThan, Value = "3000" });
+        await RefreshRulePreviewAsync();
+    }
+
+    private async Task ApplyPresetDiscountAsync()
+    {
+        rootRules.Rules.Add(new CollectionRuleCondition { Field = CollectionRuleField.HasDiscount, Operator = CollectionRuleOperator.IsTrue, Value = "true" });
+        await RefreshRulePreviewAsync();
+    }
+
+    private async Task RefreshRulePreviewAsync()
+    {
+        if (Input is null) return;
+        previewLoading = true;
+        try
+        {
+            (totalRuleMatches, rulePreviewItems) = await CollectionSvc.PreviewRuleMatchesAsync(rootRules, Input.SortMode, 16);
+        }
+        finally
+        {
+            previewLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving || Input is null) return;
+        errorMessage = null;
+
+        var cleanName = Input.Name.Trim();
+        var cleanSlug = SlugAndSkuGenerator.GenerateSlug(string.IsNullOrWhiteSpace(Input.Slug) ? cleanName : Input.Slug);
+
+        if (await Db.Collections.AnyAsync(c => c.Slug == cleanSlug && c.Id != Id && !c.IsDeleted))
+        {
+            errorMessage = $"A collection with slug '{cleanSlug}' already exists.";
+            return;
+        }
+
+        if (Input.Type == CollectionType.RuleBased && !CollectionRuleEvaluator.HasAnyRules(rootRules))
+        {
+            errorMessage = "Please add at least one condition rule for an Automated Rule-Based collection.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            Collection entity;
+            if (Id == 0)
+            {
+                entity = new Collection
+                {
+                    Name = cleanName,
+                    Slug = cleanSlug,
+                    InternalNotes = string.IsNullOrWhiteSpace(Input.InternalNotes) ? null : Input.InternalNotes.Trim(),
+                    Type = Input.Type,
+                    SortMode = Input.Type == CollectionType.Manual ? CollectionSortOrder.ManualOrder : Input.SortMode,
+                    RulesJson = Input.Type == CollectionType.RuleBased ? CollectionRuleEvaluator.SerializeRules(rootRules) : null,
+                    IsActive = Input.IsActive
+                };
+                Db.Collections.Add(entity);
+                await Db.SaveChangesAsync();
+            }
+            else
+            {
+                var found = await Db.Collections.FirstOrDefaultAsync(c => c.Id == Id && !c.IsDeleted);
+                if (found is null)
+                {
+                    errorMessage = "Collection not found.";
+                    saving = false;
+                    return;
+                }
+                entity = found;
+                entity.Name = cleanName;
+                entity.Slug = cleanSlug;
+                entity.InternalNotes = string.IsNullOrWhiteSpace(Input.InternalNotes) ? null : Input.InternalNotes.Trim();
+                entity.Type = Input.Type;
+                entity.SortMode = Input.Type == CollectionType.Manual ? CollectionSortOrder.ManualOrder : Input.SortMode;
+                entity.RulesJson = Input.Type == CollectionType.RuleBased ? CollectionRuleEvaluator.SerializeRules(rootRules) : null;
+                entity.IsActive = Input.IsActive;
+                entity.UpdatedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+            }
+
+            // Sync manual items when Manual mode
+            var existingItems = await Db.CollectionProducts.Where(cp => cp.CollectionId == entity.Id).ToListAsync();
+            if (existingItems.Count > 0)
+            {
+                Db.CollectionProducts.RemoveRange(existingItems);
+                await Db.SaveChangesAsync();
+            }
+
+            if (Input.Type == CollectionType.Manual && manualItems.Count > 0)
+            {
+                var newItems = manualItems.Select((item, index) => new CollectionProduct
+                {
+                    CollectionId = entity.Id,
+                    ProductId = item.Id,
+                    SortOrder = index,
+                    AddedAt = DateTimeOffset.UtcNow
+                });
+                Db.CollectionProducts.AddRange(newItems);
+                await Db.SaveChangesAsync();
+            }
+
+            await CollectionSvc.InvalidateCacheAsync(entity.Id);
+            await CampaignSvc.InvalidateCacheAsync();
+            await Catalog.InvalidateHomepageSectionsCacheAsync();
+            Nav.NavigateTo("/admin/collections?saved=true");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save collection: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    public void Dispose() => _pickerDebounce?.Dispose();
+}

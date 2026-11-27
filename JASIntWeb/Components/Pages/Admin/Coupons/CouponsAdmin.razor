@@ -60,10 +60,16 @@
                 <TemplateColumn Title="Coupon Code" Sortable="false"><HeaderTemplate><AdminSortHeader Label="Coupon Code" SortKey="Code" /></HeaderTemplate><ChildContent>
                     <div class="flex items-center gap-2">
                         <strong class="font-mono text-sm text-blue-600 font-bold">@context.Code</strong>
-                        @if (context.HasTargetingRules)
+                        @if (context.Collection != null)
                         {
-                            <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Restricted to specific categories, brands, or tags">
-                                Targeted
+                            <a href="/admin/collections/@context.Collection.Id/edit" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100">
+                                📦 @context.Collection.Name
+                            </a>
+                        }
+                        else if (context.HasTargetingRules)
+                        {
+                            <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Legacy Targeted
                             </span>
                         }
                     </div>
@@ -182,7 +188,7 @@
         }
 
         Page = Math.Max(1, Page);
-        var q = Db.Coupons.AsNoTracking();
+        var q = Db.Coupons.AsNoTracking().Include(c => c.Collection).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(Query))
         {

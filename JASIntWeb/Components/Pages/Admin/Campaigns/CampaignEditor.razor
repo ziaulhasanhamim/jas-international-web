@@ -261,56 +261,35 @@ else
             </div>
         </div>
 
-        <!-- Section 4: Products Deals Source (Tags + Curated) -->
-        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
-            <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>📦</span> Campaign Products &amp; Deals
-            </h3>
-            <p class="text-xs text-slate-500">
-                You can automatically populate products using a <strong>Product Tag</strong> (e.g. Summer Sale / Winter Fest), and/or hand-pick specific <strong>Curated Products</strong> to pin at the top.
-            </p>
+        <!-- Section 4: Collection Selection (Single Option) -->
+        <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-display text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span>📦</span> Campaign Products Collection
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Select a single Collection to power this campaign's deals grid (manual curated order or automated rules).
+                    </p>
+                </div>
+                <a href="/admin/collections/new" target="_blank" class="btn-secondary text-xs shrink-0">
+                    + Create Collection ↗
+                </a>
+            </div>
 
             <label class="shop-label">
-                Link to Product Tag (Dynamic Source)
-                <InputSelect @bind-Value="Input.TagId" class="shop-input font-medium cursor-pointer">
-                    <option value="">-- No Tag (Curated Products Only) --</option>
-                    @foreach (var t in availableTags)
+                Campaign Collection
+                <InputSelect @bind-Value="Input.CollectionId" class="shop-input font-semibold cursor-pointer">
+                    <option value="">-- No Collection Selected --</option>
+                    @foreach (var col in availableCollections)
                     {
-                        <option value="@t.Id">@t.Name @(t.IsHidden ? "(Admin Tag)" : "")</option>
+                        <option value="@col.Id">
+                            @col.Name (@(col.Type == CollectionType.Manual ? "Manual" : "Rule-Based"))@(!col.IsActive ? " · Paused" : "")
+                        </option>
                     }
                 </InputSelect>
-                <small>All active products tagged with this label will automatically show on the campaign page.</small>
+                <small>All products in the selected collection will display on this campaign page in your configured order. Manage collections in <a href="/admin/collections" target="_blank" class="text-blue-600 font-semibold underline">Catalog &gt; Collections</a>.</small>
             </label>
-
-            <!-- Curated Products Picker -->
-            <div class="pt-3 border-t border-slate-200">
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Pinned Curated Products (@Input.CuratedProductIds.Count selected)
-                </label>
-
-                <div class="flex gap-2 mb-2">
-                    <input type="text" @bind="productSearchTerm" @bind:event="oninput"
-                           placeholder="Search products by name or SKU to pin…"
-                           class="shop-input text-xs" />
-                </div>
-
-                <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl bg-white p-2 divide-y divide-slate-100">
-                    @foreach (var prod in FilteredProducts)
-                    {
-                        var isSelected = Input.CuratedProductIds.Contains(prod.Id);
-                        <div class="flex items-center justify-between py-1.5 px-2 hover:bg-slate-50 rounded-lg text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="font-semibold text-slate-800">@prod.Name</span>
-                                <span class="text-slate-400 font-mono">৳@prod.Price.ToString("N0")</span>
-                            </div>
-                            <button type="button" @onclick="() => ToggleCuratedProduct(prod.Id)"
-                                    class="px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer @(isSelected ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "bg-blue-50 text-blue-700 hover:bg-blue-100")">
-                                @(isSelected ? "✕ Remove" : "+ Pin Deal")
-                            </button>
-                        </div>
-                    }
-                </div>
-            </div>
         </div>
 
         <!-- Section 5: Visibility & Sorting -->
@@ -388,7 +367,6 @@ else
     private bool uploadingMobile;
     private bool loading = true;
     private bool saving;
-    private string productSearchTerm = "";
 
     private async Task OnDesktopBannerUpload(InputFileChangeEventArgs e)
     {
@@ -453,17 +431,10 @@ else
     }
 
     private List<CouponItem> activeCoupons = [];
-    private List<TagItem> availableTags = [];
-    private List<ProductPickItem> allProducts = [];
+    private List<CollectionItem> availableCollections = [];
 
     public sealed record CouponItem(string Code, string? Description);
-    public sealed record TagItem(int Id, string Name, bool IsHidden);
-    public sealed record ProductPickItem(int Id, string Name, decimal Price);
-
-    private IEnumerable<ProductPickItem> FilteredProducts =>
-        string.IsNullOrWhiteSpace(productSearchTerm)
-            ? allProducts.Take(20)
-            : allProducts.Where(p => p.Name.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)).Take(20);
+    public sealed record CollectionItem(int Id, string Name, CollectionType Type, bool IsActive);
 
     protected override async Task OnInitializedAsync()
     {
@@ -473,20 +444,10 @@ else
             .Select(c => new CouponItem(c.Code, c.Description))
             .ToListAsync();
 
-        availableTags = await Db.Tags.AsNoTracking()
-            .Where(t => !t.IsDeleted)
-            .OrderBy(t => t.SortOrder)
-            .ThenBy(t => t.Name)
-            .Select(t => new TagItem(t.Id, t.Name, t.IsHidden))
-            .ToListAsync();
-
-        allProducts = await Db.Products.AsNoTracking()
-            .Where(p => !p.IsDeleted && p.ProductVariants.Any(v => v.IsActive && !v.IsDeleted))
-            .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new ProductPickItem(
-                p.Id,
-                p.Name,
-                p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).Select(v => v.SellingPrice).FirstOrDefault()))
+        availableCollections = await Db.Collections.AsNoTracking()
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .Select(c => new CollectionItem(c.Id, c.Name, c.Type, c.IsActive))
             .ToListAsync();
 
         if (Input is null)
@@ -515,6 +476,7 @@ else
                     ShowCountdown = existing.ShowCountdown,
                     ThemeColor = existing.ThemeColor,
                     HighlightCouponCode = existing.HighlightCouponCode,
+                    CollectionId = existing.CollectionId,
                     TagId = existing.TagId,
                     CuratedProductIds = [.. existing.CuratedProductIds],
                     IsActive = existing.IsActive,
@@ -530,19 +492,6 @@ else
             }
         }
         loading = false;
-    }
-
-    private void ToggleCuratedProduct(int productId)
-    {
-        if (Input is null) return;
-        if (Input.CuratedProductIds.Contains(productId))
-        {
-            Input.CuratedProductIds.Remove(productId);
-        }
-        else
-        {
-            Input.CuratedProductIds.Add(productId);
-        }
     }
 
     private async Task Save()
@@ -595,8 +544,9 @@ else
                     ShowCountdown = Input.ShowCountdown,
                     ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim(),
                     HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant(),
-                    TagId = Input.TagId,
-                    CuratedProductIds = [.. Input.CuratedProductIds],
+                    CollectionId = Input.CollectionId,
+                    TagId = null,
+                    CuratedProductIds = [],
                     IsActive = Input.IsActive,
                     SortOrder = Input.SortOrder,
                     MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim(),
@@ -622,8 +572,9 @@ else
                     existing.ShowCountdown = Input.ShowCountdown;
                     existing.ThemeColor = string.IsNullOrWhiteSpace(Input.ThemeColor) ? "indigo" : Input.ThemeColor.Trim();
                     existing.HighlightCouponCode = string.IsNullOrWhiteSpace(Input.HighlightCouponCode) ? null : Input.HighlightCouponCode.Trim().ToUpperInvariant();
-                    existing.TagId = Input.TagId;
-                    existing.CuratedProductIds = [.. Input.CuratedProductIds];
+                    existing.CollectionId = Input.CollectionId;
+                    existing.TagId = null;
+                    existing.CuratedProductIds = [];
                     existing.IsActive = Input.IsActive;
                     existing.SortOrder = Input.SortOrder;
                     existing.MetaTitle = string.IsNullOrWhiteSpace(Input.MetaTitle) ? null : Input.MetaTitle.Trim();

@@ -1,0 +1,317 @@
+@using JASIntWeb.Client.Dtos
+
+<div class="rounded-xl border @(Depth == 0 ? "border-slate-200 bg-white" : "border-indigo-200 bg-indigo-50/40 ml-2 sm:ml-4") p-4 space-y-3">
+    <!-- Group Header: Match AND / OR -->
+    <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+        <div class="flex items-center gap-2 text-xs">
+            @if (Depth == 0)
+            {
+                <span class="font-bold text-slate-800">Products must match</span>
+            }
+            else
+            {
+                <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold uppercase text-[10px]">Nested Group</span>
+            }
+
+            <select @bind="Group.MatchOperator" @bind:after="NotifyChangedAsync"
+                    class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold text-xs text-slate-900 cursor-pointer focus:border-blue-500">
+                <option value="@CollectionRuleLogicalOp.And">ALL conditions (AND)</option>
+                <option value="@CollectionRuleLogicalOp.Or">ANY condition (OR)</option>
+            </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <button type="button" @onclick="AddConditionAsync"
+                    class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold transition cursor-pointer">
+                + Add Rule
+            </button>
+            @if (Depth < 2)
+            {
+                <button type="button" @onclick="AddSubGroupAsync"
+                        class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold transition cursor-pointer">
+                    + Add OR/AND Group
+                </button>
+            }
+            @if (OnRemoveGroup.HasDelegate)
+            {
+                <button type="button" @onclick="() => OnRemoveGroup.InvokeAsync(Group)"
+                        class="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer" title="Remove group">
+                    ✕
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Leaf Rules -->
+    @if (Group.Rules.Count == 0 && Group.Groups.Count == 0)
+    {
+        <p class="text-xs text-slate-400 italic py-2 text-center">
+            No conditions yet. Click "+ Add Rule" or "+ Add OR/AND Group" above.
+        </p>
+    }
+    else
+    {
+        <div class="space-y-2.5">
+            @for (int i = 0; i < Group.Rules.Count; i++)
+            {
+                var rule = Group.Rules[i];
+                var idx = i;
+                @if (i > 0)
+                {
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded @(Group.MatchOperator == CollectionRuleLogicalOp.And ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-800")">
+                            @(Group.MatchOperator == CollectionRuleLogicalOp.And ? "AND" : "OR")
+                        </span>
+                    </div>
+                }
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                    <!-- Field -->
+                    <div class="sm:col-span-3">
+                        <select value="@rule.Field" @onchange="e => OnFieldChangedAsync(rule, e)"
+                                class="shop-input !py-1.5 text-xs font-semibold cursor-pointer">
+                            <option value="@CollectionRuleField.Tag">Product Tag</option>
+                            <option value="@CollectionRuleField.Category">Category</option>
+                            <option value="@CollectionRuleField.Brand">Brand</option>
+                            <option value="@CollectionRuleField.Price">Selling Price (৳)</option>
+                            <option value="@CollectionRuleField.Stock">Available Stock</option>
+                            <option value="@CollectionRuleField.HasDiscount">On Sale / Discounted</option>
+                            <option value="@CollectionRuleField.DiscountPercent">Discount %</option>
+                            <option value="@CollectionRuleField.IsFeatured">Is Featured</option>
+                            <option value="@CollectionRuleField.IsNewArrival">Is New Arrival</option>
+                            <option value="@CollectionRuleField.Title">Product Name</option>
+                        </select>
+                    </div>
+
+                    <!-- Operator -->
+                    <div class="sm:col-span-3">
+                        <select @bind="rule.Operator" @bind:after="NotifyChangedAsync"
+                                class="shop-input !py-1.5 text-xs cursor-pointer">
+                            @foreach (var op in GetOperatorsForField(rule.Field))
+                            {
+                                <option value="@op.Op">@op.Label</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Value -->
+                    <div class="sm:col-span-5">
+                        @if (rule.Field == CollectionRuleField.Tag)
+                        {
+                            <select @bind="rule.Value" @bind:after="NotifyChangedAsync" class="shop-input !py-1.5 text-xs cursor-pointer">
+                                <option value="">-- Pick Tag --</option>
+                                @foreach (var t in Tags)
+                                {
+                                    <option value="@t.Id">@t.Name (@t.Slug) @(t.IsHidden ? "🔒" : "")</option>
+                                }
+                            </select>
+                        }
+                        else if (rule.Field == CollectionRuleField.Category)
+                        {
+                            <select @bind="rule.Value" @bind:after="NotifyChangedAsync" class="shop-input !py-1.5 text-xs cursor-pointer">
+                                <option value="">-- Pick Category --</option>
+                                @foreach (var c in Categories)
+                                {
+                                    <option value="@c.Id">@c.Name (@c.Slug)</option>
+                                }
+                            </select>
+                        }
+                        else if (rule.Field == CollectionRuleField.Brand)
+                        {
+                            <select @bind="rule.Value" @bind:after="NotifyChangedAsync" class="shop-input !py-1.5 text-xs cursor-pointer">
+                                <option value="">-- Pick Brand --</option>
+                                @foreach (var b in Brands)
+                                {
+                                    <option value="@b.Id">@b.Name</option>
+                                }
+                            </select>
+                        }
+                        else if (rule.Field is CollectionRuleField.HasDiscount or CollectionRuleField.IsFeatured or CollectionRuleField.IsNewArrival)
+                        {
+                            <div class="text-xs text-slate-500 font-medium px-2">
+                                @(rule.Operator == CollectionRuleOperator.IsFalse ? "Condition: False / No" : "Condition: True / Yes")
+                            </div>
+                        }
+                        else if (rule.Field is CollectionRuleField.Price or CollectionRuleField.Stock or CollectionRuleField.DiscountPercent)
+                        {
+                            <input type="number"
+                                   step="@(rule.Field == CollectionRuleField.Stock ? "1" : "any")"
+                                   value="@rule.Value"
+                                   @oninput="e => OnValueInputAsync(rule, e)"
+                                   placeholder="@(rule.Field == CollectionRuleField.Price ? "e.g. 3000" : (rule.Field == CollectionRuleField.Stock ? "e.g. 0" : "e.g. 15"))"
+                                   class="shop-input !py-1.5 text-xs font-mono" />
+                        }
+                        else
+                        {
+                            <input type="text"
+                                   value="@rule.Value"
+                                   @oninput="e => OnValueInputAsync(rule, e)"
+                                   placeholder="Enter keyword..."
+                                   class="shop-input !py-1.5 text-xs" />
+                        }
+                    </div>
+
+                    <!-- Remove Rule -->
+                    <div class="sm:col-span-1 flex justify-end">
+                        <button type="button" @onclick="() => RemoveConditionAsync(idx)"
+                                class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 text-xs font-bold cursor-pointer" title="Remove rule">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <!-- Nested Sub-Groups -->
+            @for (int g = 0; g < Group.Groups.Count; g++)
+            {
+                var subGroup = Group.Groups[g];
+                var gIdx = g;
+                @if (Group.Rules.Count > 0 || g > 0)
+                {
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded @(Group.MatchOperator == CollectionRuleLogicalOp.And ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-800")">
+                            @(Group.MatchOperator == CollectionRuleLogicalOp.And ? "AND" : "OR")
+                        </span>
+                    </div>
+                }
+
+                <CollectionRuleGroupEditor
+                    Group="subGroup"
+                    Depth="Depth + 1"
+                    Tags="Tags"
+                    Categories="Categories"
+                    Brands="Brands"
+                    OnChanged="NotifyChangedAsync"
+                    OnRemoveGroup="_ => RemoveSubGroupAsync(gIdx)" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CollectionRuleGroup Group { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter, EditorRequired] public List<RuleLookupItem> Tags { get; set; } = [];
+    [Parameter, EditorRequired] public List<RuleLookupItem> Categories { get; set; } = [];
+    [Parameter, EditorRequired] public List<RuleLookupItem> Brands { get; set; } = [];
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<CollectionRuleGroup> OnRemoveGroup { get; set; }
+
+    public sealed record RuleLookupItem(int Id, string Name, string Slug, bool IsHidden = false);
+    private sealed record OperatorChoice(CollectionRuleOperator Op, string Label);
+
+    private async Task NotifyChangedAsync()
+    {
+        if (OnChanged.HasDelegate)
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task AddConditionAsync()
+    {
+        Group.Rules.Add(new CollectionRuleCondition
+        {
+            Field = CollectionRuleField.Category,
+            Operator = CollectionRuleOperator.Equals,
+            Value = Categories.FirstOrDefault()?.Id.ToString() ?? ""
+        });
+        await NotifyChangedAsync();
+    }
+
+    private async Task RemoveConditionAsync(int index)
+    {
+        if (index >= 0 && index < Group.Rules.Count)
+        {
+            Group.Rules.RemoveAt(index);
+            await NotifyChangedAsync();
+        }
+    }
+
+    private async Task AddSubGroupAsync()
+    {
+        var opposite = Group.MatchOperator == CollectionRuleLogicalOp.And
+            ? CollectionRuleLogicalOp.Or
+            : CollectionRuleLogicalOp.And;
+
+        Group.Groups.Add(new CollectionRuleGroup
+        {
+            MatchOperator = opposite,
+            Rules =
+            [
+                new CollectionRuleCondition
+                {
+                    Field = CollectionRuleField.Tag,
+                    Operator = CollectionRuleOperator.Equals,
+                    Value = Tags.FirstOrDefault()?.Id.ToString() ?? ""
+                }
+            ]
+        });
+        await NotifyChangedAsync();
+    }
+
+    private async Task RemoveSubGroupAsync(int index)
+    {
+        if (index >= 0 && index < Group.Groups.Count)
+        {
+            Group.Groups.RemoveAt(index);
+            await NotifyChangedAsync();
+        }
+    }
+
+    private async Task OnFieldChangedAsync(CollectionRuleCondition rule, ChangeEventArgs e)
+    {
+        if (Enum.TryParse<CollectionRuleField>(e.Value?.ToString(), out var newField))
+        {
+            rule.Field = newField;
+            rule.Operator = GetOperatorsForField(newField).First().Op;
+            rule.Value = newField switch
+            {
+                CollectionRuleField.Tag => Tags.FirstOrDefault()?.Id.ToString() ?? "",
+                CollectionRuleField.Category => Categories.FirstOrDefault()?.Id.ToString() ?? "",
+                CollectionRuleField.Brand => Brands.FirstOrDefault()?.Id.ToString() ?? "",
+                CollectionRuleField.Stock => "0",
+                CollectionRuleField.Price => "3000",
+                CollectionRuleField.DiscountPercent => "10",
+                CollectionRuleField.HasDiscount or CollectionRuleField.IsFeatured or CollectionRuleField.IsNewArrival => "true",
+                _ => ""
+            };
+            await NotifyChangedAsync();
+        }
+    }
+
+    private async Task OnValueInputAsync(CollectionRuleCondition rule, ChangeEventArgs e)
+    {
+        rule.Value = e.Value?.ToString();
+        await NotifyChangedAsync();
+    }
+
+    private static List<OperatorChoice> GetOperatorsForField(CollectionRuleField field) => field switch
+    {
+        CollectionRuleField.Tag or CollectionRuleField.Category or CollectionRuleField.Brand =>
+        [
+            new(CollectionRuleOperator.Equals, "is"),
+            new(CollectionRuleOperator.NotEquals, "is not")
+        ],
+        CollectionRuleField.Price or CollectionRuleField.Stock or CollectionRuleField.DiscountPercent =>
+        [
+            new(CollectionRuleOperator.GreaterThan, "is greater than (>)"),
+            new(CollectionRuleOperator.GreaterThanOrEqual, "is at least (>=)"),
+            new(CollectionRuleOperator.LessThan, "is less than (<)"),
+            new(CollectionRuleOperator.LessThanOrEqual, "is at most (<=)"),
+            new(CollectionRuleOperator.Equals, "equals (=)")
+        ],
+        CollectionRuleField.HasDiscount or CollectionRuleField.IsFeatured or CollectionRuleField.IsNewArrival =>
+        [
+            new(CollectionRuleOperator.IsTrue, "is Yes / True"),
+            new(CollectionRuleOperator.IsFalse, "is No / False")
+        ],
+        CollectionRuleField.Title =>
+        [
+            new(CollectionRuleOperator.Contains, "contains"),
+            new(CollectionRuleOperator.NotContains, "does not contain"),
+            new(CollectionRuleOperator.Equals, "equals exactly")
+        ],
+        _ => [new(CollectionRuleOperator.Equals, "equals")]
+    };
+}

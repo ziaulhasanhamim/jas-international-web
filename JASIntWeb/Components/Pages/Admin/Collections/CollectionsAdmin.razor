@@ -1,0 +1,364 @@
+@page "/admin/collections"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@using JASIntWeb.Persistence.Entities
+@inject AppDbContext Db
+@inject CollectionService CollectionSvc
+@inject CampaignService CampaignSvc
+@inject NavigationManager Nav
+
+<PageTitle>Collections · JAS Admin</PageTitle>
+
+<div class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+        <p class="eyebrow">MERCHANDISING &amp; TARGETING</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Product Collections</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Create manual ordered groups or automated rule-based collections for Landing Page Featured sections, Coupons, Offers/Campaigns, and optional Collection Pages.
+        </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+        <a href="/admin/collection-pages" class="btn-secondary text-xs shadow-xs">
+            <span>📄 Collection Pages</span>
+        </a>
+        <a href="/admin/collections/new" class="btn-primary shadow-xs flex items-center gap-1.5">
+            <Icon Name="plus" Class="size-4" />
+            <span>Create Collection</span>
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_toast))
+{
+    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+            <Icon Name="check" Class="size-4 text-emerald-600" />
+            @_toast
+        </span>
+        <button type="button" @onclick="() => _toast = null" class="text-emerald-600 hover:text-emerald-950 cursor-pointer">
+            <Icon Name="close" Class="size-3.5" />
+        </button>
+    </div>
+}
+
+<!-- Filters & Search -->
+<div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-2">
+        <button type="button" @onclick='() => SetFilter("all")'
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer @(typeFilter == "all" ? "bg-slate-900 text-white shadow-xs" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50")">
+            All (@totalAll)
+        </button>
+        <button type="button" @onclick='() => SetFilter("manual")'
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer @(typeFilter == "manual" ? "bg-blue-600 text-white shadow-xs" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50")">
+            ✋ Manual Curated (@totalManual)
+        </button>
+        <button type="button" @onclick='() => SetFilter("rule")'
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer @(typeFilter == "rule" ? "bg-indigo-600 text-white shadow-xs" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50")">
+            ⚡ Automated Rule-Based (@totalRule)
+        </button>
+    </div>
+
+    <div class="relative w-full max-w-xs">
+        <input @bind="searchQuery" @bind:event="oninput" @bind:after="OnSearchInput"
+               placeholder="Search collections by name, slug..."
+               class="shop-input text-xs pl-8 pr-8" />
+        <span class="absolute left-2.5 top-2.5 text-slate-400">
+            <Icon Name="search" Class="size-3.5" />
+        </span>
+        @if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            <button type="button" @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs cursor-pointer">✕</button>
+        }
+    </div>
+</div>
+
+<div class="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+    <div class="table-scroll">
+        <QuickGrid Items="@collectionsQuery" class="data-table">
+            <PropertyColumn Property="@(c => c.Id)" Title="#ID" Class="col-id font-mono text-xs text-slate-500 w-16 text-center" Align="Align.Center" />
+
+            <TemplateColumn Title="Collection" Class="min-w-[220px]">
+                <div>
+                    <a href="/admin/collections/@context.Id/edit" class="font-bold text-slate-900 hover:text-blue-600 text-sm transition block">
+                        @context.Name
+                    </a>
+                    <span class="text-xs text-slate-400 font-mono block">@context.Slug</span>
+                    @if (!string.IsNullOrWhiteSpace(context.InternalNotes))
+                    {
+                        <span class="text-[11px] text-slate-500 line-clamp-1 mt-0.5">@context.InternalNotes</span>
+                    }
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Type" Class="w-40">
+                @if (context.Type == CollectionType.Manual)
+                {
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        ✋ Manual Ordered
+                    </span>
+                }
+                else
+                {
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        ⚡ Automated Rules
+                    </span>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Products" Class="text-center w-28" Align="Align.Center">
+                <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                    @context.ProductCount items
+                </span>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Used In" Class="min-w-[160px]">
+                <div class="flex flex-wrap gap-1 text-[10px] font-bold">
+                    @if (context.CouponCount > 0)
+                    {
+                        <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">🎟️ @context.CouponCount coupon@(context.CouponCount == 1 ? "" : "s")</span>
+                    }
+                    @if (context.CampaignCount > 0)
+                    {
+                        <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200">🎉 @context.CampaignCount offer@(context.CampaignCount == 1 ? "" : "s")</span>
+                    }
+                    @if (context.HomepageCount > 0)
+                    {
+                        <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200">🏠 @context.HomepageCount home</span>
+                    }
+                    @if (context.CouponCount == 0 && context.CampaignCount == 0 && context.HomepageCount == 0)
+                    {
+                        <span class="text-slate-400 font-normal text-xs">Not linked yet</span>
+                    }
+                </div>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Storefront Page" Class="min-w-[160px]">
+                @if (!string.IsNullOrWhiteSpace(context.PublishedPageSlug))
+                {
+                    <div class="flex items-center gap-2">
+                        <a href="/collections/@context.PublishedPageSlug" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">
+                            <span>Live ↗</span>
+                        </a>
+                        @if (context.PrimaryPageId.HasValue)
+                        {
+                            <a href="/admin/collection-pages/@context.PrimaryPageId/edit" class="text-[11px] text-blue-600 font-semibold hover:underline">Edit Page</a>
+                        }
+                    </div>
+                }
+                else if (context.PrimaryPageId.HasValue)
+                {
+                    <a href="/admin/collection-pages/@context.PrimaryPageId/edit" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        Draft Page · Edit
+                    </a>
+                }
+                else
+                {
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-slate-400">No page</span>
+                        <a href="/admin/collection-pages/new?collectionId=@context.Id" class="text-[11px] font-bold text-blue-600 hover:underline">
+                            + Create Page
+                        </a>
+                    </div>
+                }
+            </TemplateColumn>
+
+            <TemplateColumn Title="Status" Class="text-center w-24" Align="Align.Center">
+                <button type="button" @onclick="() => ToggleActiveAsync(context.Id)"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer @(context.IsActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200")">
+                    <span class="size-1.5 rounded-full @(context.IsActive ? "bg-emerald-500" : "bg-slate-400")"></span>
+                    <span>@(context.IsActive ? "Active" : "Paused")</span>
+                </button>
+            </TemplateColumn>
+
+            <TemplateColumn Title="Actions" Class="text-right w-32" Align="Align.End">
+                <div class="flex items-center justify-end gap-1.5">
+                    <a href="/admin/collections/@context.Id/edit" class="btn-secondary !px-2.5 !py-1 text-xs">
+                        Edit
+                    </a>
+                    <button type="button" @onclick="() => DeleteCollectionAsync(context.Id)"
+                            class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer">
+                        Delete
+                    </button>
+                </div>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+
+    @if (rowCount == 0 && !loading)
+    {
+        <div class="empty-state py-12">
+            <Icon Name="box" Class="size-10 text-slate-300" />
+            <p>No collections found. Create your first manual or automated collection!</p>
+        </div>
+    }
+</div>
+
+@code {
+    public sealed record AdminCollectionRow(
+        int Id,
+        string Name,
+        string Slug,
+        string? InternalNotes,
+        CollectionType Type,
+        bool IsActive,
+        int ProductCount,
+        int CouponCount,
+        int CampaignCount,
+        int HomepageCount,
+        int? PrimaryPageId,
+        string? PublishedPageSlug
+    );
+
+    private IQueryable<AdminCollectionRow> collectionsQuery = Array.Empty<AdminCollectionRow>().AsQueryable();
+    private int rowCount;
+    private int totalAll;
+    private int totalManual;
+    private int totalRule;
+    private string typeFilter = "all";
+    private string searchQuery = "";
+    private string? _toast;
+    private bool loading = true;
+    private System.Threading.Timer? _debounceTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).ContainsKey("saved"))
+        {
+            _toast = "Collection saved successfully!";
+        }
+
+        await LoadCollectionsAsync();
+    }
+
+    private async Task SetFilter(string filter)
+    {
+        typeFilter = filter;
+        await LoadCollectionsAsync();
+    }
+
+    private void OnSearchInput()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(async () =>
+            {
+                await LoadCollectionsAsync();
+                StateHasChanged();
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task ClearSearch()
+    {
+        searchQuery = "";
+        await LoadCollectionsAsync();
+    }
+
+    private async Task LoadCollectionsAsync()
+    {
+        loading = true;
+        var all = await Db.Collections.AsNoTracking()
+            .Where(c => !c.IsDeleted)
+            .OrderByDescending(c => c.CreatedAt)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Slug,
+                c.InternalNotes,
+                c.Type,
+                c.IsActive,
+                ManualCount = c.Items.Count(i => !i.Product!.IsDeleted),
+                CouponCount = Db.Coupons.Count(cp => cp.CollectionId == c.Id),
+                CampaignCount = Db.Campaigns.Count(cm => cm.CollectionId == c.Id),
+                HomepageCount = Db.HomepageSections.Count(hs => hs.CollectionId == c.Id),
+                Pages = c.Pages.OrderByDescending(p => p.IsPublished).ThenBy(p => p.Id).Select(p => new { p.Id, p.Slug, p.IsPublished }).ToList()
+            })
+            .ToListAsync();
+
+        totalAll = all.Count;
+        totalManual = all.Count(c => c.Type == CollectionType.Manual);
+        totalRule = all.Count(c => c.Type == CollectionType.RuleBased);
+
+        var filtered = all.AsEnumerable();
+        if (typeFilter == "manual") filtered = filtered.Where(c => c.Type == CollectionType.Manual);
+        else if (typeFilter == "rule") filtered = filtered.Where(c => c.Type == CollectionType.RuleBased);
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            var term = searchQuery.Trim().ToLowerInvariant();
+            filtered = filtered.Where(c => c.Name.ToLowerInvariant().Contains(term)
+                || c.Slug.ToLowerInvariant().Contains(term)
+                || (c.InternalNotes != null && c.InternalNotes.ToLowerInvariant().Contains(term)));
+        }
+
+        var rows = new List<AdminCollectionRow>();
+        foreach (var c in filtered)
+        {
+            int count = c.Type == CollectionType.Manual
+                ? c.ManualCount
+                : (c.IsActive ? (await CollectionSvc.GetCollectionProductIdsAsync(c.Id)).Count : 0);
+
+            var publishedPage = c.Pages.FirstOrDefault(p => p.IsPublished);
+            var primaryPage = publishedPage ?? c.Pages.FirstOrDefault();
+
+            rows.Add(new AdminCollectionRow(
+                c.Id,
+                c.Name,
+                c.Slug,
+                c.InternalNotes,
+                c.Type,
+                c.IsActive,
+                count,
+                c.CouponCount,
+                c.CampaignCount,
+                c.HomepageCount,
+                primaryPage?.Id,
+                publishedPage?.Slug
+            ));
+        }
+
+        rowCount = rows.Count;
+        collectionsQuery = rows.AsQueryable();
+        loading = false;
+    }
+
+    private async Task ToggleActiveAsync(int id)
+    {
+        var col = await Db.Collections.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+        if (col != null)
+        {
+            col.IsActive = !col.IsActive;
+            col.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync(col.Id);
+            await CampaignSvc.InvalidateCacheAsync();
+            _toast = $"Collection '{col.Name}' is now {(col.IsActive ? "Active" : "Paused")}.";
+            await LoadCollectionsAsync();
+        }
+    }
+
+    private async Task DeleteCollectionAsync(int id)
+    {
+        var col = await Db.Collections.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+        if (col != null)
+        {
+            col.IsDeleted = true;
+            col.IsActive = false;
+            col.DeletedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            await CollectionSvc.InvalidateCacheAsync(col.Id);
+            await CampaignSvc.InvalidateCacheAsync();
+            _toast = $"Collection '{col.Name}' deleted.";
+            await LoadCollectionsAsync();
+        }
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
+}

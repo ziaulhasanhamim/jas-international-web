@@ -18,7 +18,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261123123925_AddProductTagsCouponRulesAndCampaigns";
+    public override string LastMigrationId => "20261125190916_AddCollectionsAndCollectionPages";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -183,6 +183,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("BannerImageUrl")
                     .HasColumnType("text");
 
+                b.Property<int?>("CollectionId")
+                    .HasColumnType("integer");
+
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone");
 
@@ -253,6 +256,8 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer");
 
                 b.HasKey("Id");
+
+                b.HasIndex("CollectionId");
 
                 b.HasIndex("Slug")
                     .IsUnique();
@@ -555,6 +560,163 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("CategoryPlacements");
             });
 
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.Collection", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("CreatedByUserId")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset?>("DeletedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<string>("InternalNotes")
+                    .HasColumnType("text");
+
+                b.Property<bool>("IsActive")
+                    .HasColumnType("boolean");
+
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("RulesJson")
+                    .HasColumnType("jsonb");
+
+                b.Property<string>("Slug")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<int>("SortMode")
+                    .HasColumnType("integer");
+
+                b.Property<int>("Type")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset?>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("UpdatedByUserId")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Slug")
+                    .IsUnique()
+                    .HasFilter("NOT \"IsDeleted\"");
+
+                b.HasIndex("IsDeleted", "IsActive", "Type");
+
+                b.ToTable("Collections");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CollectionPage", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<string>("BannerImageUrl")
+                    .HasColumnType("text");
+
+                b.Property<int>("CollectionId")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("CreatedByUserId")
+                    .HasColumnType("integer");
+
+                b.Property<string>("Description")
+                    .HasColumnType("text");
+
+                b.Property<string>("Eyebrow")
+                    .HasColumnType("text");
+
+                b.Property<bool>("IsPublished")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("MetaDescription")
+                    .HasColumnType("text");
+
+                b.Property<string>("MetaTitle")
+                    .HasColumnType("text");
+
+                b.Property<string>("MobileBannerImageUrl")
+                    .HasColumnType("text");
+
+                b.Property<string>("OgImageUrl")
+                    .HasColumnType("text");
+
+                b.Property<bool>("ShowFilters")
+                    .HasColumnType("boolean");
+
+                b.Property<string>("Slug")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("ThemeColor")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("text");
+
+                b.Property<DateTimeOffset?>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int?>("UpdatedByUserId")
+                    .HasColumnType("integer");
+
+                b.HasKey("Id");
+
+                b.HasIndex("CollectionId");
+
+                b.HasIndex("Slug")
+                    .IsUnique();
+
+                b.HasIndex("IsPublished", "CollectionId");
+
+                b.ToTable("CollectionPages");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CollectionProduct", b =>
+            {
+                b.Property<int>("CollectionId")
+                    .HasColumnType("integer");
+
+                b.Property<int>("ProductId")
+                    .HasColumnType("integer");
+
+                b.Property<DateTimeOffset>("AddedAt")
+                    .HasColumnType("timestamp with time zone");
+
+                b.Property<int>("SortOrder")
+                    .HasColumnType("integer");
+
+                b.HasKey("CollectionId", "ProductId");
+
+                b.HasIndex("ProductId");
+
+                b.HasIndex("CollectionId", "SortOrder");
+
+                b.ToTable("CollectionProducts");
+            });
+
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Coupon", b =>
             {
                 var id = b.Property<int>("Id")
@@ -566,6 +728,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Code")
                     .IsRequired()
                     .HasColumnType("text");
+
+                b.Property<int?>("CollectionId")
+                    .HasColumnType("integer");
 
                 b.Property<DateTimeOffset>("CreatedAt")
                     .HasColumnType("timestamp with time zone");
@@ -646,6 +811,8 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("Code")
                     .IsUnique();
+
+                b.HasIndex("CollectionId");
 
                 b.HasIndex("IsActive", "ExpiryDate");
 
@@ -919,6 +1086,9 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("CategorySlug")
                     .HasColumnType("text");
 
+                b.Property<int?>("CollectionId")
+                    .HasColumnType("integer");
+
                 b.Property<string>("Eyebrow")
                     .HasColumnType("text");
 
@@ -940,6 +1110,8 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("text");
 
                 b.HasKey("Id");
+
+                b.HasIndex("CollectionId");
 
                 b.ToTable("HomepageSections");
             });
@@ -2325,9 +2497,16 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Campaign", b =>
             {
+                b.HasOne("JASIntWeb.Persistence.Entities.Collection", "Collection")
+                    .WithMany()
+                    .HasForeignKey("CollectionId")
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 b.HasOne("JASIntWeb.Persistence.Entities.Tag", "Tag")
                     .WithMany()
                     .HasForeignKey("TagId");
+
+                b.Navigation("Collection");
 
                 b.Navigation("Tag");
             });
@@ -2381,12 +2560,62 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("Category");
             });
 
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CollectionPage", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.Collection", "Collection")
+                    .WithMany("Pages")
+                    .HasForeignKey("CollectionId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
+                b.Navigation("Collection");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.CollectionProduct", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.Collection", "Collection")
+                    .WithMany("Items")
+                    .HasForeignKey("CollectionId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
+                b.HasOne("JASIntWeb.Persistence.Entities.Product", "Product")
+                    .WithMany()
+                    .HasForeignKey("ProductId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
+                b.Navigation("Collection");
+
+                b.Navigation("Product");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.Coupon", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.Collection", "Collection")
+                    .WithMany()
+                    .HasForeignKey("CollectionId")
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                b.Navigation("Collection");
+            });
+
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.DeliveryAddress", b =>
             {
                 b.HasOne("JASIntWeb.Persistence.Entities.User", null)
                     .WithMany("DeliveryAddresses")
                     .HasForeignKey("CustomerId")
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.HomepageSection", b =>
+            {
+                b.HasOne("JASIntWeb.Persistence.Entities.Collection", "Collection")
+                    .WithMany()
+                    .HasForeignKey("CollectionId")
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                b.Navigation("Collection");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.InventoryItem", b =>
@@ -2686,6 +2915,13 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("ChildCategories");
 
                 b.Navigation("Products");
+            });
+
+        modelBuilder.Entity("JASIntWeb.Persistence.Entities.Collection", b =>
+            {
+                b.Navigation("Items");
+
+                b.Navigation("Pages");
             });
 
         modelBuilder.Entity("JASIntWeb.Persistence.Entities.Order", b =>

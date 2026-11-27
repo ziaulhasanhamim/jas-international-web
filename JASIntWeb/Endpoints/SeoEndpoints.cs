@@ -33,6 +33,12 @@ public static class SeoEndpoints
             return Results.Content(xml, "application/xml", Encoding.UTF8);
         }).CacheOutput("SitemapPolicy");
 
+        endpoints.MapGet("/sitemap-collections.xml", async (SitemapService sitemap) =>
+        {
+            var xml = await sitemap.GenerateCollectionsSitemapAsync();
+            return Results.Content(xml, "application/xml", Encoding.UTF8);
+        }).CacheOutput("SitemapPolicy");
+
         endpoints.MapGet("/sitemap-products.xml", async (SitemapService sitemap) =>
         {
             var xml = await sitemap.GenerateProductsSitemapAsync();

@@ -72,10 +72,19 @@
                     </div>
                 </TemplateColumn>
 
-                <TemplateColumn Title="Target Category">
-                    <span class="badge badge-indigo">
-                        @(string.IsNullOrWhiteSpace(context.CategorySlug) ? "All / Newest" : context.CategorySlug)
-                    </span>
+                <TemplateColumn Title="Product Source">
+                    @if (context.Collection != null)
+                    {
+                        <a href="/admin/collections/@context.Collection.Id/edit" class="badge badge-emerald hover:opacity-80">
+                            📦 Collection: @context.Collection.Name
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="badge badge-indigo">
+                            @(string.IsNullOrWhiteSpace(context.CategorySlug) ? "All / Newest" : $"Category: {context.CategorySlug}")
+                        </span>
+                    }
                 </TemplateColumn>
 
                 <TemplateColumn Title="Items" Class="text-center w-24">
@@ -147,9 +156,21 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-                <label class="shop-label mb-1">Category Filter</label>
+                <label class="shop-label mb-1">Collection Source (Recommended)</label>
+                <select name="FormCollectionId" class="shop-input font-semibold">
+                    <option value="">-- Use Category Filter Below --</option>
+                    @foreach (var col in _collections)
+                    {
+                        <option value="@col.Id" selected="@(editSection?.CollectionId == col.Id)">📦 @col.Name</option>
+                    }
+                </select>
+                <small class="text-slate-400 text-[11px]">Overrides category filter; preserves curated order.</small>
+            </div>
+
+            <div>
+                <label class="shop-label mb-1">Category Filter (Fallback)</label>
                 <select name="FormCategorySlug" class="shop-input">
                     <option value="">All Categories (Latest)</option>
                     @foreach (var c in _categories)
@@ -208,6 +229,9 @@
     public string? FormCategorySlug { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
+    public int? FormCollectionId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "save-section")]
     public int? FormItemLimit { get; set; }
 
     [SupplyParameterFromForm(FormName = "save-section")]
@@ -216,6 +240,7 @@
     private List<HomepageSection> _sections = [];
     private IQueryable<HomepageSection> sectionsQuery => _sections.AsQueryable();
     private List<Category> _categories = [];
+    private List<Collection> _collections = [];
     private HomepageSection? editSection;
     private string? _toast;
 
@@ -272,7 +297,23 @@
         }
         else if (SaveAction == "save" && !string.IsNullOrWhiteSpace(FormTitle))
         {
-            var viewHref = string.IsNullOrWhiteSpace(FormCategorySlug) ? "/products" : $"/category/{FormCategorySlug}";
+            int? collectionId = (FormCollectionId.HasValue && FormCollectionId.Value > 0) ? FormCollectionId.Value : null;
+            string? categorySlug = collectionId.HasValue ? null : FormCategorySlug;
+            string viewHref = "/products";
+            if (collectionId.HasValue)
+            {
+                var publishedPageSlug = await Db.CollectionPages.AsNoTracking()
+                    .Where(p => p.CollectionId == collectionId.Value && p.IsPublished)
+                    .OrderBy(p => p.Id)
+                    .Select(p => p.Slug)
+                    .FirstOrDefaultAsync();
+                viewHref = !string.IsNullOrWhiteSpace(publishedPageSlug) ? $"/collections/{publishedPageSlug}" : "/products";
+            }
+            else if (!string.IsNullOrWhiteSpace(categorySlug))
+            {
+                viewHref = $"/category/{categorySlug}";
+            }
+
             string noticeText;
             if (FormId == null || FormId == 0)
             {
@@ -280,7 +321,8 @@
                 {
                     Title = FormTitle.Trim(),
                     Eyebrow = FormEyebrow?.Trim(),
-                    CategorySlug = FormCategorySlug,
+                    CollectionId = collectionId,
+                    CategorySlug = categorySlug,
                     ViewAllHref = viewHref,
                     ItemLimit = (FormItemLimit == null || FormItemLimit <= 0) ? 8 : FormItemLimit.Value,
                     SortOrder = FormSortOrder ?? 0,
@@ -295,7 +337,8 @@
                 {
                     existing.Title = FormTitle.Trim();
                     existing.Eyebrow = FormEyebrow?.Trim();
-                    existing.CategorySlug = FormCategorySlug;
+                    existing.CollectionId = collectionId;
+                    existing.CategorySlug = categorySlug;
                     existing.ViewAllHref = viewHref;
                     existing.ItemLimit = (FormItemLimit == null || FormItemLimit <= 0) ? 8 : FormItemLimit.Value;
                     existing.SortOrder = FormSortOrder ?? existing.SortOrder;
@@ -318,11 +361,18 @@
     private async Task LoadData()
     {
         _sections = await Db.HomepageSections
+            .Include(s => s.Collection)
             .OrderBy(s => s.SortOrder)
             .ToListAsync();
 
         _categories = await Db.Categories
             .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        _collections = await Db.Collections
+            .AsNoTracking()
+            .Where(c => !c.IsDeleted && c.IsActive)
             .OrderBy(c => c.Name)
             .ToListAsync();
     }

@@ -18,10 +18,34 @@
     </div>
 
     <div class="flex items-center gap-2.5">
+        <a href="/admin/collections" class="btn-primary text-xs shadow-xs">
+            <span>📦 Manage Featured Collection</span>
+        </a>
         <a href="/admin/products" class="btn-secondary text-xs shadow-xs">
             <Icon Name="box" Class="size-3.5" />
             <span>All Products</span>
         </a>
+    </div>
+</div>
+
+<div class="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+        <strong class="font-bold block text-sm">Landing Page Featured Products uses Collections</strong>
+        <span class="text-indigo-800">To pick exact Featured products and set their display order on the homepage, edit the <strong>Homepage Featured</strong> collection (or configure any collection in Homepage Sections).</span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+        @if (_featuredCollectionId.HasValue)
+        {
+            <a href="/admin/collections/@_featuredCollectionId/edit" class="btn-primary !py-1.5 !px-3 text-xs">
+                Edit Homepage Featured Order →
+            </a>
+        }
+        else
+        {
+            <a href="/admin/collections/new" class="btn-primary !py-1.5 !px-3 text-xs">
+                Create Featured Collection →
+            </a>
+        }
     </div>
 </div>
 
@@ -196,6 +220,7 @@
     private int _totalAll;
     private int _totalFeatured;
     private int _totalNew;
+    private int? _featuredCollectionId;
     private string? _toast;
 
     private string FilterUrl(string tab)
@@ -244,6 +269,10 @@
         _totalAll = await Db.Products.CountAsync(p => !p.IsDeleted);
         _totalFeatured = await Db.Products.CountAsync(p => !p.IsDeleted && p.IsFeatured);
         _totalNew = await Db.Products.CountAsync(p => !p.IsDeleted && p.IsNewArrival);
+        _featuredCollectionId = await Db.Collections.AsNoTracking()
+            .Where(c => !c.IsDeleted && c.Slug == "homepage-featured")
+            .Select(c => (int?)c.Id)
+            .FirstOrDefaultAsync();
     }
 
     private async Task LoadProductsAsync()

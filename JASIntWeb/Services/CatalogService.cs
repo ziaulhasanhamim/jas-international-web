@@ -7,7 +7,8 @@ namespace JASIntWeb.Services;
 public sealed class CatalogService(
     IDbContextFactory<AppDbContext> dbFactory,
     HybridCache cache,
-    IOutputCacheStore? outputCache = null)
+    IOutputCacheStore? outputCache = null,
+    CollectionService? collectionService = null)
 {
     public const string TagCatalog = "catalog";
     public const string TagCategories = "categories";
@@ -93,6 +94,8 @@ public sealed class CatalogService(
     public async Task InvalidateBrandsCacheAsync()
     {
         await cache.RemoveByTagAsync(TagBrands);
+        await cache.RemoveByTagAsync(CollectionService.TagCollections);
+        await cache.RemoveByTagAsync(TagSections);
         await EvictHomePageOutputCacheAsync();
     }
 
@@ -118,6 +121,7 @@ public sealed class CatalogService(
     public async Task InvalidateCategoriesCacheAsync()
     {
         await cache.RemoveByTagAsync(TagCategories);
+        await cache.RemoveByTagAsync(CollectionService.TagCollections);
         await cache.RemoveByTagAsync(TagSections);
         await EvictHomePageOutputCacheAsync();
     }
@@ -279,6 +283,7 @@ public sealed class CatalogService(
         {
             await cache.RemoveByTagAsync(TagProducts);
         }
+        await cache.RemoveByTagAsync(CollectionService.TagCollections);
         await cache.RemoveByTagAsync(TagSections);
         await EvictHomePageOutputCacheAsync();
     }
@@ -367,7 +372,23 @@ public sealed class CatalogService(
                 var result = new List<HomepageSectionDto>();
                 foreach (var s in sections)
                 {
-                    var products = await LatestAsync(s.CategorySlug, s.ItemLimit);
+                    List<ProductSummaryDto> products;
+                    string viewAllHref = s.ViewAllHref;
+
+                    if (s.CollectionId.HasValue && collectionService != null)
+                    {
+                        products = await collectionService.GetCollectionProductsAsync(s.CollectionId.Value, s.ItemLimit, ct);
+                        if (string.IsNullOrWhiteSpace(viewAllHref) || viewAllHref == "/products")
+                        {
+                            var colPageSlug = await collectionService.GetPublishedPageSlugForCollectionAsync(s.CollectionId.Value, ct);
+                            viewAllHref = !string.IsNullOrWhiteSpace(colPageSlug) ? $"/collections/{colPageSlug}" : "/products";
+                        }
+                    }
+                    else
+                    {
+                        products = await LatestAsync(s.CategorySlug, s.ItemLimit);
+                    }
+
                     if (products.Count > 0)
                     {
                         result.Add(new HomepageSectionDto(
@@ -375,21 +396,23 @@ public sealed class CatalogService(
                             s.Title,
                             s.Eyebrow,
                             s.CategorySlug,
-                            s.ViewAllHref,
+                            viewAllHref,
                             s.SortOrder,
                             s.IsActive,
                             s.ItemLimit,
-                            products
+                            products,
+                            s.CollectionId
                         ));
                     }
                 }
                 return result;
             },
             options: StandardOptions,
-            tags: [TagCatalog, TagSections]);
+            tags: [TagCatalog, TagSections, CollectionService.TagCollections]);
 
     public async Task InvalidateHomepageSectionsCacheAsync()
     {
+        await cache.RemoveByTagAsync(CollectionService.TagCollections);
         await cache.RemoveByTagAsync(TagSections);
         await EvictHomePageOutputCacheAsync();
     }
