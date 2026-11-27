@@ -270,5 +270,18 @@ public class CampaignPricingIntegrationTests : JasIntegrationTestBase
         var offerHtml = await AnonymousClient.GetStringAsync($"/offers/{liveCampaign.Slug}");
         await offerHtml.Contains(liveCampaign.Name).Should().BeTrue();
         await offerHtml.Contains("Tk. 1,111").Should().BeTrue();
+
+        // Verify upcoming campaign shows regular price + upcoming offer price preview on /offers/{futureCampaign.Slug}
+        var futureDetailsCheck = await campaignSvc.GetCampaignBySlugAsync(futureCampaign.Slug);
+        await futureDetailsCheck.Should().NotBeNull();
+        var futureProdSummary = futureDetailsCheck!.Products.Single(p => p.Id == pFuture.Id);
+        await futureProdSummary.Price.Should().BeEqualTo(1500m);
+        await futureProdSummary.CampaignOffer.Should().NotBeNull();
+        await futureProdSummary.CampaignOffer!.IsUpcoming.Should().BeTrue();
+        await futureProdSummary.CampaignOffer.EffectivePrice.Should().BeEqualTo(750m);
+
+        var upcomingHtml = await AnonymousClient.GetStringAsync($"/offers/{futureCampaign.Slug}");
+        await upcomingHtml.Contains("Tk. 1,500").Should().BeTrue();
+        await upcomingHtml.Contains("Tk. 750").Should().BeTrue();
     }
 }

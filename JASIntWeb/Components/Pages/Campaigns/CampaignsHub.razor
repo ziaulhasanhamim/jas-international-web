@@ -30,7 +30,7 @@
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         @if (campaigns.Count == 0)
         {
             <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
@@ -51,7 +51,7 @@
                 <div class="relative flex-1 max-w-md">
                     <input @bind="searchTerm" @bind:event="oninput"
                            class="shop-input !mt-0 text-xs pr-9 pl-9"
-                           placeholder="Search offers &amp; festival sales..." />
+                           placeholder="Search offers & festival sales..." />
                     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Icon Name="search" Class="size-4" />
                     </span>
@@ -139,10 +139,16 @@
                         @if (!string.IsNullOrWhiteSpace(primary.BannerImageUrl))
                         {
                             <div class="lg:col-span-5">
-                                <a href="/campaigns/@primary.Slug" class="block aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-md group">
-                                    <img src="@primary.BannerImageUrl"
-                                         alt="@primary.Name"
-                                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <a href="/campaigns/@primary.Slug" class="block rounded-2xl overflow-hidden shadow-md bg-slate-100 group">
+                                    <picture>
+                                        @if (!string.IsNullOrWhiteSpace(primary.MobileBannerImageUrl))
+                                        {
+                                            <source media="(max-width: 640px)" srcset="@primary.MobileBannerImageUrl" />
+                                        }
+                                        <img src="@primary.BannerImageUrl"
+                                             alt="@primary.Name"
+                                             class="w-full h-auto max-h-[340px] object-contain mx-auto block transition-transform duration-500 group-hover:scale-[1.02]" />
+                                    </picture>
                                 </a>
                             </div>
                         }
@@ -160,8 +166,8 @@
                                 <article class="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden flex flex-col justify-between">
                                     @if (!string.IsNullOrWhiteSpace(c.BannerImageUrl))
                                     {
-                                        <a href="/campaigns/@c.Slug" class="block aspect-video overflow-hidden">
-                                            <img src="@c.BannerImageUrl" alt="@c.Name" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                                        <a href="/campaigns/@c.Slug" class="block bg-slate-100 overflow-hidden">
+                                            <img src="@c.BannerImageUrl" alt="@c.Name" class="w-full h-auto max-h-52 object-contain mx-auto block hover:scale-[1.02] transition-transform duration-300" />
                                         </a>
                                     }
                                     <div class="p-5 flex-1 flex flex-col justify-between space-y-3">

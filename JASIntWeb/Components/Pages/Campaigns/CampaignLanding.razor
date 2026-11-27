@@ -155,11 +155,11 @@ else
                         }
                     </div>
 
-                    <!-- Banner Graphic (Responsive Picture with Mobile Fallback) -->
+                    <!-- Banner Graphic (Responsive Picture with Mobile Fallback, Uncropped) -->
                     @if (!string.IsNullOrWhiteSpace(campaign.BannerImageUrl))
                     {
                         <div class="lg:col-span-5">
-                            <div class="aspect-video sm:aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black/20">
+                            <div class="rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black/25">
                                 <picture>
                                     @if (!string.IsNullOrWhiteSpace(campaign.MobileBannerImageUrl))
                                     {
@@ -167,7 +167,7 @@ else
                                     }
                                     <img src="@campaign.BannerImageUrl"
                                          alt="@campaign.Name"
-                                         class="w-full h-full object-cover" />
+                                         class="w-full h-auto max-h-[380px] object-contain mx-auto block" />
                                 </picture>
                             </div>
                         </div>
@@ -178,6 +178,18 @@ else
 
         @if (campaign.Products.Count > 0)
         {
+            @if (isUpcoming && (campaign.DiscountScenario == CampaignDiscountScenario.DirectDiscount || campaign.DiscountScenario == CampaignDiscountScenario.DirectAndCoupon))
+            {
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-xs sm:text-sm text-indigo-900 flex items-center gap-2.5 shadow-2xs">
+                        <span class="text-base shrink-0">🕒</span>
+                        <span>
+                            <strong>Campaign starts @(campaign.StartDate?.ToLocalTime().ToString("MMM dd, hh:mm tt")):</strong>
+                            Regular prices apply now; each deal card below previews the exact offer price that activates automatically at launch.
+                        </span>
+                    </div>
+                </div>
+            }
             <!-- Category Chips & Social Share Toolbar -->
             <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">

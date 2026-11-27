@@ -10,7 +10,9 @@ public sealed record ActiveCampaignDiscountDto(
     decimal RegularPrice,
     decimal SavingsAmount,
     int DiscountPercent,
-    DateTimeOffset? EndsAt);
+    DateTimeOffset? EndsAt,
+    bool IsUpcoming = false,
+    DateTimeOffset? StartsAt = null);
 
 public sealed record ProductSummaryDto(int Id, string Name, string Slug, decimal Price, string Category, string Image,
     int? DefaultVariantId, int DefaultVariantStock, string? BrandName = null, string? BrandSlug = null,

@@ -181,6 +181,13 @@ public sealed class CampaignService(
         if (details is not null && campaignPricing is not null && details.Products.Count > 0)
         {
             var pricedProducts = await campaignPricing.ApplyCampaignPricingAsync(details.Products, ct);
+            var now = DateTimeOffset.UtcNow;
+            if (details.StartDate.HasValue && details.StartDate.Value > now
+                && (details.DiscountScenario == CampaignDiscountScenario.DirectDiscount
+                    || details.DiscountScenario == CampaignDiscountScenario.DirectAndCoupon))
+            {
+                pricedProducts = await campaignPricing.PreviewUpcomingCampaignPricingAsync(details.Id, pricedProducts, ct);
+            }
             return details with { Products = pricedProducts };
         }
 

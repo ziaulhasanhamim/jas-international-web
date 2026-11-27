@@ -247,6 +247,92 @@ public sealed class CampaignPricingService(
         return updated;
     }
 
+    /// <summary>
+    /// Populates preview CampaignOffer metadata (IsUpcoming = true) for products shown on an upcoming campaign page
+    /// while leaving ProductSummaryDto.Price untouched at regular price until StartDate arrives.
+    /// </summary>
+    public async Task<List<ProductSummaryDto>> PreviewUpcomingCampaignPricingAsync(
+        int campaignId,
+        IReadOnlyList<ProductSummaryDto> products,
+        CancellationToken ct = default)
+    {
+        if (products.Count == 0)
+        {
+            return [.. products];
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var c = await db.Campaigns.AsNoTracking()
+            .Include(x => x.CampaignProducts)
+            .FirstOrDefaultAsync(x => x.Id == campaignId && x.IsActive
+                && (x.DiscountScenario == CampaignDiscountScenario.DirectDiscount
+                    || x.DiscountScenario == CampaignDiscountScenario.DirectAndCoupon), ct);
+
+        if (c is null)
+        {
+            return [.. products];
+        }
+
+        var now = _time.GetUtcNow();
+        if (!c.StartDate.HasValue || c.StartDate.Value <= now || (c.EndDate.HasValue && c.EndDate.Value <= now))
+        {
+            return [.. products];
+        }
+
+        var collectionIds = new HashSet<int>();
+        if (c.CollectionId.HasValue && c.DefaultDiscountType.HasValue && c.DefaultDiscountValue is > 0m)
+        {
+            var ids = await collections.GetCollectionProductIdsAsync(c.CollectionId.Value, ct);
+            foreach (var id in ids) collectionIds.Add(id);
+        }
+
+        var overrides = new Dictionary<(int ProductId, int? VariantId), CampaignProductOverrideRule>();
+        foreach (var cp in c.CampaignProducts)
+        {
+            overrides[(cp.ProductId, cp.ProductVariantId)] = new CampaignProductOverrideRule(
+                cp.ProductId, cp.ProductVariantId, cp.DiscountType, cp.DiscountValue, cp.MaxDiscountAmount);
+        }
+
+        var rule = new CachedCampaignPricingRule(
+            c.Id, c.Name, c.Slug,
+            !string.IsNullOrWhiteSpace(c.BadgeText) ? c.BadgeText.Trim() : c.Name,
+            string.IsNullOrWhiteSpace(c.ThemeColor) ? "rose" : c.ThemeColor,
+            c.StartDate, c.EndDate, c.SortOrder,
+            c.DefaultDiscountType, c.DefaultDiscountValue, c.MaxDiscountAmount,
+            collectionIds, overrides);
+
+        var inputs = products
+            .Select(p => (p.Id, VariantId: p.DefaultVariantId ?? 0, SellingPrice: p.Price, CompareAtPrice: p.OriginalPrice))
+            .ToList();
+
+        var previewOffers = await ResolveVariantOffersByProductAndVariantAsync(inputs, [rule]);
+
+        var updated = new List<ProductSummaryDto>(products.Count);
+        foreach (var product in products)
+        {
+            // Keep regular Product.Price unchanged before StartDate; only preview if no live campaign already beats it
+            if (product.CampaignOffer is null
+                && previewOffers.TryGetValue(product.Id, out var offer)
+                && offer.EffectivePrice < product.Price)
+            {
+                updated.Add(product with
+                {
+                    CampaignOffer = offer with
+                    {
+                        IsUpcoming = true,
+                        StartsAt = c.StartDate
+                    }
+                });
+            }
+            else
+            {
+                updated.Add(product);
+            }
+        }
+
+        return updated;
+    }
+
     private static Task<Dictionary<int, ActiveCampaignDiscountDto>> ResolveVariantOffersByProductAndVariantAsync(
         IReadOnlyList<(int ProductId, int VariantId, decimal SellingPrice, decimal? CompareAtPrice)> inputs,
         IReadOnlyList<CachedCampaignPricingRule> liveRules)
