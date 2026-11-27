@@ -85,7 +85,7 @@
             value="@Query"
             class="field pr-9 !py-1.5 text-xs"
             placeholder="Search categories..."
-            oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
+            data-debounce-submit="350"
         />
         <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
             <Icon Name="search" Class="size-3.5" />
@@ -107,7 +107,7 @@
             <button type="submit" name="BulkAction" value="restore" class="btn-secondary !py-1 !px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer">
                 Restore Selected
             </button>
-            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Are you sure you want to delete selected categories? Categories with active products will be safely hidden.')">
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" data-confirm="Are you sure you want to delete selected categories? Categories with active products will be safely hidden.">
                 Delete Selected
             </button>
         </div>
@@ -120,7 +120,7 @@
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-categories"
                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                               onclick="document.querySelectorAll('.cat-select-cb').forEach(cb => cb.checked = this.checked)"
+                               data-select-all=".cat-select-cb"
                                title="Select all" />
                     </HeaderTemplate>
                     <ChildContent Context="c">
@@ -186,7 +186,7 @@
                             name="ToggleVisibilityId"
                             value="@context.Id"
                             class="btn-secondary !px-2.5 !py-1 text-xs @(context.IsDeleted ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-700 hover:bg-amber-50") cursor-pointer"
-                            onclick="@(context.IsDeleted ? "" : "return confirm('Hide this category from storefront?');")"
+                            data-confirm="@(context.IsDeleted ? null : "Hide this category from storefront?")"
                             title="@(context.IsDeleted ? "Restore category" : "Hide category")"
                         >
                             @(context.IsDeleted ? "Restore" : "Hide")
@@ -198,7 +198,7 @@
                                 name="HardDeleteCategoryId"
                                 value="@context.Id"
                                 class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                onclick="return confirm('Permanently delete this category?');"
+                                data-confirm="Permanently delete this category?"
                                 title="Delete category"
                             >
                                 Delete

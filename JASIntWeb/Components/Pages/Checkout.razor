@@ -930,7 +930,8 @@
             {
                 var auth = AuthStateTask != null ? await AuthStateTask : null;
                 var uid = auth?.User != null ? ShoppingService.UserId(auth.User) : null;
-                var attr = await JS.InvokeAsync<MetaAttributionDto>("window.jasGetAttribution");
+                await using var metaModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/meta-tracking.js");
+                var attr = await metaModule.InvokeAsync<MetaAttributionDto>("getAttribution");
                 await Shop.RecordLeadCartAsync(uid, phoneNumber, customerName, email, Cart.Items.ToList(), attr);
             }
             catch
@@ -1193,7 +1194,8 @@
             // Retrieve client-side Meta Ads attribution if available
             try
             {
-                var attr = await JS.InvokeAsync<MetaAttributionDto>("window.jasGetAttribution");
+                await using var metaModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/meta-tracking.js");
+                var attr = await metaModule.InvokeAsync<MetaAttributionDto>("getAttribution");
                 if (attr != null)
                 {
                     checkoutRequest.Fbclid = attr.Fbclid;
@@ -1228,7 +1230,8 @@
 
             try
             {
-                await JS.InvokeVoidAsync("window.jasClearCartCookie");
+                await using var cartModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/cart.js");
+                await cartModule.InvokeVoidAsync("clearCartToken");
             }
             catch
             {
@@ -1237,7 +1240,8 @@
 
             try
             {
-                await JS.InvokeVoidAsync("window.jasRecordGuestOrder", result.OrderId, result.PublicToken.ToString(), result.Total);
+                await using var ordersModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/device-orders.js");
+                await ordersModule.InvokeVoidAsync("recordGuestOrder", result.OrderId, result.PublicToken.ToString(), result.Total);
             }
             catch
             {

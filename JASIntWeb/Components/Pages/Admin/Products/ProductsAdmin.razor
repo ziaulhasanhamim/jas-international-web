@@ -65,7 +65,7 @@
 
     <form method="get" data-enhance class="flex flex-wrap items-center gap-2.5">
         <input type="hidden" name="status" value="@Filter" />
-        <select name="category" onchange="this.form.submit()" class="field !py-1.5 text-xs w-auto min-w-[150px]">
+        <select name="category" data-auto-submit class="field !py-1.5 text-xs w-auto min-w-[150px]">
             <option value="0" selected="@(CategoryId == 0)">All Categories</option>
             @foreach (var c in _categories)
             {
@@ -79,7 +79,7 @@
                 value="@Query"
                 class="field pr-9 !py-1.5 text-xs"
                 placeholder="Search name, slug, SKU..."
-                oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
+                data-debounce-submit="350"
             />
             <button type="submit" class="absolute right-2 top-2 text-slate-400 hover:text-slate-700">
                 <Icon Name="search" Class="size-3.5" />
@@ -102,7 +102,7 @@
             <button type="submit" name="BulkAction" value="archive" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 cursor-pointer">
                 Archive Selected
             </button>
-            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Permanently archive/delete selected products?')">
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" data-confirm="Permanently archive/delete selected products?">
                 Delete Selected
             </button>
         </div>
@@ -127,7 +127,7 @@
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-products"
                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                               onclick="document.querySelectorAll('.prod-select-cb').forEach(cb => cb.checked = this.checked)"
+                               data-select-all=".prod-select-cb"
                                title="Select all" />
                     </HeaderTemplate>
                     <ChildContent Context="p">

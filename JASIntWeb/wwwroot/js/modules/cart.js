@@ -1,51 +1,28 @@
 /**
  * JAS International - Functional Cart Module (ES2024+)
- * High-performance, functional cart controller with 0ms optimistic UI updates,
- * declarative data-* delegation, and native CustomEvents.
+ * Optimistic UI cart controller routed through core/api.js and core/events.js,
+ * with declarative data-* delegation and Blazor JS interop aliases.
  */
+
+import { emit } from '../core/events.js';
+import { request } from '../core/api.js';
 
 let currentCartState = null;
 
-/**
- * Returns the latest in-memory cart state if available.
- * @returns {object|null}
- */
 export function getCurrentCart() {
     return currentCartState;
 }
 
-/**
- * Dispatches a custom event from document.
- * @param {string} eventName
- * @param {any} [detail=null]
- */
-export function emit(eventName, detail = null) {
-    if (typeof document !== 'undefined' && typeof CustomEvent === 'function') {
-        document.dispatchEvent(new CustomEvent(eventName, { bubbles: true, cancelable: true, detail }));
-    }
-}
-
-/**
- * Reads the secure cart GUID token from the client cookie.
- * @returns {string|null}
- */
 export function getCartToken() {
     const match = typeof document !== 'undefined' && document.cookie ? document.cookie.match(/(?:^|;\s*)jas_cart_id=([^;]*)/) : null;
     return match ? decodeURIComponent(match[1]) : null;
 }
 
-/**
- * Sets the cart GUID token in the browser cookie.
- * @param {string} token
- */
 export function setCartToken(token) {
     if (!token || typeof document === 'undefined') return;
     document.cookie = `jas_cart_id=${encodeURIComponent(token)}; path=/; max-age=2592000; SameSite=Lax`;
 }
 
-/**
- * Clears the cart cookie and resets cart badges.
- */
 export function clearCartToken() {
     if (typeof document !== 'undefined') {
         document.cookie = 'jas_cart_id=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
@@ -55,10 +32,6 @@ export function clearCartToken() {
     emit('cart:cleared');
 }
 
-/**
- * Updates all cart badge elements across the page with the latest count.
- * @param {number} count
- */
 export function updateCartBadges(count) {
     const safeCount = Math.max(0, parseInt(count, 10) || 0);
     if (typeof document === 'undefined') return;
@@ -69,19 +42,12 @@ export function updateCartBadges(count) {
             badge.setAttribute('data-cart-count', safeCount);
         }
 
-        // Add micro-pulse animation
         badge.classList.remove('animate-pulse');
-        if ('offsetWidth' in badge) void badge.offsetWidth; // Force reflow
+        if ('offsetWidth' in badge) void badge.offsetWidth;
         badge.classList.add('animate-pulse');
     });
 }
 
-/**
- * Displays a non-intrusive floating toast notification.
- * @param {string} message
- * @param {'success'|'error'|'info'} [type='success']
- * @param {{ text: string, href: string }|null} [action=null]
- */
 export function showCartToast(message, type = 'success', action = { text: 'View Cart →', href: '/cart' }) {
     if (typeof document === 'undefined') return;
     let container = document.getElementById('jas-toast-container');
@@ -138,163 +104,98 @@ export function showCartToast(message, type = 'success', action = { text: 'View 
     }
 }
 
-/**
- * Fetches the current cart from the backend API.
- * @returns {Promise<object|null>}
- */
 export async function fetchCart() {
-    try {
-        const response = await fetch('/api/cart', {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            credentials: 'same-origin',
-            cache: 'no-store'
-        });
-        if (response.ok) {
-            const data = await response.json();
-            currentCartState = data;
-            if (data?.token) setCartToken(data.token);
-            updateCartBadges(data?.itemCount ?? 0);
-            emit('cart:updated', data);
-            return data;
-        }
-    } catch (e) {
-        console.warn('[JAS] Failed to fetch cart:', e);
+    const res = await request('/api/cart');
+    if (res.ok && res.data) {
+        currentCartState = res.data;
+        if (res.data?.token) setCartToken(res.data.token);
+        updateCartBadges(res.data?.itemCount ?? 0);
+        emit('cart:updated', res.data);
+        return res.data;
     }
     return null;
 }
 
-/**
- * Fetches the current cart item count from the backend API.
- * @returns {Promise<number>}
- */
 export async function refreshCartBadge() {
-    try {
-        const response = await fetch('/api/cart/count', {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            credentials: 'same-origin',
-            cache: 'no-store'
-        });
-        if (response.ok) {
-            const data = await response.json();
-            const count = typeof data?.count === 'number' ? data.count : 0;
-            updateCartBadges(count);
-            return count;
-        }
-    } catch (e) {
-        console.warn('[JAS] Failed to refresh cart badge:', e);
+    const res = await request('/api/cart/count');
+    if (res.ok && res.data) {
+        const count = typeof res.data?.count === 'number' ? res.data.count : 0;
+        updateCartBadges(count);
+        return count;
     }
     return 0;
 }
 
-/**
- * Adds an item to the cart using the backend API.
- * @param {number} variantId
- * @param {number} [quantity=1]
- * @param {number} [productId=0]
- * @param {{ showToast?: boolean }} [options={ showToast: true }]
- * @returns {Promise<{success: boolean, message?: string, cart?: object}>}
- */
 export async function addToCart(variantId, quantity = 1, productId = 0, { showToast = true } = {}) {
-    try {
-        const payload = {
-            variantId: Number(variantId) || 0,
-            quantity: Math.max(1, Number(quantity) || 1),
-            productId: Number(productId) || 0
-        };
+    const payload = {
+        variantId: Number(variantId) || 0,
+        quantity: Math.max(1, Number(quantity) || 1),
+        productId: Number(productId) || 0
+    };
 
-        const securityResponse = await fetch('/api/cart/security', { credentials: 'same-origin', cache: 'no-store' });
-        if (!securityResponse.ok) throw new Error('Could not secure the cart request.');
-        const security = await securityResponse.json();
+    const res = await request('/api/cart', {
+        method: 'POST',
+        body: payload,
+        includeCsrf: true,
+        csrfUrl: '/api/cart/security'
+    });
 
-        const response = await fetch('/api/cart', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': security.token
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(payload)
-        });
+    if (res.ok && res.data) {
+        const cart = res.data;
+        currentCartState = cart;
+        if (cart?.token) setCartToken(cart.token);
 
-        if (response.ok) {
-            const cart = await response.json();
-            currentCartState = cart;
-            if (cart?.token) setCartToken(cart.token);
+        const totalCount = cart?.itemCount ?? (Array.isArray(cart?.items) ? cart.items.reduce((s, x) => s + (x.quantity || 0), 0) : 1);
+        updateCartBadges(totalCount);
 
-            const totalCount = cart?.itemCount ?? (Array.isArray(cart?.items) ? cart.items.reduce((s, x) => s + (x.quantity || 0), 0) : 1);
-            updateCartBadges(totalCount);
+        emit('cart:updated', cart);
 
-            emit('cart:updated', cart);
+        try {
+            const addedItem = Array.isArray(cart?.items) ? cart.items.find(i => i.variantId === Number(variantId)) : null;
+            const sku = cart?.addedSku || addedItem?.sku || (variantId ? `V${variantId}` : null);
+            const eventId = cart?.metaEventId || res.headers?.get('X-Meta-Event-Id') || `atc_${variantId}_${Date.now()}`;
+            const price = addedItem?.price || 0;
+            const name = addedItem?.name || 'Product';
+            const qty = Math.max(1, Number(quantity) || 1);
 
-            // Track Meta Pixel AddToCart event
-            try {
-                const addedItem = Array.isArray(cart?.items) ? cart.items.find(i => i.variantId === Number(variantId)) : null;
-                const sku = cart?.addedSku || addedItem?.sku || (variantId ? `V${variantId}` : null);
-                const eventId = cart?.metaEventId || response.headers?.get('X-Meta-Event-Id') || `atc_${variantId}_${Date.now()}`;
-                const price = addedItem?.price || 0;
-                const name = addedItem?.name || 'Product';
-                const qty = Math.max(1, Number(quantity) || 1);
-
-                if (sku && typeof window.jasTrackMeta === 'function') {
-                    window.jasTrackMeta('AddToCart', {
-                        content_ids: [String(sku).trim().toUpperCase()],
-                        content_name: name,
-                        content_type: 'product',
-                        value: price * qty,
-                        currency: 'BDT'
-                    }, eventId);
-                }
-            } catch (trackErr) {
-                console.debug('[Cart] Meta AddToCart tracking error:', trackErr);
+            if (sku && typeof window.jasTrackMeta === 'function') {
+                window.jasTrackMeta('AddToCart', {
+                    content_ids: [String(sku).trim().toUpperCase()],
+                    content_name: name,
+                    content_type: 'product',
+                    value: price * qty,
+                    currency: 'BDT'
+                }, eventId);
             }
-
-            if (showToast) {
-                showCartToast('Added to your shopping cart!', 'success');
-            }
-            return { success: true, cart };
-        } else {
-            let message = 'Could not add item to cart.';
-            try {
-                const data = await response.json();
-                if (data?.message) message = data.message;
-            } catch {}
-
-            showCartToast(message, 'error', null);
-            emit('cart:error', { message });
-            return { success: false, message };
+        } catch (trackErr) {
+            console.debug('[Cart] Meta AddToCart tracking error:', trackErr);
         }
-    } catch (err) {
-        console.error('[JAS] Add to cart error:', err);
-        showCartToast('Network error. Please try again.', 'error', null);
-        emit('cart:error', { message: 'Network error.' });
-        return { success: false, message: 'Network error.' };
+
+        if (showToast) {
+            showCartToast('Added to your shopping cart!', 'success');
+        }
+        return { success: true, cart };
     }
+
+    const message = res.status === 0
+        ? 'Network error. Please try again.'
+        : (res.data?.message || res.error || 'Could not add item to cart.');
+    showCartToast(message, 'error', null);
+    emit('cart:error', { message });
+    return { success: false, message };
 }
 
-/**
- * Sets the quantity of an item with optimistic updates and error rollback.
- * @param {number} variantId
- * @param {number} quantity
- * @returns {Promise<{success: boolean, cart?: object}>}
- */
 export async function setQuantity(variantId, quantity) {
     const targetQty = Math.max(0, Math.min(99, Number(quantity) || 0));
     const previousState = currentCartState;
 
-    // 1. Optimistic in-memory update
     if (currentCartState && Array.isArray(currentCartState.items)) {
-        let updatedItems;
-        if (targetQty === 0) {
-            updatedItems = currentCartState.items.filter(i => i.variantId !== variantId);
-        } else {
-            updatedItems = currentCartState.items.map(i => i.variantId === variantId
+        const updatedItems = targetQty === 0
+            ? currentCartState.items.filter(i => i.variantId !== variantId)
+            : currentCartState.items.map(i => i.variantId === variantId
                 ? { ...i, quantity: targetQty, lineTotal: targetQty * (i.unitPrice || i.price || 0) }
                 : i
             );
-        }
 
         const newSubtotal = updatedItems.reduce((acc, i) => acc + (i.lineTotal || (i.quantity * (i.unitPrice || i.price || 0))), 0);
         const newItemCount = updatedItems.reduce((acc, i) => acc + i.quantity, 0);
@@ -311,77 +212,39 @@ export async function setQuantity(variantId, quantity) {
         emit('cart:updated', optimisticCart);
     }
 
-    // 2. Dispatch to backend
-    try {
-        const securityResponse = await fetch('/api/cart/security', { credentials: 'same-origin', cache: 'no-store' });
-        const security = securityResponse.ok ? await securityResponse.json() : null;
+    const res = await request('/api/cart', {
+        method: 'PUT',
+        body: { variantId, quantity: targetQty },
+        includeCsrf: true,
+        csrfUrl: '/api/cart/security'
+    });
 
-        const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        };
-        if (security?.token) {
-            headers['X-CSRF-TOKEN'] = security.token;
-        }
-
-        const response = await fetch('/api/cart', {
-            method: 'PUT',
-            headers,
-            credentials: 'same-origin',
-            body: JSON.stringify({ variantId, quantity: targetQty })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            currentCartState = data;
-            if (data?.token) setCartToken(data.token);
-            updateCartBadges(data?.itemCount ?? 0);
-            emit('cart:updated', data);
-            return { success: true, cart: data };
-        }
-
-        // Rollback on non-200
-        if (previousState) {
-            currentCartState = previousState;
-            updateCartBadges(previousState.itemCount ?? 0);
-            emit('cart:updated', previousState);
-        }
-
-        let message = 'Could not update item quantity.';
-        try {
-            const err = await response.json();
-            if (err?.message) message = err.message;
-        } catch {}
-
-        showCartToast(message, 'error', null);
-        emit('cart:error', { message });
-        return { success: false, message };
-    } catch (err) {
-        if (previousState) {
-            currentCartState = previousState;
-            updateCartBadges(previousState.itemCount ?? 0);
-            emit('cart:updated', previousState);
-        }
-        showCartToast('Network error. Please try again.', 'error', null);
-        emit('cart:error', { message: 'Network error.' });
-        return { success: false, message: 'Network error.' };
+    if (res.ok && res.data) {
+        currentCartState = res.data;
+        if (res.data?.token) setCartToken(res.data.token);
+        updateCartBadges(res.data?.itemCount ?? 0);
+        emit('cart:updated', res.data);
+        return { success: true, cart: res.data };
     }
+
+    if (previousState) {
+        currentCartState = previousState;
+        updateCartBadges(previousState.itemCount ?? 0);
+        emit('cart:updated', previousState);
+    }
+
+    const message = res.status === 0
+        ? 'Network error. Please try again.'
+        : (res.data?.message || res.error || 'Could not update item quantity.');
+    showCartToast(message, 'error', null);
+    emit('cart:error', { message });
+    return { success: false, message };
 }
 
-/**
- * Removes an item from the cart.
- * @param {number} variantId
- */
 export function removeFromCart(variantId) {
     return setQuantity(variantId, 0);
 }
 
-/**
- * Adds item to cart and navigates directly to /cart or /checkout.
- * @param {number} variantId
- * @param {number} [quantity=1]
- * @param {number} [productId=0]
- */
 export async function buyNow(variantId, quantity = 1, productId = 0) {
     const result = await addToCart(variantId, quantity, productId, { showToast: false });
     if (result.success) {
@@ -393,22 +256,28 @@ export async function buyNow(variantId, quantity = 1, productId = 0) {
     }
 }
 
-/**
- * Synchronizes cart badges from in-page sync marker elements if present.
- */
 export function syncCartBadges() {
     refreshCartBadge();
 }
 
-/**
- * Wires global delegated click listeners for all cart actions.
- */
+function resolveButtonQuantity(button) {
+    const qtyTarget = button.getAttribute('data-quantity-target');
+    if (qtyTarget) {
+        const input = document.querySelector(qtyTarget);
+        if (input) return parseInt(input.value, 10) || 1;
+    } else {
+        const container = button.closest('form, div, article');
+        const input = container?.querySelector('input[name="Quantity"], input[name="quantity"]');
+        if (input) return parseInt(input.value, 10) || 1;
+    }
+    return 1;
+}
+
 export function initCartDelegation() {
     if (typeof document === 'undefined' || document.__jasCartDelegated) return;
     document.__jasCartDelegated = true;
 
     document.addEventListener('click', async (e) => {
-        // 1. Add to Cart button
         const addBtn = e.target.closest('[data-cart-add], [data-add-to-cart]');
         if (addBtn) {
             e.preventDefault();
@@ -416,17 +285,7 @@ export function initCartDelegation() {
 
             const variantId = parseInt(addBtn.getAttribute('data-variant-id'), 10) || 0;
             const productId = parseInt(addBtn.getAttribute('data-product-id'), 10) || 0;
-
-            let qty = 1;
-            const qtyTarget = addBtn.getAttribute('data-quantity-target');
-            if (qtyTarget) {
-                const input = document.querySelector(qtyTarget);
-                if (input) qty = parseInt(input.value, 10) || 1;
-            } else {
-                const container = addBtn.closest('form, div, article');
-                const input = container?.querySelector('input[name="Quantity"], input[name="quantity"]');
-                if (input) qty = parseInt(input.value, 10) || 1;
-            }
+            const qty = resolveButtonQuantity(addBtn);
 
             const origHtml = addBtn.innerHTML;
             addBtn.disabled = true;
@@ -442,10 +301,8 @@ export function initCartDelegation() {
             return;
         }
 
-        // 2. Buy Now button
         const buyBtn = e.target.closest('[data-buy-now]');
         if (buyBtn) {
-            // If the button is inside an SSR form targeting /cart/buy-now, let Blazor enhanced form navigation submit it directly
             const form = buyBtn.closest ? buyBtn.closest('form') : null;
             if (form && typeof form.getAttribute === 'function' && form.getAttribute('action')?.includes('/cart/buy-now')) {
                 return;
@@ -456,17 +313,7 @@ export function initCartDelegation() {
 
             const variantId = parseInt(buyBtn.getAttribute('data-variant-id'), 10) || 0;
             const productId = parseInt(buyBtn.getAttribute('data-product-id'), 10) || 0;
-
-            let qty = 1;
-            const qtyTarget = buyBtn.getAttribute('data-quantity-target');
-            if (qtyTarget) {
-                const input = document.querySelector(qtyTarget);
-                if (input) qty = parseInt(input.value, 10) || 1;
-            } else {
-                const container = buyBtn.closest('form, div, article');
-                const input = container?.querySelector('input[name="Quantity"], input[name="quantity"]');
-                if (input) qty = parseInt(input.value, 10) || 1;
-            }
+            const qty = resolveButtonQuantity(buyBtn);
 
             const origHtml = buyBtn.innerHTML;
             buyBtn.disabled = true;
@@ -481,7 +328,6 @@ export function initCartDelegation() {
             return;
         }
 
-        // 3. Cart Stepper Buttons (+ / -)
         const qtyBtn = e.target.closest('[data-cart-qty]');
         if (qtyBtn) {
             e.preventDefault();
@@ -501,7 +347,6 @@ export function initCartDelegation() {
             return;
         }
 
-        // 4. Cart Remove Button
         const removeBtn = e.target.closest('[data-cart-remove]');
         if (removeBtn) {
             e.preventDefault();
@@ -509,20 +354,16 @@ export function initCartDelegation() {
             if (variantId) {
                 await removeFromCart(variantId);
             }
-            return;
         }
     });
 }
 
-/**
- * Initializes cart module listeners and refreshes badge count.
- */
 export function initCart() {
     refreshCartBadge();
     initCartDelegation();
 }
 
-// Global window exposure
+// Global window exposure for Blazor interop and existing callers
 if (typeof window !== 'undefined') {
     window.jasGetCartToken = getCartToken;
     window.jasClearCartCookie = clearCartToken;

@@ -1,7 +1,12 @@
 /**
  * JAS International - Reviews Module (ES2024+)
- * Handles client-side rating star selection, modal dialogs, and non-reloading enhanced form submissions.
+ * Handles client-side rating star selection, pending review persistence,
+ * and review submissions routed through core/api.js and core/overlay.js.
  */
+
+import { request } from '../core/api.js';
+import { on } from '../core/events.js';
+import { closeOverlay } from '../core/overlay.js';
 
 let isDelegationInitialized = false;
 
@@ -15,10 +20,6 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-/**
- * Sets the star rating value in the form and updates visual stars.
- * @param {number} rating
- */
 export function setStarRating(rating) {
     const input = document.getElementById('review-rating-input');
     const text = document.getElementById('review-rating-text');
@@ -37,40 +38,6 @@ export function setStarRating(rating) {
     });
 }
 
-/**
- * Opens a modal dialog by element ID.
- * @param {string} modalId
- */
-export function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('hidden');
-        const errorEl = document.getElementById('review-form-error');
-        if (errorEl) {
-            errorEl.classList.add('hidden');
-            errorEl.textContent = '';
-        }
-        const nameInput = document.getElementById('review-name');
-        if (nameInput) {
-            setTimeout(() => nameInput.focus(), 50);
-        }
-    }
-}
-
-/**
- * Closes a modal dialog by element ID.
- * @param {string} modalId
- */
-export function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-/**
- * Builds HTML for a review card.
- */
 function createReviewCardHtml(review, isPending = false) {
     const rating = Math.min(5, Math.max(1, parseInt(review.rating, 10) || 5));
     const starsHtml = [1, 2, 3, 4, 5].map(s =>
@@ -116,14 +83,10 @@ function createReviewCardHtml(review, isPending = false) {
     `;
 }
 
-/**
- * Inserts a review into the reviews section on the page.
- */
 function insertReview(review, isPending = false) {
     const container = document.getElementById('reviews-container');
     if (!container) return;
 
-    // Guarantee that at most ONE pending card exists for this author
     if (isPending) {
         container.querySelectorAll('[data-review-pending="true"]').forEach(el => el.remove());
     }
@@ -141,14 +104,9 @@ function insertReview(review, isPending = false) {
         container.appendChild(list);
     }
 
-    const cardHtml = createReviewCardHtml(review, isPending);
-    list.insertAdjacentHTML('afterbegin', cardHtml);
+    list.insertAdjacentHTML('afterbegin', createReviewCardHtml(review, isPending));
 }
 
-/**
- * Restores any locally stored pending reviews for this product on page load.
- * Only shown to the author on their device, and automatically removed once approved.
- */
 function restorePendingReviews() {
     const section = document.getElementById('reviews');
     if (!section) return;
@@ -159,17 +117,14 @@ function restorePendingReviews() {
         const raw = localStorage.getItem(`jas_pending_review_${productId}`);
         if (!raw) return;
         const stored = JSON.parse(raw);
-        // Handle array or single object - take the most recent
         const rev = Array.isArray(stored) ? stored[stored.length - 1] : stored;
         if (!rev || !rev.comment) return;
 
-        // Check if this review was already approved by an admin and rendered in the DOM
         const list = document.getElementById('reviews-list');
         if (list) {
             let alreadyApproved = false;
-            if (rev.id) {
-                const elById = list.querySelector(`[data-review-id="${rev.id}"]`);
-                if (elById) alreadyApproved = true;
+            if (rev.id && list.querySelector(`[data-review-id="${rev.id}"]`)) {
+                alreadyApproved = true;
             }
             if (!alreadyApproved) {
                 const cleanComment = (rev.comment || '').trim().toLowerCase();
@@ -183,15 +138,12 @@ function restorePendingReviews() {
                 });
             }
             if (alreadyApproved) {
-                // The review is now officially approved and visible from server
                 localStorage.removeItem(`jas_pending_review_${productId}`);
                 return;
             }
         }
 
-        // Only insert if not already present
-        const existingPending = document.querySelectorAll('[data-review-pending="true"]');
-        if (existingPending.length > 0) return;
+        if (document.querySelectorAll('[data-review-pending="true"]').length > 0) return;
 
         insertReview(rev, true);
     } catch {
@@ -199,9 +151,6 @@ function restorePendingReviews() {
     }
 }
 
-/**
- * Handles review form submission asynchronously via fetch (no page reload).
- */
 async function handleReviewSubmit(event) {
     const form = event.target.closest('#write-review-form');
     if (!form) return;
@@ -256,43 +205,34 @@ async function handleReviewSubmit(event) {
     }
 
     try {
-        const formData = new FormData(form);
-        const response = await fetch(form.action, {
+        const res = await request(form.action, {
             method: 'POST',
-            body: formData,
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
 
-        if (response.ok) {
-            const data = await response.json();
+        if (res.ok) {
+            const data = res.data || {};
+            closeOverlay('write-review-modal');
 
-            // 1. Close modal cleanly
-            closeModal('write-review-modal');
-
-            // 2. Reset form
             form.reset();
             setStarRating(5);
 
-            // 3. Show success alert in the reviews section
             const alertContainer = document.getElementById('review-alert-container');
             if (alertContainer) {
                 alertContainer.innerHTML = `
                     <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 font-semibold flex items-center justify-between animate-fadeIn">
                         <span>✓ ${escapeHtml(data.message || 'Thank you! Your review has been submitted and is awaiting moderation.')}</span>
-                        <button type="button" onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-950 font-bold p-1 cursor-pointer">✕</button>
+                        <button type="button" data-dismiss-parent class="text-emerald-600 hover:text-emerald-950 font-bold p-1 cursor-pointer" aria-label="Dismiss">✕</button>
                     </div>
                 `;
             }
 
-            // 4. Insert the new review card into the reviews list immediately
             const reviewData = data.review || {
                 customerName: name,
-                rating: rating,
+                rating,
                 title: form.querySelector('[name="Title"]')?.value.trim() || 'Customer Review',
-                comment: comment,
+                comment,
                 createdAt: 'Just now',
                 isApproved: false,
                 isVerifiedPurchase: false
@@ -300,36 +240,19 @@ async function handleReviewSubmit(event) {
 
             insertReview(reviewData, true);
 
-            // 5. Save pending review into localStorage so it persists across refreshes for the author only
             const section = document.getElementById('reviews');
             const productId = section?.getAttribute('data-product-id');
             if (productId) {
                 try {
                     localStorage.setItem(`jas_pending_review_${productId}`, JSON.stringify(reviewData));
-                } catch {
-                    // Ignore localStorage quota errors
-                }
+                } catch {}
             }
 
-            // 6. Smoothly scroll to the reviews section
             section?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-            let errorMsg = 'Failed to submit review. Please try again.';
-            try {
-                const errData = await response.json();
-                if (errData && errData.message) errorMsg = errData.message;
-            } catch {
-                const text = await response.text();
-                if (text) errorMsg = text;
-            }
-            if (errorEl) {
-                errorEl.textContent = errorMsg;
-                errorEl.classList.remove('hidden');
-            }
-        }
-    } catch {
-        if (errorEl) {
-            errorEl.textContent = 'Network error. Please check your connection and try again.';
+        } else if (errorEl) {
+            errorEl.textContent = res.status === 0
+                ? 'Network error. Please check your connection and try again.'
+                : (res.error || 'Failed to submit review. Please try again.');
             errorEl.classList.remove('hidden');
         }
     } finally {
@@ -340,45 +263,26 @@ async function handleReviewSubmit(event) {
     }
 }
 
-/**
- * Initializes document-level event delegation for review controls, modals, and AJAX form submit.
- */
 export function initReviews() {
-    // Restore any pending reviews stored in localStorage
     restorePendingReviews();
 
     if (isDelegationInitialized) return;
     isDelegationInitialized = true;
 
-    // Document click delegation
+    on('overlay:opened', detail => {
+        if (detail?.id !== 'write-review-modal') return;
+        const errorEl = document.getElementById('review-form-error');
+        if (errorEl) {
+            errorEl.classList.add('hidden');
+            errorEl.textContent = '';
+        }
+        const nameInput = document.getElementById('review-name');
+        if (nameInput) {
+            setTimeout(() => nameInput.focus(), 50);
+        }
+    });
+
     document.addEventListener('click', event => {
-        // Modal opener
-        const openBtn = event.target.closest('[data-open-modal]');
-        if (openBtn) {
-            const modalId = openBtn.getAttribute('data-open-modal');
-            openModal(modalId);
-            return;
-        }
-
-        // Modal closer
-        const closeBtn = event.target.closest('[data-close-modal]');
-        if (closeBtn) {
-            const modalId = closeBtn.getAttribute('data-close-modal');
-            closeModal(modalId);
-            return;
-        }
-
-        // Close when clicking directly on the backdrop outside the modal card
-        const modal = event.target;
-        if (modal && modal.id === 'write-review-modal' && !modal.classList.contains('hidden')) {
-            const dialog = modal.querySelector('.max-w-lg');
-            if (dialog && !dialog.contains(event.target)) {
-                closeModal(modal.id);
-                return;
-            }
-        }
-
-        // Star rating button
         const starBtn = event.target.closest('[data-star-rating]');
         if (starBtn) {
             const rating = parseInt(starBtn.getAttribute('data-star-rating'), 10);
@@ -388,20 +292,9 @@ export function initReviews() {
         }
     });
 
-    // Form submit delegation (enhanced AJAX submit, no full-page reload)
     document.addEventListener('submit', event => {
         if (event.target && event.target.id === 'write-review-form') {
             handleReviewSubmit(event);
-        }
-    });
-
-    // Close modal on Escape key
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            const openModalEl = document.querySelector('#write-review-modal:not(.hidden)');
-            if (openModalEl) {
-                closeModal(openModalEl.id);
-            }
         }
     });
 }

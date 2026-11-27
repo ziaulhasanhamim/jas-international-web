@@ -17,7 +17,7 @@
         <form method="get" data-enhance class="brand-search" role="search">
             <input type="hidden" name="status" value="@Filter" />
             <label class="sr-only" for="brand-search">Search brands</label>
-            <input id="brand-search" name="q" value="@Query" placeholder="Search brands…" oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)" />
+            <input id="brand-search" name="q" value="@Query" placeholder="Search brands…" data-debounce-submit="350" />
             <button type="submit" aria-label="Search brands"><Icon Name="search" Class="size-4" /></button>
         </form>
     </div>
