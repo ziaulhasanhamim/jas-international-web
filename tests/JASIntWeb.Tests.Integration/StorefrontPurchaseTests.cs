@@ -29,9 +29,27 @@ public class StorefrontPurchaseTests : JasIntegrationTestBase
         await card.Contains("data-buy-now").Should().BeTrue();
         await card.Contains("data-variant-id=\"1\"").Should().BeTrue();
         await card.Contains("Choose options").Should().BeFalse();
-        var response = await client.PostAsync("/cart/buy-now", new FormUrlEncodedContent(new Dictionary<string, string> { ["productId"] = "1", ["variantId"] = "1", ["quantity"] = "1" }));
-        await response.StatusCode.Should().BeEqualTo(HttpStatusCode.Redirect);
-        await response.Headers.Location!.ToString().Should().BeEqualTo("/cart");
+        await card.Contains("action=\"/cart/buy-now\"").Should().BeFalse();
+
+        var formMatch = Regex.Match(card, "<form\\b[\\s\\S]*?</form>");
+        await formMatch.Success.Should().BeTrue();
+
+        var fields = new Dictionary<string, string>();
+        foreach (Match input in Regex.Matches(formMatch.Value, "<input[^>]*>"))
+        {
+            var fieldName = Regex.Match(input.Value, "name=\"([^\"]+)\"").Groups[1].Value;
+            var value = Regex.Match(input.Value, "value=\"([^\"]*)\"").Groups[1].Value;
+            if (fieldName.Length > 0) fields[fieldName] = WebUtility.HtmlDecode(value);
+        }
+        await fields.ContainsKey("_handler").Should().BeTrue();
+        await fields["_handler"].Should().StartWith("buy-now-");
+
+        var ssrPost = await client.PostAsync("/products", new FormUrlEncodedContent(fields));
+        await ssrPost.StatusCode.Should().BeEqualTo(HttpStatusCode.Redirect);
+        var redirectPath = ssrPost.Headers.Location!.IsAbsoluteUri
+            ? ssrPost.Headers.Location.AbsolutePath
+            : ssrPost.Headers.Location.ToString();
+        await redirectPath.Should().BeEqualTo("/cart");
         var cart = (await client.GetFromJsonAsync<CartDto>("/api/cart"))!;
         await cart.Items.Single().VariantId.Should().BeEqualTo(1);
         await cart.Items.Single().Quantity.Should().BeEqualTo(1);

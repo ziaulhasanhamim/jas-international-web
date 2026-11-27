@@ -1,7 +1,7 @@
 <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3">
     @foreach (var product in Products)
     {
-        <ProductCard Product="product" />
+        <ProductCard Product="product" FormScope="@FormScope" />
     }
 </div>
 
@@ -9,4 +9,7 @@
 {
     [Parameter]
     public IReadOnlyList<ProductSummaryDto> Products { get; set; } = [];
+
+    [Parameter]
+    public string FormScope { get; set; } = "grid";
 }

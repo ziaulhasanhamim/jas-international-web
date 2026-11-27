@@ -39,7 +39,7 @@
                 @foreach (var product in Products)
                 {
                     <div class="w-[230px] sm:w-[250px] md:w-[260px] lg:w-[270px] shrink-0 snap-start">
-                        <ProductCard Product="product" />
+                        <ProductCard Product="product" FormScope="@FormScope" />
                     </div>
                 }
             </div>
@@ -72,4 +72,7 @@
 
     [Parameter]
     public string ViewAllHref { get; set; } = "/products";
+
+    [Parameter]
+    public string? FormScope { get; set; }
 }

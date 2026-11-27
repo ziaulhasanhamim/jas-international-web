@@ -73,7 +73,9 @@
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             @foreach (var p in products)
             {
-                var price = p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).Select(v => v.SellingPrice).FirstOrDefault();
+                var defaultVariant = p.ProductVariants.Where(v => v.IsActive && !v.IsDeleted).OrderByDescending(v => v.IsDefault).FirstOrDefault();
+                var price = defaultVariant?.SellingPrice ?? 0;
+                var defaultVariantId = defaultVariant?.Id ?? 0;
                 <article @key="p.Id" class="product-card group relative flex flex-col justify-between h-full bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden">
                     <button
                         type="button"
@@ -102,19 +104,16 @@
                             <span class="text-base sm:text-lg font-black text-[#ea580c]">Tk. @price.ToString("N0")</span>
                         </div>
                         <div class="mt-auto pt-2 border-t border-slate-100">
-                            <form method="post" action="/cart/buy-now" data-enhance class="w-full">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="productId" value="@p.Id" />
-                                <input type="hidden" name="quantity" value="1" />
-                                <button
-                                    type="submit"
-                                    data-buy-now
-                                    data-product-id="@p.Id"
-                                    class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
-                                >
-                                    <span>⚡ Buy Now</span>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                data-buy-now
+                                data-variant-id="@defaultVariantId"
+                                data-product-id="@p.Id"
+                                disabled="@(defaultVariantId <= 0)"
+                                class="btn-primary w-full py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span>⚡ Buy Now</span>
+                            </button>
                         </div>
                     </div>
                 </article>

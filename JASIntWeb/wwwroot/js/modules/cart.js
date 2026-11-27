@@ -304,7 +304,10 @@ export function initCartDelegation() {
         const buyBtn = e.target.closest('[data-buy-now]');
         if (buyBtn) {
             const form = buyBtn.closest ? buyBtn.closest('form') : null;
-            if (form && typeof form.getAttribute === 'function' && form.getAttribute('action')?.includes('/cart/buy-now')) {
+            if (form && (
+                (typeof form.hasAttribute === 'function' && form.hasAttribute('data-enhance')) ||
+                (typeof form.getAttribute === 'function' && form.getAttribute('action')?.includes('/cart/buy-now'))
+            )) {
                 return;
             }
 

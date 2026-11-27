@@ -209,3 +209,27 @@ test('Buy Now updates cart state and badges without showing toast before navigat
     const eventNames = dispatchedEvents.map(e => e.type);
     assert.ok(eventNames.includes('cart:updated'), 'Should update cart state and badges');
 });
+
+test('Buy Now inside a Blazor data-enhance component form yields to native form submission', async () => {
+    resetState({ enhanced: true, failure: false });
+    cartModule.initCart();
+    let prevented = false;
+    const enhancedForm = {
+        hasAttribute: name => name === 'data-enhance',
+        getAttribute: () => null
+    };
+    const button = {
+        disabled: false,
+        innerHTML: 'Buy Now',
+        getAttribute: name => ({ 'data-variant-id': '17', 'data-product-id': '42' })[name] ?? null,
+        closest: selector => selector === 'form' ? enhancedForm : null
+    };
+    const clickListener = listeners.get('click')[0];
+    await clickListener({
+        target: { closest: selector => selector === '[data-buy-now]' ? button : null },
+        preventDefault() { prevented = true; },
+        stopPropagation() {}
+    });
+    assert.equal(prevented, false);
+    assert.equal(requests.filter(r => r.url === '/api/cart').length, 0);
+});

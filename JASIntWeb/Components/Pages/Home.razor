@@ -62,6 +62,7 @@
                 Eyebrow="@section.Eyebrow"
                 Products="@section.Products"
                 ViewAllHref="@section.ViewAllHref"
+                FormScope="@($"section-{count}")"
             />
 
             @if (count == 1)
@@ -106,6 +107,7 @@
             Eyebrow="Just landed"
             Products="newArrivals"
             ViewAllHref="/products?sort=newest"
+            FormScope="new"
         />
 
         <!-- Highlight Showroom Banner with Since 2005 Trust Marker -->
@@ -139,9 +141,9 @@
             </div>
         </section>
 
-        <ProductSection Title="Wireless Earbuds &amp; Audio" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/audio" />
-        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/smart-wearables" />
-        <ProductSection Title="Bluetooth Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" />
+        <ProductSection Title="Wireless Earbuds &amp; Audio" Eyebrow="Hear more" Products="audio" ViewAllHref="/category/audio" FormScope="audio" />
+        <ProductSection Title="Smart Watches &amp; Bands" Eyebrow="Stay connected" Products="watches" ViewAllHref="/category/smart-wearables" FormScope="watches" />
+        <ProductSection Title="Bluetooth Speakers" Eyebrow="Turn it up" Products="speakers" ViewAllHref="/category/speakers" FormScope="speakers" />
     }
 
     <!-- Featured Brands Section (Contained cleanly inside max-w-7xl with elegant cards) -->

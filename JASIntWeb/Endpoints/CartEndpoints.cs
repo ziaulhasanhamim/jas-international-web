@@ -160,6 +160,24 @@ public static class CartEndpoints
         ShoppingService shop,
         IMetaConversionsApiService? metaApi = null)
     {
+        var result = await AddToCartFromSsrAsync(context, productId, variantId, quantity, db, shop, metaApi);
+        if (result is CartDto cart)
+        {
+            return cart.Items.Sum(i => i.Quantity);
+        }
+        var (token, userId) = EnsureCartIdentity(context);
+        return await shop.GetCartItemCountAsync(token, userId);
+    }
+
+    internal static async Task<Result<CartDto>> AddToCartFromSsrAsync(
+        HttpContext context,
+        int productId,
+        int? variantId,
+        int quantity,
+        AppDbContext db,
+        ShoppingService shop,
+        IMetaConversionsApiService? metaApi = null)
+    {
         var vId = variantId ?? 0;
         if (vId <= 0 && productId > 0)
         {
@@ -174,39 +192,39 @@ public static class CartEndpoints
         var qty = Math.Clamp(quantity <= 0 ? 1 : quantity, 1, 99);
         var (token, userId) = EnsureCartIdentity(context);
 
-        if (vId > 0)
+        if (vId <= 0)
         {
-            var cartRes = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
-            switch (cartRes)
-            {
-                case CartDto cart:
-                    if (cart.Token.HasValue && cart.Token.Value != token)
-                    {
-                        SetCartCookie(context, cart.Token.Value);
-                    }
-
-                    if (metaApi != null)
-                    {
-                        var variant = await db.ProductVariants.AsNoTracking()
-                            .Include(v => v.Product).ThenInclude(p => p!.Category)
-                            .FirstOrDefaultAsync(v => v.Id == vId);
-                        if (variant != null)
-                        {
-                            var sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
-                            var atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
-                            await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
-                        }
-                    }
-
-                    return cart.Items.Sum(i => i.Quantity);
-                case Error:
-                    break;
-            }
-
-            return await shop.GetCartItemCountAsync(token, userId);
+            return Error.Failure("Selected product option is unavailable.");
         }
 
-        return await shop.GetCartItemCountAsync(token, userId);
+        var cartRes = await shop.ChangeAsync(token, userId, new CartLineRequest(vId, qty), add: true);
+        switch (cartRes)
+        {
+            case CartDto cart:
+                if (cart.Token.HasValue && cart.Token.Value != token)
+                {
+                    SetCartCookie(context, cart.Token.Value);
+                }
+
+                if (metaApi != null)
+                {
+                    var variant = await db.ProductVariants.AsNoTracking()
+                        .Include(v => v.Product).ThenInclude(p => p!.Category)
+                        .FirstOrDefaultAsync(v => v.Id == vId);
+                    if (variant != null)
+                    {
+                        var sku = (!string.IsNullOrWhiteSpace(variant.SKU) ? variant.SKU : $"V{variant.Id}").Trim().ToUpperInvariant();
+                        var atcEventId = $"atc_{variant.Id}_{Guid.CreateVersion7():N}";
+                        await metaApi.EnqueueAddToCartEventAsync(sku, variant.Product?.Name ?? "Product", variant.Product?.Category?.Name, variant.SellingPrice, qty, atcEventId, context);
+                    }
+                }
+
+                return cart;
+            case Error err:
+                return err;
+            default:
+                return Error.Failure("Unable to add product to cart.");
+        }
     }
 
     public static AntiforgeryDto Security(HttpContext context, IAntiforgery csrf) =>

@@ -259,7 +259,7 @@ else
                     @foreach (var p in campaign.Products)
                     {
                         <div data-campaign-product data-category="@p.Category" class="h-full">
-                            <ProductCard Product="@p" />
+                            <ProductCard Product="@p" FormScope="campaign" />
                         </div>
                     }
                 </div>
