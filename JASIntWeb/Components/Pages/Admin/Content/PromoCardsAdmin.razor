@@ -89,7 +89,7 @@
                         name="Action"
                         value="@($"delete:{context.Id}")"
                         class="btn-secondary !px-2.5 !py-1 text-xs text-rose-600 hover:bg-rose-50"
-                        data-confirm="Are you sure you want to delete this promo card?"
+                        onclick="return confirm('Are you sure you want to delete this promo card?');"
                     >
                         Delete
                     </button>

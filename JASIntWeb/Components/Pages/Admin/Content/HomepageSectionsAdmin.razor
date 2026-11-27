@@ -110,7 +110,7 @@
                         <a href="/admin/homepage-sections?edit=@context.Id" class="btn-secondary !px-2.5 !py-1 text-xs">
                             Edit
                         </a>
-                        <button type="submit" name="Action" value="@($"delete:{context.Id}")" class="btn-danger !px-2 !py-1 text-xs cursor-pointer" title="Delete section" data-confirm="Delete this section?">
+                        <button type="submit" name="Action" value="@($"delete:{context.Id}")" class="btn-danger !px-2 !py-1 text-xs cursor-pointer" title="Delete section" onclick="return confirm('Delete this section?');">
                             <Icon Name="trash" Class="size-3.5" />
                         </button>
                     </div>

@@ -7,15 +7,14 @@ export function initConsent() {
         const button = document.getElementById(id);
         if (!button || button.dataset.bound) continue;
         button.dataset.bound = 'true';
-        button.addEventListener('click', async () => {
+        button.addEventListener('click', () => {
             document.cookie = `jas_cookie_consent=${choice}; max-age=31536000; path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
             banner.classList.add('hidden');
-            const meta = await import('./meta-tracking.js');
-            if (choice === 'accepted') {
-                meta.initMetaTracking();
-                meta.trackPageView();
-            } else {
-                meta.revokeMetaConsent();
+            if (choice === 'accepted') { window.JAS?.MetaTracking?.init(); window.JAS?.MetaTracking?.trackPageView(); }
+            else {
+                window.fbq?.('consent', 'revoke');
+                for (const name of ['_fbp', '_fbc', 'jas_attribution', 'jas_first_touch']) document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax`;
+                for (const name of ['jas_fbclid', 'jas_attribution']) { try { localStorage.removeItem(name); } catch {} }
             }
         });
     }

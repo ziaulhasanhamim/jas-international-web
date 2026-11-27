@@ -47,20 +47,18 @@
              data-contents="@System.Text.Json.JsonSerializer.Serialize(contents)"
              hidden></div>
 
+        <script>
+            if (typeof window.jasClearCartCookie === 'function') window.jasClearCartCookie();
+            if (typeof window.jasRecordGuestOrder === 'function') window.jasRecordGuestOrder(@order.Id, '@order.PublicToken', @((double)order.Total));
+        </script>
+
         var isPaymentVerified = order.PaidAmount > 0 && order.Payments.Any(p => p.Status == PaymentStatus.Completed);
         var isCancelled = order.Status == OrderStatus.Cancelled;
         var isDelivered = order.Status == OrderStatus.Delivered;
         var isInTransit = order.Status == OrderStatus.InTransit;
         var isProcessing = order.Status == OrderStatus.Processing;
 
-        <div id="live-order-tracker"
-             data-order-id="@order.PublicToken"
-             data-current-status="@order.Status"
-             data-clear-cart="true"
-             data-record-order-id="@order.Id"
-             data-record-order-token="@order.PublicToken"
-             data-record-order-total="@((double)order.Total)"
-             class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+        <div id="live-order-tracker" data-order-id="@order.PublicToken" data-current-status="@order.Status" class="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <!-- Header Banner -->
             <div class="bg-gradient-to-r @(isCancelled ? "from-rose-600 via-rose-700 to-rose-800" : (isDelivered ? "from-emerald-600 via-teal-600 to-emerald-700" : (isInTransit ? "from-purple-600 via-indigo-600 to-blue-700" : "from-blue-600 via-indigo-600 to-blue-700"))) p-8 text-white text-center">
                 <span class="flex size-14 items-center justify-center rounded-full bg-white @(isCancelled ? "text-rose-600" : (isDelivered ? "text-emerald-600" : (isInTransit ? "text-purple-600" : "text-blue-600"))) mx-auto mb-4 shadow-md">

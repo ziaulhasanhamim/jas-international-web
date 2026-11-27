@@ -82,7 +82,7 @@
             <button type="submit" name="BulkAction" value="hide" class="btn-secondary !py-1 !px-3 text-xs font-bold hover:bg-slate-200 cursor-pointer">
                 Hide Selected
             </button>
-            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" data-confirm="Permanently delete selected reviews?">
+            <button type="submit" name="BulkAction" value="delete" class="btn-secondary !py-1 !px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer" onclick="return confirm('Permanently delete selected reviews?')">
                 Delete Selected
             </button>
         </div>
@@ -95,7 +95,7 @@
                     <HeaderTemplate Context="_">
                         <input type="checkbox" id="select-all-reviews"
                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                               data-select-all=".rev-select-cb"
+                               onclick="document.querySelectorAll('.rev-select-cb').forEach(cb => cb.checked = this.checked)"
                                title="Select all" />
                     </HeaderTemplate>
                     <ChildContent Context="r">
@@ -186,7 +186,7 @@
                             name="DeleteReviewId"
                             value="@context.Id"
                             class="btn-secondary !px-2 !py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
-                            data-confirm="Permanently delete this customer review?"
+                            onclick="return confirm('Permanently delete this customer review?')"
                             title="Delete review"
                         >
                             <Icon Name="close" Class="size-3" />

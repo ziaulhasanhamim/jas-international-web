@@ -38,7 +38,7 @@
 <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
     <form method="get" data-enhance class="relative w-full max-w-xs">
         <input name="q" value="@Query" placeholder="Search coupons by code, description..."
-               data-debounce-submit="350"
+               oninput="clearTimeout(this._t); this._t=setTimeout(()=>this.form.requestSubmit(), 350)"
                class="shop-input !mt-0 text-xs pl-9 pr-9" />
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <Icon Name="search" Class="size-3.5" />

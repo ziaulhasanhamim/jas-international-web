@@ -116,8 +116,7 @@ else
 
         try
         {
-            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/device-orders.js");
-            var raw = await module.InvokeAsync<string>("getGuestOrders");
+            var raw = await JS.InvokeAsync<string>("jasGetGuestOrders");
             if (!string.IsNullOrWhiteSpace(raw) && raw != "[]")
             {
                 using var doc = JsonDocument.Parse(raw);
@@ -132,7 +131,7 @@ else
 
                 if (tokens.Count > 0)
                 {
-                    var jsonResult = await module.InvokeAsync<string>("fetchDeviceOrders", JsonSerializer.Serialize(tokens));
+                    var jsonResult = await JS.InvokeAsync<string>("jasFetchDeviceOrders", JsonSerializer.Serialize(tokens));
                     if (!string.IsNullOrWhiteSpace(jsonResult) && jsonResult != "[]")
                     {
                         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };

@@ -399,6 +399,24 @@ form[data-submit-indication="true"][aria-busy="true"]:not([data-pending-cursor="
     vertical-align: middle;
 }
 
+.navigation-progress {
+    pointer-events: none;
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 100;
+    transition: opacity 180ms ease;
+}
+
+.navigation-progress-bar {
+    height: 3px;
+    background: #2563eb;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.75);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 180ms ease-out;
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);
@@ -411,6 +429,10 @@ form[data-submit-indication="true"][aria-busy="true"]:not([data-pending-cursor="
 @media (prefers-reduced-motion: reduce) {
     .form-submit-spinner {
         animation: none;
+    }
+    .navigation-progress,
+    .navigation-progress-bar {
+        transition: none;
     }
 }
 

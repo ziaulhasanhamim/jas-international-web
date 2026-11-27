@@ -10,6 +10,5 @@
     "css:watch": "tailwindcss -i JASIntWeb/wwwroot/css/input.css -o JASIntWeb/wwwroot/css/output.css --watch"
   },
   "name": "jas-international-web",
-  "type": "module",
   "private": true
 }

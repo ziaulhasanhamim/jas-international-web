@@ -159,7 +159,7 @@
                     <label class="text-slate-600 font-bold block mb-1">1. XML / RSS Feed URL (Recommended)</label>
                     <div class="flex items-center gap-1.5">
                         <input type="text" readonly value="@GetXmlFeedUrl()" class="field font-mono text-[11px] bg-slate-50 flex-1 select-all" id="xml-feed-input" />
-                        <button type="button" data-copy-target="#xml-feed-input" data-copy-message="XML Feed URL copied to clipboard!" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
+                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('xml-feed-input').value); alert('XML Feed URL copied to clipboard!');" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
                             Copy
                         </button>
                     </div>
@@ -169,7 +169,7 @@
                     <label class="text-slate-600 font-bold block mb-1">2. CSV Feed URL (Alternative)</label>
                     <div class="flex items-center gap-1.5">
                         <input type="text" readonly value="@GetCsvFeedUrl()" class="field font-mono text-[11px] bg-slate-50 flex-1 select-all" id="csv-feed-input" />
-                        <button type="button" data-copy-target="#csv-feed-input" data-copy-message="CSV Feed URL copied to clipboard!" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
+                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('csv-feed-input').value); alert('CSV Feed URL copied to clipboard!');" class="btn-secondary px-2.5 py-1.5 text-xs cursor-pointer whitespace-nowrap">
                             Copy
                         </button>
                     </div>

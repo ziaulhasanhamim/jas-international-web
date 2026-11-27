@@ -79,7 +79,7 @@ public partial class ProductEditorForm
         restored = true;
         try
         {
-            browser ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/product-editor.js");
+            browser ??= await JS.InvokeAsync<IJSObjectReference>("import", "/js/modules/product-editor.js");
             var user = (await (Authentication ?? Task.FromResult(new AuthenticationState(new())))).User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "admin";
             storageKey = $"jas-product-pending:{user}:{Id}";
             var json = await browser.InvokeAsync<string?>("read", storageKey);
@@ -328,7 +328,7 @@ public partial class ProductEditorForm
     }
     private async Task Remember() { try { if (browser is not null) await browser.InvokeVoidAsync("remember", storageKey, JsonSerializer.Serialize(new Pending(submitted, submittedStock))); } catch (JSException) { } }
     private async Task Forget() { try { if (browser is not null) await browser.InvokeVoidAsync("forget", storageKey); } catch (JSException) { } }
-    private async Task Export() { try { browser ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/modules/product-editor.js"); await browser.InvokeVoidAsync("exportDraft", JsonSerializer.Serialize(new { state.Draft, Pending = new Pending(submitted, submittedStock) })); } catch (JSException) { state.Message = "Draft download is unavailable. Keep this tab open and retry."; } }
+    private async Task Export() { try { browser ??= await JS.InvokeAsync<IJSObjectReference>("import", "/js/modules/product-editor.js"); await browser.InvokeVoidAsync("exportDraft", JsonSerializer.Serialize(new { state.Draft, Pending = new Pending(submitted, submittedStock) })); } catch (JSException) { state.Message = "Draft download is unavailable. Keep this tab open and retry."; } }
     private async Task<bool> Confirm(string message) { try { return await JS.InvokeAsync<bool>("confirm", message); } catch (JSException) { return false; } }
     private Task BeforeNavigation(LocationChangingContext context)
     {

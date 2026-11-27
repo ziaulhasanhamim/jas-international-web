@@ -23,7 +23,7 @@
             <!-- Left Arrow Button (Client-side smooth scroll) -->
             <button
                 type="button"
-                data-slider-scroll="-320"
+                onclick="this.parentElement.querySelector('.slider-track').scrollBy({left: -320, behavior: 'smooth'})"
                 class="absolute -left-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95 cursor-pointer"
                 aria-label="Previous products"
             >
@@ -47,7 +47,7 @@
             <!-- Right Arrow Button (Client-side smooth scroll) -->
             <button
                 type="button"
-                data-slider-scroll="320"
+                onclick="this.parentElement.querySelector('.slider-track').scrollBy({left: 320, behavior: 'smooth'})"
                 class="absolute -right-3 top-1/2 -translate-y-1/2 z-20 hidden md:flex size-10 items-center justify-center rounded-full bg-white shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition active:scale-95 cursor-pointer"
                 aria-label="Next products"
             >

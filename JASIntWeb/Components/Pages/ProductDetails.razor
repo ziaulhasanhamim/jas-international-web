@@ -352,9 +352,9 @@ else
                             <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
                                 <!-- Stepper -->
                                 <div class="flex items-center rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-2xs">
-                                    <button type="button" data-qty-step="-1" data-qty-target="#product-qty-input" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Decrease quantity">−</button>
+                                    <button type="button" onclick="const q = document.getElementById('product-qty-input'); if (q && parseInt(q.value) > 1) { q.value = parseInt(q.value) - 1; }" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Decrease quantity">−</button>
                                     <input type="number" id="product-qty-input" name="Quantity" value="1" min="1" max="@selected.Stock" class="w-12 text-center text-sm font-bold text-slate-800 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                    <button type="button" data-qty-step="1" data-qty-target="#product-qty-input" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Increase quantity">+</button>
+                                    <button type="button" onclick="const q = document.getElementById('product-qty-input'); if (q && parseInt(q.value) < @selected.Stock) { q.value = parseInt(q.value) + 1; }" class="size-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer" aria-label="Increase quantity">+</button>
                                 </div>
 
                                 <!-- Add to Cart Button (Pure JS, zero page reloads) -->
@@ -369,7 +369,7 @@ else
                                 </button>
 
                                 <!-- Buy Now Button (SSR Form POST to /cart/buy-now with Blazor Enhanced Navigation) -->
-                                <form method="post" action="/cart/buy-now" data-enhance data-qty-sync="#product-qty-input" class="flex-1">
+                                <form method="post" action="/cart/buy-now" data-enhance class="flex-1" onsubmit="const q = document.getElementById('product-qty-input'); if (q) { this.querySelector('input[name=quantity]').value = q.value; }">
                                     <AntiforgeryToken />
                                     <input type="hidden" name="productId" value="@product.Id" />
                                     <input type="hidden" name="variantId" value="@selected.Id" />
@@ -478,7 +478,7 @@ else
                             </span>
                         </div>
                     </div>
-                    <button type="button" data-overlay-open="write-review-modal" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <button type="button" data-open-modal="write-review-modal" class="btn-secondary !px-4 !py-2 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
                         <span>✍️ Write a Review</span>
                     </button>
                 </div>
@@ -488,7 +488,7 @@ else
                     {
                         <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 font-semibold flex items-center justify-between">
                             <span>✓ @reviewSuccessMessage</span>
-                            <button type="button" data-dismiss-target class="text-emerald-600 hover:text-emerald-950 font-bold p-1 cursor-pointer" aria-label="Dismiss">✕</button>
+                            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-950 font-bold p-1 cursor-pointer">✕</button>
                         </div>
                     }
                 </div>
@@ -552,14 +552,11 @@ else
         }
 
         <!-- Write Review Modal -->
-        <div id="write-review-modal" class="review-dialog fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none transition-all duration-300" aria-hidden="true">
-            <div data-overlay-backdrop
-                 data-overlay-close="write-review-modal"
-                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs opacity-0 pointer-events-none transition-opacity duration-300 cursor-pointer"></div>
-            <div data-overlay-panel role="dialog" aria-modal="true" aria-labelledby="review-dialog-title" class="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 opacity-0 scale-95 pointer-events-none transition-all duration-300">
+        <div id="write-review-modal" class="review-dialog fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-fadeIn hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="review-dialog-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                     <h3 id="review-dialog-title" class="text-base font-bold text-slate-900">Write a Review for @product.Name</h3>
-                    <button type="button" data-overlay-close="write-review-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer" aria-label="Close">✕</button>
+                    <button type="button" data-close-modal="write-review-modal" class="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer">✕</button>
                 </div>
                 <div id="review-form-error" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800"></div>
                 <form id="write-review-form" method="post" action="@($"/products/{product.Id}/reviews")" data-enhance="true" class="space-y-3">
@@ -602,7 +599,7 @@ else
                         <textarea id="review-comment" name="Comment" rows="3" minlength="10" maxlength="3000" required placeholder="Share details about performance, build quality, and delivery speed (minimum 10 characters)..." class="field text-xs"></textarea>
                     </div>
                     <div class="flex items-center justify-end gap-2 pt-2">
-                        <button type="button" data-overlay-close="write-review-modal" class="btn-secondary text-xs cursor-pointer">Cancel</button>
+                        <button type="button" data-close-modal="write-review-modal" class="btn-secondary text-xs cursor-pointer">Cancel</button>
                         <button type="submit" id="submit-review-btn" class="btn-primary text-xs !bg-blue-600 hover:!bg-blue-700 cursor-pointer">Submit Review</button>
                     </div>
                 </form>

@@ -22,7 +22,7 @@
             <span class="font-bold block leading-tight">@GetTitle()</span>
             <span class="font-medium text-slate-600 block mt-0.5">@message</span>
         </div>
-        <button type="button" data-dismiss-target="[role=alert]" class="ml-2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer text-sm font-bold" aria-label="Dismiss">
+        <button type="button" onclick="this.closest('[role=alert]').remove()" class="ml-2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer text-sm font-bold" aria-label="Dismiss">
             ✕
         </button>
     </div>

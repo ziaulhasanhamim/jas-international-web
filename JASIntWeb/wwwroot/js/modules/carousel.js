@@ -1,132 +1,162 @@
 /**
  * JAS International - Interactive Carousel Module (ES2024+)
- * Pure functional swipe carousel with auto-rotation and AbortController-managed cleanup.
+ * Touch-enabled swipe carousel with auto-rotation, gesture thresholds,
+ * and AbortController-managed event lifecycles.
  */
+class CarouselInstance {
+    static #AUTO_ROTATE_DELAY_MS = 5000;
+    static #SWIPE_THRESHOLD_PX = 40;
 
-const AUTO_ROTATE_DELAY_MS = 5000;
-const SWIPE_THRESHOLD_PX = 40;
-const activeCarousels = new Map();
+    #root;
+    #slides;
+    #dots;
+    #prevBtn;
+    #nextBtn;
+    #currentIndex = 0;
+    #timer = null;
+    #abortController = new AbortController();
 
-function createCarousel(root) {
-    const slides = [...root.querySelectorAll('[data-carousel-slide]')];
-    const dots = [...root.querySelectorAll('[data-carousel-dot]')];
-    const prevBtn = root.querySelector('[data-carousel-prev]');
-    const nextBtn = root.querySelector('[data-carousel-next]');
+    /**
+     * @param {HTMLElement} root Carousel container element
+     */
+    constructor(root) {
+        this.#root = root;
+        this.#slides = [...root.querySelectorAll("[data-carousel-slide]")];
+        this.#dots = [...root.querySelectorAll("[data-carousel-dot]")];
+        this.#prevBtn = root.querySelector("[data-carousel-prev]");
+        this.#nextBtn = root.querySelector("[data-carousel-next]");
 
-    if (slides.length <= 1) {
-        return { destroy() {} };
+        if (this.#slides.length <= 1) return;
+
+        this.#bindEvents();
+        this.#startTimer();
     }
 
-    let currentIndex = 0;
-    let timer = null;
-    const abortController = new AbortController();
-    const { signal } = abortController;
+    /**
+     * Transitions to the specified slide index
+     * @param {number} targetIndex Target slide index
+     */
+    showSlide(targetIndex) {
+        const count = this.#slides.length;
+        this.#currentIndex = ((targetIndex % count) + count) % count;
 
-    function showSlide(targetIndex) {
-        const count = slides.length;
-        currentIndex = ((targetIndex % count) + count) % count;
-
-        slides.forEach((slide, idx) => {
-            const isTarget = idx === currentIndex;
-            slide.classList.toggle('opacity-100', isTarget);
-            slide.classList.toggle('z-10', isTarget);
-            slide.classList.toggle('opacity-0', !isTarget);
-            slide.classList.toggle('pointer-events-none', !isTarget);
-            slide.classList.toggle('z-0', !isTarget);
-            slide.setAttribute('aria-hidden', String(!isTarget));
+        this.#slides.forEach((slide, idx) => {
+            const isTarget = idx === this.#currentIndex;
+            slide.classList.toggle("opacity-100", isTarget);
+            slide.classList.toggle("z-10", isTarget);
+            slide.classList.toggle("opacity-0", !isTarget);
+            slide.classList.toggle("pointer-events-none", !isTarget);
+            slide.classList.toggle("z-0", !isTarget);
+            slide.setAttribute("aria-hidden", String(!isTarget));
         });
 
-        dots.forEach((dot, idx) => {
-            const isTarget = idx === currentIndex;
-            dot.classList.toggle('w-6', isTarget);
-            dot.classList.toggle('sm:w-7', isTarget);
-            dot.classList.toggle('bg-slate-900', isTarget);
-            dot.classList.toggle('shadow-xs', isTarget);
-            dot.classList.toggle('w-2', !isTarget);
-            dot.classList.toggle('bg-slate-400/60', !isTarget);
-            dot.setAttribute('aria-selected', String(isTarget));
+        this.#dots.forEach((dot, idx) => {
+            const isTarget = idx === this.#currentIndex;
+            dot.classList.toggle("w-6", isTarget);
+            dot.classList.toggle("sm:w-7", isTarget);
+            dot.classList.toggle("bg-slate-900", isTarget);
+            dot.classList.toggle("shadow-xs", isTarget);
+            dot.classList.toggle("w-2", !isTarget);
+            dot.classList.toggle("bg-slate-400/60", !isTarget);
+            dot.setAttribute("aria-selected", String(isTarget));
         });
     }
 
-    function stopTimer() {
-        if (timer !== null) {
-            clearInterval(timer);
-            timer = null;
+    #startTimer() {
+        this.#stopTimer();
+        this.#timer = setInterval(() => {
+            this.showSlide(this.#currentIndex + 1);
+        }, CarouselInstance.#AUTO_ROTATE_DELAY_MS);
+    }
+
+    #stopTimer() {
+        if (this.#timer !== null) {
+            clearInterval(this.#timer);
+            this.#timer = null;
         }
     }
 
-    function startTimer() {
-        stopTimer();
-        timer = setInterval(() => {
-            showSlide(currentIndex + 1);
-        }, AUTO_ROTATE_DELAY_MS);
-    }
+    #bindEvents() {
+        const signal = this.#abortController.signal;
 
-    prevBtn?.addEventListener('click', () => {
-        showSlide(currentIndex - 1);
-        startTimer();
-    }, { signal });
-
-    nextBtn?.addEventListener('click', () => {
-        showSlide(currentIndex + 1);
-        startTimer();
-    }, { signal });
-
-    dots.forEach((dot, idx) => {
-        dot.addEventListener('click', () => {
-            showSlide(idx);
-            startTimer();
+        this.#prevBtn?.addEventListener("click", () => {
+            this.showSlide(this.#currentIndex - 1);
+            this.#startTimer();
         }, { signal });
-    });
 
-    root.addEventListener('mouseenter', stopTimer, { signal });
-    root.addEventListener('mouseleave', startTimer, { signal });
+        this.#nextBtn?.addEventListener("click", () => {
+            this.showSlide(this.#currentIndex + 1);
+            this.#startTimer();
+        }, { signal });
 
-    let touchStartX = 0;
-    let touchStartY = 0;
+        this.#dots.forEach((dot, idx) => {
+            dot.addEventListener("click", () => {
+                this.showSlide(idx);
+                this.#startTimer();
+            }, { signal });
+        });
 
-    root.addEventListener('touchstart', event => {
-        const touch = event.changedTouches?.[0];
-        if (touch) {
-            touchStartX = touch.screenX;
-            touchStartY = touch.screenY;
-        }
-        stopTimer();
-    }, { passive: true, signal });
+        // Pause on mouse hover
+        this.#root.addEventListener("mouseenter", () => this.#stopTimer(), { signal });
+        this.#root.addEventListener("mouseleave", () => this.#startTimer(), { signal });
 
-    root.addEventListener('touchend', event => {
-        const touch = event.changedTouches?.[0];
-        if (touch) {
-            const diffX = touch.screenX - touchStartX;
-            const diffY = touch.screenY - touchStartY;
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > SWIPE_THRESHOLD_PX) {
-                showSlide(currentIndex + (diffX < 0 ? 1 : -1));
+        // Touch & swipe gestures for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        this.#root.addEventListener("touchstart", event => {
+            const touch = event.changedTouches?.[0];
+            if (touch) {
+                touchStartX = touch.screenX;
+                touchStartY = touch.screenY;
             }
-        }
-        startTimer();
-    }, { passive: true, signal });
+            this.#stopTimer();
+        }, { passive: true, signal });
 
-    startTimer();
+        this.#root.addEventListener("touchend", event => {
+            const touch = event.changedTouches?.[0];
+            if (touch) {
+                const diffX = touch.screenX - touchStartX;
+                const diffY = touch.screenY - touchStartY;
 
-    return {
-        destroy() {
-            stopTimer();
-            abortController.abort();
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > CarouselInstance.#SWIPE_THRESHOLD_PX) {
+                    this.showSlide(this.#currentIndex + (diffX < 0 ? 1 : -1));
+                }
+            }
+            this.#startTimer();
+        }, { passive: true, signal });
+    }
+
+    /**
+     * Destroys timers and aborts all attached event listeners
+     */
+    destroy() {
+        this.#stopTimer();
+        this.#abortController.abort();
+    }
+}
+
+// Global initialization
+(function (global) {
+    "use strict";
+
+    const activeCarousels = new Map();
+
+    function initCarousels() {
+        const carouselElements = document.querySelectorAll("[data-carousel]");
+        carouselElements.forEach(el => {
+            if (!activeCarousels.has(el)) {
+                activeCarousels.set(el, new CarouselInstance(el));
+            }
+        });
+    }
+
+    const JAS = global.JAS ??= {};
+    JAS.Carousel = {
+        init: initCarousels,
+        cleanup: () => {
+            for (const carousel of activeCarousels.values()) carousel.destroy();
+            activeCarousels.clear();
         }
     };
-}
-
-export function initCarousel() {
-    document.querySelectorAll('[data-carousel]').forEach(el => {
-        if (!activeCarousels.has(el)) {
-            activeCarousels.set(el, createCarousel(el));
-        }
-    });
-}
-
-export function cleanupCarousel() {
-    for (const carousel of activeCarousels.values()) {
-        carousel.destroy();
-    }
-    activeCarousels.clear();
-}
+})(window);
