@@ -188,8 +188,13 @@ export async function addToCart(variantId, quantity = 1, productId = 0, { showTo
 export async function setQuantity(variantId, quantity) {
     const targetQty = Math.max(0, Math.min(99, Number(quantity) || 0));
     const previousState = currentCartState;
+    const hasOptimisticMatch = Boolean(
+        currentCartState &&
+        Array.isArray(currentCartState.items) &&
+        currentCartState.items.some(i => i.variantId === variantId)
+    );
 
-    if (currentCartState && Array.isArray(currentCartState.items)) {
+    if (hasOptimisticMatch) {
         const updatedItems = targetQty === 0
             ? currentCartState.items.filter(i => i.variantId !== variantId)
             : currentCartState.items.map(i => i.variantId === variantId
@@ -333,6 +338,11 @@ export function initCartDelegation() {
 
         const qtyBtn = e.target.closest('[data-cart-qty]');
         if (qtyBtn) {
+            const form = qtyBtn.closest ? qtyBtn.closest('form') : null;
+            if (form && typeof form.hasAttribute === 'function' && form.hasAttribute('data-enhance')) {
+                return;
+            }
+
             e.preventDefault();
             const action = qtyBtn.getAttribute('data-cart-qty');
             const variantId = parseInt(qtyBtn.getAttribute('data-variant-id'), 10);
@@ -352,6 +362,11 @@ export function initCartDelegation() {
 
         const removeBtn = e.target.closest('[data-cart-remove]');
         if (removeBtn) {
+            const form = removeBtn.closest ? removeBtn.closest('form') : null;
+            if (form && typeof form.hasAttribute === 'function' && form.hasAttribute('data-enhance')) {
+                return;
+            }
+
             e.preventDefault();
             const variantId = parseInt(removeBtn.getAttribute('data-variant-id'), 10);
             if (variantId) {

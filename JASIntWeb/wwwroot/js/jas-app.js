@@ -89,11 +89,6 @@ function bindStorefrontDelegation() {
 async function initRouteModules() {
     const path = location.pathname || '/';
 
-    if (document.getElementById('jas-cart-page')) {
-        const { initCartPage } = await import('./modules/cart-page.js');
-        initCartPage();
-    }
-
     if (document.querySelector('.thumb-btn')) {
         const { initGallery } = await import('./modules/gallery.js');
         initGallery();

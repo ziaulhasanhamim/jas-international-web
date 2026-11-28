@@ -233,3 +233,55 @@ test('Buy Now inside a Blazor data-enhance component form yields to native form 
     assert.equal(prevented, false);
     assert.equal(requests.filter(r => r.url === '/api/cart').length, 0);
 });
+
+test('setQuantity after SSR Buy Now does not wipe cart to empty when in-memory state was stale', async () => {
+    resetState({ enhanced: true, failure: false });
+    // Simulate earlier session state where in-memory cart was empty,
+    // followed by an SSR Buy Now that navigated to /cart with variant 17 in DB.
+    globalThis.fetch = async (url, options) => {
+        requests.push({ url, options });
+        if (url === '/api/cart/security') return { ok: true, json: async () => ({ token: 'csrf' }) };
+        if (url === '/api/cart/count') return { ok: true, json: async () => ({ count: 0 }) };
+        if (options?.method === 'PUT') {
+            return {
+                ok: true,
+                json: async () => ({
+                    itemCount: 2,
+                    subtotal: 2000,
+                    items: [{ variantId: 17, quantity: 2, price: 1000, lineTotal: 2000 }]
+                })
+            };
+        }
+        return { ok: true, json: async () => ({ itemCount: 0, subtotal: 0, items: [] }) };
+    };
+
+    await cartModule.fetchCart();
+    dispatchedEvents.length = 0;
+
+    const result = await cartModule.setQuantity(17, 2);
+    assert.equal(result.success, true);
+    const updatedPayloads = dispatchedEvents.filter(e => e.type === 'cart:updated').map(e => e.detail);
+    assert.equal(updatedPayloads.length, 1);
+    assert.equal(updatedPayloads[0].items.length, 1);
+    assert.equal(updatedPayloads[0].items[0].quantity, 2);
+});
+
+test('Cart stepper and remove buttons inside a data-enhance SSR form yield to native submission', async () => {
+    resetState({ enhanced: true, failure: false });
+    cartModule.initCart();
+    const enhancedForm = { hasAttribute: name => name === 'data-enhance' };
+    for (const attr of ['data-cart-qty', 'data-cart-remove']) {
+        let prevented = false;
+        const button = {
+            getAttribute: name => name === 'data-variant-id' ? '17' : 'inc',
+            closest: selector => selector === 'form' ? enhancedForm : null
+        };
+        const clickListener = listeners.get('click')[0];
+        await clickListener({
+            target: { closest: selector => selector === `[${attr}]` ? button : null },
+            preventDefault() { prevented = true; }
+        });
+        assert.equal(prevented, false);
+    }
+    assert.equal(requests.filter(r => r.url === '/api/cart').length, 0);
+});

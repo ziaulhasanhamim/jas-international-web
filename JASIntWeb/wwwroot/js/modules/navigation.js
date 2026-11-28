@@ -6,6 +6,7 @@
 
 let pendingForm = null;
 let scrollTopFromPath = null;
+let suppressNavIndicator = false;
 let progress = 0;
 let isActive = false;
 let tickTimer = null;
@@ -47,6 +48,7 @@ export function restorePendingForm() {
     const {
         form,
         button,
+        disabledButtons = [],
         label,
         originalLabelNodes,
         originalLabelText,
@@ -64,6 +66,10 @@ export function restorePendingForm() {
         button.disabled = originalDisabled;
     }
 
+    for (const { element, wasDisabled } of disabledButtons) {
+        element.disabled = wasDisabled;
+    }
+
     for (const { element, wasHidden } of spinners) {
         element.toggleAttribute('hidden', wasHidden);
     }
@@ -78,6 +84,11 @@ export function restorePendingForm() {
 }
 
 export function startNavigation() {
+    if (suppressNavIndicator) {
+        suppressNavIndicator = false;
+        return;
+    }
+
     stopTimers();
     const track = getIndicator();
     const bar = getProgressBar();
@@ -115,6 +126,7 @@ export function startNavigation() {
 }
 
 export function finishNavigation() {
+    suppressNavIndicator = false;
     stopTimers();
     restorePendingForm();
 
@@ -169,6 +181,13 @@ export function finishNavigation() {
     }, 250);
 }
 
+function handleNavigationClick(event) {
+    if (event.defaultPrevented || !(event.target instanceof Element)) return;
+    const link = event.target.closest?.('a[href]');
+    if (!link) return;
+    suppressNavIndicator = Boolean(link.closest?.('[data-no-nav-indicator]') || link.hasAttribute?.('data-no-nav-indicator'));
+}
+
 function handleFormSubmit(event) {
     if (event.defaultPrevented) return;
     const form = event.target;
@@ -180,16 +199,28 @@ function handleFormSubmit(event) {
         : Boolean(form.hasAttribute?.('data-scroll-top'));
     scrollTopFromPath = isScrollTopForm ? (window.location?.pathname ?? '') : null;
 
+    suppressNavIndicator = Boolean(
+        form.closest?.('[data-no-nav-indicator]') ||
+        form.hasAttribute?.('data-no-nav-indicator') ||
+        event.submitter?.closest?.('[data-no-nav-indicator]') ||
+        event.submitter?.hasAttribute?.('data-no-nav-indicator')
+    );
+
     if (form.dataset?.submitIndication !== 'true') return;
 
-    const button = event.submitter instanceof HTMLButtonElement
+    const button = (typeof HTMLButtonElement !== 'undefined' && event.submitter instanceof HTMLButtonElement)
+        || event.submitter?.tagName === 'BUTTON'
         ? event.submitter
-        : form.querySelector('button[type="submit"]');
+        : form.querySelector?.('button[type="submit"]');
+    const disableAllSubmits = form.dataset?.disableSubmits === 'all';
+    const submitButtons = disableAllSubmits && typeof form.querySelectorAll === 'function'
+        ? [...form.querySelectorAll('button[type="submit"]')]
+        : [];
 
     queueMicrotask(() => {
         restorePendingForm();
-        const spinnerElements = [...form.querySelectorAll('.form-submit-spinner')];
-        const label = button?.hasAttribute('data-pending-text')
+        const spinnerElements = [...(form.querySelectorAll?.('.form-submit-spinner') ?? [])];
+        const label = button?.hasAttribute?.('data-pending-text')
             ? button.querySelector('[data-submit-label]')
                 ?? [...button.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
             : null;
@@ -197,11 +228,12 @@ function handleFormSubmit(event) {
         pendingForm = {
             form,
             button,
+            disabledButtons: submitButtons.map(element => ({ element, wasDisabled: element.disabled })),
             label,
-            originalLabelNodes: label instanceof Element ? [...label.childNodes] : [],
+            originalLabelNodes: typeof Element !== 'undefined' && label instanceof Element ? [...label.childNodes] : [],
             originalLabelText: label?.textContent,
             originalDisabled: button?.disabled,
-            originalBusy: form.getAttribute('aria-busy'),
+            originalBusy: form.getAttribute?.('aria-busy') ?? null,
             spinners: spinnerElements.map(element => ({ element, wasHidden: element.hasAttribute('hidden') }))
         };
 
@@ -212,16 +244,21 @@ function handleFormSubmit(event) {
             button.disabled = true;
         }
 
+        for (const { element } of pendingForm.disabledButtons) {
+            element.disabled = true;
+        }
+
         for (const spinner of spinnerElements) {
             spinner.removeAttribute('hidden');
         }
-        form.setAttribute('aria-busy', 'true');
+        form.setAttribute?.('aria-busy', 'true');
     });
 }
 
 export function initNavigation() {
     if (submitListenerBound) return;
     submitListenerBound = true;
+    document.addEventListener('click', handleNavigationClick, true);
     document.addEventListener('submit', handleFormSubmit, true);
 }
 

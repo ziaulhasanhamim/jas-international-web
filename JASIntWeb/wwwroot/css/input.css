@@ -399,6 +399,10 @@ form[data-submit-indication="true"][aria-busy="true"]:not([data-pending-cursor="
     vertical-align: middle;
 }
 
+.form-submit-spinner[hidden] {
+    display: none !important;
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);

@@ -4,7 +4,9 @@
 @using JASIntWeb.Persistence.Entities
 @using JASIntWeb.Services
 @using JASIntWeb.Client.Dtos
+@using JASIntWeb.Helpers
 @inject ShoppingService Shop
+@inject NavigationManager Nav
 
 <PageTitle>Your Cart — JAS International</PageTitle>
 
@@ -22,6 +24,13 @@
                 </span>
             }
         </div>
+
+        @if (!string.IsNullOrWhiteSpace(cartError))
+        {
+            <div role="alert" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs sm:text-sm font-semibold text-rose-700">
+                ⚠️ @cartError
+            </div>
+        }
 
         @if (cart.Items.Count == 0)
         {
@@ -75,32 +84,47 @@
                             </div>
 
                             <div class="flex items-center justify-between sm:justify-end gap-5 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                                <!-- Stepper Buttons (Instant Optimistic Feedback via JS) -->
-                                <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
+                                <!-- Stepper Form (Static SSR Enhanced Form with local quantity spinner, global nav bar disabled) -->
+                                <form method="post"
+                                      @formname="@($"cart-qty-{item.VariantId}")"
+                                      @onsubmit="() => HandleUpdateQuantityAsync(item.VariantId)"
+                                      data-enhance
+                                      data-no-nav-indicator
+                                      data-submit-indication="true"
+                                      data-disable-submits="all"
+                                      data-pending-cursor="false"
+                                      class="group flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1 shadow-2xs">
+                                    <AntiforgeryToken />
                                     <button
-                                        type="button"
+                                        type="submit"
+                                        name="targetQuantity"
+                                        value="@Math.Max(0, item.Quantity - 1)"
                                         data-cart-qty="dec"
                                         data-variant-id="@item.VariantId"
                                         data-current-qty="@item.Quantity"
-                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer disabled:opacity-50"
                                         aria-label="Decrease quantity"
                                     >
                                         −
                                     </button>
-                                    <span data-cart-qty-val="@item.VariantId" class="w-8 text-center text-xs font-bold text-slate-800 tabular-nums">
-                                        @item.Quantity
+                                    <span class="w-8 h-6 inline-flex items-center justify-center text-xs font-bold text-slate-800 tabular-nums">
+                                        <span data-cart-qty-val="@item.VariantId" class="group-aria-busy:hidden">@item.Quantity</span>
+                                        <span class="form-submit-spinner !m-0 !size-3.5 text-blue-600 hidden group-aria-busy:inline-block" hidden aria-hidden="true"></span>
                                     </span>
                                     <button
-                                        type="button"
+                                        type="submit"
+                                        name="targetQuantity"
+                                        value="@Math.Min(99, item.Quantity + 1)"
                                         data-cart-qty="inc"
                                         data-variant-id="@item.VariantId"
                                         data-current-qty="@item.Quantity"
-                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+                                        disabled="@(item.Quantity >= 99)"
+                                        class="size-8 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer disabled:opacity-50"
                                         aria-label="Increase quantity"
                                     >
                                         +
                                     </button>
-                                </div>
+                                </form>
 
                                 <div class="text-right min-w-[78px]">
                                     <strong data-cart-line-total="@item.VariantId" class="font-extrabold text-slate-900 text-sm sm:text-base tabular-nums block">৳@item.LineTotal.ToString("N0")</strong>
@@ -109,16 +133,29 @@
                                         <span class="block text-[11px] text-slate-400 line-through tabular-nums">৳@((item.RegularPrice.Value * item.Quantity).ToString("N0"))</span>
                                     }
                                 </div>
-                                <button
-                                    type="button"
-                                    data-cart-remove
-                                    data-variant-id="@item.VariantId"
-                                    class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
-                                    title="Remove item"
-                                    aria-label="Remove item"
-                                >
-                                    <Icon Name="trash" Class="size-4" />
-                                </button>
+                                <form method="post"
+                                      @formname="@($"cart-remove-{item.VariantId}")"
+                                      @onsubmit="() => HandleRemoveAsync(item.VariantId)"
+                                      data-enhance
+                                      data-no-nav-indicator
+                                      data-submit-indication="true"
+                                      data-pending-cursor="false"
+                                      class="group inline-flex">
+                                    <AntiforgeryToken />
+                                    <button
+                                        type="submit"
+                                        data-cart-remove
+                                        data-variant-id="@item.VariantId"
+                                        class="size-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                                        title="Remove item"
+                                        aria-label="Remove item"
+                                    >
+                                        <span class="inline-flex group-aria-busy:hidden">
+                                            <Icon Name="trash" Class="size-4" />
+                                        </span>
+                                        <span class="form-submit-spinner !m-0 !size-3.5 text-red-600 hidden group-aria-busy:inline-block" hidden aria-hidden="true"></span>
+                                    </button>
+                                </form>
                             </div>
                         </article>
                     }
@@ -184,16 +221,57 @@
     private HttpContext? HttpContext { get; set; }
 
     private CartDto cart = new(false, []);
+    private string? cartError;
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext != null)
+        await LoadCartAsync();
+    }
+
+    private async Task LoadCartAsync()
+    {
+        if (HttpContext == null) return;
+        var (token, userId) = CartEndpoints.ResolveCartIdentity(HttpContext);
+        if (token.HasValue || userId.HasValue)
         {
-            var (token, userId) = CartEndpoints.ResolveCartIdentity(HttpContext);
-            if (token.HasValue || userId.HasValue)
-            {
-                cart = await Shop.GetCartAsync(token, userId);
-            }
+            cart = await Shop.GetCartAsync(token, userId);
+        }
+        else
+        {
+            cart = new(false, []);
+        }
+    }
+
+    private async Task HandleUpdateQuantityAsync(int variantId)
+    {
+        if (HttpContext == null || variantId <= 0) return;
+        var rawQty = HttpContext.Request.Form["targetQuantity"].FirstOrDefault();
+        if (!int.TryParse(rawQty, out var qty)) return;
+        await ApplyCartChangeAsync(variantId, Math.Clamp(qty, 0, 99));
+    }
+
+    private Task HandleRemoveAsync(int variantId) =>
+        variantId > 0 ? ApplyCartChangeAsync(variantId, 0) : Task.CompletedTask;
+
+    private async Task ApplyCartChangeAsync(int variantId, int quantity)
+    {
+        if (HttpContext == null) return;
+        cartError = null;
+        var (token, userId) = CartEndpoints.EnsureCartIdentity(HttpContext);
+        var changeRes = await Shop.ChangeAsync(token, userId, new CartLineRequest(variantId, quantity), add: false);
+        switch (changeRes)
+        {
+            case CartDto updated:
+                if (updated.Token.HasValue && updated.Token.Value != token)
+                {
+                    CartEndpoints.SetCartCookie(HttpContext, updated.Token.Value);
+                }
+                Nav.NavigateTo("/cart");
+                break;
+            case Error err:
+                cartError = err.Message;
+                await LoadCartAsync();
+                break;
         }
     }
 }

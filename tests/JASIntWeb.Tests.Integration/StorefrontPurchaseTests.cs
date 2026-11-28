@@ -54,6 +54,50 @@ public class StorefrontPurchaseTests : JasIntegrationTestBase
         var cart = (await client.GetFromJsonAsync<CartDto>("/api/cart"))!;
         await cart.Items.Single().VariantId.Should().BeEqualTo(1);
         await cart.Items.Single().Quantity.Should().BeEqualTo(1);
+
+        var cartHtml = await client.GetStringAsync("/cart");
+        await cartHtml.Should().Contain("data-cart-qty=\"inc\"");
+        await cartHtml.Should().Contain("data-variant-id=\"1\"");
+        await cartHtml.Should().Contain("data-no-nav-indicator");
+        await cartHtml.Should().Contain("form-submit-spinner");
+        await cartHtml.Should().NotContain("Your cart is empty");
+
+        // Increment quantity via Cart page SSR stepper form handler -> PRG redirect to /cart
+        var qtyFormMatch = Regex.Matches(cartHtml, "<form\\b[\\s\\S]*?</form>")
+            .FirstOrDefault(m => m.Value.Contains("value=\"cart-qty-1\""));
+        await (qtyFormMatch is not null).Should().BeTrue();
+        var qtyFields = new Dictionary<string, string>();
+        foreach (Match input in Regex.Matches(qtyFormMatch!.Value, "<input[^>]*>"))
+        {
+            var fieldName = Regex.Match(input.Value, "name=\"([^\"]+)\"").Groups[1].Value;
+            var value = Regex.Match(input.Value, "value=\"([^\"]*)\"").Groups[1].Value;
+            if (fieldName.Length > 0) qtyFields[fieldName] = WebUtility.HtmlDecode(value);
+        }
+        qtyFields["targetQuantity"] = "2";
+        var incRes = await client.PostAsync("/cart", new FormUrlEncodedContent(qtyFields));
+        await incRes.StatusCode.Should().BeEqualTo(HttpStatusCode.Redirect);
+
+        var updatedCartHtml = await client.GetStringAsync("/cart");
+        await updatedCartHtml.Should().Contain("2 items");
+        var cartAfterInc = (await client.GetFromJsonAsync<CartDto>("/api/cart"))!;
+        await cartAfterInc.Items.Single().Quantity.Should().BeEqualTo(2);
+
+        // Remove item via Cart page SSR remove form handler -> PRG redirect to empty /cart
+        var removeFormMatch = Regex.Matches(updatedCartHtml, "<form\\b[\\s\\S]*?</form>")
+            .FirstOrDefault(m => m.Value.Contains("value=\"cart-remove-1\""));
+        await (removeFormMatch is not null).Should().BeTrue();
+        var removeFields = new Dictionary<string, string>();
+        foreach (Match input in Regex.Matches(removeFormMatch!.Value, "<input[^>]*>"))
+        {
+            var fieldName = Regex.Match(input.Value, "name=\"([^\"]+)\"").Groups[1].Value;
+            var value = Regex.Match(input.Value, "value=\"([^\"]*)\"").Groups[1].Value;
+            if (fieldName.Length > 0) removeFields[fieldName] = WebUtility.HtmlDecode(value);
+        }
+        var removeRes = await client.PostAsync("/cart", new FormUrlEncodedContent(removeFields));
+        await removeRes.StatusCode.Should().BeEqualTo(HttpStatusCode.Redirect);
+
+        var emptyCartHtml = await client.GetStringAsync("/cart");
+        await emptyCartHtml.Should().Contain("Your cart is empty");
     }
 
     [Test]
