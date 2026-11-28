@@ -127,7 +127,7 @@
 
         <!-- Buy Now Action (Component-scoped Blazor Static SSR form handler -> redirects to /cart) -->
         <div class="mt-auto pt-2 border-t border-slate-100">
-            <form method="post" @formname="@cardFormName" @onsubmit="HandleBuyNowAsync" data-enhance class="w-full">
+            <form method="post" @formname="@cardFormName" @onsubmit="HandleBuyNowAsync" data-enhance data-scroll-top class="w-full">
                 <AntiforgeryToken />
                 <input type="hidden" name="productId" value="@Product.Id" />
                 <input type="hidden" name="variantId" value="@(Product.DefaultVariantId ?? 0)" />

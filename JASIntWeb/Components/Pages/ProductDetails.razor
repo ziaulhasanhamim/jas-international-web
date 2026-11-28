@@ -369,7 +369,7 @@ else
                                 </button>
 
                                 <!-- Buy Now Button (Component SSR Form Handler -> redirects to /cart) -->
-                                <form method="post" @formname="product-buy-now" @onsubmit="HandleBuyNowAsync" data-enhance data-qty-sync="#product-qty-input" class="flex-1">
+                                <form method="post" @formname="product-buy-now" @onsubmit="HandleBuyNowAsync" data-enhance data-scroll-top data-qty-sync="#product-qty-input" class="flex-1">
                                     <AntiforgeryToken />
                                     <input type="hidden" name="variantId" value="@selected.Id" />
                                     <input type="hidden" name="quantity" value="1" />
@@ -637,7 +637,7 @@ else
                                 class="btn-secondary !py-2 !px-3 text-xs font-bold cursor-pointer">
                             Add
                         </button>
-                        <form method="post" @formname="product-buy-now-sticky" @onsubmit="HandleStickyBuyNowAsync" data-enhance class="inline-block">
+                        <form method="post" @formname="product-buy-now-sticky" @onsubmit="HandleStickyBuyNowAsync" data-enhance data-scroll-top class="inline-block">
                             <AntiforgeryToken />
                             <input type="hidden" name="variantId" value="@selected.Id" />
                             <button type="submit"

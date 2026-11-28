@@ -27,6 +27,7 @@ public class StorefrontPurchaseTests : JasIntegrationTestBase
         var html = await client.GetStringAsync("/products");
         var card = Regex.Matches(html, "<article\\b[\\s\\S]*?</article>").Single(match => match.Value.Contains("data-wishlist-toggle=\"1\"")).Value;
         await card.Contains("data-buy-now").Should().BeTrue();
+        await card.Contains("data-scroll-top").Should().BeTrue();
         await card.Contains("data-variant-id=\"1\"").Should().BeTrue();
         await card.Contains("Choose options").Should().BeFalse();
         await card.Contains("action=\"/cart/buy-now\"").Should().BeFalse();

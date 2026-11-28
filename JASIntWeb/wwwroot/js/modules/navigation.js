@@ -5,6 +5,7 @@
  */
 
 let pendingForm = null;
+let scrollTopFromPath = null;
 let progress = 0;
 let isActive = false;
 let tickTimer = null;
@@ -117,6 +118,28 @@ export function finishNavigation() {
     stopTimers();
     restorePendingForm();
 
+    if (scrollTopFromPath !== null) {
+        const fromPath = scrollTopFromPath;
+        scrollTopFromPath = null;
+
+        if (window.location?.pathname !== fromPath) {
+            let hashId = '';
+            if (window.location?.hash) {
+                try {
+                    hashId = decodeURIComponent(window.location.hash.slice(1));
+                } catch {
+                    hashId = window.location.hash.slice(1);
+                }
+            }
+            const target = hashId ? document.getElementById(hashId) : null;
+            if (target && typeof target.scrollIntoView === 'function') {
+                target.scrollIntoView({ behavior: 'instant' });
+            } else if (!window.location?.hash && typeof window.scrollTo === 'function') {
+                window.scrollTo({ top: 0, behavior: 'instant' });
+            }
+        }
+    }
+
     const wasActive = isActive;
     isActive = false;
     progress = 1;
@@ -147,8 +170,17 @@ export function finishNavigation() {
 }
 
 function handleFormSubmit(event) {
+    if (event.defaultPrevented) return;
     const form = event.target;
-    if (!(form instanceof HTMLFormElement) || form.dataset.submitIndication !== 'true') return;
+    const isFormElement = (typeof HTMLFormElement !== 'undefined' && form instanceof HTMLFormElement) || form?.tagName === 'FORM';
+    if (!isFormElement) return;
+
+    const isScrollTopForm = typeof form.matches === 'function'
+        ? form.matches('form[data-scroll-top]')
+        : Boolean(form.hasAttribute?.('data-scroll-top'));
+    scrollTopFromPath = isScrollTopForm ? (window.location?.pathname ?? '') : null;
+
+    if (form.dataset?.submitIndication !== 'true') return;
 
     const button = event.submitter instanceof HTMLButtonElement
         ? event.submitter
